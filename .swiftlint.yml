@@ -7,6 +7,9 @@ included:
 excluded:
   - Packages/KeepoCore/.build
   - .build
+  # supabase gen types output — regenerated after every migration, not
+  # hand-written, and its shape is dictated by the schema, not style rules.
+  - Packages/KeepoCore/Sources/KeepoCore/Generated
 
 opt_in_rules:
   - empty_count

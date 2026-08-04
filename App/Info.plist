@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged with the auto-generated Info.plist (GENERATE_INFOPLIST_FILE=YES
+	     stays on for CFBundleDisplayName/UILaunchScreen/etc via INFOPLIST_KEY_*
+	     in project.yml). $(VAR) here is substituted from build settings during
+	     the Process Info.plist phase — the standard mechanism for surfacing
+	     xcconfig values to Swift via Bundle.main, since INFOPLIST_KEY_* only
+	     recognizes well-known Apple plist keys, not arbitrary custom ones. -->
+	<key>SupabaseURL</key>
+	<string>$(SUPABASE_URL)</string>
+	<key>SupabaseAnonKey</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
+</dict>
+</plist>

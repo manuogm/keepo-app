@@ -37,6 +37,12 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_CFBundleDisplayName: Keepo
+        # App/Info.plist is a partial plist merged into the auto-generated
+        # one — INFOPLIST_KEY_* only recognizes well-known Apple keys, so
+        # arbitrary custom keys (SupabaseURL/SupabaseAnonKey) go here instead,
+        # $(VAR)-substituted from the xcconfig-injected build settings during
+        # Process Info.plist. See Config/Debug.xcconfig.example.
+        INFOPLIST_FILE: App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: App/Keepo.entitlements
         MARKETING_VERSION: "0.1.0"

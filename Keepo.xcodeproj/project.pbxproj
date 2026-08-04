@@ -13,6 +13,9 @@
 		6D136EF3E95EB5BD256F22C7 /* KeepoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA14030637CFFD08A547224 /* KeepoUITests.swift */; };
 		826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */; };
 		85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A520844CB1127366801CB8 /* KeepoCore */; };
+		A5FFBD48BD9FE9D8281754EE /* AccountsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A0D5880530458F27A93E14 /* AccountsListView.swift */; };
+		D870CF193CABA5CA3A2B649C /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */; };
+		D9287EC318089E6B6250F08D /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE77801FEDF30EF5EC63D7C9 /* SessionStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,10 +36,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		02A0D5880530458F27A93E14 /* AccountsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsListView.swift; sourceTree = "<group>"; };
+		07039596342F80EA227C6AFD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		12FF29F32E42DD3CA5E20B7D /* KeepoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4BB58A8214ECD93F7BA2BFA3 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		4DC8348A94F64846D6389F14 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7742491A185D240463F3F936 /* KeepoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BA14030637CFFD08A547224 /* KeepoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoUITests.swift; sourceTree = "<group>"; };
 		884043304F66BADDBBBE1E13 /* KeepoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoApp.swift; sourceTree = "<group>"; };
@@ -45,6 +51,7 @@
 		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C91440E871E1BD48AB796B63 /* Keepo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Keepo.entitlements; sourceTree = "<group>"; };
 		D3CD02450207FB6B2E822D2F /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		EE77801FEDF30EF5EC63D7C9 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -100,9 +107,13 @@
 		BD4710062B33E10DA714C285 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				02A0D5880530458F27A93E14 /* AccountsListView.swift */,
+				07039596342F80EA227C6AFD /* Info.plist */,
 				C91440E871E1BD48AB796B63 /* Keepo.entitlements */,
 				884043304F66BADDBBBE1E13 /* KeepoApp.swift */,
+				768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */,
 				4DC8348A94F64846D6389F14 /* RootView.swift */,
+				EE77801FEDF30EF5EC63D7C9 /* SessionStore.swift */,
 				050342BA3DE341BA002FCD9C /* Resources */,
 			);
 			path = App;
@@ -262,8 +273,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A5FFBD48BD9FE9D8281754EE /* AccountsListView.swift in Sources */,
 				04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */,
+				D870CF193CABA5CA3A2B649C /* OnboardingView.swift in Sources */,
 				00A8F3AF0335A763CABB29B2 /* RootView.swift in Sources */,
+				D9287EC318089E6B6250F08D /* SessionStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -411,6 +425,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -451,6 +466,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (

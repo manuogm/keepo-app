@@ -15,7 +15,7 @@ Before starting work on a new version, **read every file in `version-logs/`** �
 ## Commands
 - Build/run: Xcode (`xcodebuild -scheme Keepo build`, or open `Keepo.xcodeproj` and Run). `Keepo.xcodeproj` is generated from `project.yml` via XcodeGen — edit `project.yml`, then run `xcodegen generate`, never hand-edit the `.xcodeproj`
 - Lint: SwiftLint — must pass before PR/release
-- `XCTest` — pure logic (money, dates, FX, validation) lives in the `KeepoCore` Swift package and is unit tested in `Packages/KeepoCore/Tests/KeepoCoreTests`, run via `swift test` or as part of the `Keepo` scheme. App-target-specific logic is tested in `KeepoTests`
+- `Swift Testing` (`@Suite`/`@Test`/`#expect`, not `XCTest`) — pure logic (money, dates, FX, validation) lives in the `KeepoCore` Swift package and is unit tested in `Packages/KeepoCore/Tests/KeepoCoreTests`, run via `swift test` or as part of the `Keepo` scheme. App-target-specific logic is tested in `KeepoTests`
 - `XCUITest` — UI flows in `KeepoUITests`
 - `supabase start` / `db reset` / `db push`
 - `supabase gen types swift` — regenerate types after **every** migration
