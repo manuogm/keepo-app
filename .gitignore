@@ -20,9 +20,9 @@ xcuserdata/
 # Secrets / config
 .env
 .env.*
+# *.xcconfig.example files are intentionally tracked — this pattern only
+# matches names ending in .xcconfig, never .xcconfig.example.
 *.xcconfig
-!Debug.xcconfig.example
-!Release.xcconfig.example
 
 # Supabase
 supabase/.temp/

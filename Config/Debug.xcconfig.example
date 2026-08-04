@@ -1,0 +1,5 @@
+// Copy this file to Debug.xcconfig (gitignored) and fill in real values.
+// Never commit Debug.xcconfig — see CLAUDE.md Code Style.
+
+SUPABASE_URL = https:/$()/your-project.supabase.co
+SUPABASE_ANON_KEY = your-anon-key-here

@@ -1,0 +1,575 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00A8F3AF0335A763CABB29B2 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC8348A94F64846D6389F14 /* RootView.swift */; };
+		04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 884043304F66BADDBBBE1E13 /* KeepoApp.swift */; };
+		4C27DB33415AF4D03D91EEE8 /* KeepoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */; };
+		6D136EF3E95EB5BD256F22C7 /* KeepoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA14030637CFFD08A547224 /* KeepoUITests.swift */; };
+		826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */; };
+		85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A520844CB1127366801CB8 /* KeepoCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		0AE63279D9A5001A558D6502 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 80DD05CAC2B13911A7A230B6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6EFE059FF7E365DABE8FEEA5;
+			remoteInfo = Keepo;
+		};
+		2671B183AD3C01758DC586CC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 80DD05CAC2B13911A7A230B6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6EFE059FF7E365DABE8FEEA5;
+			remoteInfo = Keepo;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		12FF29F32E42DD3CA5E20B7D /* KeepoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4BB58A8214ECD93F7BA2BFA3 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		4DC8348A94F64846D6389F14 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		7742491A185D240463F3F936 /* KeepoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7BA14030637CFFD08A547224 /* KeepoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoUITests.swift; sourceTree = "<group>"; };
+		884043304F66BADDBBBE1E13 /* KeepoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoApp.swift; sourceTree = "<group>"; };
+		8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoTests.swift; sourceTree = "<group>"; };
+		A6EC2DB7E832362CEA7CCF77 /* KeepoCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = KeepoCore; path = Packages/KeepoCore; sourceTree = SOURCE_ROOT; };
+		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C91440E871E1BD48AB796B63 /* Keepo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Keepo.entitlements; sourceTree = "<group>"; };
+		D3CD02450207FB6B2E822D2F /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		16966E2B9180C023A82A77EE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		050342BA3DE341BA002FCD9C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		2670CD850D9FC00353F46CCC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C0F66735C03B655438EA8251 /* Keepo.app */,
+				12FF29F32E42DD3CA5E20B7D /* KeepoTests.xctest */,
+				7742491A185D240463F3F936 /* KeepoUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7EFAF88579B01776BD0774BC = {
+			isa = PBXGroup;
+			children = (
+				BD4710062B33E10DA714C285 /* App */,
+				C15A51F048C5BDDACE390967 /* Config */,
+				D8B056B5D3C0D609BDC3AAFD /* KeepoTests */,
+				E26873A1AF4AA309CFC73D22 /* KeepoUITests */,
+				9E64A59616CDFD44028A30D8 /* Packages */,
+				2670CD850D9FC00353F46CCC /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9E64A59616CDFD44028A30D8 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				A6EC2DB7E832362CEA7CCF77 /* KeepoCore */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		BD4710062B33E10DA714C285 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				C91440E871E1BD48AB796B63 /* Keepo.entitlements */,
+				884043304F66BADDBBBE1E13 /* KeepoApp.swift */,
+				4DC8348A94F64846D6389F14 /* RootView.swift */,
+				050342BA3DE341BA002FCD9C /* Resources */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		C15A51F048C5BDDACE390967 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				4BB58A8214ECD93F7BA2BFA3 /* Debug.xcconfig */,
+				D3CD02450207FB6B2E822D2F /* Release.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		D8B056B5D3C0D609BDC3AAFD /* KeepoTests */ = {
+			isa = PBXGroup;
+			children = (
+				8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */,
+			);
+			path = KeepoTests;
+			sourceTree = "<group>";
+		};
+		E26873A1AF4AA309CFC73D22 /* KeepoUITests */ = {
+			isa = PBXGroup;
+			children = (
+				7BA14030637CFFD08A547224 /* KeepoUITests.swift */,
+			);
+			path = KeepoUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		443717CB9EC5A40624C60410 /* KeepoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C516736D0445EA288479C3D1 /* Build configuration list for PBXNativeTarget "KeepoTests" */;
+			buildPhases = (
+				23487B15A74D14809E82364C /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4995BBC0840D97D61E961128 /* PBXTargetDependency */,
+			);
+			name = KeepoTests;
+			packageProductDependencies = (
+			);
+			productName = KeepoTests;
+			productReference = 12FF29F32E42DD3CA5E20B7D /* KeepoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		6A3D50B479C3A68CBDA12352 /* KeepoUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3C667AB24BFF3B1F2F28D042 /* Build configuration list for PBXNativeTarget "KeepoUITests" */;
+			buildPhases = (
+				5BEA6075711862C5F7B3D0A5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6A509BB3641B6FE544F82F9E /* PBXTargetDependency */,
+			);
+			name = KeepoUITests;
+			packageProductDependencies = (
+			);
+			productName = KeepoUITests;
+			productReference = 7742491A185D240463F3F936 /* KeepoUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		6EFE059FF7E365DABE8FEEA5 /* Keepo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 14F329C12BE11BC28BAE3CDA /* Build configuration list for PBXNativeTarget "Keepo" */;
+			buildPhases = (
+				CFF6091A58775FDB94B577E8 /* Sources */,
+				AAFDF4C8A40033B8388F8833 /* Resources */,
+				16966E2B9180C023A82A77EE /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Keepo;
+			packageProductDependencies = (
+				55A520844CB1127366801CB8 /* KeepoCore */,
+			);
+			productName = Keepo;
+			productReference = C0F66735C03B655438EA8251 /* Keepo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		80DD05CAC2B13911A7A230B6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					6A3D50B479C3A68CBDA12352 = {
+						TestTargetID = 6EFE059FF7E365DABE8FEEA5;
+					};
+				};
+			};
+			buildConfigurationList = AA573AD0EC89FF67D5981DE8 /* Build configuration list for PBXProject "Keepo" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7EFAF88579B01776BD0774BC;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				ADEF292666A264221272220B /* XCLocalSwiftPackageReference "Packages/KeepoCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2670CD850D9FC00353F46CCC /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6EFE059FF7E365DABE8FEEA5 /* Keepo */,
+				443717CB9EC5A40624C60410 /* KeepoTests */,
+				6A3D50B479C3A68CBDA12352 /* KeepoUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AAFDF4C8A40033B8388F8833 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		23487B15A74D14809E82364C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4C27DB33415AF4D03D91EEE8 /* KeepoTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5BEA6075711862C5F7B3D0A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6D136EF3E95EB5BD256F22C7 /* KeepoUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CFF6091A58775FDB94B577E8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */,
+				00A8F3AF0335A763CABB29B2 /* RootView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4995BBC0840D97D61E961128 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6EFE059FF7E365DABE8FEEA5 /* Keepo */;
+			targetProxy = 2671B183AD3C01758DC586CC /* PBXContainerItemProxy */;
+		};
+		6A509BB3641B6FE544F82F9E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6EFE059FF7E365DABE8FEEA5 /* Keepo */;
+			targetProxy = 0AE63279D9A5001A558D6502 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0C100EA4202FF6CF2EBF2FA1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		2488C221E8BD5E1EA35CD134 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		625C9BA0D441A36552A73E2C /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D3CD02450207FB6B2E822D2F /* Release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.manuogm.keepo;
+				PRODUCT_NAME = Keepo;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		6BE6EFDF08158F9F92FBBB0F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.manuogm.KeepoUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Keepo;
+			};
+			name = Debug;
+		};
+		7E2A4718570DBCDD443A894F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4BB58A8214ECD93F7BA2BFA3 /* Debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.manuogm.keepo;
+				PRODUCT_NAME = Keepo;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B514AE30B48CC5159D5591DB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.manuogm.KeepoUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Keepo;
+			};
+			name = Release;
+		};
+		B9ADF78398B060BE1BDF47ED /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.manuogm.KeepoTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Keepo.app/Keepo";
+			};
+			name = Debug;
+		};
+		FE9D5933A6D34AED97928E27 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.manuogm.KeepoTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Keepo.app/Keepo";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		14F329C12BE11BC28BAE3CDA /* Build configuration list for PBXNativeTarget "Keepo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7E2A4718570DBCDD443A894F /* Debug */,
+				625C9BA0D441A36552A73E2C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3C667AB24BFF3B1F2F28D042 /* Build configuration list for PBXNativeTarget "KeepoUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6BE6EFDF08158F9F92FBBB0F /* Debug */,
+				B514AE30B48CC5159D5591DB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AA573AD0EC89FF67D5981DE8 /* Build configuration list for PBXProject "Keepo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C100EA4202FF6CF2EBF2FA1 /* Debug */,
+				2488C221E8BD5E1EA35CD134 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C516736D0445EA288479C3D1 /* Build configuration list for PBXNativeTarget "KeepoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B9ADF78398B060BE1BDF47ED /* Debug */,
+				FE9D5933A6D34AED97928E27 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		ADEF292666A264221272220B /* XCLocalSwiftPackageReference "Packages/KeepoCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/KeepoCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		55A520844CB1127366801CB8 /* KeepoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KeepoCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 80DD05CAC2B13911A7A230B6 /* Project object */;
+}

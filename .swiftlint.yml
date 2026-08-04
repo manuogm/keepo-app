@@ -1,0 +1,18 @@
+included:
+  - App
+  - Packages/KeepoCore/Sources
+  - KeepoTests
+  - KeepoUITests
+
+excluded:
+  - Packages/KeepoCore/.build
+  - .build
+
+opt_in_rules:
+  - empty_count
+  - force_unwrapping
+  - redundant_type_annotation
+
+line_length:
+  warning: 120
+  error: 160

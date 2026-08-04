@@ -1,0 +1,5 @@
+// Copy this file to Release.xcconfig (gitignored) and fill in real values.
+// Never commit Release.xcconfig — see CLAUDE.md Code Style.
+
+SUPABASE_URL = https:/$()/your-project.supabase.co
+SUPABASE_ANON_KEY = your-anon-key-here
