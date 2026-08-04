@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Claude Code local state
+.claude/
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Secrets / config
+.env
+.env.*
+*.xcconfig
+!Debug.xcconfig.example
+!Release.xcconfig.example
+
+# Supabase
+supabase/.temp/
+supabase/.branches/
