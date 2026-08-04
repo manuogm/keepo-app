@@ -13,9 +13,9 @@ Fill it in as the architecture solidifies, don't duplicate here.
 Before starting work on a new version, **read every file in `version-logs/`** — all `*-log.md` and `lessons-learned.md` files, across all past versions. They contain prior implementation summaries, open items carried forward, and hard-won lessons (environment quirks, framework gotchas, footguns already hit). Do not repeat mistakes documented there. When you finish a version, add/update its log and lessons file in that same folder, concise and written for the next agent, not a human.
 
 ## Commands
-- Build/run: Xcode (`xcodebuild -scheme Keepo build`, or open the project and Run) — adjust scheme/target names once the project is scaffolded
+- Build/run: Xcode (`xcodebuild -scheme Keepo build`, or open `Keepo.xcodeproj` and Run). `Keepo.xcodeproj` is generated from `project.yml` via XcodeGen — edit `project.yml`, then run `xcodegen generate`, never hand-edit the `.xcodeproj`
 - Lint: SwiftLint — must pass before PR/release
-- `XCTest` — pure logic (money, dates, FX, validation) unit tested in `KeepoTests`
+- `XCTest` — pure logic (money, dates, FX, validation) lives in the `KeepoCore` Swift package and is unit tested in `Packages/KeepoCore/Tests/KeepoCoreTests`, run via `swift test` or as part of the `Keepo` scheme. App-target-specific logic is tested in `KeepoTests`
 - `XCUITest` — UI flows in `KeepoUITests`
 - `supabase start` / `db reset` / `db push`
 - `supabase gen types swift` — regenerate types after **every** migration
