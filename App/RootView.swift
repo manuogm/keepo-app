@@ -16,9 +16,23 @@ struct RootView: View {
                     Task { try? await session.refreshProfile() }
                 }
             case .ready:
-                NavigationStack {
-                    AccountsListView(session: session)
+                TabView {
+                    NavigationStack {
+                        AccountsListView(session: session)
+                    }
+                    .tabItem { Label("Accounts", systemImage: "creditcard") }
+
+                    NavigationStack {
+                        TransactionsListView(session: session)
+                    }
+                    .tabItem { Label("Transactions", systemImage: "list.bullet") }
+
+                    NavigationStack {
+                        CategoriesView(session: session)
+                    }
+                    .tabItem { Label("Categories", systemImage: "tag") }
                 }
+                .tint(Color("BrandPrimary"))
             case .failed(let message):
                 errorView(message)
             }

@@ -137,3 +137,163 @@ private struct NewSnapshotRow: Encodable {
         case createdBy = "created_by"
     }
 }
+
+public enum CategoryRepository {
+    public static func fetchAll(client: SupabaseClient) async throws -> [PublicSchema.CategoriesSelect] {
+        try await client.from("categories").select().order("kind").order("name").execute().value
+    }
+
+    @discardableResult
+    public static func create(
+        client: SupabaseClient,
+        ownerId: UUID,
+        kind: PublicSchema.CategoryKind,
+        name: String
+    ) async throws -> UUID {
+        let id = UUID()
+        let row = NewCategoryRow(id: id, ownerId: ownerId, kind: kind, name: name)
+        try await client.from("categories").insert(row).execute()
+        return id
+    }
+
+    public static func rename(client: SupabaseClient, categoryId: UUID, name: String) async throws {
+        try await client.from("categories").update(NamePatch(name: name)).eq("id", value: categoryId).execute()
+    }
+
+    /// Rejected by the DB (prevent_default_category_deletion trigger, not
+    /// just a hidden UI affordance) if this is one of the two default
+    /// "Other" categories.
+    public static func softDelete(client: SupabaseClient, categoryId: UUID) async throws {
+        try await client.from("categories")
+            .update(DeletedAtPatch(deletedAt: ISO8601DateFormatter().string(from: Date())))
+            .eq("id", value: categoryId)
+            .execute()
+    }
+}
+
+private struct NewCategoryRow: Encodable {
+    let id: UUID
+    let ownerId: UUID
+    let kind: PublicSchema.CategoryKind
+    let name: String
+    enum CodingKeys: String, CodingKey {
+        case id, kind, name
+        case ownerId = "owner_id"
+    }
+}
+
+private struct NamePatch: Encodable {
+    let name: String
+}
+
+private struct DeletedAtPatch: Encodable {
+    let deletedAt: String
+    enum CodingKeys: String, CodingKey {
+        case deletedAt = "deleted_at"
+    }
+}
+
+public enum TransactionRepository {
+    public static func fetchAll(client: SupabaseClient) async throws -> [PublicSchema.TransactionsWithDetailsSelect] {
+        try await client.from("transactions_with_details")
+            .select()
+            .order("occurred_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    /// Expense or income — a plain insert. The DB's sign_matches_category_kind
+    /// CHECK makes a wrong sign impossible; nothing here re-signs the amount
+    /// (money rule: never re-sign in application code). `amount` must
+    /// already carry the correct sign for the category's kind.
+    ///
+    /// Six named, self-explanatory parameters describing one transaction —
+    /// same reasoning as AccountRepository.create above.
+    @discardableResult
+    // swiftlint:disable:next function_parameter_count
+    public static func create(
+        client: SupabaseClient,
+        ownerId: UUID,
+        accountId: UUID,
+        categoryId: UUID,
+        amount: Decimal,
+        currency: String,
+        occurredAt: Date = Date()
+    ) async throws -> UUID {
+        let id = UUID()
+        let row = NewTransactionRow(
+            id: id,
+            ownerId: ownerId,
+            createdBy: ownerId,
+            accountId: accountId,
+            categoryId: categoryId,
+            amount: amount,
+            currency: currency,
+            occurredAt: ISO8601DateFormatter().string(from: occurredAt)
+        )
+        try await client.from("transactions").insert(row).execute()
+        return id
+    }
+
+    /// The only transaction kind with an RPC — both legs, signed in SQL, in
+    /// one call. `toAmount` is `nil` for a same-currency transfer (the DB
+    /// infers it equals `fromAmount`); required when currencies differ.
+    public static func createTransfer(
+        client: SupabaseClient,
+        fromAccountId: UUID,
+        toAccountId: UUID,
+        fromAmount: Decimal,
+        toAmount: Decimal? = nil,
+        occurredAt: Date = Date()
+    ) async throws {
+        let params = CreateTransferParams(
+            fromAccountId: fromAccountId,
+            toAccountId: toAccountId,
+            fromAmount: fromAmount,
+            toAmount: toAmount,
+            occurredAt: ISO8601DateFormatter().string(from: occurredAt)
+        )
+        try await client.rpc("create_transfer", params: params).execute()
+    }
+
+    public static func softDelete(client: SupabaseClient, transactionId: UUID) async throws {
+        try await client.from("transactions")
+            .update(DeletedAtPatch(deletedAt: ISO8601DateFormatter().string(from: Date())))
+            .eq("id", value: transactionId)
+            .execute()
+    }
+}
+
+private struct NewTransactionRow: Encodable {
+    let id: UUID
+    let ownerId: UUID
+    let createdBy: UUID
+    let accountId: UUID
+    let categoryId: UUID
+    let amount: Decimal
+    let currency: String
+    let occurredAt: String
+    enum CodingKeys: String, CodingKey {
+        case id, amount, currency
+        case ownerId = "owner_id"
+        case createdBy = "created_by"
+        case accountId = "account_id"
+        case categoryId = "category_id"
+        case occurredAt = "occurred_at"
+    }
+}
+
+private struct CreateTransferParams: Encodable {
+    let fromAccountId: UUID
+    let toAccountId: UUID
+    let fromAmount: Decimal
+    let toAmount: Decimal?
+    let occurredAt: String
+    enum CodingKeys: String, CodingKey {
+        case fromAccountId = "p_from_account_id"
+        case toAccountId = "p_to_account_id"
+        case fromAmount = "p_from_amount"
+        case toAmount = "p_to_amount"
+        case occurredAt = "p_occurred_at"
+    }
+}

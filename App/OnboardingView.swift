@@ -120,7 +120,7 @@ struct OnboardingView: View {
     }
 
     private func createFirstAccount() async {
-        guard let userId = session.profile?.id, let openingBalance = Decimal(string: openingBalanceText) else {
+        guard let userId = session.profile?.id, let openingBalance = AmountParser.parse(openingBalanceText) else {
             errorMessage = "Enter a valid opening balance."
             return
         }

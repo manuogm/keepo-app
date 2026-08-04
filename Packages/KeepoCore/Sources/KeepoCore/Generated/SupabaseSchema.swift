@@ -15,6 +15,21 @@ public enum PublicSchema {
     case loan = "loan"
     case investment = "investment"
   }
+  public enum CategoryKind: String, Codable, Hashable, Sendable {
+    case expense = "expense"
+    case income = "income"
+  }
+  public enum TransactionSource: String, Codable, Hashable, Sendable {
+    case manual = "manual"
+    case capture = "capture"
+    case recurring = "recurring"
+    case adjustment = "adjustment"
+    case csvImport = "csv_import"
+  }
+  public enum TransactionStatus: String, Codable, Hashable, Sendable {
+    case pending = "pending"
+    case confirmed = "confirmed"
+  }
   public struct AccountsSelect: Codable, Hashable, Sendable {
     public let archivedAt: String?
     public let countsTowardFi: Bool
@@ -177,6 +192,72 @@ public enum PublicSchema {
       case value = "value"
     }
   }
+  public struct CategoriesSelect: Codable, Hashable, Sendable {
+    public let createdAt: String
+    public let deletedAt: String?
+    public let id: UUID
+    public let isDefault: Bool
+    public let kind: CategoryKind
+    public let name: String
+    public let ownerId: UUID
+    public let updatedAt: String
+    public let version: Int32
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case id = "id"
+      case isDefault = "is_default"
+      case kind = "kind"
+      case name = "name"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct CategoriesInsert: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let deletedAt: String?
+    public let id: UUID?
+    public let isDefault: Bool?
+    public let kind: CategoryKind
+    public let name: String
+    public let ownerId: UUID
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case id = "id"
+      case isDefault = "is_default"
+      case kind = "kind"
+      case name = "name"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct CategoriesUpdate: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let deletedAt: String?
+    public let id: UUID?
+    public let isDefault: Bool?
+    public let kind: CategoryKind?
+    public let name: String?
+    public let ownerId: UUID?
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case id = "id"
+      case isDefault = "is_default"
+      case kind = "kind"
+      case name = "name"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
   public struct CurrenciesSelect: Codable, Hashable, Sendable {
     public let code: String
     public let minorUnit: Int16
@@ -243,6 +324,138 @@ public enum PublicSchema {
       case updatedAt = "updated_at"
     }
   }
+  public struct TransactionsSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let accountKind: AccountKind?
+    public let amount: Decimal
+    public let categoryId: UUID?
+    public let categoryKind: CategoryKind?
+    public let createdAt: String
+    public let createdBy: UUID
+    public let currency: String
+    public let deletedAt: String?
+    public let externalId: String?
+    public let id: UUID
+    public let merchantNormalized: String?
+    public let merchantRaw: String?
+    public let occurredAt: String
+    public let ownerId: UUID
+    public let source: TransactionSource
+    public let status: TransactionStatus
+    public let transferGroupId: UUID?
+    public let updatedAt: String
+    public let version: Int32
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case accountKind = "account_kind"
+      case amount = "amount"
+      case categoryId = "category_id"
+      case categoryKind = "category_kind"
+      case createdAt = "created_at"
+      case createdBy = "created_by"
+      case currency = "currency"
+      case deletedAt = "deleted_at"
+      case externalId = "external_id"
+      case id = "id"
+      case merchantNormalized = "merchant_normalized"
+      case merchantRaw = "merchant_raw"
+      case occurredAt = "occurred_at"
+      case ownerId = "owner_id"
+      case source = "source"
+      case status = "status"
+      case transferGroupId = "transfer_group_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct TransactionsInsert: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let accountKind: AccountKind?
+    public let amount: Decimal
+    public let categoryId: UUID?
+    public let categoryKind: CategoryKind?
+    public let createdAt: String?
+    public let createdBy: UUID
+    public let currency: String
+    public let deletedAt: String?
+    public let externalId: String?
+    public let id: UUID?
+    public let merchantNormalized: String?
+    public let merchantRaw: String?
+    public let occurredAt: String?
+    public let ownerId: UUID
+    public let source: TransactionSource?
+    public let status: TransactionStatus?
+    public let transferGroupId: UUID?
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case accountKind = "account_kind"
+      case amount = "amount"
+      case categoryId = "category_id"
+      case categoryKind = "category_kind"
+      case createdAt = "created_at"
+      case createdBy = "created_by"
+      case currency = "currency"
+      case deletedAt = "deleted_at"
+      case externalId = "external_id"
+      case id = "id"
+      case merchantNormalized = "merchant_normalized"
+      case merchantRaw = "merchant_raw"
+      case occurredAt = "occurred_at"
+      case ownerId = "owner_id"
+      case source = "source"
+      case status = "status"
+      case transferGroupId = "transfer_group_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct TransactionsUpdate: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let accountKind: AccountKind?
+    public let amount: Decimal?
+    public let categoryId: UUID?
+    public let categoryKind: CategoryKind?
+    public let createdAt: String?
+    public let createdBy: UUID?
+    public let currency: String?
+    public let deletedAt: String?
+    public let externalId: String?
+    public let id: UUID?
+    public let merchantNormalized: String?
+    public let merchantRaw: String?
+    public let occurredAt: String?
+    public let ownerId: UUID?
+    public let source: TransactionSource?
+    public let status: TransactionStatus?
+    public let transferGroupId: UUID?
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case accountKind = "account_kind"
+      case amount = "amount"
+      case categoryId = "category_id"
+      case categoryKind = "category_kind"
+      case createdAt = "created_at"
+      case createdBy = "created_by"
+      case currency = "currency"
+      case deletedAt = "deleted_at"
+      case externalId = "external_id"
+      case id = "id"
+      case merchantNormalized = "merchant_normalized"
+      case merchantRaw = "merchant_raw"
+      case occurredAt = "occurred_at"
+      case ownerId = "owner_id"
+      case source = "source"
+      case status = "status"
+      case transferGroupId = "transfer_group_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
   public struct AccountBalancesSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let balance: Decimal?
@@ -275,6 +488,44 @@ public enum PublicSchema {
       case minorUnit = "minor_unit"
       case name = "name"
       case subtype = "subtype"
+    }
+  }
+  public struct TransactionsWithDetailsSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let accountName: String?
+    public let amount: Decimal?
+    public let categoryId: UUID?
+    public let categoryName: String?
+    public let createdAt: String?
+    public let createdBy: UUID?
+    public let currency: String?
+    public let kind: String?
+    public let merchantNormalized: String?
+    public let merchantRaw: String?
+    public let minorUnit: Int16?
+    public let occurredAt: String?
+    public let source: TransactionSource?
+    public let status: TransactionStatus?
+    public let transactionId: UUID?
+    public let transferGroupId: UUID?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case accountName = "account_name"
+      case amount = "amount"
+      case categoryId = "category_id"
+      case categoryName = "category_name"
+      case createdAt = "created_at"
+      case createdBy = "created_by"
+      case currency = "currency"
+      case kind = "kind"
+      case merchantNormalized = "merchant_normalized"
+      case merchantRaw = "merchant_raw"
+      case minorUnit = "minor_unit"
+      case occurredAt = "occurred_at"
+      case source = "source"
+      case status = "status"
+      case transactionId = "transaction_id"
+      case transferGroupId = "transfer_group_id"
     }
   }
 }
