@@ -256,11 +256,86 @@ public enum TransactionRepository {
         try await client.rpc("create_transfer", params: params).execute()
     }
 
-    public static func softDelete(client: SupabaseClient, transactionId: UUID) async throws {
-        try await client.from("transactions")
-            .update(DeletedAtPatch(deletedAt: ISO8601DateFormatter().string(from: Date())))
-            .eq("id", value: transactionId)
-            .execute()
+    /// Ledger-only edit (expense/income) — a transfer's kind and legs are
+    /// locked once it exists, so a transfer goes through `updateTransfer`
+    /// instead. Version-checked: the DB returns `conflict = true` rather
+    /// than throwing when `expectedVersion` is stale (see `update_transaction`
+    /// in migration 003 — an RPC call is one statement, so a thrown
+    /// exception would also roll back its own conflict-audit row).
+    ///
+    /// Eight named, self-explanatory parameters describing one edit — same
+    /// reasoning as AccountRepository.create above.
+    @discardableResult
+    // swiftlint:disable:next function_parameter_count
+    public static func update(
+        client: SupabaseClient,
+        id: UUID,
+        expectedVersion: Int,
+        accountId: UUID,
+        categoryId: UUID,
+        amount: Decimal,
+        currency: String,
+        occurredAt: Date = Date(),
+        merchantRaw: String?
+    ) async throws -> WriteResult {
+        let params = UpdateTransactionParams(
+            id: id,
+            expectedVersion: expectedVersion,
+            accountId: accountId,
+            categoryId: categoryId,
+            amount: amount,
+            currency: currency,
+            occurredAt: ISO8601DateFormatter().string(from: occurredAt),
+            merchantRaw: merchantRaw
+        )
+        let rows: [ConflictRow] = try await client.rpc("update_transaction", params: params).execute().value
+        return rows.first.map(WriteResult.init) ?? .conflict
+    }
+
+    /// Both legs' amount/date, updated atomically with each leg's own
+    /// expected version — see `update_transfer` in migration 003.
+    @discardableResult
+    // swiftlint:disable:next function_parameter_count
+    public static func updateTransfer(
+        client: SupabaseClient,
+        transferGroupId: UUID,
+        fromExpectedVersion: Int,
+        toExpectedVersion: Int,
+        fromAmount: Decimal,
+        toAmount: Decimal,
+        occurredAt: Date = Date()
+    ) async throws -> WriteResult {
+        let params = UpdateTransferParams(
+            transferGroupId: transferGroupId,
+            fromExpectedVersion: fromExpectedVersion,
+            toExpectedVersion: toExpectedVersion,
+            fromAmount: fromAmount,
+            toAmount: toAmount,
+            occurredAt: ISO8601DateFormatter().string(from: occurredAt)
+        )
+        let rows: [ConflictRow] = try await client.rpc("update_transfer", params: params).execute().value
+        return rows.first.map(WriteResult.init) ?? .conflict
+    }
+
+    public static func delete(client: SupabaseClient, id: UUID, expectedVersion: Int) async throws -> Bool {
+        let params = DeleteTransactionParams(id: id, expectedVersion: expectedVersion)
+        let rows: [ConflictFlag] = try await client.rpc("delete_transaction", params: params).execute().value
+        return !(rows.first?.conflict ?? true)
+    }
+
+    public static func deleteTransfer(
+        client: SupabaseClient,
+        transferGroupId: UUID,
+        fromExpectedVersion: Int,
+        toExpectedVersion: Int
+    ) async throws -> Bool {
+        let params = DeleteTransferParams(
+            transferGroupId: transferGroupId,
+            fromExpectedVersion: fromExpectedVersion,
+            toExpectedVersion: toExpectedVersion
+        )
+        let rows: [ConflictFlag] = try await client.rpc("delete_transfer", params: params).execute().value
+        return !(rows.first?.conflict ?? true)
     }
 }
 

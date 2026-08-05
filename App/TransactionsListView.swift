@@ -8,6 +8,8 @@ struct TransactionsListView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAddingTransaction = false
+    @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
+    @State private var showConflictAlert = false
 
     var body: some View {
         ZStack {
@@ -22,6 +24,8 @@ struct TransactionsListView: View {
                 List {
                     ForEach(transactions, id: \.transactionId) { transaction in
                         TransactionRow(transaction: transaction)
+                            .contentShape(Rectangle())
+                            .onTapGesture { editingTransaction = transaction }
                     }
                     .onDelete { offsets in
                         Task { await delete(at: offsets) }
@@ -55,7 +59,24 @@ struct TransactionsListView: View {
                 Task { await load() }
             }
         }
+        .sheet(item: $editingTransaction) { transaction in
+            TransactionFormView(session: session, mode: .edit(transaction, sibling: sibling(of: transaction))) {
+                Task { await load() }
+            }
+        }
+        .alert("This transaction changed elsewhere", isPresented: $showConflictAlert) {
+            Button("OK") {}
+        } message: {
+            Text("The list has been refreshed with the latest version.")
+        }
         .task { await load() }
+    }
+
+    private func sibling(
+        of transaction: PublicSchema.TransactionsWithDetailsSelect
+    ) -> PublicSchema.TransactionsWithDetailsSelect? {
+        guard let groupId = transaction.transferGroupId else { return nil }
+        return transactions.first { $0.transferGroupId == groupId && $0.transactionId != transaction.transactionId }
     }
 
     private func load() async {
@@ -68,16 +89,36 @@ struct TransactionsListView: View {
     }
 
     private func delete(at offsets: IndexSet) async {
+        var hadConflict = false
         for index in offsets {
-            guard let id = transactions[index].transactionId else { continue }
+            let transaction = transactions[index]
+            guard let id = transaction.transactionId, let version = transaction.version else { continue }
             do {
-                try await TransactionRepository.softDelete(client: session.client, transactionId: id)
+                let deleted: Bool
+                if let groupId = transaction.transferGroupId, let siblingVersion = sibling(of: transaction)?.version {
+                    deleted = try await TransactionRepository.deleteTransfer(
+                        client: session.client,
+                        transferGroupId: groupId,
+                        fromExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(version) : Int(siblingVersion),
+                        toExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(siblingVersion) : Int(version)
+                    )
+                } else {
+                    deleted = try await TransactionRepository.delete(
+                        client: session.client, id: id, expectedVersion: Int(version)
+                    )
+                }
+                if !deleted { hadConflict = true }
             } catch {
                 errorMessage = String(describing: error)
             }
         }
         await load()
+        if hadConflict { showConflictAlert = true }
     }
+}
+
+extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
+    public var id: UUID { transactionId ?? UUID() }
 }
 
 private struct TransactionRow: View {

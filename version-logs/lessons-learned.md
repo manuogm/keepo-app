@@ -1,0 +1,30 @@
+# Lessons Learned — read before starting a new phase
+
+Consolidated from Phases 1–3. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
+
+## Process
+
+- **This directory didn't exist until Phase 3**, despite `CLAUDE.md` requiring it since Phase 1. Phase 1 and 2's logs here are reconstructed from `app-architecture.md`'s inline defect history, commit bodies, and old plan files — good enough, but written after the fact. Write the log for *this* phase before starting the next one, not retroactively.
+- `app-architecture.md` inline comments are themselves a good defect log (e.g. migration headers listing what they fix) — keep that habit; it's what made reconstruction possible at all.
+
+## Postgres / Supabase
+
+- **`SECURITY DEFINER`, not `INVOKER`, for any function that re-queries the table its own RLS policy is attached to** — `INVOKER` recurses infinitely through the policy. But `SECURITY DEFINER` self-reference has its own trap: it breaks `INSERT ... RETURNING` for a row written earlier in the *same command* (confirmed empirically, Phase 2). `accounts`' own `SELECT`/`UPDATE` policies inline `owner_id = auth.uid()` instead of calling the shared predicate, as the one accepted exception.
+- **Supabase's local cluster grants `TRUNCATE`/`REFERENCES`/`TRIGGER`/`MAINTAIN` to `anon`/`authenticated` by default** (`pg_default_acl`) — `TRUNCATE` bypasses RLS. Revoke schema-wide with `ALTER DEFAULT PRIVILEGES ... REVOKE` before the first `CREATE TABLE`.
+- **A raised exception aborts the entire enclosing transaction — including any audit-row insert that happened earlier in the same function call.** An RPC call from a client is one top-level statement. If a function needs to log something *and* signal a recoverable condition (a version conflict, say), return the signal as data (`conflict boolean`), don't raise — raising is only for genuine errors with nothing worth persisting.
+- **`SELECT (some_function(...)).*` invokes a composite-returning function once per output column**, not once. Use `SELECT * FROM some_function(...)` in the FROM clause instead — this bit SQL test-writing in Phase 3 and looked exactly like a real conflict-detection bug until isolated.
+- **`CREATE OR REPLACE VIEW` can add a column only at the end of the SELECT list**, never in the middle — "cannot change name of view column X to Y" if you try to insert one earlier.
+- **`numeric`/`timestamptz` function return types under `SET search_path = ''` need explicit `public.` qualification** — `RETURNS transactions` fails with "type does not exist"; `RETURNS public.transactions` is required, same for `DECLARE v_result transactions;` → `public.transactions`.
+- **PostgREST named-parameter RPC calls require every non-defaulted parameter to be present in the JSON body.** Swift's synthesized `Encodable` uses `encodeIfPresent` for `Optional` fields, silently omitting `nil` ones from the payload — not sending `null`. Any RPC parameter a Swift client might send as `nil` needs `default null` (or another default) on the Postgres side, or the call fails with `PGRST202` every time that field is nil. `create_transfer`'s `p_to_amount`/`p_occurred_at` already did this; `update_transaction`'s `p_merchant_raw` didn't, and broke on the very first real (non-SQL-test) call.
+- **After `supabase db reset`, PostgREST's schema cache sometimes needs an explicit nudge**: `NOTIFY pgrst, 'reload schema';` in psql. It usually reloads automatically, but don't assume it did if a freshly-added RPC comes back "could not find the function."
+- **`supabase gen types --local --lang swift` changed its default access level to `internal`** somewhere around CLI v2.100+ (this codebase was built against an older default of `public`). Pass `--swift-access-control public` explicitly every time — the codebase's whole cross-module (`KeepoCore` → `App`) design depends on it, and the failure mode (types silently `internal`) is a build error in the consuming target, not a warning.
+
+## iOS Simulator / dev loop
+
+- **`xcrun simctl uninstall` does not reliably clear Keychain items on the Simulator** — a stale cached Supabase Auth session survives app uninstall/reinstall, so testing "fresh sign-up" after a `supabase db reset` (which wipes `auth.users`) needs `xcrun simctl erase <device>` (full device erase), not just uninstall/reinstall. Symptom: `PostgrestError PGRST116 "Cannot coerce the result to a single JSON object"` on the very first profile fetch, because the cached session belongs to a user that no longer exists.
+- Simulator tap/text input can lag by a full screenshot cycle, and text fields sometimes don't show a visible cursor/keyboard even when focused and accepting input — verify by screenshotting after the *next* action, not just immediately after a tap.
+
+## Money-rule-adjacent
+
+- `merchant_raw`/`merchant_normalized` are capture-only fields (Phase 8) — the manual entry/edit form must never show them. On edit, pass the existing value through unchanged rather than exposing an edit control for it.
+- A form field that isn't shown in the UI but whose backing column has no explicit default (like `occurred_at`) will silently take `Date()` on every save unless the client explicitly threads through the original value — worth checking for on every "add editing to an existing create-only form" task, not just this one.

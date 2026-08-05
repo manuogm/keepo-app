@@ -3,13 +3,23 @@ import SwiftUI
 
 /// One component for all three transaction kinds — per CLAUDE.md's
 /// Engineering Principles, screens that handle the same concept share one
-/// implementation rather than three near-duplicates. The received-amount
-/// field appears only when the two accounts' currencies differ (spec
-/// §Transaction Entry); for a same-currency transfer it's inferred and
-/// never shown.
+/// implementation rather than three near-duplicates. Used for both create
+/// and edit (app-architecture.md §2). The received-amount field appears
+/// only when the two accounts' currencies differ (spec §Transaction Entry);
+/// for a same-currency transfer it's inferred and never shown.
 struct TransactionFormView: View {
     let session: SessionStore
+    /// `.create` for a new transaction; `.edit` pre-fills every field from
+    /// an existing row (plus its sibling leg, for a transfer) and locks the
+    /// kind — changing kind is delete-and-recreate, never an in-place edit
+    /// (app-architecture.md §2).
+    var mode: Mode = .create
     var onSaved: () -> Void
+
+    enum Mode {
+        case create
+        case edit(PublicSchema.TransactionsWithDetailsSelect, sibling: PublicSchema.TransactionsWithDetailsSelect?)
+    }
 
     private enum Kind: String, CaseIterable {
         case expense = "Expense"
@@ -26,12 +36,28 @@ struct TransactionFormView: View {
     @State private var selectedAccountId: UUID?
     @State private var selectedCategoryId: UUID?
     @State private var amountText = ""
+    @State private var occurredAt = Date()
+    @State private var merchantRaw: String?
 
     @State private var selectedToAccountId: UUID?
     @State private var receivedAmountText = ""
 
+    // Populated in edit mode: the version(s) the save call sends back so the
+    // DB can detect a lost update. A transfer needs both legs' versions and
+    // their shared transfer_group_id.
+    @State private var editingId: UUID?
+    @State private var editingFromVersion: Int?
+    @State private var editingToVersion: Int?
+    @State private var editingTransferGroupId: UUID?
+
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var showConflictAlert = false
+
+    private var isEditing: Bool {
+        if case .edit = mode { return true }
+        return false
+    }
 
     private var fromAccount: PublicSchema.AccountsWithBalancesSelect? {
         accounts.first { $0.accountId == selectedAccountId }
@@ -58,6 +84,7 @@ struct TransactionFormView: View {
                     ForEach(Kind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .disabled(isEditing)
 
                 Section(kind == .transfer ? "From" : "Account") {
                     accountPicker(selection: $selectedAccountId, excluding: nil)
@@ -90,13 +117,18 @@ struct TransactionFormView: View {
                     }
                 }
 
+                Section("Date") {
+                    DatePicker("Date", selection: $occurredAt, displayedComponents: [.date])
+                        .labelsHidden()
+                }
+
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
                         .foregroundStyle(.red)
                 }
             }
-            .navigationTitle("New \(kind.rawValue)")
+            .navigationTitle(isEditing ? "Edit \(kind.rawValue)" : "New \(kind.rawValue)")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -107,6 +139,11 @@ struct TransactionFormView: View {
                     }
                     .disabled(isSaveDisabled)
                 }
+            }
+            .alert("This transaction changed elsewhere", isPresented: $showConflictAlert) {
+                Button("OK") {}
+            } message: {
+                Text("Showing the latest version — review it and save again.")
             }
         }
         .task { await load() }
@@ -137,11 +174,66 @@ struct TransactionFormView: View {
         async let categoriesResult = CategoryRepository.fetchAll(client: session.client)
         accounts = (try? await accountsResult) ?? []
         categories = (try? await categoriesResult) ?? []
+
+        if case .edit(let transaction, let sibling) = mode {
+            apply(transaction: transaction, sibling: sibling)
+        }
     }
 
-    private func save() async {
+    /// Shared by the initial edit-mode prefill and by a post-conflict
+    /// reload — both are "populate the form from a server row."
+    private func apply(
+        transaction: PublicSchema.TransactionsWithDetailsSelect,
+        sibling: PublicSchema.TransactionsWithDetailsSelect?
+    ) {
+        kind = {
+            switch transaction.kind {
+            case "income": return .income
+            case "transfer": return .transfer
+            default: return .expense
+            }
+        }()
+
+        if let occurredAtString = transaction.occurredAt,
+           let date = ISO8601DateFormatter().date(from: occurredAtString) {
+            occurredAt = date
+        }
+
+        switch kind {
+        case .expense, .income:
+            editingId = transaction.transactionId
+            editingFromVersion = transaction.version.map(Int.init)
+            selectedAccountId = transaction.accountId
+            selectedCategoryId = transaction.categoryId
+            merchantRaw = transaction.merchantRaw
+            if let amount = transaction.amount {
+                amountText = "\(abs(amount))"
+            }
+        case .transfer:
+            let legs = [transaction, sibling].compactMap { $0 }
+            guard
+                let from = legs.first(where: { ($0.amount ?? 0) < 0 }),
+                let destination = legs.first(where: { ($0.amount ?? 0) > 0 })
+            else { return }
+            editingTransferGroupId = transaction.transferGroupId
+            editingFromVersion = from.version.map(Int.init)
+            editingToVersion = destination.version.map(Int.init)
+            selectedAccountId = from.accountId
+            selectedToAccountId = destination.accountId
+            if let amount = from.amount {
+                amountText = "\(abs(amount))"
+            }
+            if from.currency != destination.currency, let amount = destination.amount {
+                receivedAmountText = "\(abs(amount))"
+            }
+        }
+    }
+
+}
+
+extension TransactionFormView {
+    fileprivate func save() async {
         guard
-            let userId = session.profile?.id,
             let accountId = selectedAccountId,
             let magnitude = AmountParser.parse(amountText),
             magnitude > 0
@@ -153,22 +245,28 @@ struct TransactionFormView: View {
         isSaving = true
         errorMessage = nil
         do {
-            switch kind {
-            case .expense, .income:
-                try await saveLedgerTransaction(userId: userId, accountId: accountId, magnitude: magnitude)
-            case .transfer:
+            switch (isEditing, kind) {
+            case (false, .expense), (false, .income):
+                try await saveLedgerTransaction(accountId: accountId, magnitude: magnitude)
+            case (false, .transfer):
                 try await saveTransfer(accountId: accountId, magnitude: magnitude)
+            case (true, .expense), (true, .income):
+                try await updateLedgerTransaction(accountId: accountId, magnitude: magnitude)
+            case (true, .transfer):
+                try await updateTransfer(magnitude: magnitude)
             }
-            onSaved()
-            dismiss()
+            if !showConflictAlert {
+                onSaved()
+                dismiss()
+            }
         } catch {
             errorMessage = String(describing: error)
         }
         isSaving = false
     }
 
-    private func saveLedgerTransaction(userId: UUID, accountId: UUID, magnitude: Decimal) async throws {
-        guard let categoryId = selectedCategoryId, let account = fromAccount else {
+    fileprivate func saveLedgerTransaction(accountId: UUID, magnitude: Decimal) async throws {
+        guard let userId = session.profile?.id, let categoryId = selectedCategoryId, let account = fromAccount else {
             errorMessage = "Choose a category."
             return
         }
@@ -183,11 +281,12 @@ struct TransactionFormView: View {
             accountId: accountId,
             categoryId: categoryId,
             amount: signedAmount,
-            currency: account.currency ?? "USD"
+            currency: account.currency ?? "USD",
+            occurredAt: occurredAt
         )
     }
 
-    private func saveTransfer(accountId: UUID, magnitude: Decimal) async throws {
+    fileprivate func saveTransfer(accountId: UUID, magnitude: Decimal) async throws {
         guard let toAccountId = selectedToAccountId else {
             errorMessage = "Choose a destination account."
             return
@@ -202,7 +301,93 @@ struct TransactionFormView: View {
             fromAccountId: accountId,
             toAccountId: toAccountId,
             fromAmount: magnitude,
-            toAmount: receivedAmount
+            toAmount: receivedAmount,
+            occurredAt: occurredAt
         )
+    }
+
+    fileprivate func updateLedgerTransaction(accountId: UUID, magnitude: Decimal) async throws {
+        guard
+            let categoryId = selectedCategoryId,
+            let account = fromAccount,
+            let id = editingId,
+            let expectedVersion = editingFromVersion
+        else {
+            errorMessage = "Choose a category."
+            return
+        }
+        let signedAmount = kind == .expense ? -magnitude : magnitude
+        let result = try await TransactionRepository.update(
+            client: session.client,
+            id: id,
+            expectedVersion: expectedVersion,
+            accountId: accountId,
+            categoryId: categoryId,
+            amount: signedAmount,
+            currency: account.currency ?? "USD",
+            occurredAt: occurredAt,
+            merchantRaw: merchantRaw
+        )
+        switch result {
+        case .saved:
+            break
+        case .conflict:
+            await reloadAfterConflict()
+        }
+    }
+
+    fileprivate func updateTransfer(magnitude: Decimal) async throws {
+        guard
+            let transferGroupId = editingTransferGroupId,
+            let fromExpectedVersion = editingFromVersion,
+            let toExpectedVersion = editingToVersion
+        else {
+            errorMessage = "Missing transfer details."
+            return
+        }
+        let receivedAmount = needsReceivedAmount ? AmountParser.parse(receivedAmountText) : magnitude
+        guard let toAmount = receivedAmount, toAmount > 0 else {
+            errorMessage = "Enter a valid received amount."
+            return
+        }
+        let result = try await TransactionRepository.updateTransfer(
+            client: session.client,
+            transferGroupId: transferGroupId,
+            fromExpectedVersion: fromExpectedVersion,
+            toExpectedVersion: toExpectedVersion,
+            fromAmount: magnitude,
+            toAmount: toAmount,
+            occurredAt: occurredAt
+        )
+        switch result {
+        case .saved:
+            break
+        case .conflict:
+            await reloadAfterConflict()
+        }
+    }
+
+    /// A stale version means someone else changed this transaction since it
+    /// loaded — reload the current row from the server, repopulate the
+    /// form with it, and let the user decide whether to reapply their edit,
+    /// rather than silently discarding what they typed or clobbering the
+    /// newer data.
+    fileprivate func reloadAfterConflict() async {
+        guard let all = try? await TransactionRepository.fetchAll(client: session.client) else {
+            showConflictAlert = true
+            return
+        }
+        let groupId = editingTransferGroupId
+        let id = editingId
+        let transaction = all.first {
+            $0.transactionId == id || ($0.transferGroupId != nil && $0.transferGroupId == groupId)
+        }
+        let sibling = groupId.flatMap { group in
+            all.first { $0.transferGroupId == group && $0.transactionId != transaction?.transactionId }
+        }
+        if let transaction {
+            apply(transaction: transaction, sibling: sibling)
+        }
+        showConflictAlert = true
     }
 }

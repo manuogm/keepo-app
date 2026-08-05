@@ -324,6 +324,66 @@ public enum PublicSchema {
       case updatedAt = "updated_at"
     }
   }
+  public struct SyncConflictsSelect: Codable, Hashable, Sendable {
+    public let clientVersion: Int32
+    public let createdAt: String
+    public let id: UUID
+    public let ownerId: UUID
+    public let resolvedAt: String?
+    public let rowId: UUID
+    public let serverVersion: Int32
+    public let tableName: String
+    public enum CodingKeys: String, CodingKey {
+      case clientVersion = "client_version"
+      case createdAt = "created_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case resolvedAt = "resolved_at"
+      case rowId = "row_id"
+      case serverVersion = "server_version"
+      case tableName = "table_name"
+    }
+  }
+  public struct SyncConflictsInsert: Codable, Hashable, Sendable {
+    public let clientVersion: Int32
+    public let createdAt: String?
+    public let id: UUID?
+    public let ownerId: UUID
+    public let resolvedAt: String?
+    public let rowId: UUID
+    public let serverVersion: Int32
+    public let tableName: String
+    public enum CodingKeys: String, CodingKey {
+      case clientVersion = "client_version"
+      case createdAt = "created_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case resolvedAt = "resolved_at"
+      case rowId = "row_id"
+      case serverVersion = "server_version"
+      case tableName = "table_name"
+    }
+  }
+  public struct SyncConflictsUpdate: Codable, Hashable, Sendable {
+    public let clientVersion: Int32?
+    public let createdAt: String?
+    public let id: UUID?
+    public let ownerId: UUID?
+    public let resolvedAt: String?
+    public let rowId: UUID?
+    public let serverVersion: Int32?
+    public let tableName: String?
+    public enum CodingKeys: String, CodingKey {
+      case clientVersion = "client_version"
+      case createdAt = "created_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case resolvedAt = "resolved_at"
+      case rowId = "row_id"
+      case serverVersion = "server_version"
+      case tableName = "table_name"
+    }
+  }
   public struct TransactionsSelect: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let accountKind: AccountKind?
@@ -508,6 +568,7 @@ public enum PublicSchema {
     public let status: TransactionStatus?
     public let transactionId: UUID?
     public let transferGroupId: UUID?
+    public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case accountName = "account_name"
@@ -526,6 +587,7 @@ public enum PublicSchema {
       case status = "status"
       case transactionId = "transaction_id"
       case transferGroupId = "transfer_group_id"
+      case version = "version"
     }
   }
 }
