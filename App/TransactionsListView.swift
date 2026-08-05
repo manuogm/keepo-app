@@ -136,12 +136,21 @@ private struct TransactionRow: View {
                     .foregroundStyle(Color("TextSecondary"))
             }
             Spacer()
-            // MoneyFormatter is the one place amounts render (Engineering
-            // Principles) — the same call AccountsListView and
-            // TransactionFormView use, not a per-screen formatter.
-            Text(formattedAmount)
-                .monospacedDigit()
-                .foregroundStyle(amountColor)
+            VStack(alignment: .trailing, spacing: 2) {
+                // MoneyFormatter is the one place amounts render (Engineering
+                // Principles) — the same call AccountsListView and
+                // TransactionFormView use, not a per-screen formatter.
+                Text(formattedAmount)
+                    .monospacedDigit()
+                    .foregroundStyle(amountColor)
+                CurrencyConversionLabel(
+                    nativeCurrency: transaction.currency,
+                    amountBase: transaction.amountBase,
+                    baseCurrency: transaction.baseCurrency,
+                    baseMinorUnit: transaction.baseMinorUnit,
+                    hasMissingRate: transaction.hasMissingRate ?? false
+                )
+            }
         }
     }
 

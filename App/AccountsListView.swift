@@ -76,13 +76,22 @@ private struct AccountRow: View {
             Text(account.name ?? "—")
                 .foregroundStyle(Color("TextPrimary"))
             Spacer()
-            // Balance and currency both come from the row — MoneyFormatter is
-            // the one place amounts render, per CLAUDE.md's Engineering
-            // Principles. A nil balance (e.g. an unsnapshotted valuation
-            // account) renders as "—", never "0" (money rule 5).
-            Text(formattedBalance)
-                .monospacedDigit()
-                .foregroundStyle(Color("BrandPrimary"))
+            VStack(alignment: .trailing, spacing: 2) {
+                // Balance and currency both come from the row — MoneyFormatter
+                // is the one place amounts render, per CLAUDE.md's Engineering
+                // Principles. A nil balance (e.g. an unsnapshotted valuation
+                // account) renders as "—", never "0" (money rule 5).
+                Text(formattedBalance)
+                    .monospacedDigit()
+                    .foregroundStyle(Color("BrandPrimary"))
+                CurrencyConversionLabel(
+                    nativeCurrency: account.currency,
+                    amountBase: account.balanceBase,
+                    baseCurrency: account.baseCurrency,
+                    baseMinorUnit: account.baseMinorUnit,
+                    hasMissingRate: account.hasMissingRate ?? false
+                )
+            }
         }
     }
 

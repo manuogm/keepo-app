@@ -19,6 +19,9 @@ public enum PublicSchema {
     case expense = "expense"
     case income = "income"
   }
+  public enum FxSource: String, Codable, Hashable, Sendable {
+    case ecb = "ecb"
+  }
   public enum TransactionSource: String, Codable, Hashable, Sendable {
     case manual = "manual"
     case capture = "capture"
@@ -282,6 +285,48 @@ public enum PublicSchema {
       case minorUnit = "minor_unit"
     }
   }
+  public struct FxRatesSelect: Codable, Hashable, Sendable {
+    public let currency: String
+    public let fetchedAt: String
+    public let rateDate: String
+    public let rateToEur: Decimal
+    public let source: FxSource
+    public enum CodingKeys: String, CodingKey {
+      case currency = "currency"
+      case fetchedAt = "fetched_at"
+      case rateDate = "rate_date"
+      case rateToEur = "rate_to_eur"
+      case source = "source"
+    }
+  }
+  public struct FxRatesInsert: Codable, Hashable, Sendable {
+    public let currency: String
+    public let fetchedAt: String?
+    public let rateDate: String
+    public let rateToEur: Decimal
+    public let source: FxSource
+    public enum CodingKeys: String, CodingKey {
+      case currency = "currency"
+      case fetchedAt = "fetched_at"
+      case rateDate = "rate_date"
+      case rateToEur = "rate_to_eur"
+      case source = "source"
+    }
+  }
+  public struct FxRatesUpdate: Codable, Hashable, Sendable {
+    public let currency: String?
+    public let fetchedAt: String?
+    public let rateDate: String?
+    public let rateToEur: Decimal?
+    public let source: FxSource?
+    public enum CodingKeys: String, CodingKey {
+      case currency = "currency"
+      case fetchedAt = "fetched_at"
+      case rateDate = "rate_date"
+      case rateToEur = "rate_to_eur"
+      case source = "source"
+    }
+  }
   public struct ProfilesSelect: Codable, Hashable, Sendable {
     public let baseCurrency: String?
     public let createdAt: String
@@ -526,12 +571,34 @@ public enum PublicSchema {
       case currency = "currency"
     }
   }
+  public struct AccountBalancesBaseSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let balance: Decimal?
+    public let balanceBase: Decimal?
+    public let baseCurrency: String?
+    public let currency: String?
+    public let hasMissingRate: Bool?
+    public let ownerId: UUID?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case balance = "balance"
+      case balanceBase = "balance_base"
+      case baseCurrency = "base_currency"
+      case currency = "currency"
+      case hasMissingRate = "has_missing_rate"
+      case ownerId = "owner_id"
+    }
+  }
   public struct AccountsWithBalancesSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let archivedAt: String?
     public let balance: Decimal?
+    public let balanceBase: Decimal?
+    public let baseCurrency: String?
+    public let baseMinorUnit: Int16?
     public let countsTowardFi: Bool?
     public let currency: String?
+    public let hasMissingRate: Bool?
     public let includeInTotal: Bool?
     public let kind: AccountKind?
     public let minorUnit: Int16?
@@ -541,8 +608,12 @@ public enum PublicSchema {
       case accountId = "account_id"
       case archivedAt = "archived_at"
       case balance = "balance"
+      case balanceBase = "balance_base"
+      case baseCurrency = "base_currency"
+      case baseMinorUnit = "base_minor_unit"
       case countsTowardFi = "counts_toward_fi"
       case currency = "currency"
+      case hasMissingRate = "has_missing_rate"
       case includeInTotal = "include_in_total"
       case kind = "kind"
       case minorUnit = "minor_unit"
@@ -554,11 +625,15 @@ public enum PublicSchema {
     public let accountId: UUID?
     public let accountName: String?
     public let amount: Decimal?
+    public let amountBase: Decimal?
+    public let baseCurrency: String?
+    public let baseMinorUnit: Int16?
     public let categoryId: UUID?
     public let categoryName: String?
     public let createdAt: String?
     public let createdBy: UUID?
     public let currency: String?
+    public let hasMissingRate: Bool?
     public let kind: String?
     public let merchantNormalized: String?
     public let merchantRaw: String?
@@ -573,11 +648,15 @@ public enum PublicSchema {
       case accountId = "account_id"
       case accountName = "account_name"
       case amount = "amount"
+      case amountBase = "amount_base"
+      case baseCurrency = "base_currency"
+      case baseMinorUnit = "base_minor_unit"
       case categoryId = "category_id"
       case categoryName = "category_name"
       case createdAt = "created_at"
       case createdBy = "created_by"
       case currency = "currency"
+      case hasMissingRate = "has_missing_rate"
       case kind = "kind"
       case merchantNormalized = "merchant_normalized"
       case merchantRaw = "merchant_raw"
