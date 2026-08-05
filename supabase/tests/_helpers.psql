@@ -1,0 +1,117 @@
+-- Shared pgTAP test setup. Include via `\ir _helpers.psql` at the very top
+-- of every test file, BEFORE that file's own BEGIN — everything here runs
+-- at top level (auto-committed), so the extension and the two fixture users
+-- are created once and persist across every file in one `supabase test db`
+-- run. Each test file's own BEGIN...ROLLBACK still wraps everything IT
+-- creates (accounts, transactions, categories, ...), so tests never leak
+-- data into each other — only these two identities are shared, and they're
+-- identical every run because `db reset` always starts from a clean image.
+--
+-- pgTAP is installed HERE, never in a migration — it must never reach the
+-- hosted project (keepo-v1-master-plan.md, Phase 5).
+create extension if not exists pgtap;
+
+-- Two fixture identities. Real auth.users rows (not bare uuids) so
+-- handle_new_user() fires exactly as it would for a live signup, and
+-- can_read_account/can_write_account/every RLS policy see a genuine
+-- authenticated identity, not a fabricated one. Distinct from
+-- supabase/seed.sql's own fixtures (different ids, different purpose:
+-- that file is for manual/Studio exploration, this is for automated
+-- assertions — keeping them separate means a manual db poke-around can
+-- never desync a test run).
+do $$
+begin
+  if not exists (select 1 from auth.users where id = '11111111-1111-1111-1111-111111111111') then
+    insert into auth.users (
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change
+    ) values (
+      '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111',
+      'authenticated', 'authenticated', 'fixture-a@keepo.test', crypt('fixture', gen_salt('bf')),
+      now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''
+    );
+  end if;
+
+  if not exists (select 1 from auth.users where id = '22222222-2222-2222-2222-222222222222') then
+    insert into auth.users (
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change
+    ) values (
+      '00000000-0000-0000-0000-000000000000', '22222222-2222-2222-2222-222222222222',
+      'authenticated', 'authenticated', 'fixture-b@keepo.test', crypt('fixture', gen_salt('bf')),
+      now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''
+    );
+  end if;
+end;
+$$;
+
+-- Onboarded with DIFFERENT base currencies, deliberately — a suite where
+-- every fixture shares one base currency can't catch a viewer-scoped-
+-- conversion bug (the exact class Phase 7 households introduces).
+update profiles set base_currency = 'EUR', onboarded_at = coalesce(onboarded_at, now())
+where id = '11111111-1111-1111-1111-111111111111' and base_currency is null;
+update profiles set base_currency = 'USD', onboarded_at = coalesce(onboarded_at, now())
+where id = '22222222-2222-2222-2222-222222222222' and base_currency is null;
+
+-- ============================================================================
+-- Usage inside a test file, after its own BEGIN. Deliberately plain SQL, not
+-- a wrapper function: Postgres refuses SET ROLE / SET LOCAL ROLE from inside
+-- ANY function body, SECURITY DEFINER included — "cannot set parameter
+-- "role" within security-definer function" (confirmed empirically while
+-- building this harness; a tidier tests.as_user(uuid) helper was tried
+-- first and rejected for exactly this reason). Two lines at the call site
+-- is the actual minimum:
+--
+--   set local role authenticated;
+--   select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+--   -- ... assertions as fixture A ...
+--
+--   reset role;
+--   select set_config('request.jwt.claim.sub', '', true);
+--   -- ... assertions as postgres/superuser, or switch to the other fixture ...
+--
+--   set local role anon;
+--   -- ... assertions as anon (no jwt claim to set — anon has none) ...
+--
+-- Gotchas worth re-reading before writing a new test file:
+--
+-- 1. auth.uid() reads current_setting('request.jwt.claim.sub', true) first
+--    (confirmed via auth.uid()'s own source) — set_config(..., true) with
+--    is_local = true is exactly right, no JWT minting needed.
+-- 2. This file's own BEGIN is each TEST FILE's, not a savepoint per
+--    assertion — every DEFERRABLE INITIALLY DEFERRED constraint
+--    (check_transfer_integrity, the (account_id, owner_id)/(category_id,
+--    owner_id) composite FKs, ...) fires at COMMIT, which never happens
+--    inside a rolled-back test file. Testing one needs an explicit
+--    SET CONSTRAINTS ALL IMMEDIATE; at the point of assertion — and if the
+--    bad row must not leak into later assertions in the same file, wrap
+--    BOTH the insert and the immediate-check in your own SAVEPOINT and
+--    roll back to it afterward: throws_ok's own internal savepoint only
+--    undoes the immediate-check statement itself (reverting the mode back
+--    to deferred), never the earlier insert that's actually still pending
+--    (confirmed empirically — see 03_transactions_integrity.sql's H12
+--    test, which corrupted an unrelated later assertion before this fix).
+-- 3. SELECT * FROM some_function(...), never SELECT (some_function(...)).*
+--    — the latter invokes a composite-returning function once PER OUTPUT
+--    COLUMN (Phase 3's finding, confirmed empirically).
+-- 4. throws_ok's 2- and 3-arg forms never take a free-text description as
+--    their last argument — every text argument after `sql` is matched
+--    against the actual error (a 5-character string like '23514' as SQL
+--    dispatches it as the expected SQLSTATE; any other string is matched
+--    as the expected exact error MESSAGE), confirmed against pgtap's own
+--    source while building this harness. To pin a SQLSTATE while leaving
+--    the message unchecked AND supply a friendly description, use the
+--    4-arg form explicitly: throws_ok(sql, '23514', null, 'description').
+--    throws_ok(sql) alone (1-arg) matches any exception, no description.
+-- 5. now() is frozen for the whole enclosing transaction (standard Postgres
+--    semantics), and a whole test file IS one transaction (BEGIN..ROLLBACK).
+--    Two rows inserted in the same file with default now()-derived columns
+--    (e.g. balance_snapshots.created_at vs a transaction's occurred_at)
+--    get the IDENTICAL timestamp, not "a moment apart" — this can silently
+--    flip a `>` comparison that would never tie in real usage (two separate
+--    client calls, two separate transactions). Use clock_timestamp() with
+--    an explicit offset when a test needs two rows provably ordered in time
+--    within one transaction.
+-- ============================================================================

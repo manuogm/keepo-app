@@ -1,6 +1,6 @@
 # Lessons Learned — read before starting a new phase
 
-Consolidated from Phases 1–3. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
+Consolidated from Phases 1–5. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
 
 ## Process
 
@@ -19,6 +19,20 @@ Consolidated from Phases 1–3. Environment quirks, framework gotchas, and footg
 - **After `supabase db reset`, PostgREST's schema cache sometimes needs an explicit nudge**: `NOTIFY pgrst, 'reload schema';` in psql. It usually reloads automatically, but don't assume it did if a freshly-added RPC comes back "could not find the function."
 - **`supabase gen types --local --lang swift` changed its default access level to `internal`** somewhere around CLI v2.100+ (this codebase was built against an older default of `public`). Pass `--swift-access-control public` explicitly every time — the codebase's whole cross-module (`KeepoCore` → `App`) design depends on it, and the failure mode (types silently `internal`) is a build error in the consuming target, not a warning.
 - **A conditional `ON CONFLICT ... DO UPDATE ... WHERE`** (Phase 4's "later `fetched_at` wins" rule for `fx_rates`) works exactly as documented — the `WHERE` clause runs against `EXCLUDED` vs. the existing row, and a false result leaves the existing row untouched (not a delete, not an error). Confirmed empirically: calling with an earlier `fetched_at` than what's stored is silently a no-op, not "last write wins." Useful pattern for any future upsert that needs a monotonic guard PostgREST's own `Prefer: resolution=merge-duplicates` can't express.
+
+## pgTAP (Phase 5)
+
+- **`supabase test db` globs every `.sql` file in the target directory as a standalone test file** — a shared-setup file with no `plan()`/`finish()` gets run anyway, and because it has no `BEGIN`/`ROLLBACK` of its own, anything in it (an extension, fixture inserts) **commits for real** to the persistent database. Name shared-setup files with a non-`.sql` extension (`_helpers.psql`) and `\ir` them from each real test file, rather than relying on a naming convention the CLI doesn't actually enforce.
+- **`SET LOCAL ROLE` cannot be issued from inside any PL/pgSQL function body — `SECURITY DEFINER` included.** Postgres rejects it outright ("cannot set parameter 'role' within security-definer function"). There is no tidy `as_user(uuid)` wrapper; role-switching is three plain top-level statements at every call site (`set local role authenticated; select set_config('request.jwt.claim.sub', '<uuid>', true);` / `reset role;`).
+- **`now()` is frozen for the whole enclosing transaction, and a whole pgTAP test file IS one transaction.** Two rows inserted in the same file with default `now()`-derived timestamp columns get the *identical* value, not "a moment apart" — this can silently flip a `>` comparison that would never tie in real usage (two separate client calls, two separate transactions each with their own `now()`). Use `clock_timestamp() - interval '...'` for an explicit, provably-ordered timestamp when a test needs one.
+- **A `DEFERRABLE INITIALLY DEFERRED` constraint's violation survives past `throws_ok`'s own internal savepoint.** `throws_ok` only rolls back the statement that forces the check (`SET CONSTRAINTS ALL IMMEDIATE`); the earlier statement that actually violates the deferred constraint is untouched and its violation stays pending, ready to fire again — and corrupt an unrelated assertion — the next time anything forces constraints immediate in the same file. Wrap both the insert and the immediate-check in your own explicit `SAVEPOINT` and roll back to it manually afterward.
+- **pgTAP's `throws_ok` never takes a free-text description as an argument after `sql` in its 2-/3-arg forms** — every such argument is matched against the actual error itself (a 5-character string dispatches as an expected SQLSTATE; anything else is matched as the exact expected message, confirmed against the installed `pgtap--1.3.1.sql`). To pin a SQLSTATE while leaving the message unchecked and still supply a real description, use the 4-arg form explicitly: `throws_ok(sql, '23514', null, 'a friendly description')`.
+- **`supabase gen types --linked`'s temporary introspection role can run DDL (`db push`, `migration list`) but returns empty structs for every table/view column** — enums come through fine, tables/views don't, with no error and no CLI flag to point it at a different role. Treat `--local` as the only reliable source for the committed generated types; a hosted-vs-local diff isn't currently possible in this environment.
+
+## Hosted Supabase (Phase 5)
+
+- **Hosted GoTrue's email validator rejects the `.test` TLD** (`email_address_invalid`) that the local stack accepts without complaint. Use `.dev` or a real-looking domain for any hosted-only fixture identity.
+- **Hosted projects require email confirmation by default; the local stack doesn't** — a fresh `signUp` + immediate `signIn` (the exact pattern `StubAuthProvider`/`PasswordAuthProvider` both use) gets `invalid_credentials` against hosted until the email is confirmed. Don't disable email confirmation project-wide to work around this (a real, persistent security-policy change) — provision the fixture identity directly via the Admin API instead: `POST /auth/v1/admin/users` with `email_confirm: true`, using the `service_role` key.
 
 ## iOS Simulator / dev loop
 

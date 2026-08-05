@@ -1,0 +1,166 @@
+-- accounts / balance_snapshots: RLS visibility and the two balance formulas
+-- (money rule 1). Fixture A = 11111111-..., fixture B = 22222222-...
+-- (supabase/tests/_helpers.sql).
+
+\ir _helpers.psql
+
+begin;
+select plan(11);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+-- ----------------------------------------------------------------------------
+-- RLS visibility
+-- ----------------------------------------------------------------------------
+
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 100);
+
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+values ('b0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'B Checking', 'USD', 100);
+
+select is(
+  (select count(*) from accounts where id = 'a0000000-0000-0000-0000-000000000001'),
+  0::bigint,
+  'fixture B cannot see fixture A''s private account (RLS SELECT, not a UI filter)'
+);
+
+-- Not an exception — RLS's UPDATE USING clause simply matches zero rows for
+-- a row B can't see, so this is a silent no-op, not a thrown error. The
+-- assertion is that the row is genuinely untouched, not that the statement
+-- raised.
+update accounts set name = 'hijacked' where id = 'a0000000-0000-0000-0000-000000000001';
+
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+
+select is(
+  (select name from accounts where id = 'a0000000-0000-0000-0000-000000000001'),
+  'A Checking',
+  'fixture B''s update of fixture A''s private account silently matched zero rows'
+);
+
+-- ----------------------------------------------------------------------------
+-- Ledger balance: opening_balance + SUM(confirmed, non-deleted, occurred_at <= now())
+-- ----------------------------------------------------------------------------
+
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+select is(
+  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  100.0000,
+  'ledger balance with zero transactions is exactly opening_balance'
+);
+
+insert into categories (id, owner_id, kind, name)
+values ('c0000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Test Expense');
+
+insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -30, 'EUR', now());
+
+select is(
+  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  70.0000,
+  'ledger balance reflects a confirmed expense'
+);
+
+-- A future-dated row must never move today's balance (recurring's guard,
+-- built in now since account_balances already filters on it — Phase 14
+-- inherits this for free rather than needing to add it later).
+insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -1000, 'EUR', now() + interval '10 days');
+
+select is(
+  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  70.0000,
+  'a future-dated transaction never moves today''s balance'
+);
+
+-- A pending (unconfirmed capture) row must never move the balance either.
+insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, status, source)
+values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -500, 'EUR', now(), 'pending', 'capture');
+
+select is(
+  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  70.0000,
+  'a pending transaction never moves the balance'
+);
+
+-- ----------------------------------------------------------------------------
+-- Valuation balance: latest snapshot at/before today + SUM(transfers after
+-- the snapshot's created_at, confirmed, occurred_at <= now())
+-- ----------------------------------------------------------------------------
+
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+values ('a0000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'valuation', 'investment', 'Brokerage', 'EUR', 0);
+
+select is(
+  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
+  null::numeric,
+  'an unsnapshotted valuation account renders no balance (never 0)'
+);
+
+-- created_at is backdated by a minute explicitly: now() is frozen for the
+-- whole enclosing transaction in Postgres, so inside this one test-file
+-- transaction the snapshot and the transfer below would otherwise share
+-- the EXACT same now()-derived timestamp, making occurred_at > created_at
+-- false and silently failing to reproduce the same-day-transfer scenario
+-- this test exists to cover. Two separate client calls in production never
+-- have this problem — each gets its own transaction and its own now().
+insert into balance_snapshots (account_id, currency, as_of, value, created_by, created_at)
+values ('a0000000-0000-0000-0000-000000000002', 'EUR', current_date, 1000, auth.uid(), clock_timestamp() - interval '1 minute');
+
+select is(
+  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
+  1000.0000,
+  'valuation balance with zero transfers after the snapshot is exactly the snapshot value'
+);
+
+-- A same-day transfer must count — the exact bug the Phase 2 log documents
+-- comparing occurred_at::date > as_of (both "today", so false) instead of
+-- occurred_at > created_at.
+select create_transfer('a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 50);
+
+select is(
+  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
+  1050.0000,
+  'a same-day transfer after the snapshot is included in the valuation balance'
+);
+
+-- valuation_transfers_only: a valuation account can never take a plain
+-- expense/income insert, only transfers.
+-- The 4-arg form (sql, errcode, errmsg, description) is the only one that
+-- can pin the SQLSTATE while leaving the message unchecked and still
+-- supplying a friendly description: the 3-arg (sql, errcode, X) form
+-- dispatches X as errmsg to match, NOT as a free-text description —
+-- confirmed against pgtap's own source while building this test, after the
+-- 3-arg form failed here expecting the description text verbatim as the
+-- constraint's error message.
+select throws_ok(
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+     values (
+       '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
+       'a0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000001', -10, 'EUR', now()
+     ) $$,
+  '23514', null,
+  'a valuation account rejects a plain expense/income insert (transfers only)'
+);
+
+-- accounts_with_balances exposes the join every screen relies on.
+select is(
+  (select name from accounts_with_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  'A Checking',
+  'accounts_with_balances joins name/kind/currency onto the balance'
+);
+
+select * from finish();
+rollback;

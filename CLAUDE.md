@@ -9,6 +9,10 @@ SwiftUI + Swift Package Manager, Xcode. Supabase (Postgres/Auth/Edge Functions/S
 See `app-architecture.md` 
 Fill it in as the architecture solidifies, don't duplicate here.
 
+## Master plan
+**`keepo-v1-master-plan.md` is the authoritative roadmap for the rest of the v1 build (Phases 5–20).** If a session starts with no memory of prior work — context lost, cleared, or a fresh agent — **read this file first**, before touching code. It has the phase-by-phase order, the reasoning for that order (hazards it exists to avoid), doc amendments in flight, and the human-review-stop cadence agreed with the user.
+If the plan changes while building — a phase splits, a hazard turns out different, a decision gets revisited — **update `keepo-v1-master-plan.md` in place** with the key finding before continuing. It must stay a reliable source of truth, not a snapshot of the day it was written.
+
 ## Version logs
 Before starting work on a new version, **read every file in `version-logs/`** — all `*-log.md` and `lessons-learned.md` files, across all past versions. They contain prior implementation summaries, open items carried forward, and hard-won lessons (environment quirks, framework gotchas, footguns already hit). Do not repeat mistakes documented there. When you finish a version, add/update its log and lessons file in that same folder, concise and written for the next agent, not a human.
 

@@ -29,7 +29,14 @@ public final class SessionStore {
         let config = Self.loadConfig()
         let client = makeSupabaseClient(config: config)
         self.client = client
-        self.authProvider = StubAuthProvider(client: client, config: config)
+        // The only place this branches: StubAuthProvider refuses to run
+        // against anything but the local stack (see its own precondition),
+        // so a build pointed at a hosted SupabaseURL needs the hosted-
+        // capable provider instead. Nothing else in the app knows or cares
+        // which is active — see AuthProvider.swift.
+        self.authProvider = config.isLocal
+            ? StubAuthProvider(client: client, config: config)
+            : PasswordAuthProvider(client: client)
     }
 
     public func start() async {
