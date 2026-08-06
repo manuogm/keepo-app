@@ -12,7 +12,7 @@ import Supabase
 /// of a silent misconfiguration.
 public final class StubAuthProvider: AuthProvider {
     private let client: SupabaseClient
-    private let email = "dev@keepo.local"
+    private let email: String
     private let password = "keepo-dev-stub-password"
 
     public init(client: SupabaseClient, config: SupabaseConfig) {
@@ -22,6 +22,21 @@ public final class StubAuthProvider: AuthProvider {
                 + "swap in AppleAuthProvider for hosted use."
         )
         self.client = client
+        self.email = Self.resolveEmail()
+    }
+
+    /// Debug-only second identity, so households (Phase 7) and anything
+    /// after it can be exercised manually with two real, distinct users —
+    /// this provider previously hardcoded one fixed email, meaning the app
+    /// itself could never have a second user. `KEEPO_DEV_USER=b` as an
+    /// environment variable (Xcode scheme → Run → Arguments) selects it;
+    /// anything else, including unset, keeps the original identity so no
+    /// existing session/behavior changes by default.
+    private static func resolveEmail() -> String {
+        switch ProcessInfo.processInfo.environment["KEEPO_DEV_USER"] {
+        case "b": return "dev-b@keepo.local"
+        default: return "dev@keepo.local"
+        }
     }
 
     public func currentSession() async throws -> Session? {

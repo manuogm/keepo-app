@@ -8,6 +8,11 @@ public enum PublicSchema {
     case ledger = "ledger"
     case valuation = "valuation"
   }
+  public enum AccountScope: String, Codable, Hashable, Sendable {
+    case me = "me"
+    case household = "household"
+    case total = "total"
+  }
   public enum AccountSubtype: String, Codable, Hashable, Sendable {
     case checking = "checking"
     case cash = "cash"
@@ -21,6 +26,12 @@ public enum PublicSchema {
   }
   public enum FxSource: String, Codable, Hashable, Sendable {
     case ecb = "ecb"
+  }
+  public enum HouseholdInviteStatus: String, Codable, Hashable, Sendable {
+    case pending = "pending"
+    case accepted = "accepted"
+    case revoked = "revoked"
+    case expired = "expired"
   }
   public enum TransactionSource: String, Codable, Hashable, Sendable {
     case manual = "manual"
@@ -327,6 +338,144 @@ public enum PublicSchema {
       case source = "source"
     }
   }
+  public struct HouseholdAccountsSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let householdId: UUID
+    public let sharedAt: String
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case householdId = "household_id"
+      case sharedAt = "shared_at"
+    }
+  }
+  public struct HouseholdAccountsInsert: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let householdId: UUID
+    public let sharedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case householdId = "household_id"
+      case sharedAt = "shared_at"
+    }
+  }
+  public struct HouseholdAccountsUpdate: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let householdId: UUID?
+    public let sharedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case householdId = "household_id"
+      case sharedAt = "shared_at"
+    }
+  }
+  public struct HouseholdInvitesSelect: Codable, Hashable, Sendable {
+    public let createdAt: String
+    public let expiresAt: String
+    public let householdId: UUID
+    public let id: UUID
+    public let invitedBy: UUID
+    public let status: HouseholdInviteStatus
+    public let tokenHash: String
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case expiresAt = "expires_at"
+      case householdId = "household_id"
+      case id = "id"
+      case invitedBy = "invited_by"
+      case status = "status"
+      case tokenHash = "token_hash"
+    }
+  }
+  public struct HouseholdInvitesInsert: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let expiresAt: String
+    public let householdId: UUID
+    public let id: UUID?
+    public let invitedBy: UUID
+    public let status: HouseholdInviteStatus?
+    public let tokenHash: String
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case expiresAt = "expires_at"
+      case householdId = "household_id"
+      case id = "id"
+      case invitedBy = "invited_by"
+      case status = "status"
+      case tokenHash = "token_hash"
+    }
+  }
+  public struct HouseholdInvitesUpdate: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let expiresAt: String?
+    public let householdId: UUID?
+    public let id: UUID?
+    public let invitedBy: UUID?
+    public let status: HouseholdInviteStatus?
+    public let tokenHash: String?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case expiresAt = "expires_at"
+      case householdId = "household_id"
+      case id = "id"
+      case invitedBy = "invited_by"
+      case status = "status"
+      case tokenHash = "token_hash"
+    }
+  }
+  public struct HouseholdMembersSelect: Codable, Hashable, Sendable {
+    public let householdId: UUID
+    public let joinedAt: String
+    public let userId: UUID
+    public enum CodingKeys: String, CodingKey {
+      case householdId = "household_id"
+      case joinedAt = "joined_at"
+      case userId = "user_id"
+    }
+  }
+  public struct HouseholdMembersInsert: Codable, Hashable, Sendable {
+    public let householdId: UUID
+    public let joinedAt: String?
+    public let userId: UUID
+    public enum CodingKeys: String, CodingKey {
+      case householdId = "household_id"
+      case joinedAt = "joined_at"
+      case userId = "user_id"
+    }
+  }
+  public struct HouseholdMembersUpdate: Codable, Hashable, Sendable {
+    public let householdId: UUID?
+    public let joinedAt: String?
+    public let userId: UUID?
+    public enum CodingKeys: String, CodingKey {
+      case householdId = "household_id"
+      case joinedAt = "joined_at"
+      case userId = "user_id"
+    }
+  }
+  public struct HouseholdsSelect: Codable, Hashable, Sendable {
+    public let createdAt: String
+    public let id: UUID
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case id = "id"
+    }
+  }
+  public struct HouseholdsInsert: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let id: UUID?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case id = "id"
+    }
+  }
+  public struct HouseholdsUpdate: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let id: UUID?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case id = "id"
+    }
+  }
   public struct ProfilesSelect: Codable, Hashable, Sendable {
     public let baseCurrency: String?
     public let createdAt: String
@@ -600,6 +749,7 @@ public enum PublicSchema {
     public let currency: String?
     public let hasMissingRate: Bool?
     public let includeInTotal: Bool?
+    public let isShared: Bool?
     public let kind: AccountKind?
     public let minorUnit: Int16?
     public let name: String?
@@ -616,6 +766,7 @@ public enum PublicSchema {
       case currency = "currency"
       case hasMissingRate = "has_missing_rate"
       case includeInTotal = "include_in_total"
+      case isShared = "is_shared"
       case kind = "kind"
       case minorUnit = "minor_unit"
       case name = "name"

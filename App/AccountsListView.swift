@@ -184,8 +184,19 @@ private struct AccountRow: View {
 
     var body: some View {
         HStack {
-            Text(account.name ?? "—")
-                .foregroundStyle(account.archivedAt == nil ? Color("TextPrimary") : Color("TextSecondary"))
+            HStack(spacing: 4) {
+                Text(account.name ?? "—")
+                    .foregroundStyle(account.archivedAt == nil ? Color("TextPrimary") : Color("TextSecondary"))
+                // Shared/private indicator (Phase 7) — a household member
+                // never has to guess whether an account is visible to their
+                // partner; this reads accounts_with_balances.is_shared
+                // directly rather than a second round trip per screen.
+                if account.isShared == true {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color("TextSecondary"))
+                }
+            }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 // Balance and currency both come from the row — MoneyFormatter

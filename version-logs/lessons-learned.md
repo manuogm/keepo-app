@@ -1,6 +1,6 @@
 # Lessons Learned — read before starting a new phase
 
-Consolidated from Phases 1–6. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
+Consolidated from Phases 1–7. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
 
 ## Process
 
@@ -28,6 +28,7 @@ Consolidated from Phases 1–6. Environment quirks, framework gotchas, and footg
 - **A `DEFERRABLE INITIALLY DEFERRED` constraint's violation survives past `throws_ok`'s own internal savepoint.** `throws_ok` only rolls back the statement that forces the check (`SET CONSTRAINTS ALL IMMEDIATE`); the earlier statement that actually violates the deferred constraint is untouched and its violation stays pending, ready to fire again — and corrupt an unrelated assertion — the next time anything forces constraints immediate in the same file. Wrap both the insert and the immediate-check in your own explicit `SAVEPOINT` and roll back to it manually afterward.
 - **pgTAP's `throws_ok` never takes a free-text description as an argument after `sql` in its 2-/3-arg forms** — every such argument is matched against the actual error itself (a 5-character string dispatches as an expected SQLSTATE; anything else is matched as the exact expected message, confirmed against the installed `pgtap--1.3.1.sql`). To pin a SQLSTATE while leaving the message unchecked and still supply a real description, use the 4-arg form explicitly: `throws_ok(sql, '23514', null, 'a friendly description')`.
 - **`supabase gen types --linked`'s temporary introspection role can run DDL (`db push`, `migration list`) but returns empty structs for every table/view column** — enums come through fine, tables/views don't, with no error and no CLI flag to point it at a different role. Treat `--local` as the only reliable source for the committed generated types; a hosted-vs-local diff isn't currently possible in this environment.
+- **A `DEFERRABLE INITIALLY DEFERRED` trigger simply never fires inside a whole-file pgTAP test, full stop — not "fires late," never fires at all** (Phase 7, testing `check_transfer_integrity`'s relaxed household rule). The entire test file is one transaction that always rolls back; a deferred constraint only runs at `COMMIT`, which never happens. Without an explicit `SET CONSTRAINTS ALL IMMEDIATE;` right after the statement that should trip it, the assertion that follows passes **vacuously** — it would pass identically whether or not the SQL being tested is even correct, because the trigger it's supposedly exercising never ran. Any test of a deferred constraint/trigger needs this line, not just tests of the *violation* case (gotcha #2 above already covers that half); the *success* case needs it too, or nothing was actually tested.
 
 ## Hosted Supabase (Phase 5)
 

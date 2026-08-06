@@ -49,6 +49,8 @@ struct TransactionFormView: View {
     @State private var editingFromVersion: Int?
     @State private var editingToVersion: Int?
     @State private var editingTransferGroupId: UUID?
+    // created_by (who entered it) differs from the viewer on a shared account.
+    @State private var addedByHouseholdMember = false
 
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -120,6 +122,10 @@ struct TransactionFormView: View {
                 Section("Date") {
                     DatePicker("Date", selection: $occurredAt, displayedComponents: [.date])
                         .labelsHidden()
+                }
+
+                if addedByHouseholdMember {
+                    Text("Added by your household member").font(.footnote).foregroundStyle(Color("TextSecondary"))
                 }
 
                 if let errorMessage {
@@ -199,6 +205,8 @@ struct TransactionFormView: View {
             occurredAt = date
         }
 
+        addedByHouseholdMember = transaction.createdBy != nil && transaction.createdBy != session.profile?.id
+
         switch kind {
         case .expense, .income:
             editingId = transaction.transactionId
@@ -228,7 +236,6 @@ struct TransactionFormView: View {
             }
         }
     }
-
 }
 
 extension TransactionFormView {

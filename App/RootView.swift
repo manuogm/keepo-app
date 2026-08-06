@@ -31,6 +31,11 @@ struct RootView: View {
                         CategoriesView(session: session)
                     }
                     .tabItem { Label("Categories", systemImage: "tag") }
+
+                    NavigationStack {
+                        SettingsView(session: session)
+                    }
+                    .tabItem { Label("Settings", systemImage: "gearshape") }
                 }
                 .tint(Color("BrandPrimary"))
             case .failed(let message):

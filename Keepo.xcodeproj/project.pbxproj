@@ -18,6 +18,7 @@
 		85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A520844CB1127366801CB8 /* KeepoCore */; };
 		A3DAB11A62E215ECC049AEC0 /* DataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62788FB5EF130F2FD05DED15 /* DataStore.swift */; };
 		A5FFBD48BD9FE9D8281754EE /* AccountsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A0D5880530458F27A93E14 /* AccountsListView.swift */; };
+		D60DD08A0A2DD8446CA993CD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871465199EB566D42ACEC52 /* SettingsView.swift */; };
 		D870CF193CABA5CA3A2B649C /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */; };
 		D9287EC318089E6B6250F08D /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE77801FEDF30EF5EC63D7C9 /* SessionStore.swift */; };
 		E4AE632568A815AAFE48026F /* TransactionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192A9246EB85747C42D7E97D /* TransactionsListView.swift */; };
@@ -59,6 +60,7 @@
 		7742491A185D240463F3F936 /* KeepoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BA14030637CFFD08A547224 /* KeepoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoUITests.swift; sourceTree = "<group>"; };
 		884043304F66BADDBBBE1E13 /* KeepoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoApp.swift; sourceTree = "<group>"; };
+		8871465199EB566D42ACEC52 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoTests.swift; sourceTree = "<group>"; };
 		A6EC2DB7E832362CEA7CCF77 /* KeepoCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = KeepoCore; path = Packages/KeepoCore; sourceTree = SOURCE_ROOT; };
 		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -133,6 +135,7 @@
 				333AEF1387D80D7D4ECFD033 /* RefreshCoordinator.swift */,
 				4DC8348A94F64846D6389F14 /* RootView.swift */,
 				EE77801FEDF30EF5EC63D7C9 /* SessionStore.swift */,
+				8871465199EB566D42ACEC52 /* SettingsView.swift */,
 				223C215A93C8B4A390E17F34 /* TransactionFormView.swift */,
 				192A9246EB85747C42D7E97D /* TransactionsListView.swift */,
 				050342BA3DE341BA002FCD9C /* Resources */,
@@ -304,6 +307,7 @@
 				503974F3E8B7F0D828A0C6CA /* RefreshCoordinator.swift in Sources */,
 				00A8F3AF0335A763CABB29B2 /* RootView.swift in Sources */,
 				D9287EC318089E6B6250F08D /* SessionStore.swift in Sources */,
+				D60DD08A0A2DD8446CA993CD /* SettingsView.swift in Sources */,
 				F3CCB559F93565682DBAE498 /* TransactionFormView.swift in Sources */,
 				E4AE632568A815AAFE48026F /* TransactionsListView.swift in Sources */,
 			);
