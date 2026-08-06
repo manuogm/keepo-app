@@ -27,6 +27,11 @@ public enum PublicSchema {
   public enum FxSource: String, Codable, Hashable, Sendable {
     case ecb = "ecb"
   }
+  public enum HouseholdEventKind: String, Codable, Hashable, Sendable {
+    case memberJoined = "member_joined"
+    case memberLeft = "member_left"
+    case memberErased = "member_erased"
+  }
   public enum HouseholdInviteStatus: String, Codable, Hashable, Sendable {
     case pending = "pending"
     case accepted = "accepted"
@@ -647,6 +652,30 @@ public enum PublicSchema {
       case withdrawalRate = "withdrawal_rate"
     }
   }
+  public struct ForkHandledTablesSelect: Codable, Hashable, Sendable {
+    public let handling: String
+    public let tableName: String
+    public enum CodingKeys: String, CodingKey {
+      case handling = "handling"
+      case tableName = "table_name"
+    }
+  }
+  public struct ForkHandledTablesInsert: Codable, Hashable, Sendable {
+    public let handling: String
+    public let tableName: String
+    public enum CodingKeys: String, CodingKey {
+      case handling = "handling"
+      case tableName = "table_name"
+    }
+  }
+  public struct ForkHandledTablesUpdate: Codable, Hashable, Sendable {
+    public let handling: String?
+    public let tableName: String?
+    public enum CodingKeys: String, CodingKey {
+      case handling = "handling"
+      case tableName = "table_name"
+    }
+  }
   public struct FxRatesSelect: Codable, Hashable, Sendable {
     public let currency: String
     public let fetchedAt: String
@@ -717,6 +746,48 @@ public enum PublicSchema {
       case accountId = "account_id"
       case householdId = "household_id"
       case sharedAt = "shared_at"
+    }
+  }
+  public struct HouseholdEventsSelect: Codable, Hashable, Sendable {
+    public let actorId: UUID
+    public let createdAt: String
+    public let householdId: UUID
+    public let id: UUID
+    public let kind: HouseholdEventKind
+    public enum CodingKeys: String, CodingKey {
+      case actorId = "actor_id"
+      case createdAt = "created_at"
+      case householdId = "household_id"
+      case id = "id"
+      case kind = "kind"
+    }
+  }
+  public struct HouseholdEventsInsert: Codable, Hashable, Sendable {
+    public let actorId: UUID
+    public let createdAt: String?
+    public let householdId: UUID
+    public let id: UUID?
+    public let kind: HouseholdEventKind
+    public enum CodingKeys: String, CodingKey {
+      case actorId = "actor_id"
+      case createdAt = "created_at"
+      case householdId = "household_id"
+      case id = "id"
+      case kind = "kind"
+    }
+  }
+  public struct HouseholdEventsUpdate: Codable, Hashable, Sendable {
+    public let actorId: UUID?
+    public let createdAt: String?
+    public let householdId: UUID?
+    public let id: UUID?
+    public let kind: HouseholdEventKind?
+    public enum CodingKeys: String, CodingKey {
+      case actorId = "actor_id"
+      case createdAt = "created_at"
+      case householdId = "household_id"
+      case id = "id"
+      case kind = "kind"
     }
   }
   public struct HouseholdInvitesSelect: Codable, Hashable, Sendable {

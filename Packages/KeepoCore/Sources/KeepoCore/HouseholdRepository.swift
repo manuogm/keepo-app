@@ -1,11 +1,47 @@
 import Foundation
 import Supabase
 
-/// Phase 7's client-side seam for the household access model. Deliberately
-/// thin — invites/leave/fork are Phase 19; this only creates a household,
-/// shares/unshares one of the caller's own accounts into it, and reads the
-/// scoped net worth totals RLS + net_worth() already compute correctly.
+/// Phase 7's client-side seam for the household access model, widened in
+/// Phase 19 with the actual lifecycle: invites, leave (fork), erase.
 public enum HouseholdRepository {
+    /// The plaintext token, returned exactly once — never stored, never
+    /// retrievable again. The caller is responsible for putting it in front
+    /// of the invitee (share sheet, copy button, ...).
+    public static func createInvite(client: SupabaseClient) async throws -> String {
+        try await client.rpc("create_invite").execute().value
+    }
+
+    /// Returns the household id the caller just joined.
+    @discardableResult
+    public static func acceptInvite(client: SupabaseClient, token: String) async throws -> UUID {
+        try await client.rpc("accept_invite", params: TokenParam(token: token)).execute().value
+    }
+
+    /// Forks every account shared in the caller's household into two fresh,
+    /// private copies (one per member) and removes only the caller's own
+    /// membership — see the migration's own header for why this is a split,
+    /// not a transfer of ownership.
+    public static func leave(client: SupabaseClient) async throws {
+        try await client.rpc("leave_household").execute()
+    }
+
+    /// Same fork, plus scrubbing the caller's own resulting copy's free-text
+    /// fields (merchant names, filenames, ...) — never the other member's.
+    public static func eraseOwnAccount(client: SupabaseClient) async throws {
+        try await client.rpc("erase_own_account").execute()
+    }
+
+    /// The no-op-transport notification seam's read side — the client polls
+    /// this rather than waiting on a push (Phase 20 swaps the transport,
+    /// not this read path).
+    public static func fetchEvents(client: SupabaseClient) async throws -> [PublicSchema.HouseholdEventsSelect] {
+        try await client.from("household_events")
+            .select()
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
     /// `nil` if the caller doesn't belong to a household yet — RLS
     /// (`households_select`) already scopes this to at most one row.
     public static func fetchMine(client: SupabaseClient) async throws -> PublicSchema.HouseholdsSelect? {
@@ -112,6 +148,13 @@ private struct AccountIdParam: Encodable {
     let accountId: UUID
     enum CodingKeys: String, CodingKey {
         case accountId = "p_account_id"
+    }
+}
+
+private struct TokenParam: Encodable {
+    let token: String
+    enum CodingKeys: String, CodingKey {
+        case token = "p_token"
     }
 }
 
