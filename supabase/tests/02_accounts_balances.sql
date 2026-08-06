@@ -5,7 +5,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(11);
+select plan(12);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -31,11 +31,18 @@ select is(
   'fixture B cannot see fixture A''s private account (RLS SELECT, not a UI filter)'
 );
 
--- Not an exception — RLS's UPDATE USING clause simply matches zero rows for
--- a row B can't see, so this is a silent no-op, not a thrown error. The
--- assertion is that the row is genuinely untouched, not that the statement
--- raised.
-update accounts set name = 'hijacked' where id = 'a0000000-0000-0000-0000-000000000001';
+-- As of Phase 6 (migration 20260805180000), `authenticated` has no raw
+-- UPDATE grant on accounts at all — every account mutation goes through
+-- update_account/archive_account/delete_account. This is now a permission
+-- error, not RLS's USING clause silently matching zero rows (that was the
+-- pre-Phase-6 behavior, and accounts_update's own USING/WITH CHECK is left
+-- dormant in place per the same rationale as transactions_update in
+-- migration 003).
+select throws_ok(
+  $$ update accounts set name = 'hijacked' where id = 'a0000000-0000-0000-0000-000000000001' $$,
+  null::char(5), null,
+  'authenticated has no raw UPDATE grant on accounts, even acting on another owner''s row'
+);
 
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
@@ -43,7 +50,7 @@ select set_config('request.jwt.claim.sub', '', true);
 select is(
   (select name from accounts where id = 'a0000000-0000-0000-0000-000000000001'),
   'A Checking',
-  'fixture B''s update of fixture A''s private account silently matched zero rows'
+  'fixture A''s account is untouched by fixture B''s rejected update attempt'
 );
 
 -- ----------------------------------------------------------------------------

@@ -195,7 +195,7 @@ struct TransactionFormView: View {
         }()
 
         if let occurredAtString = transaction.occurredAt,
-           let date = ISO8601DateFormatter().date(from: occurredAtString) {
+           let date = PostgresDate.date(fromTimestamp: occurredAtString) {
             occurredAt = date
         }
 
@@ -207,7 +207,7 @@ struct TransactionFormView: View {
             selectedCategoryId = transaction.categoryId
             merchantRaw = transaction.merchantRaw
             if let amount = transaction.amount {
-                amountText = "\(abs(amount))"
+                amountText = AmountFormatter.editableString(amount, minorUnit: Int(transaction.minorUnit ?? 2))
             }
         case .transfer:
             let legs = [transaction, sibling].compactMap { $0 }
@@ -221,10 +221,10 @@ struct TransactionFormView: View {
             selectedAccountId = from.accountId
             selectedToAccountId = destination.accountId
             if let amount = from.amount {
-                amountText = "\(abs(amount))"
+                amountText = AmountFormatter.editableString(amount, minorUnit: Int(from.minorUnit ?? 2))
             }
             if from.currency != destination.currency, let amount = destination.amount {
-                receivedAmountText = "\(abs(amount))"
+                receivedAmountText = AmountFormatter.editableString(amount, minorUnit: Int(destination.minorUnit ?? 2))
             }
         }
     }

@@ -604,6 +604,7 @@ public enum PublicSchema {
     public let minorUnit: Int16?
     public let name: String?
     public let subtype: AccountSubtype?
+    public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case archivedAt = "archived_at"
@@ -619,6 +620,7 @@ public enum PublicSchema {
       case minorUnit = "minor_unit"
       case name = "name"
       case subtype = "subtype"
+      case version = "version"
     }
   }
   public struct TransactionsWithDetailsSelect: Codable, Hashable, Sendable {

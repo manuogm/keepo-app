@@ -18,7 +18,7 @@ public enum ProfileRepository {
     public static func completeOnboarding(client: SupabaseClient, userId: UUID, baseCurrency: String) async throws {
         let patch = ProfileOnboardingPatch(
             baseCurrency: baseCurrency,
-            onboardedAt: ISO8601DateFormatter().string(from: Date())
+            onboardedAt: PostgresDate.timestampString(Date())
         )
         try await client.from("profiles").update(patch).eq("id", value: userId).execute()
     }
@@ -38,6 +38,14 @@ public enum AccountRepository {
         client: SupabaseClient
     ) async throws -> [PublicSchema.AccountsWithBalancesSelect] {
         try await client.from("accounts_with_balances").select().order("name").execute().value
+    }
+
+    /// The raw row, not the enriched view — `accounts_with_balances` exposes
+    /// the computed running `balance`, never the stored `opening_balance`
+    /// an edit form needs to prefill. Used only when opening the edit form;
+    /// the list itself keeps reading the enriched view.
+    public static func fetchOne(client: SupabaseClient, id: UUID) async throws -> PublicSchema.AccountsSelect {
+        try await client.from("accounts").select().eq("id", value: id).single().execute().value
     }
 
     /// Creates an account with a client-generated id (money rule: client-
@@ -95,11 +103,10 @@ public enum AccountRepository {
         value: Decimal,
         ownerId: UUID
     ) async throws {
-        let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
         let snapshot = NewSnapshotRow(
             accountId: accountId,
             currency: currency,
-            asOf: String(today),
+            asOf: PostgresDate.dateOnlyString(Date()),
             value: value,
             createdBy: ownerId
         )
@@ -165,7 +172,7 @@ public enum CategoryRepository {
     /// "Other" categories.
     public static func softDelete(client: SupabaseClient, categoryId: UUID) async throws {
         try await client.from("categories")
-            .update(DeletedAtPatch(deletedAt: ISO8601DateFormatter().string(from: Date())))
+            .update(DeletedAtPatch(deletedAt: PostgresDate.timestampString(Date())))
             .eq("id", value: categoryId)
             .execute()
     }
@@ -229,7 +236,7 @@ public enum TransactionRepository {
             categoryId: categoryId,
             amount: amount,
             currency: currency,
-            occurredAt: ISO8601DateFormatter().string(from: occurredAt)
+            occurredAt: PostgresDate.timestampString(occurredAt)
         )
         try await client.from("transactions").insert(row).execute()
         return id
@@ -251,7 +258,7 @@ public enum TransactionRepository {
             toAccountId: toAccountId,
             fromAmount: fromAmount,
             toAmount: toAmount,
-            occurredAt: ISO8601DateFormatter().string(from: occurredAt)
+            occurredAt: PostgresDate.timestampString(occurredAt)
         )
         try await client.rpc("create_transfer", params: params).execute()
     }
@@ -285,7 +292,7 @@ public enum TransactionRepository {
             categoryId: categoryId,
             amount: amount,
             currency: currency,
-            occurredAt: ISO8601DateFormatter().string(from: occurredAt),
+            occurredAt: PostgresDate.timestampString(occurredAt),
             merchantRaw: merchantRaw
         )
         let rows: [ConflictRow] = try await client.rpc("update_transaction", params: params).execute().value
@@ -311,7 +318,7 @@ public enum TransactionRepository {
             toExpectedVersion: toExpectedVersion,
             fromAmount: fromAmount,
             toAmount: toAmount,
-            occurredAt: ISO8601DateFormatter().string(from: occurredAt)
+            occurredAt: PostgresDate.timestampString(occurredAt)
         )
         let rows: [ConflictRow] = try await client.rpc("update_transfer", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict

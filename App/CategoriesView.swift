@@ -10,10 +10,11 @@ import SwiftUI
 struct CategoriesView: View {
     let session: SessionStore
 
-    @State private var categories: [PublicSchema.CategoriesSelect] = []
-    @State private var isLoading = true
-    @State private var errorMessage: String?
+    @State private var store = DataStore<PublicSchema.CategoriesSelect>()
     @State private var isAddingCategory = false
+    @State private var deleteErrorMessage: String?
+
+    private var categories: [PublicSchema.CategoriesSelect] { store.items }
 
     private var expenseCategories: [PublicSchema.CategoriesSelect] {
         categories.filter { $0.kind == .expense }
@@ -27,7 +28,7 @@ struct CategoriesView: View {
         ZStack {
             Color("BGCanvas").ignoresSafeArea()
 
-            if isLoading {
+            if store.isLoading {
                 ProgressView()
             } else {
                 List {
@@ -61,9 +62,10 @@ struct CategoriesView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .refreshable { await load() }
             }
 
-            if let errorMessage {
+            if let errorMessage = store.errorMessage ?? deleteErrorMessage {
                 VStack {
                     Spacer()
                     Text(errorMessage)
@@ -85,27 +87,23 @@ struct CategoriesView: View {
         }
         .sheet(isPresented: $isAddingCategory) {
             AddCategorySheet(session: session) {
-                await load()
+                session.refresh.bump()
             }
         }
-        .task { await load() }
+        .task(id: session.refresh.token) { await load() }
     }
 
     private func load() async {
-        do {
-            categories = try await CategoryRepository.fetchAll(client: session.client)
-        } catch {
-            errorMessage = String(describing: error)
-        }
-        isLoading = false
+        await store.load { try await CategoryRepository.fetchAll(client: session.client) }
     }
 
     private func delete(_ category: PublicSchema.CategoriesSelect) async {
+        deleteErrorMessage = nil
         do {
             try await CategoryRepository.softDelete(client: session.client, categoryId: category.id)
-            await load()
+            session.refresh.bump()
         } catch {
-            errorMessage = String(describing: error)
+            deleteErrorMessage = String(describing: error)
         }
     }
 }

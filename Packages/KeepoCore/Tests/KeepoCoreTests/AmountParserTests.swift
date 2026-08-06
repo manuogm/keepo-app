@@ -40,3 +40,40 @@ struct AmountParserTests {
         #expect(AmountParser.parse("500", locale: Locale(identifier: "en_US")) == Decimal(500))
     }
 }
+
+@Suite("AmountFormatter")
+struct AmountFormatterTests {
+    @Test("round-trips through AmountParser on a comma-decimal locale")
+    func roundTripsOnCommaLocale() {
+        let locale = Locale(identifier: "de_DE")
+        let original = Decimal(string: "1250.75")!
+        let text = AmountFormatter.editableString(original, minorUnit: 2, locale: locale)
+        #expect(text.contains(","))
+        #expect(AmountParser.parse(text, locale: locale) == original)
+    }
+
+    @Test("always renders unsigned — sign is the caller's, not the field's")
+    func alwaysUnsigned() {
+        let text = AmountFormatter.editableString(Decimal(-42.50), minorUnit: 2, locale: Locale(identifier: "en_US"))
+        #expect(!text.contains("-"))
+        #expect(text == "42.50")
+    }
+
+    @Test("pads to the currency's minor unit even for a whole number")
+    func padsToMinorUnit() {
+        let text = AmountFormatter.editableString(Decimal(500), minorUnit: 2, locale: Locale(identifier: "en_US"))
+        #expect(text == "500.00")
+    }
+
+    @Test("zero-decimal currencies render no fraction digits")
+    func zeroDecimalCurrency() {
+        let text = AmountFormatter.editableString(Decimal(1500), minorUnit: 0, locale: Locale(identifier: "en_US"))
+        #expect(text == "1500")
+    }
+
+    @Test("never emits a grouping separator — the field must stay parseable")
+    func noGroupingSeparator() {
+        let text = AmountFormatter.editableString(Decimal(1_234.56), minorUnit: 2, locale: Locale(identifier: "en_US"))
+        #expect(!text.contains(","))
+    }
+}

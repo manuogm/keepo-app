@@ -22,6 +22,9 @@ public final class SessionStore {
     public private(set) var profile: PublicSchema.ProfilesSelect?
 
     public let client: SupabaseClient
+    /// Bumped by every successful write; every list screen's `.task(id:)`
+    /// keys off it. See RefreshCoordinator's own doc comment.
+    public let refresh = RefreshCoordinator()
     private let authProvider: AuthProvider
     private var userId: UUID?
 

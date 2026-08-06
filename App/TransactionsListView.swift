@@ -4,18 +4,19 @@ import SwiftUI
 struct TransactionsListView: View {
     let session: SessionStore
 
-    @State private var transactions: [PublicSchema.TransactionsWithDetailsSelect] = []
-    @State private var isLoading = true
-    @State private var errorMessage: String?
+    @State private var store = DataStore<PublicSchema.TransactionsWithDetailsSelect>()
     @State private var isAddingTransaction = false
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
     @State private var showConflictAlert = false
+    @State private var deleteErrorMessage: String?
+
+    private var transactions: [PublicSchema.TransactionsWithDetailsSelect] { store.items }
 
     var body: some View {
         ZStack {
             Color("BGCanvas").ignoresSafeArea()
 
-            if isLoading {
+            if store.isLoading {
                 ProgressView()
             } else if transactions.isEmpty {
                 Text("No transactions yet")
@@ -32,9 +33,10 @@ struct TransactionsListView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .refreshable { await load() }
             }
 
-            if let errorMessage {
+            if let errorMessage = store.errorMessage ?? deleteErrorMessage {
                 VStack {
                     Spacer()
                     Text(errorMessage)
@@ -56,12 +58,12 @@ struct TransactionsListView: View {
         }
         .sheet(isPresented: $isAddingTransaction) {
             TransactionFormView(session: session) {
-                Task { await load() }
+                session.refresh.bump()
             }
         }
         .sheet(item: $editingTransaction) { transaction in
             TransactionFormView(session: session, mode: .edit(transaction, sibling: sibling(of: transaction))) {
-                Task { await load() }
+                session.refresh.bump()
             }
         }
         .alert("This transaction changed elsewhere", isPresented: $showConflictAlert) {
@@ -69,7 +71,7 @@ struct TransactionsListView: View {
         } message: {
             Text("The list has been refreshed with the latest version.")
         }
-        .task { await load() }
+        .task(id: session.refresh.token) { await load() }
     }
 
     private func sibling(
@@ -80,16 +82,12 @@ struct TransactionsListView: View {
     }
 
     private func load() async {
-        do {
-            transactions = try await TransactionRepository.fetchAll(client: session.client)
-        } catch {
-            errorMessage = String(describing: error)
-        }
-        isLoading = false
+        await store.load { try await TransactionRepository.fetchAll(client: session.client) }
     }
 
     private func delete(at offsets: IndexSet) async {
         var hadConflict = false
+        deleteErrorMessage = nil
         for index in offsets {
             let transaction = transactions[index]
             guard let id = transaction.transactionId, let version = transaction.version else { continue }
@@ -109,10 +107,10 @@ struct TransactionsListView: View {
                 }
                 if !deleted { hadConflict = true }
             } catch {
-                errorMessage = String(describing: error)
+                deleteErrorMessage = String(describing: error)
             }
         }
-        await load()
+        session.refresh.bump()
         if hadConflict { showConflictAlert = true }
     }
 }
