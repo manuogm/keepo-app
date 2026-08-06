@@ -7,6 +7,8 @@ struct TransactionsListView: View {
     @State private var store = DataStore<PublicSchema.TransactionsWithDetailsSelect>(cacheKey: "transactions_page_0")
     @State private var isAddingTransaction = false
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
+    @State private var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
+    @State private var editingRecurringRule: PublicSchema.RecurringRulesSelect?
     @State private var showConflictAlert = false
     @State private var filter = TransactionFilter()
     @State private var isFilterSheetPresented = false
@@ -61,7 +63,7 @@ struct TransactionsListView: View {
                     ForEach(transactions, id: \.transactionId) { transaction in
                         TransactionRow(transaction: transaction)
                             .contentShape(Rectangle())
-                            .onTapGesture { editingTransaction = transaction }
+                            .onTapGesture { handleTap(on: transaction) }
                     }
                     .onDelete { offsets in
                         Task { await delete(at: offsets) }
@@ -109,6 +111,20 @@ struct TransactionsListView: View {
                 session.refresh.bump()
             }
         }
+        .sheet(item: $editingRecurringRule) { rule in
+            RecurringRuleFormView(session: session, mode: .edit(rule)) {
+                session.refresh.bump()
+            }
+        }
+        .confirmationDialog(
+            "This is a recurring transaction", isPresented: recurringChoiceBinding, presenting: recurringEditChoice
+        ) { transaction in
+            Button("Edit this transaction") { editingTransaction = transaction }
+            Button("Edit all future occurrences") {
+                Task { await openRecurringRule(for: transaction) }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .sheet(isPresented: $isFilterSheetPresented) {
             TransactionFilterView(filter: $filter, accounts: filterAccounts, categories: filterCategories)
         }
@@ -136,6 +152,27 @@ struct TransactionsListView: View {
     ) -> PublicSchema.TransactionsWithDetailsSelect? {
         guard let groupId = transaction.transferGroupId else { return nil }
         return transactions.first { $0.transferGroupId == groupId && $0.transactionId != transaction.transactionId }
+    }
+
+    /// A row materialized from a recurring rule needs a choice before
+    /// editing at all — "this one" (the historical row, unaffected by any
+    /// future rule change) vs "all future" (the rule itself). An ordinary
+    /// manual/capture/transfer row skips straight to the normal edit sheet.
+    private func handleTap(on transaction: PublicSchema.TransactionsWithDetailsSelect) {
+        if transaction.recurringRuleId != nil {
+            recurringEditChoice = transaction
+        } else {
+            editingTransaction = transaction
+        }
+    }
+
+    private var recurringChoiceBinding: Binding<Bool> {
+        Binding(get: { recurringEditChoice != nil }, set: { if !$0 { recurringEditChoice = nil } })
+    }
+
+    private func openRecurringRule(for transaction: PublicSchema.TransactionsWithDetailsSelect) async {
+        guard let ruleId = transaction.recurringRuleId else { return }
+        editingRecurringRule = try? await RecurringRuleRepository.fetchOne(client: session.client, id: ruleId)
     }
 
     private func load() async {
@@ -205,44 +242,6 @@ extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
 private struct TransactionsLoadKey: Equatable {
     let token: Int
     let filter: TransactionFilter
-}
-
-private struct PendingTransactionDisplay: Identifiable {
-    let id: UUID
-    let accountName: String
-    let categoryName: String
-    let amount: Decimal
-    let currency: String
-    let minorUnit: Int
-}
-
-private struct PendingTransactionRow: View {
-    let pending: PendingTransactionDisplay
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(pending.categoryName)
-                    .foregroundStyle(Color("TextPrimary"))
-                HStack(spacing: 4) {
-                    Text(pending.accountName)
-                        .font(.caption)
-                        .foregroundStyle(Color("TextSecondary"))
-                    Image(systemName: "icloud.slash")
-                        .font(.caption2)
-                        .foregroundStyle(Color("BrandSecondary"))
-                    Text("Not synced")
-                        .font(.caption2)
-                        .foregroundStyle(Color("BrandSecondary"))
-                }
-            }
-            Spacer()
-            let currency = CurrencyInfo(code: pending.currency, minorUnit: pending.minorUnit)
-            Text(MoneyFormatter.format(pending.amount, currency: currency))
-                .monospacedDigit()
-                .foregroundStyle(pending.amount < 0 ? Color("TextPrimary") : Color("BrandPrimary"))
-        }
-    }
 }
 
 /// Account/category/kind/date-range — every field optional, AND'd

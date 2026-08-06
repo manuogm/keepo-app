@@ -58,6 +58,14 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        NavigationLink("Recurring Transactions") {
+                            RecurringRulesView(session: session)
+                        }
+                    } footer: {
+                        Text("Rent, subscriptions, salary — anything on a schedule logs itself automatically.")
+                    }
+
+                    Section {
                         NavigationLink("Set Up Apple Pay Capture") {
                             WalletAutomationGuideView()
                         }

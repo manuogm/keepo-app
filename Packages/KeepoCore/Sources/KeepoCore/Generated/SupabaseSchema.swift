@@ -38,6 +38,11 @@ public enum PublicSchema {
     case warning = "warning"
     case error = "error"
   }
+  public enum RecurringFrequency: String, Codable, Hashable, Sendable {
+    case weekly = "weekly"
+    case monthly = "monthly"
+    case yearly = "yearly"
+  }
   public enum TransactionSource: String, Codable, Hashable, Sendable {
     case manual = "manual"
     case capture = "capture"
@@ -811,6 +816,102 @@ public enum PublicSchema {
       case snapshotId = "snapshot_id"
     }
   }
+  public struct RecurringRulesSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let active: Bool
+    public let amount: Decimal
+    public let categoryId: UUID
+    public let createdAt: String
+    public let createdBy: UUID
+    public let currency: String
+    public let frequency: RecurringFrequency
+    public let id: UUID
+    public let lastMaterializedAt: String?
+    public let nextDueAt: String
+    public let ownerId: UUID
+    public let updatedAt: String
+    public let version: Int32
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case active = "active"
+      case amount = "amount"
+      case categoryId = "category_id"
+      case createdAt = "created_at"
+      case createdBy = "created_by"
+      case currency = "currency"
+      case frequency = "frequency"
+      case id = "id"
+      case lastMaterializedAt = "last_materialized_at"
+      case nextDueAt = "next_due_at"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct RecurringRulesInsert: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let active: Bool?
+    public let amount: Decimal
+    public let categoryId: UUID
+    public let createdAt: String?
+    public let createdBy: UUID
+    public let currency: String
+    public let frequency: RecurringFrequency
+    public let id: UUID?
+    public let lastMaterializedAt: String?
+    public let nextDueAt: String
+    public let ownerId: UUID
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case active = "active"
+      case amount = "amount"
+      case categoryId = "category_id"
+      case createdAt = "created_at"
+      case createdBy = "created_by"
+      case currency = "currency"
+      case frequency = "frequency"
+      case id = "id"
+      case lastMaterializedAt = "last_materialized_at"
+      case nextDueAt = "next_due_at"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct RecurringRulesUpdate: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let active: Bool?
+    public let amount: Decimal?
+    public let categoryId: UUID?
+    public let createdAt: String?
+    public let createdBy: UUID?
+    public let currency: String?
+    public let frequency: RecurringFrequency?
+    public let id: UUID?
+    public let lastMaterializedAt: String?
+    public let nextDueAt: String?
+    public let ownerId: UUID?
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case active = "active"
+      case amount = "amount"
+      case categoryId = "category_id"
+      case createdAt = "created_at"
+      case createdBy = "created_by"
+      case currency = "currency"
+      case frequency = "frequency"
+      case id = "id"
+      case lastMaterializedAt = "last_materialized_at"
+      case nextDueAt = "next_due_at"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
   public struct SyncConflictsSelect: Codable, Hashable, Sendable {
     public let clientVersion: Int32
     public let createdAt: String
@@ -887,6 +988,7 @@ public enum PublicSchema {
     public let merchantRaw: String?
     public let occurredAt: String
     public let ownerId: UUID
+    public let recurringRuleId: UUID?
     public let source: TransactionSource
     public let status: TransactionStatus
     public let transferGroupId: UUID?
@@ -908,6 +1010,7 @@ public enum PublicSchema {
       case merchantRaw = "merchant_raw"
       case occurredAt = "occurred_at"
       case ownerId = "owner_id"
+      case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"
       case transferGroupId = "transfer_group_id"
@@ -931,6 +1034,7 @@ public enum PublicSchema {
     public let merchantRaw: String?
     public let occurredAt: String?
     public let ownerId: UUID
+    public let recurringRuleId: UUID?
     public let source: TransactionSource?
     public let status: TransactionStatus?
     public let transferGroupId: UUID?
@@ -952,6 +1056,7 @@ public enum PublicSchema {
       case merchantRaw = "merchant_raw"
       case occurredAt = "occurred_at"
       case ownerId = "owner_id"
+      case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"
       case transferGroupId = "transfer_group_id"
@@ -975,6 +1080,7 @@ public enum PublicSchema {
     public let merchantRaw: String?
     public let occurredAt: String?
     public let ownerId: UUID?
+    public let recurringRuleId: UUID?
     public let source: TransactionSource?
     public let status: TransactionStatus?
     public let transferGroupId: UUID?
@@ -996,6 +1102,7 @@ public enum PublicSchema {
       case merchantRaw = "merchant_raw"
       case occurredAt = "occurred_at"
       case ownerId = "owner_id"
+      case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"
       case transferGroupId = "transfer_group_id"
@@ -1133,6 +1240,7 @@ public enum PublicSchema {
     public let merchantRaw: String?
     public let minorUnit: Int16?
     public let occurredAt: String?
+    public let recurringRuleId: UUID?
     public let source: TransactionSource?
     public let status: TransactionStatus?
     public let transactionId: UUID?
@@ -1156,6 +1264,7 @@ public enum PublicSchema {
       case merchantRaw = "merchant_raw"
       case minorUnit = "minor_unit"
       case occurredAt = "occurred_at"
+      case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"
       case transactionId = "transaction_id"
