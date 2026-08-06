@@ -66,6 +66,14 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        NavigationLink("Budgets") {
+                            BudgetsView(session: session)
+                        }
+                    } footer: {
+                        Text("Set a monthly spending cap overall or per category.")
+                    }
+
+                    Section {
                         NavigationLink("Set Up Apple Pay Capture") {
                             WalletAutomationGuideView()
                         }

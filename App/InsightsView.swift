@@ -17,6 +17,8 @@ struct InsightsView: View {
     @State private var savingsRate: Decimal?
     @State private var investmentAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
     @State private var unrealizedGains: [UUID: Decimal?] = [:]
+    @State private var fiMetrics: FIMetrics?
+    @State private var isEditingFISettings = false
     @State private var isLoading = true
     @State private var errorMessage: String?
 
@@ -46,6 +48,8 @@ struct InsightsView: View {
                             unrealizedGainSection
                         }
 
+                        financialIndependenceSection
+
                         if let errorMessage {
                             Text(errorMessage)
                                 .font(.footnote)
@@ -58,7 +62,57 @@ struct InsightsView: View {
             }
         }
         .navigationTitle("Insights")
+        .sheet(isPresented: $isEditingFISettings) {
+            FISettingsView(session: session) {
+                Task { await loadFIMetrics() }
+            }
+        }
         .task(id: InsightsLoadKey(token: session.refresh.token, scope: scope)) { await load() }
+    }
+
+    /// FI number, % progress, years-to-FI, and Coast FI, from one visible,
+    /// editable assumption set — never a hidden constant (spec).
+    private var financialIndependenceSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Financial Independence").font(.headline).foregroundStyle(Color("TextPrimary"))
+                Spacer()
+                Button("Assumptions") { isEditingFISettings = true }
+                    .font(.caption)
+            }
+            if let fiMetrics {
+                fiMetricRow("FI number", value: fiCurrencyText(fiMetrics.fiNumber))
+                fiMetricRow("Progress", value: fiPercentText(fiMetrics.percentProgress))
+                fiMetricRow("Years to FI", value: fiYearsText(fiMetrics.yearsToFi))
+                fiMetricRow("Coast FI number", value: fiCurrencyText(fiMetrics.coastFiNumber))
+            } else {
+                Text("—").foregroundStyle(Color("TextSecondary"))
+            }
+        }
+    }
+
+    private func fiMetricRow(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label).foregroundStyle(Color("TextSecondary"))
+            Spacer()
+            Text(value).monospacedDigit().foregroundStyle(Color("TextPrimary"))
+        }
+    }
+
+    private func fiCurrencyText(_ amount: Decimal?) -> String {
+        guard let amount else { return "—" }
+        let currency = CurrencyInfo(code: session.profile?.baseCurrency ?? "USD", minorUnit: 0)
+        return MoneyFormatter.format(amount, currency: currency)
+    }
+
+    private func fiPercentText(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        return value.formatted(.percent.precision(.fractionLength(0)))
+    }
+
+    private func fiYearsText(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        return value.formatted(.number.precision(.fractionLength(1)))
     }
 
     private var savingsRateSection: some View {
@@ -189,7 +243,13 @@ struct InsightsView: View {
             )
         }
 
+        await loadFIMetrics()
+
         isLoading = false
+    }
+
+    private func loadFIMetrics() async {
+        fiMetrics = try? await FIRepository.fetchMetrics(client: session.client, scope: scope)
     }
 }
 

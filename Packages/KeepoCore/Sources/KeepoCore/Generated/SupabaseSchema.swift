@@ -216,6 +216,72 @@ public enum PublicSchema {
       case value = "value"
     }
   }
+  public struct BudgetsSelect: Codable, Hashable, Sendable {
+    public let amount: Decimal
+    public let categoryId: UUID?
+    public let createdAt: String
+    public let currency: String
+    public let id: UUID
+    public let ownerId: UUID
+    public let periodMonth: String
+    public let updatedAt: String
+    public let version: Int32
+    public enum CodingKeys: String, CodingKey {
+      case amount = "amount"
+      case categoryId = "category_id"
+      case createdAt = "created_at"
+      case currency = "currency"
+      case id = "id"
+      case ownerId = "owner_id"
+      case periodMonth = "period_month"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct BudgetsInsert: Codable, Hashable, Sendable {
+    public let amount: Decimal
+    public let categoryId: UUID?
+    public let createdAt: String?
+    public let currency: String
+    public let id: UUID?
+    public let ownerId: UUID
+    public let periodMonth: String
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case amount = "amount"
+      case categoryId = "category_id"
+      case createdAt = "created_at"
+      case currency = "currency"
+      case id = "id"
+      case ownerId = "owner_id"
+      case periodMonth = "period_month"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct BudgetsUpdate: Codable, Hashable, Sendable {
+    public let amount: Decimal?
+    public let categoryId: UUID?
+    public let createdAt: String?
+    public let currency: String?
+    public let id: UUID?
+    public let ownerId: UUID?
+    public let periodMonth: String?
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case amount = "amount"
+      case categoryId = "category_id"
+      case createdAt = "created_at"
+      case currency = "currency"
+      case id = "id"
+      case ownerId = "owner_id"
+      case periodMonth = "period_month"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
   public struct CardMappingsSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let cardIdentifier: String
@@ -358,6 +424,48 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case code = "code"
       case minorUnit = "minor_unit"
+    }
+  }
+  public struct FiSettingsSelect: Codable, Hashable, Sendable {
+    public let ownerId: UUID
+    public let realReturnRate: Decimal
+    public let targetAnnualSpend: Decimal?
+    public let updatedAt: String
+    public let withdrawalRate: Decimal
+    public enum CodingKeys: String, CodingKey {
+      case ownerId = "owner_id"
+      case realReturnRate = "real_return_rate"
+      case targetAnnualSpend = "target_annual_spend"
+      case updatedAt = "updated_at"
+      case withdrawalRate = "withdrawal_rate"
+    }
+  }
+  public struct FiSettingsInsert: Codable, Hashable, Sendable {
+    public let ownerId: UUID
+    public let realReturnRate: Decimal?
+    public let targetAnnualSpend: Decimal?
+    public let updatedAt: String?
+    public let withdrawalRate: Decimal?
+    public enum CodingKeys: String, CodingKey {
+      case ownerId = "owner_id"
+      case realReturnRate = "real_return_rate"
+      case targetAnnualSpend = "target_annual_spend"
+      case updatedAt = "updated_at"
+      case withdrawalRate = "withdrawal_rate"
+    }
+  }
+  public struct FiSettingsUpdate: Codable, Hashable, Sendable {
+    public let ownerId: UUID?
+    public let realReturnRate: Decimal?
+    public let targetAnnualSpend: Decimal?
+    public let updatedAt: String?
+    public let withdrawalRate: Decimal?
+    public enum CodingKeys: String, CodingKey {
+      case ownerId = "owner_id"
+      case realReturnRate = "real_return_rate"
+      case targetAnnualSpend = "target_annual_spend"
+      case updatedAt = "updated_at"
+      case withdrawalRate = "withdrawal_rate"
     }
   }
   public struct FxRatesSelect: Codable, Hashable, Sendable {
