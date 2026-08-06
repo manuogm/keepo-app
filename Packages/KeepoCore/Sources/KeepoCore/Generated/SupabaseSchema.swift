@@ -33,6 +33,11 @@ public enum PublicSchema {
     case revoked = "revoked"
     case expired = "expired"
   }
+  public enum ImportCandidateStatus: String, Codable, Hashable, Sendable {
+    case pending = "pending"
+    case accepted = "accepted"
+    case rejected = "rejected"
+  }
   public enum OpsEventLevel: String, Codable, Hashable, Sendable {
     case info = "info"
     case warning = "warning"
@@ -402,6 +407,138 @@ public enum PublicSchema {
       case version = "version"
     }
   }
+  public struct CsvImportBatchesSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let createdAt: String
+    public let filename: String
+    public let id: UUID
+    public let ownerId: UUID
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case createdAt = "created_at"
+      case filename = "filename"
+      case id = "id"
+      case ownerId = "owner_id"
+    }
+  }
+  public struct CsvImportBatchesInsert: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let createdAt: String?
+    public let filename: String
+    public let id: UUID?
+    public let ownerId: UUID
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case createdAt = "created_at"
+      case filename = "filename"
+      case id = "id"
+      case ownerId = "owner_id"
+    }
+  }
+  public struct CsvImportBatchesUpdate: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let createdAt: String?
+    public let filename: String?
+    public let id: UUID?
+    public let ownerId: UUID?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case createdAt = "created_at"
+      case filename = "filename"
+      case id = "id"
+      case ownerId = "owner_id"
+    }
+  }
+  public struct CsvImportCandidatesSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let amount: Decimal
+    public let batchId: UUID
+    public let createdAt: String
+    public let currency: String
+    public let id: UUID
+    public let matchedTransactionId: UUID?
+    public let merchantNormalized: String?
+    public let merchantRaw: String?
+    public let occurredAt: String
+    public let ownerId: UUID
+    public let rawRow: AnyJSON
+    public let status: ImportCandidateStatus
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case amount = "amount"
+      case batchId = "batch_id"
+      case createdAt = "created_at"
+      case currency = "currency"
+      case id = "id"
+      case matchedTransactionId = "matched_transaction_id"
+      case merchantNormalized = "merchant_normalized"
+      case merchantRaw = "merchant_raw"
+      case occurredAt = "occurred_at"
+      case ownerId = "owner_id"
+      case rawRow = "raw_row"
+      case status = "status"
+    }
+  }
+  public struct CsvImportCandidatesInsert: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let amount: Decimal
+    public let batchId: UUID
+    public let createdAt: String?
+    public let currency: String
+    public let id: UUID?
+    public let matchedTransactionId: UUID?
+    public let merchantNormalized: String?
+    public let merchantRaw: String?
+    public let occurredAt: String
+    public let ownerId: UUID
+    public let rawRow: AnyJSON
+    public let status: ImportCandidateStatus?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case amount = "amount"
+      case batchId = "batch_id"
+      case createdAt = "created_at"
+      case currency = "currency"
+      case id = "id"
+      case matchedTransactionId = "matched_transaction_id"
+      case merchantNormalized = "merchant_normalized"
+      case merchantRaw = "merchant_raw"
+      case occurredAt = "occurred_at"
+      case ownerId = "owner_id"
+      case rawRow = "raw_row"
+      case status = "status"
+    }
+  }
+  public struct CsvImportCandidatesUpdate: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let amount: Decimal?
+    public let batchId: UUID?
+    public let createdAt: String?
+    public let currency: String?
+    public let id: UUID?
+    public let matchedTransactionId: UUID?
+    public let merchantNormalized: String?
+    public let merchantRaw: String?
+    public let occurredAt: String?
+    public let ownerId: UUID?
+    public let rawRow: AnyJSON?
+    public let status: ImportCandidateStatus?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case amount = "amount"
+      case batchId = "batch_id"
+      case createdAt = "created_at"
+      case currency = "currency"
+      case id = "id"
+      case matchedTransactionId = "matched_transaction_id"
+      case merchantNormalized = "merchant_normalized"
+      case merchantRaw = "merchant_raw"
+      case occurredAt = "occurred_at"
+      case ownerId = "owner_id"
+      case rawRow = "raw_row"
+      case status = "status"
+    }
+  }
   public struct CurrenciesSelect: Codable, Hashable, Sendable {
     public let code: String
     public let minorUnit: Int16
@@ -424,6 +561,48 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case code = "code"
       case minorUnit = "minor_unit"
+    }
+  }
+  public struct ExportAuditLogSelect: Codable, Hashable, Sendable {
+    public let accountIds: [UUID]
+    public let exportedAt: String
+    public let id: UUID
+    public let ownerId: UUID
+    public let rowCount: Int32
+    public enum CodingKeys: String, CodingKey {
+      case accountIds = "account_ids"
+      case exportedAt = "exported_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case rowCount = "row_count"
+    }
+  }
+  public struct ExportAuditLogInsert: Codable, Hashable, Sendable {
+    public let accountIds: [UUID]
+    public let exportedAt: String?
+    public let id: UUID?
+    public let ownerId: UUID
+    public let rowCount: Int32
+    public enum CodingKeys: String, CodingKey {
+      case accountIds = "account_ids"
+      case exportedAt = "exported_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case rowCount = "row_count"
+    }
+  }
+  public struct ExportAuditLogUpdate: Codable, Hashable, Sendable {
+    public let accountIds: [UUID]?
+    public let exportedAt: String?
+    public let id: UUID?
+    public let ownerId: UUID?
+    public let rowCount: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case accountIds = "account_ids"
+      case exportedAt = "exported_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case rowCount = "row_count"
     }
   }
   public struct FiSettingsSelect: Codable, Hashable, Sendable {

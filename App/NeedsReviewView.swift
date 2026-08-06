@@ -92,17 +92,35 @@ struct NeedsReviewView: View {
                 NeedsReviewRow(item: item, minorUnit: minorUnit(for: item.currency))
             }
         }
-        .swipeActions(edge: .trailing) {
-            if item.kind == "sync_conflict" {
-                Button("Resolve") {
-                    Task { await resolve(item) }
-                }
-                .tint(Color("BrandPrimary"))
-            } else if item.kind == "pending_capture" {
-                Button("Confirm") {
-                    Task { await confirmCapture(item) }
-                }
-                .tint(Color("BrandPrimary"))
+        .swipeActions(edge: .trailing) { trailingActions(item) }
+        .swipeActions(edge: .leading) { leadingActions(item) }
+    }
+
+    @ViewBuilder
+    private func trailingActions(_ item: PublicSchema.NeedsReviewSelect) -> some View {
+        if item.kind == "sync_conflict" {
+            Button("Resolve") {
+                Task { await resolve(item) }
+            }
+            .tint(Color("BrandPrimary"))
+        } else if item.kind == "pending_capture" {
+            Button("Confirm") {
+                Task { await confirmCapture(item) }
+            }
+            .tint(Color("BrandPrimary"))
+        } else if item.kind == "csv_import_candidate" {
+            Button("Accept") {
+                Task { await acceptImportCandidate(item) }
+            }
+            .tint(Color("BrandPrimary"))
+        }
+    }
+
+    @ViewBuilder
+    private func leadingActions(_ item: PublicSchema.NeedsReviewSelect) -> some View {
+        if item.kind == "csv_import_candidate" {
+            Button("Reject", role: .destructive) {
+                Task { await rejectImportCandidate(item) }
             }
         }
     }
@@ -161,6 +179,28 @@ struct NeedsReviewView: View {
             _ = try await CaptureRepository.confirmCapture(
                 client: session.client, id: id, expectedVersion: Int(version)
             )
+            session.refresh.bump()
+        } catch {
+            actionErrorMessage = UserFacingError.describe(error)
+        }
+    }
+
+    private func acceptImportCandidate(_ item: PublicSchema.NeedsReviewSelect) async {
+        guard let id = item.itemId else { return }
+        actionErrorMessage = nil
+        do {
+            try await ImportRepository.accept(client: session.client, id: id)
+            session.refresh.bump()
+        } catch {
+            actionErrorMessage = UserFacingError.describe(error)
+        }
+    }
+
+    private func rejectImportCandidate(_ item: PublicSchema.NeedsReviewSelect) async {
+        guard let id = item.itemId else { return }
+        actionErrorMessage = nil
+        do {
+            try await ImportRepository.reject(client: session.client, id: id)
             session.refresh.bump()
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
@@ -272,6 +312,7 @@ private struct NeedsReviewRow: View {
         case "reconciliation_gap": return "arrow.triangle.2.circlepath"
         case "pending_capture": return "wallet.pass"
         case "ambiguous_card": return "creditcard.trianglebadge.exclamationmark"
+        case "csv_import_candidate": return "doc.text.magnifyingglass"
         default: return "questionmark.circle"
         }
     }

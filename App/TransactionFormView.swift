@@ -1,12 +1,10 @@
 import KeepoCore
 import SwiftUI
 
-/// One component for all three transaction kinds — per CLAUDE.md's
-/// Engineering Principles, screens that handle the same concept share one
-/// implementation rather than three near-duplicates. Used for both create
-/// and edit (app-architecture.md §2). The received-amount field appears
-/// only when the two accounts' currencies differ (spec §Transaction Entry);
-/// for a same-currency transfer it's inferred and never shown.
+/// One component for all three transaction kinds (CLAUDE.md's reuse
+/// principle), for both create and edit. The received-amount field appears
+/// only when the two accounts' currencies differ; inferred and hidden
+/// otherwise.
 struct TransactionFormView: View {
     let session: SessionStore
     /// `.create` for a new transaction; `.edit` pre-fills every field from
@@ -42,9 +40,7 @@ struct TransactionFormView: View {
     @State private var selectedToAccountId: UUID?
     @State private var receivedAmountText = ""
 
-    // Populated in edit mode: the version(s) the save call sends back so the
-    // DB can detect a lost update. A transfer needs both legs' versions and
-    // their shared transfer_group_id.
+    // Edit-mode versions the save call sends back for lost-update detection.
     @State private var editingId: UUID?
     @State private var editingFromVersion: Int?
     @State private var editingToVersion: Int?
@@ -55,6 +51,8 @@ struct TransactionFormView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showConflictAlert = false
+    @State private var divergenceWarning: RateDivergence?
+    @State private var transferDivergenceConfirmed = false
 
     private var isEditing: Bool {
         if case .edit = mode { return true }
@@ -151,6 +149,10 @@ struct TransactionFormView: View {
             } message: {
                 Text("Showing the latest version — review it and save again.")
             }
+            .transferDivergenceAlert($divergenceWarning) {
+                transferDivergenceConfirmed = true
+                Task { await save() }
+            }
         }
         .task { await load() }
     }
@@ -175,29 +177,17 @@ struct TransactionFormView: View {
         return false
     }
 
-    /// Falls back to the same on-device cache `AccountsListView`/
-    /// `CategoriesView` already populate when the live fetch fails — an
-    /// offline create otherwise has no way to populate its own pickers at
-    /// all, even though the write itself (via the outbox) works offline.
+    /// Falls back to `TransactionFormCache` when the live fetch fails — an
+    /// offline create otherwise has no way to populate its own pickers.
     private func load() async {
         async let accountsResult = AccountRepository.fetchAllWithBalances(client: session.client)
         async let categoriesResult = CategoryRepository.fetchAll(client: session.client)
-        accounts = (try? await accountsResult) ?? cachedAccounts()
-        categories = (try? await categoriesResult) ?? cachedCategories()
+        accounts = (try? await accountsResult) ?? TransactionFormCache.accounts(session: session)
+        categories = (try? await categoriesResult) ?? TransactionFormCache.categories(session: session)
 
         if case .edit(let transaction, let sibling) = mode {
             apply(transaction: transaction, sibling: sibling)
         }
-    }
-
-    private func cachedAccounts() -> [PublicSchema.AccountsWithBalancesSelect] {
-        guard let (data, _) = session.payloadCache.load(key: "accounts_with_balances") else { return [] }
-        return (try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data)) ?? []
-    }
-
-    private func cachedCategories() -> [PublicSchema.CategoriesSelect] {
-        guard let (data, _) = session.payloadCache.load(key: "categories") else { return [] }
-        return (try? JSONDecoder().decode([PublicSchema.CategoriesSelect].self, from: data)) ?? []
     }
 
     /// Shared by the initial edit-mode prefill and by a post-conflict
@@ -276,7 +266,7 @@ extension TransactionFormView {
             case (true, .transfer):
                 try await updateTransfer(magnitude: magnitude)
             }
-            if !showConflictAlert {
+            if !showConflictAlert && divergenceWarning == nil {
                 onSaved()
                 dismiss()
             }
@@ -286,14 +276,9 @@ extension TransactionFormView {
         isSaving = false
     }
 
-    /// Every write below goes through `session.outbox`, never
-    /// `TransactionRepository` directly (Phase 11) — it attempts the real
-    /// network call immediately and only falls back to the offline queue
-    /// on failure, so an online save behaves exactly as before and an
-    /// offline one is queued instead of erroring. `.queued` is treated the
-    /// same as success here: from the user's perspective they saved
-    /// something, and the app-wide stale-pending banner is what surfaces
-    /// "this hasn't actually reached the server yet" — not a per-save error.
+    /// Every write below goes through `session.outbox` (Phase 11), never
+    /// `TransactionRepository` directly — an offline save queues instead of
+    /// erroring; the app-wide stale-pending banner surfaces that, not this.
     fileprivate func saveLedgerTransaction(accountId: UUID, magnitude: Decimal) async throws {
         guard let userId = session.profile?.id, let categoryId = selectedCategoryId, let account = fromAccount else {
             errorMessage = "Choose a category."
@@ -321,6 +306,18 @@ extension TransactionFormView {
             errorMessage = "Enter a valid received amount."
             return
         }
+
+        if !transferDivergenceConfirmed, needsReceivedAmount, let toAmount = receivedAmount,
+           let source = fromAccount, let destination = toAccount,
+           let sourceCurrency = source.currency, let destinationCurrency = destination.currency {
+            divergenceWarning = await TransferDivergenceCheck.evaluate(
+                client: session.client, sourceCurrency: sourceCurrency, destinationCurrency: destinationCurrency,
+                fromAmount: magnitude, toAmount: toAmount, occurredAt: occurredAt
+            )
+            if divergenceWarning != nil { return }
+        }
+        transferDivergenceConfirmed = false
+
         let payload = CreateTransferPayload(
             fromId: UUID(), toId: UUID(), fromAccountId: accountId, toAccountId: toAccountId,
             fromAmount: magnitude, toAmount: receivedAmount, occurredAt: occurredAt

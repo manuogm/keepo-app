@@ -82,6 +82,19 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        NavigationLink("Import CSV") {
+                            CSVImportView(session: session)
+                        }
+                        NavigationLink("Export") {
+                            ExportView(session: session)
+                        }
+                    } header: {
+                        Text("Data")
+                    } footer: {
+                        Text("Bring in a bank statement, or take everything with you.")
+                    }
+
+                    Section {
                         NavigationLink("Security") {
                             SecuritySettingsView(session: session)
                         }

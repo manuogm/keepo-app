@@ -33,6 +33,61 @@ public extension TransactionRepository {
         )
         try await client.rpc("create_transfer", params: params).execute()
     }
+
+    /// A read-only pre-check the caller runs before `createTransfer` on a
+    /// cross-currency transfer — never inside it, so `createTransfer`'s own
+    /// signature and every existing caller stay untouched. `nil` means the
+    /// divergence can't be computed at all (no market rate for that day, a
+    /// missing-rate state per money rule 5) — the caller should treat that
+    /// as "nothing to warn about," not as "diverges."
+    static func checkTransferRateDivergence(
+        client: SupabaseClient,
+        fromCurrency: String,
+        toCurrency: String,
+        fromAmount: Decimal,
+        toAmount: Decimal,
+        occurredAt: Date = Date()
+    ) async throws -> RateDivergence? {
+        let params = CheckTransferRateDivergenceParams(
+            fromCurrency: fromCurrency,
+            toCurrency: toCurrency,
+            fromAmount: fromAmount,
+            toAmount: toAmount,
+            occurredAt: PostgresDate.timestampString(occurredAt)
+        )
+        let rows: [RateDivergence] = try await client.rpc("check_transfer_rate_divergence", params: params)
+            .execute()
+            .value
+        return rows.first
+    }
+}
+
+public struct RateDivergence: Decodable, Sendable {
+    public let diverges: Bool
+    public let impliedRate: Decimal
+    public let marketRate: Decimal
+    public let pctDiff: Decimal
+    enum CodingKeys: String, CodingKey {
+        case diverges
+        case impliedRate = "implied_rate"
+        case marketRate = "market_rate"
+        case pctDiff = "pct_diff"
+    }
+}
+
+private struct CheckTransferRateDivergenceParams: Encodable {
+    let fromCurrency: String
+    let toCurrency: String
+    let fromAmount: Decimal
+    let toAmount: Decimal
+    let occurredAt: String
+    enum CodingKeys: String, CodingKey {
+        case fromCurrency = "p_from_currency"
+        case toCurrency = "p_to_currency"
+        case fromAmount = "p_from_amount"
+        case toAmount = "p_to_amount"
+        case occurredAt = "p_occurred_at"
+    }
 }
 
 /// The outcome of a version-checked write (edit or delete). `.conflict`
