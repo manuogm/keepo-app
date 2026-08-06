@@ -24,6 +24,31 @@
 -- that one is created by the app itself on first launch via a real signUp
 -- call and is untouched by this file.
 
+-- Local-only placeholder vault secrets (Phase 13) — never real values.
+-- Seeded FIRST, before any account/profile insert below, since those fire
+-- the FX-backfill triggers immediately — seeding secrets after them would
+-- mean this file's own inserts always log a missing_vault_secret error on
+-- every fresh `db reset`. The Edge Functions themselves still need
+-- matching env vars (`supabase functions serve --env-file ...`) to accept
+-- these — see version-logs/phase-13-log.md for the exact local values.
+select vault.create_secret(
+  'http://host.docker.internal:54321/functions/v1/sync-fx-rates', 'fx_sync_url', 'sync-fx-rates Edge Function URL'
+)
+where not exists (select 1 from vault.decrypted_secrets where name = 'fx_sync_url');
+
+select vault.create_secret('local-dev-fx-sync-secret', 'fx_sync_secret', 'X-Fx-Sync-Secret header value')
+where not exists (select 1 from vault.decrypted_secrets where name = 'fx_sync_secret');
+
+select vault.create_secret(
+  'http://host.docker.internal:54321/functions/v1/alert-operator', 'alert_operator_url', 'alert-operator Edge Function URL'
+)
+where not exists (select 1 from vault.decrypted_secrets where name = 'alert_operator_url');
+
+select vault.create_secret(
+  'local-dev-alert-operator-secret', 'alert_operator_secret', 'X-Alert-Operator-Secret header value'
+)
+where not exists (select 1 from vault.decrypted_secrets where name = 'alert_operator_secret');
+
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data,

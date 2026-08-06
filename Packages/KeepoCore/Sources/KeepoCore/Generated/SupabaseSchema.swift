@@ -33,6 +33,11 @@ public enum PublicSchema {
     case revoked = "revoked"
     case expired = "expired"
   }
+  public enum OpsEventLevel: String, Codable, Hashable, Sendable {
+    case info = "info"
+    case warning = "warning"
+    case error = "error"
+  }
   public enum TransactionSource: String, Codable, Hashable, Sendable {
     case manual = "manual"
     case capture = "capture"
@@ -612,6 +617,84 @@ public enum PublicSchema {
       case currency = "currency"
       case ownerId = "owner_id"
       case updatedAt = "updated_at"
+    }
+  }
+  public struct OpsEventsSelect: Codable, Hashable, Sendable {
+    public let code: String
+    public let detail: AnyJSON?
+    public let id: UUID
+    public let level: OpsEventLevel
+    public let occurredAt: String
+    public let source: String
+    public enum CodingKeys: String, CodingKey {
+      case code = "code"
+      case detail = "detail"
+      case id = "id"
+      case level = "level"
+      case occurredAt = "occurred_at"
+      case source = "source"
+    }
+  }
+  public struct OpsEventsInsert: Codable, Hashable, Sendable {
+    public let code: String
+    public let detail: AnyJSON?
+    public let id: UUID?
+    public let level: OpsEventLevel
+    public let occurredAt: String?
+    public let source: String
+    public enum CodingKeys: String, CodingKey {
+      case code = "code"
+      case detail = "detail"
+      case id = "id"
+      case level = "level"
+      case occurredAt = "occurred_at"
+      case source = "source"
+    }
+  }
+  public struct OpsEventsUpdate: Codable, Hashable, Sendable {
+    public let code: String?
+    public let detail: AnyJSON?
+    public let id: UUID?
+    public let level: OpsEventLevel?
+    public let occurredAt: String?
+    public let source: String?
+    public enum CodingKeys: String, CodingKey {
+      case code = "code"
+      case detail = "detail"
+      case id = "id"
+      case level = "level"
+      case occurredAt = "occurred_at"
+      case source = "source"
+    }
+  }
+  public struct OpsRateLimitsSelect: Codable, Hashable, Sendable {
+    public let count: Int32
+    public let functionName: String
+    public let windowStartedAt: String
+    public enum CodingKeys: String, CodingKey {
+      case count = "count"
+      case functionName = "function_name"
+      case windowStartedAt = "window_started_at"
+    }
+  }
+  public struct OpsRateLimitsInsert: Codable, Hashable, Sendable {
+    public let count: Int32?
+    public let functionName: String
+    public let windowStartedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case count = "count"
+      case functionName = "function_name"
+      case windowStartedAt = "window_started_at"
+    }
+  }
+  public struct OpsRateLimitsUpdate: Codable, Hashable, Sendable {
+    public let count: Int32?
+    public let functionName: String?
+    public let windowStartedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case count = "count"
+      case functionName = "function_name"
+      case windowStartedAt = "window_started_at"
     }
   }
   public struct ProfilesSelect: Codable, Hashable, Sendable {

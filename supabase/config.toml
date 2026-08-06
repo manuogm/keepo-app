@@ -390,6 +390,13 @@ deno_version = 2
 [functions.sync-fx-rates]
 verify_jwt = false
 
+# alert-operator is gated by an X-Alert-Operator-Secret header — the caller
+# is ops_check_and_alert() via pg_net, never a signed-in user. Without this,
+# the platform's own JWT gate would 401 the call before it ever reached the
+# function's own secret check.
+[functions.alert-operator]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
