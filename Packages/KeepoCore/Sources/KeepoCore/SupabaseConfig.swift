@@ -19,6 +19,28 @@ public struct SupabaseConfig: Sendable {
     public var isLocal: Bool {
         url.host == "127.0.0.1" || url.host == "localhost"
     }
+
+    /// Both `SessionStore.init()` and `CaptureIntent.perform()` (Phase 12)
+    /// read the same Info.plist keys — the one place, so a config typo is
+    /// one fix, not two. `SessionStore` still `fatalError`s on failure (a
+    /// misconfigured build is unusable either way); an Intent should not
+    /// crash the host app over it, so this throws instead and lets the
+    /// caller decide.
+    public static func fromInfoPlist(bundle: Bundle = .main) throws -> SupabaseConfig {
+        guard
+            let urlString = bundle.object(forInfoDictionaryKey: "SupabaseURL") as? String,
+            let url = URL(string: urlString),
+            let anonKey = bundle.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String,
+            !anonKey.isEmpty
+        else {
+            throw SupabaseConfigError.missingInfoPlistKeys
+        }
+        return SupabaseConfig(url: url, anonKey: anonKey)
+    }
+}
+
+public enum SupabaseConfigError: Error {
+    case missingInfoPlistKeys
 }
 
 public func makeSupabaseClient(config: SupabaseConfig) -> SupabaseClient {

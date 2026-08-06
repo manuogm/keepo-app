@@ -209,6 +209,20 @@ public enum TransactionRepository {
             .value
     }
 
+    /// A single row by id — used by Needs Review to open a pending capture
+    /// for review (edit) or to read its current `version` before confirming
+    /// it, without fetching the whole list.
+    public static func fetchOne(
+        client: SupabaseClient, id: UUID
+    ) async throws -> PublicSchema.TransactionsWithDetailsSelect? {
+        let rows: [PublicSchema.TransactionsWithDetailsSelect] = try await client.from("transactions_with_details")
+            .select()
+            .eq("transaction_id", value: id)
+            .execute()
+            .value
+        return rows.first
+    }
+
     /// Expense or income — a plain insert. The DB's sign_matches_category_kind
     /// CHECK makes a wrong sign impossible; nothing here re-signs the amount
     /// (money rule: never re-sign in application code). `amount` must

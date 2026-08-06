@@ -12,6 +12,10 @@ struct NeedsReviewView: View {
     @State private var store = DataStore<PublicSchema.NeedsReviewSelect>()
     @State private var currencyMinorUnits: [String: Int] = [:]
     @State private var actionErrorMessage: String?
+    @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
+    @State private var showEditingTransaction = false
+    @State private var mappingCard: PublicSchema.NeedsReviewSelect?
+    @State private var showCardMapping = false
 
     var body: some View {
         ZStack {
@@ -44,6 +48,20 @@ struct NeedsReviewView: View {
         }
         .navigationTitle("Needs Review")
         .task(id: session.refresh.token) { await load() }
+        .navigationDestination(isPresented: $showEditingTransaction) {
+            if let editingTransaction {
+                TransactionFormView(session: session, mode: .edit(editingTransaction, sibling: nil)) {
+                    session.refresh.bump()
+                }
+            }
+        }
+        .sheet(isPresented: $showCardMapping) {
+            if let mappingCard {
+                MapCardSheet(session: session, item: mappingCard) {
+                    session.refresh.bump()
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -55,6 +73,21 @@ struct NeedsReviewView: View {
                 } label: {
                     NeedsReviewRow(item: item, minorUnit: minorUnit(for: item.currency))
                 }
+            } else if item.kind == "pending_capture" {
+                Button {
+                    Task { await openForReview(item) }
+                } label: {
+                    NeedsReviewRow(item: item, minorUnit: minorUnit(for: item.currency))
+                }
+                .buttonStyle(.plain)
+            } else if item.kind == "ambiguous_card" {
+                Button {
+                    mappingCard = item
+                    showCardMapping = true
+                } label: {
+                    NeedsReviewRow(item: item, minorUnit: minorUnit(for: item.currency))
+                }
+                .buttonStyle(.plain)
             } else {
                 NeedsReviewRow(item: item, minorUnit: minorUnit(for: item.currency))
             }
@@ -63,6 +96,11 @@ struct NeedsReviewView: View {
             if item.kind == "sync_conflict" {
                 Button("Resolve") {
                     Task { await resolve(item) }
+                }
+                .tint(Color("BrandPrimary"))
+            } else if item.kind == "pending_capture" {
+                Button("Confirm") {
+                    Task { await confirmCapture(item) }
                 }
                 .tint(Color("BrandPrimary"))
             }
@@ -90,6 +128,114 @@ struct NeedsReviewView: View {
             session.refresh.bump()
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
+        }
+    }
+
+    /// The review screen is `TransactionFormView` in edit mode, not a
+    /// bespoke capture-review screen (app-architecture.md) — this only
+    /// fetches the one row `needs_review` doesn't carry in full.
+    private func openForReview(_ item: PublicSchema.NeedsReviewSelect) async {
+        guard let id = item.itemId else { return }
+        actionErrorMessage = nil
+        do {
+            guard let transaction = try await TransactionRepository.fetchOne(client: session.client, id: id) else {
+                return
+            }
+            editingTransaction = transaction
+            showEditingTransaction = true
+        } catch {
+            actionErrorMessage = UserFacingError.describe(error)
+        }
+    }
+
+    /// Confirming only ever flips `status` — any field edit goes through
+    /// `openForReview`'s normal transaction-edit path first. Needs the
+    /// row's current version, which `needs_review` doesn't carry, hence
+    /// the extra fetch.
+    private func confirmCapture(_ item: PublicSchema.NeedsReviewSelect) async {
+        guard let id = item.itemId else { return }
+        actionErrorMessage = nil
+        do {
+            guard let transaction = try await TransactionRepository.fetchOne(client: session.client, id: id),
+                  let version = transaction.version else { return }
+            _ = try await CaptureRepository.confirmCapture(
+                client: session.client, id: id, expectedVersion: Int(version)
+            )
+            session.refresh.bump()
+        } catch {
+            actionErrorMessage = UserFacingError.describe(error)
+        }
+    }
+}
+
+/// Resolves an `ambiguous_card` item — `item.subtitle` carries the raw
+/// `card_identifier` (see migration 20260807160000's comment on why it's
+/// there and not parsed out of `title`). Only ledger (spendable) accounts
+/// are offered — `map_card` itself refuses anything else.
+private struct MapCardSheet: View {
+    let session: SessionStore
+    let item: PublicSchema.NeedsReviewSelect
+    let onMapped: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var accounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var selectedAccountId: UUID?
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let cardIdentifier = item.subtitle {
+                    Section("Card") {
+                        Text(cardIdentifier)
+                    }
+                }
+                Section("Route charges to") {
+                    Picker("Account", selection: $selectedAccountId) {
+                        Text("Choose an account").tag(UUID?.none)
+                        ForEach(ledgerAccounts, id: \.accountId) { account in
+                            Text(account.name ?? "—").tag(account.accountId)
+                        }
+                    }
+                }
+                if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Map Card")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Map") { Task { await mapCard() } }
+                        .disabled(selectedAccountId == nil || isSaving)
+                }
+            }
+            .task {
+                accounts = (try? await AccountRepository.fetchAllWithBalances(client: session.client)) ?? []
+            }
+        }
+    }
+
+    private var ledgerAccounts: [PublicSchema.AccountsWithBalancesSelect] {
+        accounts.filter { $0.kind == .ledger && $0.archivedAt == nil }
+    }
+
+    private func mapCard() async {
+        guard let selectedAccountId, let cardIdentifier = item.subtitle else { return }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            try await CaptureRepository.mapCard(
+                client: session.client, cardIdentifier: cardIdentifier, accountId: selectedAccountId
+            )
+            onMapped()
+            dismiss()
+        } catch {
+            errorMessage = UserFacingError.describe(error)
         }
     }
 }
@@ -124,6 +270,8 @@ private struct NeedsReviewRow: View {
         switch item.kind {
         case "sync_conflict": return "exclamationmark.arrow.triangle.2.circlepath"
         case "reconciliation_gap": return "arrow.triangle.2.circlepath"
+        case "pending_capture": return "wallet.pass"
+        case "ambiguous_card": return "creditcard.trianglebadge.exclamationmark"
         default: return "questionmark.circle"
         }
     }

@@ -206,6 +206,54 @@ public enum PublicSchema {
       case value = "value"
     }
   }
+  public struct CardMappingsSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let cardIdentifier: String
+    public let createdAt: String
+    public let id: UUID
+    public let ownerId: UUID
+    public let updatedAt: String
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case cardIdentifier = "card_identifier"
+      case createdAt = "created_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct CardMappingsInsert: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let cardIdentifier: String
+    public let createdAt: String?
+    public let id: UUID?
+    public let ownerId: UUID
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case cardIdentifier = "card_identifier"
+      case createdAt = "created_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct CardMappingsUpdate: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let cardIdentifier: String?
+    public let createdAt: String?
+    public let id: UUID?
+    public let ownerId: UUID?
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case cardIdentifier = "card_identifier"
+      case createdAt = "created_at"
+      case id = "id"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+    }
+  }
   public struct CategoriesSelect: Codable, Hashable, Sendable {
     public let createdAt: String
     public let deletedAt: String?
@@ -480,6 +528,42 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case createdAt = "created_at"
       case id = "id"
+    }
+  }
+  public struct MerchantCategoryMapSelect: Codable, Hashable, Sendable {
+    public let categoryId: UUID
+    public let merchantPattern: String
+    public let ownerId: UUID
+    public let updatedAt: String
+    public enum CodingKeys: String, CodingKey {
+      case categoryId = "category_id"
+      case merchantPattern = "merchant_pattern"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct MerchantCategoryMapInsert: Codable, Hashable, Sendable {
+    public let categoryId: UUID
+    public let merchantPattern: String
+    public let ownerId: UUID
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case categoryId = "category_id"
+      case merchantPattern = "merchant_pattern"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct MerchantCategoryMapUpdate: Codable, Hashable, Sendable {
+    public let categoryId: UUID?
+    public let merchantPattern: String?
+    public let ownerId: UUID?
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case categoryId = "category_id"
+      case merchantPattern = "merchant_pattern"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
     }
   }
   public struct NetWorthDailySelect: Codable, Hashable, Sendable {

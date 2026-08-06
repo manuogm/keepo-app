@@ -41,6 +41,32 @@ struct AmountParserTests {
     }
 }
 
+@Suite("AmountParser.parseFormattedCurrency")
+struct AmountParserFormattedCurrencyTests {
+    @Test("strips a dollar sign")
+    func stripsDollarSign() {
+        #expect(AmountParser.parseFormattedCurrency("$1.06", locale: Locale(identifier: "en_US")) == Decimal(string: "1.06"))
+    }
+
+    @Test("strips a euro sign and thousands grouping")
+    func stripsEuroAndGrouping() {
+        let result = AmountParser.parseFormattedCurrency("€1.234,56", locale: Locale(identifier: "de_DE"))
+        #expect(result == Decimal(string: "1234.56"))
+    }
+
+    @Test("the stripped symbol never changes the parsed magnitude regardless of currency")
+    func symbolIsIgnored() {
+        let dollars = AmountParser.parseFormattedCurrency("$1.06", locale: Locale(identifier: "en_US"))
+        let plain = AmountParser.parseFormattedCurrency("1.06", locale: Locale(identifier: "en_US"))
+        #expect(dollars == plain)
+    }
+
+    @Test("garbage-only input returns nil")
+    func garbageReturnsNil() {
+        #expect(AmountParser.parseFormattedCurrency("???", locale: Locale(identifier: "en_US")) == nil)
+    }
+}
+
 @Suite("AmountFormatter")
 struct AmountFormatterTests {
     @Test("round-trips through AmountParser on a comma-decimal locale")

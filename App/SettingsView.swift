@@ -57,6 +57,22 @@ struct SettingsView: View {
                         }
                     }
 
+                    Section {
+                        NavigationLink("Set Up Apple Pay Capture") {
+                            WalletAutomationGuideView()
+                        }
+                    } footer: {
+                        Text("Log Apple Pay purchases automatically via a Shortcuts automation on the Wallet trigger.")
+                    }
+
+                    #if DEBUG
+                    Section("Developer") {
+                        NavigationLink("Simulate Capture") {
+                            SimulateCaptureView(session: session)
+                        }
+                    }
+                    #endif
+
                     if let errorMessage {
                         Text(errorMessage)
                             .font(.footnote)

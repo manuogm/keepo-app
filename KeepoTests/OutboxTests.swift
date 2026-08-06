@@ -1,4 +1,5 @@
 import Foundation
+import KeepoCore
 import SwiftData
 import Testing
 @testable import Keepo
@@ -100,6 +101,40 @@ struct OutboxTests {
         #expect(sender.lastUpdateTransactionPayload?.amount == -30)
     }
 
+    @Test("a capture that fails to send is queued; draining replays it")
+    func captureQueuesThenDrains() async throws {
+        let sender = StubTransactionSender()
+        sender.captureTransactionResult = .failure(StubSenderError.network)
+        let outbox = try makeOutbox(sender: sender)
+        let payload = CaptureTransactionPayload(
+            id: UUID(), cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
+            amount: -4.50, occurredAt: Date(), externalId: "ext-1"
+        )
+
+        let submitResult = await outbox.submitCaptureTransaction(payload)
+        #expect(submitResult == .queued)
+        #expect(outbox.pendingCount == 1)
+
+        sender.captureTransactionResult = .success(CaptureResult(mapped: true, accountId: UUID()))
+        await outbox.drainAll()
+        #expect(outbox.pendingCount == 0)
+    }
+
+    @Test("an unmapped-card capture is delivered, not queued — mapped=false is data, not a failure")
+    func captureUnmappedIsDeliveredNotQueued() async throws {
+        let sender = StubTransactionSender()
+        sender.captureTransactionResult = .success(CaptureResult(mapped: false, accountId: nil))
+        let outbox = try makeOutbox(sender: sender)
+        let payload = CaptureTransactionPayload(
+            id: UUID(), cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
+            amount: -4.50, occurredAt: Date(), externalId: "ext-1"
+        )
+
+        let submitResult = await outbox.submitCaptureTransaction(payload)
+        #expect(submitResult == .applied(mapped: false))
+        #expect(outbox.pendingCount == 0)
+    }
+
     @Test("hasStalePending is threshold-relative, not a bare pending count")
     func stalePendingThreshold() async throws {
         let sender = StubTransactionSender()
@@ -128,6 +163,7 @@ private final class StubTransactionSender: TransactionOutboxSending, @unchecked 
     var updateTransferResult: Result<Bool, Error> = .success(true)
     var deleteTransactionResult: Result<Bool, Error> = .success(true)
     var deleteTransferResult: Result<Bool, Error> = .success(true)
+    var captureTransactionResult: Result<CaptureResult, Error> = .success(CaptureResult(mapped: true, accountId: nil))
 
     private(set) var lastUpdateTransactionPayload: UpdateTransactionPayload?
 
@@ -154,5 +190,9 @@ private final class StubTransactionSender: TransactionOutboxSending, @unchecked 
 
     func deleteTransfer(_ payload: DeleteTransferPayload) async throws -> Bool {
         try deleteTransferResult.get()
+    }
+
+    func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult {
+        try captureTransactionResult.get()
     }
 }

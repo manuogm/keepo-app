@@ -16,6 +16,11 @@ public protocol TransactionOutboxSending: Sendable {
     func updateTransfer(_ payload: UpdateTransferPayload) async throws -> Bool
     func deleteTransaction(_ payload: DeleteTransactionPayload) async throws -> Bool
     func deleteTransfer(_ payload: DeleteTransferPayload) async throws -> Bool
+    /// No conflict/applied distinction — a capture is an insert-or-noop
+    /// keyed by `externalId`, never an edit of an existing row. `mapped`
+    /// tells the caller (the App Intent, composing its local notification)
+    /// whether the card was already known; it is not a retry signal.
+    func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult
 }
 
 /// The real, network-backed sender — a thin wrapper around
@@ -92,6 +97,24 @@ public struct LiveTransactionOutboxSender: TransactionOutboxSending {
         )
     }
 
+    public func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult {
+        do {
+            return try await CaptureRepository.capture(
+                client: client, id: payload.id, cardIdentifier: payload.cardIdentifier,
+                merchantRaw: payload.merchantRaw, merchantNormalized: payload.merchantNormalized,
+                amount: payload.amount, occurredAt: payload.occurredAt, externalId: payload.externalId
+            )
+        } catch {
+            // A retried capture already landed under this id — we don't know
+            // whether it was mapped without a re-fetch, and nothing reads
+            // this result on the drain path (see Outbox.replay below), so a
+            // placeholder is fine here; only the immediate, non-retry call
+            // from CaptureIntent ever surfaces `mapped` to a human.
+            if Self.isDuplicateKey(error) { return CaptureResult(mapped: true, accountId: nil) }
+            throw error
+        }
+    }
+
     private static func isDuplicateKey(_ error: Error) -> Bool {
         (error as? PostgrestError)?.code == "23505"
     }
@@ -105,8 +128,14 @@ public enum OutboxSubmitResult: Equatable {
     case queued
 }
 
+public enum OutboxCaptureResult: Equatable, Sendable {
+    case applied(mapped: Bool)
+    case queued
+}
+
 private enum OutboxKind: String {
     case createTransaction, createTransfer, updateTransaction, updateTransfer, deleteTransaction, deleteTransfer
+    case captureTransaction
 }
 
 /// Every write attempts to send immediately; only a thrown error (offline,
@@ -198,6 +227,23 @@ public final class Outbox {
         }
     }
 
+    /// The App Intent's write. Not routed through the generic `attempt`
+    /// helper — a capture's success has a third piece of information
+    /// (`mapped`) the intent needs for its notification text, which the
+    /// applied/conflict `Bool` every other write shares can't carry.
+    public func submitCaptureTransaction(_ payload: CaptureTransactionPayload) async -> OutboxCaptureResult {
+        do {
+            let result = try await sender.captureTransaction(payload)
+            return .applied(mapped: result.mapped)
+        } catch {
+            enqueue(
+                id: payload.id, kind: .captureTransaction, payload: payload, expectedVersion: nil,
+                lastError: String(describing: error)
+            )
+            return .queued
+        }
+    }
+
     /// FIFO by `createdAt` — the order rows first needed syncing, not the
     /// order they were last edited.
     public func drainAll() async {
@@ -279,6 +325,10 @@ public final class Outbox {
             return try await sender.deleteTransaction(payload)
         case .deleteTransfer:
             return try await sender.deleteTransfer(decoder.decode(DeleteTransferPayload.self, from: item.payloadJSON))
+        case .captureTransaction:
+            let payload = try decoder.decode(CaptureTransactionPayload.self, from: item.payloadJSON)
+            _ = try await sender.captureTransaction(payload)
+            return true
         }
     }
 

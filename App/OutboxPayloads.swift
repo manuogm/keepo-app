@@ -103,6 +103,33 @@ public struct DeleteTransactionPayload: Codable, Sendable {
     }
 }
 
+/// The App Intent's write, generalized into the outbox as its 7th
+/// operation (anticipated in Phase 11's log). No `expectedVersion` — a
+/// capture has nothing to conflict against, it's an insert-or-noop keyed by
+/// `externalId`, not an edit of an existing row.
+public struct CaptureTransactionPayload: Codable, Sendable {
+    public let id: UUID
+    public let cardIdentifier: String
+    public let merchantRaw: String
+    public let merchantNormalized: String
+    public let amount: Decimal
+    public let occurredAt: Date
+    public let externalId: String
+
+    public init(
+        id: UUID, cardIdentifier: String, merchantRaw: String, merchantNormalized: String,
+        amount: Decimal, occurredAt: Date, externalId: String
+    ) {
+        self.id = id
+        self.cardIdentifier = cardIdentifier
+        self.merchantRaw = merchantRaw
+        self.merchantNormalized = merchantNormalized
+        self.amount = amount
+        self.occurredAt = occurredAt
+        self.externalId = externalId
+    }
+}
+
 public struct DeleteTransferPayload: Codable, Sendable {
     public let transferGroupId: UUID
     public let fromExpectedVersion: Int

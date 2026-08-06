@@ -72,12 +72,29 @@ public final class OutboxItem {
 }
 
 public enum OfflineStore {
+    /// Memoized: `SessionStore.init()` and `CaptureIntent.perform()`
+    /// (Phase 12) both call this from the same process — the app target,
+    /// not an extension, is exactly why an Intent can reach it at all — and
+    /// two separate `ModelContainer`s each opening their own persistent
+    /// store coordinator against the identical SQLite file is a real
+    /// same-process hazard SwiftData doesn't paper over. One process, one
+    /// container, one coordinator; a `ModelContext` per caller is still
+    /// fine and is how `Outbox`/`PayloadCache` stay independent.
+    private static let lock = NSLock()
+    // Manually synchronized by `lock` above, not by actor isolation — the
+    // compiler can't see that, hence `nonisolated(unsafe)`.
+    nonisolated(unsafe) private static var cached: ModelContainer?
+
     /// `Offline.store` lives in the app container's own Application Support
     /// directory — no App Group, deliberately: `CaptureIntent` (Phase 12)
     /// is declared in the app target, not an extension, so nothing else
     /// needs to reach this file, and an App Group isn't provisionable on
     /// the free personal team this project builds under until Phase 20.
     public static func makeContainer() throws -> ModelContainer {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached { return cached }
+
         let storeURL = try storeDirectory().appendingPathComponent("Offline.store")
         let configuration = ModelConfiguration(schema: Schema(versionedSchema: OfflineSchemaV1.self), url: storeURL)
         let container = try ModelContainer(
@@ -86,6 +103,7 @@ public enum OfflineStore {
             configurations: configuration
         )
         protectStoreFiles(at: storeURL)
+        cached = container
         return container
     }
 

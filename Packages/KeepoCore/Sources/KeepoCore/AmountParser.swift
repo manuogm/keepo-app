@@ -30,6 +30,21 @@ public enum AmountParser {
     }
 }
 
+public extension AmountParser {
+    /// Wallet's `Amount` capture parameter is a formatted currency string
+    /// (e.g. "$1.06") — strips everything but digits, a leading minus, and
+    /// the locale's decimal separator before delegating to `parse(_:)`. The
+    /// stripped symbol is never used to infer currency — money rule: a
+    /// captured transaction's currency comes from the mapped account, the
+    /// symbol is a mismatch check only (app-architecture.md §4).
+    static func parseFormattedCurrency(_ text: String, locale: Locale = .current) -> Decimal? {
+        let decimalSeparator = locale.decimalSeparator ?? "."
+        let allowed = CharacterSet(charactersIn: "0123456789-" + decimalSeparator)
+        let stripped = String(text.unicodeScalars.filter { allowed.contains($0) })
+        return parse(stripped, locale: locale)
+    }
+}
+
 /// `AmountParser`'s missing inverse — the one place a `Decimal` becomes
 /// editable text in a form field. `TransactionFormView`'s edit-mode prefill
 /// used `"\(abs(amount))"` directly, which is always period-decimal

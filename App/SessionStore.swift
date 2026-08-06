@@ -93,17 +93,13 @@ public final class SessionStore {
     /// in project.yml, themselves populated from the gitignored
     /// Config/*.xcconfig at build time — no secret is ever committed.
     private static func loadConfig() -> SupabaseConfig {
-        guard
-            let urlString = Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") as? String,
-            let url = URL(string: urlString),
-            let anonKey = Bundle.main.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String,
-            !anonKey.isEmpty
-        else {
+        do {
+            return try SupabaseConfig.fromInfoPlist()
+        } catch {
             fatalError(
                 "Missing SupabaseURL/SupabaseAnonKey in Info.plist — copy Config/Debug.xcconfig.example "
                     + "to Config/Debug.xcconfig and fill in real values."
             )
         }
-        return SupabaseConfig(url: url, anonKey: anonKey)
     }
 }

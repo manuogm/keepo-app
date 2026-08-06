@@ -103,7 +103,7 @@ Every write reaches Postgres through PostgREST/RPC, never a direct table write f
 - **`household_accounts`** — `household_id`, `account_id`, `shared_at`. PK `(household_id, account_id)`.
 - **`household_invites`** — `id`, `household_id`, `invited_by`, `token_hash`, `status` (`household_invite_status`), `expires_at`, `created_at`. Single-use, expiring, revocable per the parked security design.
 - **`sync_conflicts`** — `id`, `table_name`, `row_id`, `owner_id`, `client_version`, `server_version`, `created_at`, `resolved_at`. Populated when a push's `version` doesn't match — feeds Needs Review.
-- **`card_mappings`** — `owner_id`, `card_identifier` (raw Shortcuts card string), `account_id` (nullable — null means unmapped, routes to Needs Review). PK `(owner_id, card_identifier)`.
+- **`card_mappings`** — `id` (uuid, PK — every other Needs Review item source has one to hand back as `item_id`; amended from this doc's original `(owner_id, card_identifier)` composite PK once Phase 12 actually wired it into Needs Review), `owner_id`, `card_identifier` (raw Shortcuts card string), `account_id` (nullable — null means unmapped, routes to Needs Review), `unique (owner_id, card_identifier)`.
 - **`csv_import_batches`** / **`csv_import_candidates`** — batch: `id`, `owner_id`, `account_id`, `filename`, `created_at`. candidate: `batch_id`, `raw_row` (jsonb), `matched_transaction_id` (nullable), `status` (`import_candidate_status`).
 - **`budgets`** — `id`, `owner_id`, `category_id` (nullable = overall), `period_month`, `amount_base` (in the owner's base currency), `created_at`.
 - **`fi_settings`** — `owner_id` (PK), `target_annual_spend` (nullable → derive from trailing 12mo expenses), `withdrawal_rate` (default `0.04`), `real_return_rate` (default `0.05`), `updated_at`.
@@ -189,12 +189,12 @@ A nightly job walks `recurring_rules` and inserts real `transactions` rows (`sou
 
 Shortcuts automation on the Wallet trigger → App Intent, payload `Transaction; Card; Merchant; Amount; Name`:
 
-1. Card string resolves via `card_mappings`; unmapped → the row is still created but flagged into Needs Review (via `card_mappings.account_id IS NULL`).
+1. Card string resolves via `card_mappings`; unmapped → **no transaction is created** (there is no account to attach a signed amount to yet) — only the card's placeholder `card_mappings` row lands, flagged into Needs Review via `card_mappings.account_id IS NULL`. The purchase itself is not retried once the card is later mapped; the next capture on that card succeeds normally.
 2. Currency comes from the **mapped account**, never parsed from the `$`-formatted `Amount` string — the symbol is a mismatch check only.
 3. `merchant_normalized` strips aggregator noise (`SQ *`, `TST*`, trailing store numbers, LLC suffixes); `merchant_raw` is kept so normalization can improve without re-capture.
 4. `external_id = hash(card + amount + merchant_normalized + time_bucket)`, enforced by the partial unique index in §3 — a re-fired automation is a no-op, not a duplicate.
 5. Row is inserted `status = 'pending', source = 'capture'`. A local notification prompts review; confirming sets `status = 'confirmed'`.
-6. The App Intent extension **only ever inserts this pending stub** — it never reads a balance or existing transaction, since it executes outside the biometric lock (parked security design).
+6. The App Intent (declared in the **app target**, not an extension — see Phase 11/12) **only ever inserts this pending stub** — it never reads a balance or existing transaction, since it executes outside the biometric lock (parked security design).
 
 ### CSV import
 

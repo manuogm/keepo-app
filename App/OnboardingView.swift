@@ -1,9 +1,9 @@
 import KeepoCore
 import SwiftUI
+import UserNotifications
 
-/// Base currency → first account → opening balance, per
-/// keepo-v1-feature-spec.md §Onboarding. The Wallet automation walkthrough
-/// is deferred to Phase 8 (capture) — nothing to walk through yet.
+/// Base currency → first account → opening balance → the Wallet-automation
+/// walkthrough, per keepo-v1-feature-spec.md §Onboarding.
 struct OnboardingView: View {
     let session: SessionStore
     var onComplete: () -> Void
@@ -11,6 +11,7 @@ struct OnboardingView: View {
     private enum Step {
         case currency
         case firstAccount
+        case captureWalkthrough
     }
 
     @State private var step: Step = .currency
@@ -32,6 +33,8 @@ struct OnboardingView: View {
                     currencyStep
                 case .firstAccount:
                     firstAccountStep
+                case .captureWalkthrough:
+                    captureWalkthroughStep
                 }
 
                 if let errorMessage {
@@ -138,10 +141,39 @@ struct OnboardingView: View {
                 openingBalance: openingBalance
             )
             try await session.completeOnboarding(baseCurrency: selectedCurrency)
-            onComplete()
+            step = .captureWalkthrough
         } catch {
             errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
+    }
+
+    private var captureWalkthroughStep: some View {
+        VStack(spacing: 16) {
+            Text("Log Apple Pay purchases automatically")
+                .font(.title2).fontWeight(.bold)
+                .foregroundStyle(Color("TextPrimary"))
+                .multilineTextAlignment(.center)
+
+            Text("Optional — set it up now, or skip and find it later in Settings.")
+                .font(.callout)
+                .foregroundStyle(Color("TextSecondary"))
+                .multilineTextAlignment(.center)
+
+            NavigationStack {
+                WalletAutomationGuideView()
+            }
+            .frame(maxHeight: 320)
+
+            Button("Done") { onComplete() }
+                .buttonStyle(.borderedProminent)
+                .tint(Color("BrandPrimary"))
+        }
+        .task {
+            // A capture confirms via local notification, not by the app
+            // being open — request permission here, once, rather than
+            // waiting for the first capture to ask (and lose it).
+            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        }
     }
 }
