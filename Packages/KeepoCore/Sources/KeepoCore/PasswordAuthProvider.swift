@@ -16,6 +16,7 @@ public final class PasswordAuthProvider: AuthProvider {
     private let client: SupabaseClient
     private let email: String
     private let password = "keepo-hosted-proof-password"
+    private let stepUpAuthenticator: StepUpAuthenticator
 
     /// `email` defaults to a fixed hosted-proof identity, distinct from
     /// `StubAuthProvider`'s `dev@keepo.local` — the two never run against
@@ -24,9 +25,18 @@ public final class PasswordAuthProvider: AuthProvider {
     /// or the Supabase dashboard's user list. `.dev`, not `.test` — hosted
     /// GoTrue's email validator rejects `.test` as an invalid address
     /// (confirmed empirically; the local stack is more permissive).
-    public init(client: SupabaseClient, email: String = "hosted-proof@keepo.dev") {
+    ///
+    /// `stepUpAuthenticator` must be built against the exact same
+    /// `KeychainSessionStorage`/key `SessionStore` configured this
+    /// provider's `client` with — otherwise a step-up re-read would target
+    /// a Keychain item the session was never actually written to.
+    public init(
+        client: SupabaseClient, email: String = "hosted-proof@keepo.dev",
+        stepUpAuthenticator: StepUpAuthenticator = StepUpAuthenticator()
+    ) {
         self.client = client
         self.email = email
+        self.stepUpAuthenticator = stepUpAuthenticator
     }
 
     public func currentSession() async throws -> Session? {
@@ -51,5 +61,17 @@ public final class PasswordAuthProvider: AuthProvider {
 
     public func signOut() async throws {
         try await client.auth.signOut()
+    }
+
+    public func restoreSession() async throws -> Session? {
+        try? await client.auth.session
+    }
+
+    public func stepUp(reason: String) async throws {
+        try await stepUpAuthenticator.requireFreshSession(reason: reason)
+    }
+
+    public var capabilities: AuthProviderCapabilities {
+        AuthProviderCapabilities(supportsAppleSignIn: false, requiresBiometricStepUp: true)
     }
 }

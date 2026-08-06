@@ -81,6 +81,14 @@ struct SettingsView: View {
                         Text("Log Apple Pay purchases automatically via a Shortcuts automation on the Wallet trigger.")
                     }
 
+                    Section {
+                        NavigationLink("Security") {
+                            SecuritySettingsView(session: session)
+                        }
+                    } footer: {
+                        Text("Base currency, biometric step-up, and a recovery email.")
+                    }
+
                     #if DEBUG
                     Section("Developer") {
                         NavigationLink("Simulate Capture") {

@@ -22,6 +22,15 @@ public enum ProfileRepository {
         )
         try await client.from("profiles").update(patch).eq("id", value: userId).execute()
     }
+
+    /// A plain RLS-scoped update — `profiles_update`'s policy already
+    /// allows this. Changing `base_currency` fires
+    /// `profiles_backfill_fx_on_base_currency_change` (Phase 13) server-side
+    /// automatically; nothing extra to trigger from here.
+    public static func updateBaseCurrency(client: SupabaseClient, userId: UUID, baseCurrency: String) async throws {
+        let patch = ProfileBaseCurrencyPatch(baseCurrency: baseCurrency)
+        try await client.from("profiles").update(patch).eq("id", value: userId).execute()
+    }
 }
 
 private struct ProfileOnboardingPatch: Encodable {
@@ -30,6 +39,13 @@ private struct ProfileOnboardingPatch: Encodable {
     enum CodingKeys: String, CodingKey {
         case baseCurrency = "base_currency"
         case onboardedAt = "onboarded_at"
+    }
+}
+
+private struct ProfileBaseCurrencyPatch: Encodable {
+    let baseCurrency: String
+    enum CodingKeys: String, CodingKey {
+        case baseCurrency = "base_currency"
     }
 }
 

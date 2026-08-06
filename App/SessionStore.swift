@@ -36,7 +36,12 @@ public final class SessionStore {
 
     public init() {
         let config = Self.loadConfig()
-        let client = makeSupabaseClient(config: config)
+        // `StubAuthProvider`'s local dev flow must never require Face ID
+        // enrollment just to run the app — only a non-local (hosted-
+        // capable) provider gets the real, biometric-gated Keychain
+        // storage. Same `config.isLocal` branch that already chooses the
+        // provider itself, mirrored here for storage.
+        let client = makeSupabaseClient(config: config, localStorage: config.isLocal ? nil : KeychainSessionStorage())
         self.client = client
         // The only place this branches: StubAuthProvider refuses to run
         // against anything but the local stack (see its own precondition),
@@ -64,7 +69,16 @@ public final class SessionStore {
 
     public func start() async {
         do {
-            let session = try await authProvider.signIn()
+            // The silent, biometric-gated cold-start path first — only
+            // falls back to the full interactive signIn() (which may
+            // present a SIWA sheet) when there's genuinely no cached
+            // session, e.g. first launch or after an explicit sign-out.
+            let session: Session
+            if let restored = try await authProvider.restoreSession() {
+                session = restored
+            } else {
+                session = try await authProvider.signIn()
+            }
             userId = session.user.id
             try await refreshProfile()
             // "Only syncs once a valid session exists" is structural, not a
@@ -74,6 +88,17 @@ public final class SessionStore {
         } catch {
             phase = .failed(UserFacingError.describe(error))
         }
+    }
+
+    /// Forces a fresh biometric check before a high-value action (export,
+    /// account deletion, household invite accept/leave) — spec. Never
+    /// satisfied by anything cached in memory; see `StepUpAuthenticator`.
+    public func stepUp(reason: String) async throws {
+        try await authProvider.stepUp(reason: reason)
+    }
+
+    public var authCapabilities: AuthProviderCapabilities {
+        authProvider.capabilities
     }
 
     public func refreshProfile() async throws {

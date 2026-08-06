@@ -62,4 +62,19 @@ public final class StubAuthProvider: AuthProvider {
     public func signOut() async throws {
         try await client.auth.signOut()
     }
+
+    public func restoreSession() async throws -> Session? {
+        try? await client.auth.session
+    }
+
+    /// A no-op — this provider signs into a fixed local dev account behind
+    /// a fixed, non-secret password (see the class doc comment); there is
+    /// no real security boundary here to step up past, matching every
+    /// other stubbed security concept in this project (RLS/`can_write_*`
+    /// are still fully enforced server-side regardless).
+    public func stepUp(reason: String) async throws {}
+
+    public var capabilities: AuthProviderCapabilities {
+        AuthProviderCapabilities(supportsAppleSignIn: false, requiresBiometricStepUp: false)
+    }
 }

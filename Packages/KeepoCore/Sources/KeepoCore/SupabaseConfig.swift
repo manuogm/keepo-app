@@ -1,3 +1,4 @@
+import Auth
 import Foundation
 import Supabase
 
@@ -43,6 +44,16 @@ public enum SupabaseConfigError: Error {
     case missingInfoPlistKeys
 }
 
-public func makeSupabaseClient(config: SupabaseConfig) -> SupabaseClient {
-    SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
+/// `localStorage: nil` (the default) keeps the SDK's own plain Keychain
+/// storage — `StubAuthProvider`'s local dev flow must never require Face
+/// ID enrollment just to run the app, so `SessionStore` only passes
+/// `KeychainSessionStorage` for a non-local (hosted-capable) provider.
+public func makeSupabaseClient(config: SupabaseConfig, localStorage: (any AuthLocalStorage)? = nil) -> SupabaseClient {
+    guard let localStorage else {
+        return SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
+    }
+    let options = SupabaseClientOptions(
+        auth: .init(storage: localStorage, storageKey: KeychainSessionStorage.sessionStorageKey)
+    )
+    return SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey, options: options)
 }
