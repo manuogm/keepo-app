@@ -49,6 +49,47 @@ public enum HouseholdRepository {
     public static func netWorth(client: SupabaseClient, scope: PublicSchema.AccountScope) async throws -> Decimal? {
         try await client.rpc("net_worth", params: ScopeParam(scope: scope)).execute().value
     }
+
+    /// No `pg_cron` exists yet (Phase 13) — the client refreshes its own
+    /// window before reading the trajectory. `p_user` must be the caller's
+    /// own id; the RPC itself enforces that.
+    public static func refreshNetWorthDaily(
+        client: SupabaseClient, userId: UUID, from: Date, through: Date
+    ) async throws {
+        let params = RefreshNetWorthDailyParams(
+            userId: userId,
+            from: PostgresDate.dateOnlyString(from),
+            through: PostgresDate.dateOnlyString(through)
+        )
+        try await client.rpc("refresh_net_worth_daily", params: params).execute()
+    }
+
+    /// One point per day that has data — a day with no accounts in scope
+    /// simply isn't in the result (see the RPC's own doc comment); `total`
+    /// is `nil` for a day with an unconvertible account in scope, never a
+    /// silently-partial sum (money rule 5).
+    public static func netWorthSeries(
+        client: SupabaseClient,
+        scope: PublicSchema.AccountScope,
+        from: Date,
+        through: Date
+    ) async throws -> [NetWorthPoint] {
+        let params = NetWorthSeriesParams(
+            scope: scope,
+            from: PostgresDate.dateOnlyString(from),
+            through: PostgresDate.dateOnlyString(through)
+        )
+        return try await client.rpc("net_worth_series", params: params).execute().value
+    }
+}
+
+public struct NetWorthPoint: Decodable, Sendable {
+    public let asOf: String
+    public let total: Decimal?
+    enum CodingKeys: String, CodingKey {
+        case asOf = "as_of"
+        case total
+    }
 }
 
 public extension AccountRepository {
@@ -78,5 +119,27 @@ private struct ScopeParam: Encodable {
     let scope: PublicSchema.AccountScope
     enum CodingKeys: String, CodingKey {
         case scope = "p_scope"
+    }
+}
+
+private struct RefreshNetWorthDailyParams: Encodable {
+    let userId: UUID
+    let from: String
+    let through: String
+    enum CodingKeys: String, CodingKey {
+        case userId = "p_user"
+        case from = "p_from"
+        case through = "p_to"
+    }
+}
+
+private struct NetWorthSeriesParams: Encodable {
+    let scope: PublicSchema.AccountScope
+    let from: String
+    let through: String
+    enum CodingKeys: String, CodingKey {
+        case scope = "p_scope"
+        case from = "p_from"
+        case through = "p_to"
     }
 }

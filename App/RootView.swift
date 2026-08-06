@@ -5,6 +5,7 @@ import SwiftUI
 /// until a base currency + first account exist, AccountsListView after.
 struct RootView: View {
     @State private var session = SessionStore()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -17,6 +18,11 @@ struct RootView: View {
                 }
             case .ready:
                 TabView {
+                    NavigationStack {
+                        HomeView(session: session)
+                    }
+                    .tabItem { Label("Home", systemImage: "house") }
+
                     NavigationStack {
                         AccountsListView(session: session)
                     }
@@ -43,6 +49,16 @@ struct RootView: View {
             }
         }
         .task { await session.start() }
+        // Home (Phase 8) is the first screen whose whole purpose is a large
+        // balance — the OS captures the app-switcher snapshot the instant
+        // the scene stops being .active, so the curtain has to cover both
+        // .inactive (switcher gesture starting) and .background, not just
+        // the latter.
+        .overlay {
+            if scenePhase != .active {
+                privacyCurtain
+            }
+        }
     }
 
     private var loadingView: some View {
@@ -54,6 +70,15 @@ struct RootView: View {
                     .font(.title2).fontWeight(.bold)
                     .foregroundStyle(Color("TextPrimary"))
             }
+        }
+    }
+
+    private var privacyCurtain: some View {
+        ZStack {
+            Color("BGCanvas").ignoresSafeArea()
+            Text("Keepo")
+                .font(.title2).fontWeight(.bold)
+                .foregroundStyle(Color("TextPrimary"))
         }
     }
 

@@ -31,4 +31,15 @@ public enum PostgresDate {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
     }
+
+    /// Decodes a `date`-only column (PostgREST renders it as a bare
+    /// `YYYY-MM-DD` string, not a full timestamp) — `date(fromTimestamp:)`
+    /// above expects timezone-qualified ISO8601 and fails on this format.
+    public static func dateOnly(from string: String, calendar: Calendar = .current) -> Date? {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: string)
+    }
 }

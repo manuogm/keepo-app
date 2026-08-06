@@ -476,6 +476,54 @@ public enum PublicSchema {
       case id = "id"
     }
   }
+  public struct NetWorthDailySelect: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let asOf: String
+    public let balance: Decimal?
+    public let currency: String
+    public let ownerId: UUID
+    public let updatedAt: String
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case asOf = "as_of"
+      case balance = "balance"
+      case currency = "currency"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct NetWorthDailyInsert: Codable, Hashable, Sendable {
+    public let accountId: UUID
+    public let asOf: String
+    public let balance: Decimal?
+    public let currency: String
+    public let ownerId: UUID
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case asOf = "as_of"
+      case balance = "balance"
+      case currency = "currency"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct NetWorthDailyUpdate: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let asOf: String?
+    public let balance: Decimal?
+    public let currency: String?
+    public let ownerId: UUID?
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case asOf = "as_of"
+      case balance = "balance"
+      case currency = "currency"
+      case ownerId = "owner_id"
+      case updatedAt = "updated_at"
+    }
+  }
   public struct ProfilesSelect: Codable, Hashable, Sendable {
     public let baseCurrency: String?
     public let createdAt: String

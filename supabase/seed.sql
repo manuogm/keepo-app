@@ -4,15 +4,21 @@
 -- blocking in the phase-3 and phase-4 logs). Runs once per `supabase db
 -- reset`, local only — never applied to the hosted project.
 --
--- Two fixture users mirror the pgTAP helpers' fixture ids
--- (supabase/tests/_helpers.sql) so household-adjacent manual testing in
--- Studio and this seed data talk about the same two people. Inserted
--- directly into auth.users (bcrypt via pgcrypto, already enabled) rather
--- than through a signup call — this file runs before any Edge/Auth
--- container work is meaningful, and a raw insert is what every Supabase
--- seed script does for this. handle_new_user() fires on insert exactly as
--- it would for a real signup, creating each profile and its two default
--- categories.
+-- Two fixture users, deliberately DIFFERENT ids from the pgTAP suite's own
+-- fixtures (supabase/tests/_helpers.psql, 11111111-.../22222222-...) —
+-- Phase 8 found the two sets had accidentally been given the SAME ids
+-- despite _helpers.psql's own header comment already claiming they were
+-- distinct. That collision was invisible through Phase 7 because no test
+-- before Phase 8 aggregated "everything a fixture user owns"; net_worth_
+-- series does exactly that, and started summing this file's seeded
+-- accounts into what were supposed to be tightly-scoped test assertions.
+-- Fixed by actually separating the id spaces, matching what _helpers.psql
+-- already said should be true. Inserted directly into auth.users (bcrypt
+-- via pgcrypto, already enabled) rather than through a signup call — this
+-- file runs before any Edge/Auth container work is meaningful, and a raw
+-- insert is what every Supabase seed script does for this. handle_new_user()
+-- fires on insert exactly as it would for a real signup, creating each
+-- profile and its two default categories.
 --
 -- These are NOT the same identity as StubAuthProvider's dev@keepo.local —
 -- that one is created by the app itself on first launch via a real signUp
@@ -26,7 +32,7 @@ insert into auth.users (
 ) values
   (
     '00000000-0000-0000-0000-000000000000',
-    '11111111-1111-1111-1111-111111111111',
+    '99999999-9999-9999-9999-999999999999',
     'authenticated', 'authenticated', 'seed-a@keepo.local',
     crypt('keepo-seed-password', gen_salt('bf')),
     now(), '{"provider":"email","providers":["email"]}', '{}',
@@ -34,7 +40,7 @@ insert into auth.users (
   ),
   (
     '00000000-0000-0000-0000-000000000000',
-    '22222222-2222-2222-2222-222222222222',
+    '88888888-8888-8888-8888-888888888888',
     'authenticated', 'authenticated', 'seed-b@keepo.local',
     crypt('keepo-seed-password', gen_salt('bf')),
     now(), '{"provider":"email","providers":["email"]}', '{}',
@@ -45,13 +51,13 @@ insert into auth.identities (
   provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
 ) values
   (
-    '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
-    '{"sub":"11111111-1111-1111-1111-111111111111","email":"seed-a@keepo.local"}',
+    '99999999-9999-9999-9999-999999999999', '99999999-9999-9999-9999-999999999999',
+    '{"sub":"99999999-9999-9999-9999-999999999999","email":"seed-a@keepo.local"}',
     'email', now(), now(), now()
   ),
   (
-    '22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222',
-    '{"sub":"22222222-2222-2222-2222-222222222222","email":"seed-b@keepo.local"}',
+    '88888888-8888-8888-8888-888888888888', '88888888-8888-8888-8888-888888888888',
+    '{"sub":"88888888-8888-8888-8888-888888888888","email":"seed-b@keepo.local"}',
     'email', now(), now(), now()
   );
 
@@ -60,61 +66,61 @@ insert into auth.identities (
 -- that assumes "everyone shares one base currency" breaks visibly in Studio
 -- long before Phase 7 makes it a correctness requirement.
 update profiles set base_currency = 'EUR', onboarded_at = now()
-where id = '11111111-1111-1111-1111-111111111111';
+where id = '99999999-9999-9999-9999-999999999999';
 update profiles set base_currency = 'USD', onboarded_at = now()
-where id = '22222222-2222-2222-2222-222222222222';
+where id = '88888888-8888-8888-8888-888888888888';
 
 -- User A: EUR checking, USD checking, an investment account — covers the
 -- ledger/valuation split and a cross-currency FX line in one seed.
 insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
 values
   (
-    'aaaaaaaa-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-    '11111111-1111-1111-1111-111111111111', 'ledger', 'checking', 'Everyday Checking', 'EUR', 1000
+    'aaaaaaaa-0000-0000-0000-000000000001', '99999999-9999-9999-9999-999999999999',
+    '99999999-9999-9999-9999-999999999999', 'ledger', 'checking', 'Everyday Checking', 'EUR', 1000
   ),
   (
-    'aaaaaaaa-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
-    '11111111-1111-1111-1111-111111111111', 'ledger', 'checking', 'US Checking', 'USD', 500
+    'aaaaaaaa-0000-0000-0000-000000000002', '99999999-9999-9999-9999-999999999999',
+    '99999999-9999-9999-9999-999999999999', 'ledger', 'checking', 'US Checking', 'USD', 500
   ),
   (
-    'aaaaaaaa-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111',
-    '11111111-1111-1111-1111-111111111111', 'valuation', 'investment', 'Brokerage', 'EUR', 0
+    'aaaaaaaa-0000-0000-0000-000000000003', '99999999-9999-9999-9999-999999999999',
+    '99999999-9999-9999-9999-999999999999', 'valuation', 'investment', 'Brokerage', 'EUR', 0
   );
 
 insert into balance_snapshots (account_id, currency, as_of, value, created_by)
 values (
   'aaaaaaaa-0000-0000-0000-000000000003', 'EUR', current_date, 5000,
-  '11111111-1111-1111-1111-111111111111'
+  '99999999-9999-9999-9999-999999999999'
 );
 
 -- User B: a single USD checking account, kept simple.
 insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
 values (
-  'bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
-  '22222222-2222-2222-2222-222222222222', 'ledger', 'checking', 'Checking', 'USD', 2000
+  'bbbbbbbb-0000-0000-0000-000000000001', '88888888-8888-8888-8888-888888888888',
+  '88888888-8888-8888-8888-888888888888', 'ledger', 'checking', 'Checking', 'USD', 2000
 );
 
 -- A handful of transactions against user A's default "Other" categories.
 insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
 select
-  '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
+  '99999999-9999-9999-9999-999999999999', '99999999-9999-9999-9999-999999999999',
   'aaaaaaaa-0000-0000-0000-000000000001', c.id, -42.50, 'EUR', now() - interval '2 days', 'manual'
 from categories c
-where c.owner_id = '11111111-1111-1111-1111-111111111111' and c.kind = 'expense';
+where c.owner_id = '99999999-9999-9999-9999-999999999999' and c.kind = 'expense';
 
 insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
 select
-  '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
+  '99999999-9999-9999-9999-999999999999', '99999999-9999-9999-9999-999999999999',
   'aaaaaaaa-0000-0000-0000-000000000001', c.id, 2500.00, 'EUR', now() - interval '5 days', 'manual'
 from categories c
-where c.owner_id = '11111111-1111-1111-1111-111111111111' and c.kind = 'income';
+where c.owner_id = '99999999-9999-9999-9999-999999999999' and c.kind = 'income';
 
 insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
 select
-  '22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222',
+  '88888888-8888-8888-8888-888888888888', '88888888-8888-8888-8888-888888888888',
   'bbbbbbbb-0000-0000-0000-000000000001', c.id, -18.20, 'USD', now() - interval '1 days', 'manual'
 from categories c
-where c.owner_id = '22222222-2222-2222-2222-222222222222' and c.kind = 'expense';
+where c.owner_id = '88888888-8888-8888-8888-888888888888' and c.kind = 'expense';
 
 -- A handful of fx_rates so the two USD-denominated rows above convert to a
 -- real number instead of "—" when a screen renders them. Deliberately
