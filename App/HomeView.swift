@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var netWorth: Decimal?
     @State private var seriesPoints: [(date: Date, value: Decimal)] = []
     @State private var baseCurrencyInfo: CurrencyInfo?
+    @State private var hasStaleFeedingAccount = false
     @State private var isLoading = true
     @State private var errorMessage: String?
 
@@ -34,6 +35,10 @@ struct HomeView: View {
                             Text("Household").tag(PublicSchema.AccountScope.household)
                         }
                         .pickerStyle(.segmented)
+
+                        if hasStaleFeedingAccount {
+                            staleBanner
+                        }
 
                         BalanceHeaderView(amount: netWorth, currency: baseCurrencyInfo)
 
@@ -69,7 +74,36 @@ struct HomeView: View {
             }
         }
         .navigationTitle("Home")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    SyncRitualView(session: session)
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+            }
+        }
         .task(id: HomeLoadKey(token: session.refresh.token, scope: scope)) { await load() }
+    }
+
+    /// Factual, not alarmist — names what's stale rather than just showing
+    /// amber. "Feeding" means include_in_total: an archived or excluded
+    /// account going stale is invisible here on purpose, same reasoning as
+    /// net worth itself only summing accounts the user asked to count.
+    private var staleBanner: some View {
+        NavigationLink {
+            SyncRitualView(session: session)
+        } label: {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("A balance feeding this total needs verifying.")
+                    .font(.footnote)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+            }
+            .foregroundStyle(Color("BrandSecondary"))
+        }
     }
 
     private func load() async {
@@ -95,6 +129,11 @@ struct HomeView: View {
         try? await HouseholdRepository.refreshNetWorthDaily(
             client: session.client, userId: userId, from: from, through: today
         )
+
+        let syncStatus = (try? await ReconciliationRepository.fetchSyncStatus(client: session.client)) ?? []
+        hasStaleFeedingAccount = syncStatus.contains {
+            $0.archivedAt == nil && ($0.includeInTotal ?? false) && ($0.isStale ?? false)
+        }
 
         do {
             async let netWorthResult = HouseholdRepository.netWorth(client: session.client, scope: scope)

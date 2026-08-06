@@ -1,6 +1,6 @@
 # Lessons Learned — read before starting a new phase
 
-Consolidated from Phases 1–8. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
+Consolidated from Phases 1–9. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
 
 ## Process
 
@@ -51,6 +51,11 @@ Consolidated from Phases 1–8. Environment quirks, framework gotchas, and footg
 - **XcodeGen must be re-run (`xcodegen generate`) after adding a new source file**, not just after editing `project.yml` — a new `.swift` file dropped into an already-`sources:`-included directory (like `App/`) doesn't automatically appear in the generated `.xcodeproj`'s build phase; `xcodebuild` fails with "cannot find X in scope" until `xcodegen generate` re-syncs file references.
 - **The Simulator MCP tool's scripted `swipe` cannot trigger the app switcher** (Phase 8, testing the app-switcher privacy curtain) — a real switcher invocation is "swipe up from the bottom edge *and hold*"; a scripted swipe (any start point, speed, or edge distance tried) completes as a plain "swipe up to home," landing on the home screen instead of the switcher preview. There is no reliable way found so far to script the hold. Verify switcher-dependent UI (privacy curtains, snapshot obscuring) by code inspection of the `scenePhase`/lifecycle logic instead of a captured screenshot, and say so explicitly rather than claiming a visual confirmation that didn't happen.
 - **The Simulator MCP tool's typed text is unreliable for anything beyond short, simple strings** — characters get dropped or garbled mid-string, and QuickType/autocomplete can silently substitute a different word than what was typed (confirmed Phase 6: typing " Account" after existing text produced "Invests - No balance" in the field instead). Taps immediately after a keyboard-triggered layout shift (e.g. right after typing, before the keyboard fully dismisses) can also land on the wrong element. Never trust simulator-typed text as a record of *what was typed* — only verify that *some* value round-tripped correctly, and cross-check actual state via `supabase db query --local <<< 'select ...'` when a screenshot's contents look surprising.
+
+## Optional RPC parameters (Phase 9)
+
+- **A `uuid`-typed optional RPC parameter needs `default null` just as much as a string/number one does — and is easier to forget.** Swift's synthesized `Encodable` for an `Optional` property uses `encodeIfPresent`, so a `nil` value omits the JSON key from the RPC call entirely rather than sending `null`; PostgREST then returns `PGRST202` if the SQL function has no default for that parameter. This is the same PGRST202 lesson already documented for every other optional parameter in this codebase, but a `uuid` param reads as "obviously required" at a glance in a way an optional string doesn't — worth a specific second look on any new RPC parameter typed `uuid` that a caller can legitimately omit (Phase 9: `reconcile_ledger_account`/`reconcile_valuation_account`'s `p_expected_last_reconciliation_id`, `null` on a never-reconciled account's first call).
+- **Once a migration has been pushed to hosted, fix a bug in it with a new, additive migration — even within the same still-uncommitted phase.** The established precedent (Phase 1→2, correcting `accounts_select`) is about hosted state, not git history: the moment `supabase db push` has run against the linked project, editing the already-applied file and re-running `db reset` only fixes *local*. Hosted needs its own follow-up (`create or replace function ...`) or, if the migration truly must be edited in place, `supabase migration repair --status reverted <version> --linked` followed by manually re-running the corrected DDL — repair alone only touches the tracking table, not the actual database objects.
 
 ## Money-rule-adjacent
 
