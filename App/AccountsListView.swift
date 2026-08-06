@@ -167,7 +167,7 @@ struct AccountsListView: View {
             session.refresh.bump()
             if case .conflict = result { showConflictAlert = true }
         } catch {
-            actionErrorMessage = String(describing: error)
+            actionErrorMessage = UserFacingError.describe(error)
         }
     }
 }

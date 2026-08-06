@@ -104,7 +104,7 @@ struct SettingsView: View {
                 myAccounts = try await AccountRepository.fetchAllOwnedByMe(client: session.client, ownerId: userId)
             }
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
     }
@@ -116,7 +116,7 @@ struct SettingsView: View {
             try await HouseholdRepository.create(client: session.client)
             session.refresh.bump()
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
         isCreatingHousehold = false
     }
@@ -131,7 +131,7 @@ struct SettingsView: View {
             }
             session.refresh.bump()
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
     }
 }

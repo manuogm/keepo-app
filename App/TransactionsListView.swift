@@ -15,13 +15,33 @@ struct TransactionsListView: View {
 
     private var transactions: [PublicSchema.TransactionsWithDetailsSelect] { store.items }
 
+    /// Pending *creates* only (Phase 11) — resolved against whatever
+    /// accounts/categories are already loaded for the filter sheet, since
+    /// those already carry names and are refreshed the same way this
+    /// screen refreshes everything else. Updates/deletes stay invisible
+    /// until drained; see Outbox.pendingCreateTransactions' own doc comment.
+    private var pendingRows: [PendingTransactionDisplay] {
+        session.outbox.pendingCreateTransactions.map { pending in
+            let account = filterAccounts.first { $0.accountId == pending.accountId }
+            let category = filterCategories.first { $0.id == pending.categoryId }
+            return PendingTransactionDisplay(
+                id: pending.id,
+                accountName: account?.name ?? "—",
+                categoryName: category?.name ?? "—",
+                amount: pending.amount,
+                currency: pending.currency,
+                minorUnit: Int(account?.minorUnit ?? 2)
+            )
+        }
+    }
+
     var body: some View {
         ZStack {
             Color("BGCanvas").ignoresSafeArea()
 
             if store.isLoading {
                 ProgressView()
-            } else if transactions.isEmpty {
+            } else if transactions.isEmpty && pendingRows.isEmpty {
                 Text("No transactions yet")
                     .foregroundStyle(Color("TextSecondary"))
             } else {
@@ -30,6 +50,13 @@ struct TransactionsListView: View {
                         Text("Showing data as of \(asOf.formatted(date: .omitted, time: .shortened))")
                             .font(.caption)
                             .foregroundStyle(Color("TextSecondary"))
+                    }
+                    if !pendingRows.isEmpty {
+                        Section("Pending sync") {
+                            ForEach(pendingRows) { pending in
+                                PendingTransactionRow(pending: pending)
+                            }
+                        }
                     }
                     ForEach(transactions, id: \.transactionId) { transaction in
                         TransactionRow(transaction: transaction)
@@ -113,10 +140,12 @@ struct TransactionsListView: View {
 
     private func load() async {
         if filterAccounts.isEmpty {
-            filterAccounts = (try? await AccountRepository.fetchAllWithBalances(client: session.client)) ?? []
+            let fetched = try? await AccountRepository.fetchAllWithBalances(client: session.client)
+            filterAccounts = fetched ?? cachedAccounts()
         }
         if filterCategories.isEmpty {
-            filterCategories = (try? await CategoryRepository.fetchAll(client: session.client)) ?? []
+            let fetched = try? await CategoryRepository.fetchAll(client: session.client)
+            filterCategories = fetched ?? cachedCategories()
         }
         // Caching only applies to the default, unfiltered page — caching
         // every filter permutation would be pointless; a filtered view
@@ -125,6 +154,19 @@ struct TransactionsListView: View {
             { try await TransactionRepository.fetchFiltered(client: session.client, filter: filter) },
             cache: filter.isEmpty ? session.payloadCache : nil
         )
+    }
+
+    /// Same on-device cache `TransactionFormView` falls back to — needed
+    /// here too so a pending-create row (Phase 11) can resolve its account/
+    /// category names even on a cold, fully-offline start.
+    private func cachedAccounts() -> [PublicSchema.AccountsWithBalancesSelect] {
+        guard let (data, _) = session.payloadCache.load(key: "accounts_with_balances") else { return [] }
+        return (try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data)) ?? []
+    }
+
+    private func cachedCategories() -> [PublicSchema.CategoriesSelect] {
+        guard let (data, _) = session.payloadCache.load(key: "categories") else { return [] }
+        return (try? JSONDecoder().decode([PublicSchema.CategoriesSelect].self, from: data)) ?? []
     }
 
     /// Routed through `session.outbox` (Phase 11), same as every write in
@@ -163,6 +205,44 @@ extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
 private struct TransactionsLoadKey: Equatable {
     let token: Int
     let filter: TransactionFilter
+}
+
+private struct PendingTransactionDisplay: Identifiable {
+    let id: UUID
+    let accountName: String
+    let categoryName: String
+    let amount: Decimal
+    let currency: String
+    let minorUnit: Int
+}
+
+private struct PendingTransactionRow: View {
+    let pending: PendingTransactionDisplay
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pending.categoryName)
+                    .foregroundStyle(Color("TextPrimary"))
+                HStack(spacing: 4) {
+                    Text(pending.accountName)
+                        .font(.caption)
+                        .foregroundStyle(Color("TextSecondary"))
+                    Image(systemName: "icloud.slash")
+                        .font(.caption2)
+                        .foregroundStyle(Color("BrandSecondary"))
+                    Text("Not synced")
+                        .font(.caption2)
+                        .foregroundStyle(Color("BrandSecondary"))
+                }
+            }
+            Spacer()
+            let currency = CurrencyInfo(code: pending.currency, minorUnit: pending.minorUnit)
+            Text(MoneyFormatter.format(pending.amount, currency: currency))
+                .monospacedDigit()
+                .foregroundStyle(pending.amount < 0 ? Color("TextPrimary") : Color("BrandPrimary"))
+        }
+    }
 }
 
 /// Account/category/kind/date-range — every field optional, AND'd

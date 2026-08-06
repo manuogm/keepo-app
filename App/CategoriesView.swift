@@ -10,7 +10,7 @@ import SwiftUI
 struct CategoriesView: View {
     let session: SessionStore
 
-    @State private var store = DataStore<PublicSchema.CategoriesSelect>()
+    @State private var store = DataStore<PublicSchema.CategoriesSelect>(cacheKey: "categories")
     @State private var isAddingCategory = false
     @State private var deleteErrorMessage: String?
 
@@ -90,11 +90,15 @@ struct CategoriesView: View {
                 session.refresh.bump()
             }
         }
+        .task { store.restore(from: session.payloadCache) }
         .task(id: session.refresh.token) { await load() }
     }
 
     private func load() async {
-        await store.load { try await CategoryRepository.fetchAll(client: session.client) }
+        await store.load(
+            { try await CategoryRepository.fetchAll(client: session.client) },
+            cache: session.payloadCache
+        )
     }
 
     private func delete(_ category: PublicSchema.CategoriesSelect) async {
@@ -103,7 +107,7 @@ struct CategoriesView: View {
             try await CategoryRepository.softDelete(client: session.client, categoryId: category.id)
             session.refresh.bump()
         } catch {
-            deleteErrorMessage = String(describing: error)
+            deleteErrorMessage = UserFacingError.describe(error)
         }
     }
 }
@@ -175,7 +179,7 @@ private struct AddCategorySheet: View {
             await onSaved()
             dismiss()
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
         isSaving = false
     }

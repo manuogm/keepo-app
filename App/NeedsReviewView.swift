@@ -89,7 +89,7 @@ struct NeedsReviewView: View {
             try await NeedsReviewRepository.resolveSyncConflict(client: session.client, id: id)
             session.refresh.bump()
         } catch {
-            actionErrorMessage = String(describing: error)
+            actionErrorMessage = UserFacingError.describe(error)
         }
     }
 }

@@ -164,7 +164,7 @@ struct HomeView: View {
             saveSummaryCache()
         } catch {
             if !restoreSummaryCache() {
-                errorMessage = String(describing: error)
+                errorMessage = UserFacingError.describe(error)
             }
         }
         isLoading = false

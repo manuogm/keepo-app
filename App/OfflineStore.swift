@@ -101,10 +101,12 @@ public enum OfflineStore {
     /// file and its `-wal`/`-shm` siblings: SQLite's WAL mode means
     /// uncommitted data can sit in either for a while, and an unprotected
     /// sibling would leak exactly what the main file's protection exists to
-    /// hide. Real enforcement (ciphertext unreadable while locked) is
-    /// device-only — a simulator has no data-protection keybag at all, so
-    /// this can only be confirmed by reading the attribute back, not by
-    /// observing actual encryption, until Phase 20's device checklist.
+    /// hide. Confirmed empirically (`KeepoTests/OfflineStoreTests.swift`):
+    /// on the iOS Simulator, `setAttributes` here returns success but the
+    /// value never reads back — the Simulator has no data-protection
+    /// subsystem at all, not even as unenforced metadata. Both the
+    /// read-back and the real enforcement (ciphertext unreadable while
+    /// locked) are device-only, confirmable only in Phase 20's checklist.
     private static func protectStoreFiles(at storeURL: URL) {
         for suffix in ["", "-wal", "-shm"] {
             let path = storeURL.path + suffix

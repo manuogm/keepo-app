@@ -72,7 +72,7 @@ public final class SessionStore {
             // already succeeded.
             await outbox.drainAll()
         } catch {
-            phase = .failed(String(describing: error))
+            phase = .failed(UserFacingError.describe(error))
         }
     }
 

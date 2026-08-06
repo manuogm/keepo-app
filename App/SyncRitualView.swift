@@ -210,7 +210,7 @@ private struct ReconcileAccountView: View {
                 showConflictAlert = true
             }
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
         isSaving = false
     }

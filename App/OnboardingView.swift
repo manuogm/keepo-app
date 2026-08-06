@@ -140,7 +140,7 @@ struct OnboardingView: View {
             try await session.completeOnboarding(baseCurrency: selectedCurrency)
             onComplete()
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
     }

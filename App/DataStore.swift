@@ -1,4 +1,5 @@
 import Foundation
+import KeepoCore
 import Observation
 
 /// One shared load/loading/error shape for every list screen (Accounts,
@@ -52,7 +53,7 @@ public final class DataStore<Item: Codable> {
                 cache.save(key: cacheKey, data: data)
             }
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
     }

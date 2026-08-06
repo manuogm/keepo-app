@@ -175,15 +175,29 @@ struct TransactionFormView: View {
         return false
     }
 
+    /// Falls back to the same on-device cache `AccountsListView`/
+    /// `CategoriesView` already populate when the live fetch fails — an
+    /// offline create otherwise has no way to populate its own pickers at
+    /// all, even though the write itself (via the outbox) works offline.
     private func load() async {
         async let accountsResult = AccountRepository.fetchAllWithBalances(client: session.client)
         async let categoriesResult = CategoryRepository.fetchAll(client: session.client)
-        accounts = (try? await accountsResult) ?? []
-        categories = (try? await categoriesResult) ?? []
+        accounts = (try? await accountsResult) ?? cachedAccounts()
+        categories = (try? await categoriesResult) ?? cachedCategories()
 
         if case .edit(let transaction, let sibling) = mode {
             apply(transaction: transaction, sibling: sibling)
         }
+    }
+
+    private func cachedAccounts() -> [PublicSchema.AccountsWithBalancesSelect] {
+        guard let (data, _) = session.payloadCache.load(key: "accounts_with_balances") else { return [] }
+        return (try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data)) ?? []
+    }
+
+    private func cachedCategories() -> [PublicSchema.CategoriesSelect] {
+        guard let (data, _) = session.payloadCache.load(key: "categories") else { return [] }
+        return (try? JSONDecoder().decode([PublicSchema.CategoriesSelect].self, from: data)) ?? []
     }
 
     /// Shared by the initial edit-mode prefill and by a post-conflict
@@ -267,7 +281,7 @@ extension TransactionFormView {
                 dismiss()
             }
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
         isSaving = false
     }

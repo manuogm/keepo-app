@@ -198,7 +198,7 @@ extension AccountFormView {
                 }
             }
         } catch {
-            errorMessage = String(describing: error)
+            errorMessage = UserFacingError.describe(error)
         }
         isSaving = false
     }
