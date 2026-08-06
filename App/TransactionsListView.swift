@@ -9,6 +9,10 @@ struct TransactionsListView: View {
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
     @State private var showConflictAlert = false
     @State private var deleteErrorMessage: String?
+    @State private var filter = TransactionFilter()
+    @State private var isFilterSheetPresented = false
+    @State private var filterAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var filterCategories: [PublicSchema.CategoriesSelect] = []
 
     private var transactions: [PublicSchema.TransactionsWithDetailsSelect] { store.items }
 
@@ -46,6 +50,7 @@ struct TransactionsListView: View {
                 }
             }
         }
+        .searchable(text: searchBinding, prompt: "Merchant, category, or account")
         .navigationTitle("Transactions")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -53,6 +58,13 @@ struct TransactionsListView: View {
                     isAddingTransaction = true
                 } label: {
                     Image(systemName: "plus")
+                }
+            }
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    isFilterSheetPresented = true
+                } label: {
+                    Image(systemName: filterIconName)
                 }
             }
         }
@@ -66,12 +78,25 @@ struct TransactionsListView: View {
                 session.refresh.bump()
             }
         }
+        .sheet(isPresented: $isFilterSheetPresented) {
+            TransactionFilterView(filter: $filter, accounts: filterAccounts, categories: filterCategories)
+        }
         .alert("This transaction changed elsewhere", isPresented: $showConflictAlert) {
             Button("OK") {}
         } message: {
             Text("The list has been refreshed with the latest version.")
         }
-        .task(id: session.refresh.token) { await load() }
+        .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter)) { await load() }
+    }
+
+    /// `.searchable` needs a plain `Binding<String>`; `filter.search` is an
+    /// `Optional` (nil means "no search filter" everywhere else it's read).
+    private var searchBinding: Binding<String> {
+        Binding(get: { filter.search ?? "" }, set: { filter.search = $0.isEmpty ? nil : $0 })
+    }
+
+    private var filterIconName: String {
+        filter.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill"
     }
 
     private func sibling(
@@ -82,7 +107,13 @@ struct TransactionsListView: View {
     }
 
     private func load() async {
-        await store.load { try await TransactionRepository.fetchAll(client: session.client) }
+        if filterAccounts.isEmpty {
+            filterAccounts = (try? await AccountRepository.fetchAllWithBalances(client: session.client)) ?? []
+        }
+        if filterCategories.isEmpty {
+            filterCategories = (try? await CategoryRepository.fetchAll(client: session.client)) ?? []
+        }
+        await store.load { try await TransactionRepository.fetchFiltered(client: session.client, filter: filter) }
     }
 
     private func delete(at offsets: IndexSet) async {
@@ -117,6 +148,89 @@ struct TransactionsListView: View {
 
 extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
     public var id: UUID { transactionId ?? UUID() }
+}
+
+/// `.task(id:)` needs an `Equatable` id — bundles the refresh token and the
+/// filter together so either changing triggers exactly one reload, same
+/// convention as `HomeLoadKey`.
+private struct TransactionsLoadKey: Equatable {
+    let token: Int
+    let filter: TransactionFilter
+}
+
+/// Account/category/kind/date-range — every field optional, AND'd
+/// together server-side (`TransactionRepository.fetchFiltered`). Search
+/// lives on the list's own `.searchable`, not in this sheet.
+private struct TransactionFilterView: View {
+    @Binding var filter: TransactionFilter
+    let accounts: [PublicSchema.AccountsWithBalancesSelect]
+    let categories: [PublicSchema.CategoriesSelect]
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var hasDateRange = false
+    @State private var from = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    @State private var through = Date()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Account") {
+                    Picker("Account", selection: $filter.accountId) {
+                        Text("Any").tag(UUID?.none)
+                        ForEach(accounts, id: \.accountId) { account in
+                            Text(account.name ?? "—").tag(account.accountId)
+                        }
+                    }
+                }
+                Section("Category") {
+                    Picker("Category", selection: $filter.categoryId) {
+                        Text("Any").tag(UUID?.none)
+                        ForEach(categories, id: \.id) { category in
+                            Text(category.name).tag(UUID?.some(category.id))
+                        }
+                    }
+                }
+                Section("Kind") {
+                    Picker("Kind", selection: $filter.kind) {
+                        Text("Any").tag(String?.none)
+                        Text("Expense").tag(String?.some("expense"))
+                        Text("Income").tag(String?.some("income"))
+                        Text("Transfer").tag(String?.some("transfer"))
+                    }
+                    .pickerStyle(.segmented)
+                }
+                Section("Date range") {
+                    Toggle("Limit to a date range", isOn: $hasDateRange)
+                    if hasDateRange {
+                        DatePicker("From", selection: $from, displayedComponents: .date)
+                        DatePicker("Through", selection: $through, displayedComponents: .date)
+                    }
+                }
+            }
+            .navigationTitle("Filter")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Clear") {
+                        filter = TransactionFilter(search: filter.search)
+                        hasDateRange = false
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        filter.from = hasDateRange ? from : nil
+                        filter.through = hasDateRange ? through : nil
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .task {
+            hasDateRange = filter.from != nil || filter.through != nil
+            from = filter.from ?? from
+            through = filter.through ?? through
+        }
+    }
 }
 
 private struct TransactionRow: View {

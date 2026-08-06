@@ -1,6 +1,6 @@
 # Lessons Learned — read before starting a new phase
 
-Consolidated from Phases 1–9. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
+Consolidated from Phases 1–10. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
 
 ## Process
 
@@ -56,6 +56,11 @@ Consolidated from Phases 1–9. Environment quirks, framework gotchas, and footg
 
 - **A `uuid`-typed optional RPC parameter needs `default null` just as much as a string/number one does — and is easier to forget.** Swift's synthesized `Encodable` for an `Optional` property uses `encodeIfPresent`, so a `nil` value omits the JSON key from the RPC call entirely rather than sending `null`; PostgREST then returns `PGRST202` if the SQL function has no default for that parameter. This is the same PGRST202 lesson already documented for every other optional parameter in this codebase, but a `uuid` param reads as "obviously required" at a glance in a way an optional string doesn't — worth a specific second look on any new RPC parameter typed `uuid` that a caller can legitimately omit (Phase 9: `reconcile_ledger_account`/`reconcile_valuation_account`'s `p_expected_last_reconciliation_id`, `null` on a never-reconciled account's first call).
 - **Once a migration has been pushed to hosted, fix a bug in it with a new, additive migration — even within the same still-uncommitted phase.** The established precedent (Phase 1→2, correcting `accounts_select`) is about hosted state, not git history: the moment `supabase db push` has run against the linked project, editing the already-applied file and re-running `db reset` only fixes *local*. Hosted needs its own follow-up (`create or replace function ...`) or, if the migration truly must be edited in place, `supabase migration repair --status reverted <version> --linked` followed by manually re-running the corrected DDL — repair alone only touches the tracking table, not the actual database objects.
+
+## Cross-schema view design (Phase 10)
+
+- **A view's "stable column contract" (documented so later phases can each append a `UNION ALL` branch without touching the client) is worth being strict about, including what it deliberately leaves out.** `needs_review`'s 8 columns don't include `minor_unit` — adding it would have made money formatting one line simpler in `NeedsReviewRow`, but would also mean every future branch has to carry it too, growing the "stable" contract by accretion. Fetching `currencies` once and building a local `[code: minorUnit]` lookup client-side (already-established `CurrencyRepository`) kept the view's contract exactly as documented. When a view's contract is written down as an explicit list, treat "just one more column" requests from the client side with real suspicion.
+- **A `SwiftLint` file-length violation from adding one new method to an existing repository file is a signal to split, not to suppress.** `Repositories.swift` crossed 400 lines from `TransactionRepository.fetchFiltered`'s addition alone; moved it and its supporting `TransactionFilter` struct into their own `TransactionFilter.swift`, following the same precedent `AccountWrites.swift`/`TransactionWrites.swift` already established for exactly this situation (a repository's *write* surface split out from its *read* surface once either grew enough to justify its own file).
 
 ## Money-rule-adjacent
 

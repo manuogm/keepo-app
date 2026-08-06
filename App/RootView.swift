@@ -5,6 +5,7 @@ import SwiftUI
 /// until a base currency + first account exist, AccountsListView after.
 struct RootView: View {
     @State private var session = SessionStore()
+    @State private var needsReviewCount = 0
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -39,11 +40,18 @@ struct RootView: View {
                     .tabItem { Label("Categories", systemImage: "tag") }
 
                     NavigationStack {
+                        NeedsReviewView(session: session)
+                    }
+                    .tabItem { Label("Needs Review", systemImage: "tray.full") }
+                    .badge(needsReviewCount)
+
+                    NavigationStack {
                         SettingsView(session: session)
                     }
                     .tabItem { Label("Settings", systemImage: "gearshape") }
                 }
                 .tint(Color("BrandPrimary"))
+                .task(id: session.refresh.token) { await loadNeedsReviewCount() }
             case .failed(let message):
                 errorView(message)
             }
@@ -59,6 +67,10 @@ struct RootView: View {
                 privacyCurtain
             }
         }
+    }
+
+    private func loadNeedsReviewCount() async {
+        needsReviewCount = (try? await NeedsReviewRepository.fetchAll(client: session.client))?.count ?? 0
     }
 
     private var loadingView: some View {

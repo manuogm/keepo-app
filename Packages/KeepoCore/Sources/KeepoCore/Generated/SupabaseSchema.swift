@@ -928,6 +928,26 @@ public enum PublicSchema {
       case version = "version"
     }
   }
+  public struct NeedsReviewSelect: Codable, Hashable, Sendable {
+    public let accountId: UUID?
+    public let amount: Decimal?
+    public let currency: String?
+    public let itemId: UUID?
+    public let kind: String?
+    public let occurredAt: String?
+    public let subtitle: String?
+    public let title: String?
+    public enum CodingKeys: String, CodingKey {
+      case accountId = "account_id"
+      case amount = "amount"
+      case currency = "currency"
+      case itemId = "item_id"
+      case kind = "kind"
+      case occurredAt = "occurred_at"
+      case subtitle = "subtitle"
+      case title = "title"
+    }
+  }
   public struct TransactionsWithDetailsSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let accountName: String?

@@ -119,6 +119,7 @@ These were found during exploration and are the reason the phase order is what i
 
 - **Migration:** `needs_review` view with a **stable column contract** (`kind`, `item_id`, `account_id`, `occurred_at`, `title`, `subtitle`, `amount`, `currency`) so Phases 12/14/18/19 each append a `UNION ALL` branch without ever changing the client decoder. Initial branches: `sync_conflicts WHERE resolved_at IS NULL`, reconciliation gaps. `resolve_sync_conflict(p_id)`. Index `sync_conflicts (owner_id, resolved_at)` — currently only a PK exists.
 - **Client:** `NeedsReviewRow` (one renderer switching on `kind`), inbox screen, tab badge; transaction filters (account/category/kind/date range/search) riding the existing `(owner_id, occurred_at desc, id desc)` keyset index.
+- **Delivered (Phase 10 complete):** Needs Review IS a 6th tab with a badge, per this section's own literal wording — unlike Household/Sync Ritual (Phases 7/9), which were deliberately reached via Settings/Home instead. `needs_review`'s two branches: unresolved `sync_conflicts` (account_id resolved through the polymorphic table_name/row_id pair) and `reconciliation_gap` (every non-archived stale account, not gated by include_in_total — broader than Home's banner on purpose). No pagination UI was built for the transaction filters — "riding the keyset index" was read as an ordering constraint, not a mandate for infinite scroll. See version-logs/phase-10-log.md.
 
 ## Phase 11 — Local data protection & offline outbox
 
