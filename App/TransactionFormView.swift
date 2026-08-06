@@ -272,6 +272,14 @@ extension TransactionFormView {
         isSaving = false
     }
 
+    /// Every write below goes through `session.outbox`, never
+    /// `TransactionRepository` directly (Phase 11) — it attempts the real
+    /// network call immediately and only falls back to the offline queue
+    /// on failure, so an online save behaves exactly as before and an
+    /// offline one is queued instead of erroring. `.queued` is treated the
+    /// same as success here: from the user's perspective they saved
+    /// something, and the app-wide stale-pending banner is what surfaces
+    /// "this hasn't actually reached the server yet" — not a per-save error.
     fileprivate func saveLedgerTransaction(accountId: UUID, magnitude: Decimal) async throws {
         guard let userId = session.profile?.id, let categoryId = selectedCategoryId, let account = fromAccount else {
             errorMessage = "Choose a category."
@@ -282,15 +290,11 @@ extension TransactionFormView {
         // code beyond this single point; the DB's sign_matches_category_kind
         // CHECK is the actual backstop).
         let signedAmount = kind == .expense ? -magnitude : magnitude
-        try await TransactionRepository.create(
-            client: session.client,
-            ownerId: userId,
-            accountId: accountId,
-            categoryId: categoryId,
-            amount: signedAmount,
-            currency: account.currency ?? "USD",
-            occurredAt: occurredAt
+        let payload = CreateTransactionPayload(
+            id: UUID(), ownerId: userId, accountId: accountId, categoryId: categoryId,
+            amount: signedAmount, currency: account.currency ?? "USD", occurredAt: occurredAt
         )
+        await session.outbox.submitCreateTransaction(payload)
     }
 
     fileprivate func saveTransfer(accountId: UUID, magnitude: Decimal) async throws {
@@ -303,14 +307,11 @@ extension TransactionFormView {
             errorMessage = "Enter a valid received amount."
             return
         }
-        try await TransactionRepository.createTransfer(
-            client: session.client,
-            fromAccountId: accountId,
-            toAccountId: toAccountId,
-            fromAmount: magnitude,
-            toAmount: receivedAmount,
-            occurredAt: occurredAt
+        let payload = CreateTransferPayload(
+            fromId: UUID(), toId: UUID(), fromAccountId: accountId, toAccountId: toAccountId,
+            fromAmount: magnitude, toAmount: receivedAmount, occurredAt: occurredAt
         )
+        await session.outbox.submitCreateTransfer(payload)
     }
 
     fileprivate func updateLedgerTransaction(accountId: UUID, magnitude: Decimal) async throws {
@@ -324,21 +325,12 @@ extension TransactionFormView {
             return
         }
         let signedAmount = kind == .expense ? -magnitude : magnitude
-        let result = try await TransactionRepository.update(
-            client: session.client,
-            id: id,
-            expectedVersion: expectedVersion,
-            accountId: accountId,
-            categoryId: categoryId,
-            amount: signedAmount,
-            currency: account.currency ?? "USD",
-            occurredAt: occurredAt,
-            merchantRaw: merchantRaw
+        let payload = UpdateTransactionPayload(
+            id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
+            amount: signedAmount, currency: account.currency ?? "USD", occurredAt: occurredAt, merchantRaw: merchantRaw
         )
-        switch result {
-        case .saved:
-            break
-        case .conflict:
+        let result = await session.outbox.submitUpdateTransaction(payload)
+        if result == .conflict {
             await reloadAfterConflict()
         }
     }
@@ -357,19 +349,12 @@ extension TransactionFormView {
             errorMessage = "Enter a valid received amount."
             return
         }
-        let result = try await TransactionRepository.updateTransfer(
-            client: session.client,
-            transferGroupId: transferGroupId,
-            fromExpectedVersion: fromExpectedVersion,
-            toExpectedVersion: toExpectedVersion,
-            fromAmount: magnitude,
-            toAmount: toAmount,
-            occurredAt: occurredAt
+        let payload = UpdateTransferPayload(
+            transferGroupId: transferGroupId, fromExpectedVersion: fromExpectedVersion,
+            toExpectedVersion: toExpectedVersion, fromAmount: magnitude, toAmount: toAmount, occurredAt: occurredAt
         )
-        switch result {
-        case .saved:
-            break
-        case .conflict:
+        let result = await session.outbox.submitUpdateTransfer(payload)
+        if result == .conflict {
             await reloadAfterConflict()
         }
     }

@@ -52,6 +52,11 @@ struct RootView: View {
                 }
                 .tint(Color("BrandPrimary"))
                 .task(id: session.refresh.token) { await loadNeedsReviewCount() }
+                .overlay(alignment: .bottom) {
+                    if session.outbox.hasStalePending(threshold: staleOutboxThreshold) {
+                        stalePendingBanner
+                    }
+                }
             case .failed(let message):
                 errorView(message)
             }
@@ -67,6 +72,32 @@ struct RootView: View {
                 privacyCurtain
             }
         }
+        // Drain on foreground, not just at launch — a write made offline
+        // should sync the moment connectivity is plausible again, without
+        // waiting for the next cold start (Phase 11).
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task { await session.outbox.drainAll() }
+            }
+        }
+    }
+
+    /// Pending past 5 minutes reads as "probably actually offline," not
+    /// "a normal in-flight request" — short enough to be useful, long
+    /// enough that a momentary network blip never flashes it.
+    private var staleOutboxThreshold: TimeInterval { 5 * 60 }
+
+    private var stalePendingBanner: some View {
+        HStack {
+            Image(systemName: "icloud.slash")
+            Text("\(session.outbox.pendingCount) change(s) waiting to sync")
+                .font(.footnote)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color("BrandSecondary").opacity(0.15), in: Capsule())
+        .foregroundStyle(Color("BrandSecondary"))
+        .padding(.bottom, 8)
     }
 
     private func loadNeedsReviewCount() async {

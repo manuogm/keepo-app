@@ -214,12 +214,19 @@ public enum TransactionRepository {
     /// (money rule: never re-sign in application code). `amount` must
     /// already carry the correct sign for the category's kind.
     ///
-    /// Six named, self-explanatory parameters describing one transaction —
-    /// same reasoning as AccountRepository.create above.
+    /// `id` defaults to a fresh `UUID()` for an ordinary online caller;
+    /// the offline outbox (Phase 11) is the one caller that supplies its
+    /// own, generated once before the first send attempt, so a retry of
+    /// this exact call reuses the same id and hits `transactions`' primary
+    /// key instead of inserting a duplicate row.
+    ///
+    /// Otherwise six named, self-explanatory parameters describing one
+    /// transaction — same reasoning as AccountRepository.create above.
     @discardableResult
     // swiftlint:disable:next function_parameter_count
     public static func create(
         client: SupabaseClient,
+        id: UUID = UUID(),
         ownerId: UUID,
         accountId: UUID,
         categoryId: UUID,
@@ -227,7 +234,6 @@ public enum TransactionRepository {
         currency: String,
         occurredAt: Date = Date()
     ) async throws -> UUID {
-        let id = UUID()
         let row = NewTransactionRow(
             id: id,
             ownerId: ownerId,
@@ -240,27 +246,6 @@ public enum TransactionRepository {
         )
         try await client.from("transactions").insert(row).execute()
         return id
-    }
-
-    /// The only transaction kind with an RPC — both legs, signed in SQL, in
-    /// one call. `toAmount` is `nil` for a same-currency transfer (the DB
-    /// infers it equals `fromAmount`); required when currencies differ.
-    public static func createTransfer(
-        client: SupabaseClient,
-        fromAccountId: UUID,
-        toAccountId: UUID,
-        fromAmount: Decimal,
-        toAmount: Decimal? = nil,
-        occurredAt: Date = Date()
-    ) async throws {
-        let params = CreateTransferParams(
-            fromAccountId: fromAccountId,
-            toAccountId: toAccountId,
-            fromAmount: fromAmount,
-            toAmount: toAmount,
-            occurredAt: PostgresDate.timestampString(occurredAt)
-        )
-        try await client.rpc("create_transfer", params: params).execute()
     }
 
     /// Ledger-only edit (expense/income) — a transfer's kind and legs are
@@ -362,20 +347,5 @@ private struct NewTransactionRow: Encodable {
         case accountId = "account_id"
         case categoryId = "category_id"
         case occurredAt = "occurred_at"
-    }
-}
-
-private struct CreateTransferParams: Encodable {
-    let fromAccountId: UUID
-    let toAccountId: UUID
-    let fromAmount: Decimal
-    let toAmount: Decimal?
-    let occurredAt: String
-    enum CodingKeys: String, CodingKey {
-        case fromAccountId = "p_from_account_id"
-        case toAccountId = "p_to_account_id"
-        case fromAmount = "p_from_amount"
-        case toAmount = "p_to_amount"
-        case occurredAt = "p_occurred_at"
     }
 }

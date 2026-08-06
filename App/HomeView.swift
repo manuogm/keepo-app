@@ -17,6 +17,10 @@ struct HomeView: View {
     @State private var hasStaleFeedingAccount = false
     @State private var isLoading = true
     @State private var errorMessage: String?
+    /// Non-nil means the hero figure/trajectory are the last successful
+    /// fetch's cached copy, not a live read — Phase 11's "as of HH:mm"
+    /// marker for the Home summary specifically.
+    @State private var summaryAsOf: Date?
 
     private let rangeDays = 90
 
@@ -38,6 +42,12 @@ struct HomeView: View {
 
                         if hasStaleFeedingAccount {
                             staleBanner
+                        }
+
+                        if let summaryAsOf {
+                            Text("Showing data as of \(summaryAsOf.formatted(date: .omitted, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(Color("TextSecondary"))
                         }
 
                         BalanceHeaderView(amount: netWorth, currency: baseCurrencyInfo)
@@ -83,6 +93,7 @@ struct HomeView: View {
                 }
             }
         }
+        .task { restoreSummaryCache() }
         .task(id: HomeLoadKey(token: session.refresh.token, scope: scope)) { await load() }
     }
 
@@ -149,10 +160,62 @@ struct HomeView: View {
             }
             let granularity = DateBucketing.granularity(from: from, through: today)
             seriesPoints = DateBucketing.bucket(parsed, granularity: granularity)
+            summaryAsOf = nil
+            saveSummaryCache()
         } catch {
-            errorMessage = String(describing: error)
+            if !restoreSummaryCache() {
+                errorMessage = String(describing: error)
+            }
         }
         isLoading = false
+    }
+
+    private var summaryCacheKey: String { "home_summary_\(scope.rawValue)" }
+
+    private func saveSummaryCache() {
+        let payload = HomeSummaryCache(
+            netWorth: netWorth,
+            seriesPoints: seriesPoints.map { HomeSummaryCache.Point(date: $0.date, value: $0.value) },
+            baseCurrencyCode: baseCurrencyInfo?.code,
+            baseCurrencyMinorUnit: baseCurrencyInfo?.minorUnit
+        )
+        guard let data = try? JSONEncoder().encode(payload) else { return }
+        session.payloadCache.save(key: summaryCacheKey, data: data)
+    }
+
+    /// Returns whether a cached summary existed to restore — the caller
+    /// uses this to decide whether a live-fetch failure should still show
+    /// an error (no cache to fall back on) or can stay silent behind the
+    /// "as of" marker instead.
+    @discardableResult
+    private func restoreSummaryCache() -> Bool {
+        guard
+            let (data, fetchedAt) = session.payloadCache.load(key: summaryCacheKey),
+            let payload = try? JSONDecoder().decode(HomeSummaryCache.self, from: data)
+        else { return false }
+        netWorth = payload.netWorth
+        seriesPoints = payload.seriesPoints.map { (date: $0.date, value: $0.value) }
+        if let code = payload.baseCurrencyCode, let minorUnit = payload.baseCurrencyMinorUnit {
+            baseCurrencyInfo = CurrencyInfo(code: code, minorUnit: minorUnit)
+        }
+        summaryAsOf = fetchedAt
+        isLoading = false
+        return true
+    }
+}
+
+/// The Home summary's own cache payload — net worth + trajectory + the
+/// base currency needed to render them, for exactly one scope (part of the
+/// cache key, not this struct — Total/Me/Household are cached separately).
+private struct HomeSummaryCache: Codable {
+    let netWorth: Decimal?
+    let seriesPoints: [Point]
+    let baseCurrencyCode: String?
+    let baseCurrencyMinorUnit: Int?
+
+    struct Point: Codable {
+        let date: Date
+        let value: Decimal
     }
 }
 

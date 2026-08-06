@@ -4,11 +4,10 @@ import SwiftUI
 struct TransactionsListView: View {
     let session: SessionStore
 
-    @State private var store = DataStore<PublicSchema.TransactionsWithDetailsSelect>()
+    @State private var store = DataStore<PublicSchema.TransactionsWithDetailsSelect>(cacheKey: "transactions_page_0")
     @State private var isAddingTransaction = false
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
     @State private var showConflictAlert = false
-    @State private var deleteErrorMessage: String?
     @State private var filter = TransactionFilter()
     @State private var isFilterSheetPresented = false
     @State private var filterAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
@@ -27,6 +26,11 @@ struct TransactionsListView: View {
                     .foregroundStyle(Color("TextSecondary"))
             } else {
                 List {
+                    if let asOf = store.asOf {
+                        Text("Showing data as of \(asOf.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(Color("TextSecondary"))
+                    }
                     ForEach(transactions, id: \.transactionId) { transaction in
                         TransactionRow(transaction: transaction)
                             .contentShape(Rectangle())
@@ -40,7 +44,7 @@ struct TransactionsListView: View {
                 .refreshable { await load() }
             }
 
-            if let errorMessage = store.errorMessage ?? deleteErrorMessage {
+            if let errorMessage = store.errorMessage {
                 VStack {
                     Spacer()
                     Text(errorMessage)
@@ -86,6 +90,7 @@ struct TransactionsListView: View {
         } message: {
             Text("The list has been refreshed with the latest version.")
         }
+        .task { store.restore(from: session.payloadCache) }
         .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter)) { await load() }
     }
 
@@ -113,33 +118,35 @@ struct TransactionsListView: View {
         if filterCategories.isEmpty {
             filterCategories = (try? await CategoryRepository.fetchAll(client: session.client)) ?? []
         }
-        await store.load { try await TransactionRepository.fetchFiltered(client: session.client, filter: filter) }
+        // Caching only applies to the default, unfiltered page — caching
+        // every filter permutation would be pointless; a filtered view
+        // simply has no offline fallback beyond whatever's already shown.
+        await store.load(
+            { try await TransactionRepository.fetchFiltered(client: session.client, filter: filter) },
+            cache: filter.isEmpty ? session.payloadCache : nil
+        )
     }
 
+    /// Routed through `session.outbox` (Phase 11), same as every write in
+    /// `TransactionFormView` — an offline delete queues instead of erroring.
     private func delete(at offsets: IndexSet) async {
         var hadConflict = false
-        deleteErrorMessage = nil
         for index in offsets {
             let transaction = transactions[index]
             guard let id = transaction.transactionId, let version = transaction.version else { continue }
-            do {
-                let deleted: Bool
-                if let groupId = transaction.transferGroupId, let siblingVersion = sibling(of: transaction)?.version {
-                    deleted = try await TransactionRepository.deleteTransfer(
-                        client: session.client,
-                        transferGroupId: groupId,
-                        fromExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(version) : Int(siblingVersion),
-                        toExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(siblingVersion) : Int(version)
-                    )
-                } else {
-                    deleted = try await TransactionRepository.delete(
-                        client: session.client, id: id, expectedVersion: Int(version)
-                    )
-                }
-                if !deleted { hadConflict = true }
-            } catch {
-                deleteErrorMessage = String(describing: error)
+            let result: OutboxSubmitResult
+            if let groupId = transaction.transferGroupId, let siblingVersion = sibling(of: transaction)?.version {
+                let payload = DeleteTransferPayload(
+                    transferGroupId: groupId,
+                    fromExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(version) : Int(siblingVersion),
+                    toExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(siblingVersion) : Int(version)
+                )
+                result = await session.outbox.submitDeleteTransfer(payload)
+            } else {
+                let payload = DeleteTransactionPayload(id: id, expectedVersion: Int(version))
+                result = await session.outbox.submitDeleteTransaction(payload)
             }
+            if result == .conflict { hadConflict = true }
         }
         session.refresh.bump()
         if hadConflict { showConflictAlert = true }

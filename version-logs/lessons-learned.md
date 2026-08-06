@@ -1,6 +1,6 @@
 # Lessons Learned — read before starting a new phase
 
-Consolidated from Phases 1–10. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
+Consolidated from Phases 1–11. Environment quirks, framework gotchas, and footguns already hit — don't repeat them.
 
 ## Process
 
@@ -61,6 +61,14 @@ Consolidated from Phases 1–10. Environment quirks, framework gotchas, and foot
 
 - **A view's "stable column contract" (documented so later phases can each append a `UNION ALL` branch without touching the client) is worth being strict about, including what it deliberately leaves out.** `needs_review`'s 8 columns don't include `minor_unit` — adding it would have made money formatting one line simpler in `NeedsReviewRow`, but would also mean every future branch has to carry it too, growing the "stable" contract by accretion. Fetching `currencies` once and building a local `[code: minorUnit]` lookup client-side (already-established `CurrencyRepository`) kept the view's contract exactly as documented. When a view's contract is written down as an explicit list, treat "just one more column" requests from the client side with real suspicion.
 - **A `SwiftLint` file-length violation from adding one new method to an existing repository file is a signal to split, not to suppress.** `Repositories.swift` crossed 400 lines from `TransactionRepository.fetchFiltered`'s addition alone; moved it and its supporting `TransactionFilter` struct into their own `TransactionFilter.swift`, following the same precedent `AccountWrites.swift`/`TransactionWrites.swift` already established for exactly this situation (a repository's *write* surface split out from its *read* surface once either grew enough to justify its own file).
+
+## SwiftData / offline outbox (Phase 11)
+
+- **`SwiftData`'s `@Model` types hit the identical macOS-floor wall `@Observable` did in Phase 6.** `KeepoCore`'s `Package.swift` still floors at macOS 13 for `supabase-swift` compatibility; SwiftData needs macOS 14. Same fix as before — put the models (`OfflineStore.swift`, `Outbox.swift`) in the App target, not the shared package, rather than bumping the package's platform floor. Worth checking for *any* newer SwiftUI/Observation-framework-adjacent API before reaching for KeepoCore: if it's iOS 17+/macOS 14+, it almost certainly can't live in the package as currently configured.
+- **A write path that generates its own id server-side, instead of accepting a client-supplied one, is the one thing standing between "idempotent for free" and a silent duplicate.** Found by actually asking, for every existing write, "what happens if the outbox sends this exact call twice" — `create_transfer` was the only one that failed the question (`TransactionRepository.create` already took a client id in spirit, just didn't expose the parameter). Worth asking explicitly for every *new* write path added from here on, not just assumed from "most things already have client ids."
+- **A duplicate-key error (Postgres `23505`) on a retried insert is the correct, desired outcome for an idempotent write, not a bug to route around.** The client-side handling is to catch that specific error code and treat it as success ("already applied"), never to avoid triggering it. `PostgrestError.code` (a bare `String?`) is what carries the SQLSTATE through `supabase-swift` — check that field, not the error message text, which isn't guaranteed stable.
+- **A generic `Codable` constraint added to an existing generic type (`DataStore<Item>`) is free when every real usage already conforms** — every generated `PublicSchema.*Select` type already derives `Codable`, so adding `Item: Codable` to `DataStore` for Phase 11's persist/restore needed zero call-site changes. Worth checking for this kind of free retrofit before assuming a generic type needs a parallel/wrapper type instead.
+- **Running `xcodebuild test` to execute an XCTest/Swift Testing bundle is not the same as interactively using the Simulator app.** It boots a simulator process headlessly to host the test runner; no visual window, no screenshot/tap interaction. When simulator *use* is paused (e.g. by explicit user request, pending a joint walkthrough), automated `xcodebuild test` runs — which several phases' own Verify sections call for — are still the right way to execute a unit-test suite; only the interactive, visual walkthrough is what's actually being deferred.
 
 ## Money-rule-adjacent
 

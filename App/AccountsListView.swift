@@ -6,7 +6,7 @@ import SwiftUI
 struct AccountsListView: View {
     let session: SessionStore
 
-    @State private var store = DataStore<PublicSchema.AccountsWithBalancesSelect>()
+    @State private var store = DataStore<PublicSchema.AccountsWithBalancesSelect>(cacheKey: "accounts_with_balances")
     @State private var isAddingAccount = false
     @State private var editingAccountId: UUID?
     @State private var showConflictAlert = false
@@ -34,6 +34,11 @@ struct AccountsListView: View {
                 ProgressView()
             } else {
                 List {
+                    if let asOf = store.asOf {
+                        Text("Showing data as of \(asOf.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(Color("TextSecondary"))
+                    }
                     if !everyday.isEmpty {
                         Section {
                             ForEach(everyday, id: \.accountId) { account in
@@ -99,6 +104,7 @@ struct AccountsListView: View {
         } message: {
             Text("The list has been refreshed with the latest version.")
         }
+        .task { store.restore(from: session.payloadCache) }
         .task(id: session.refresh.token) { await load() }
     }
 
@@ -145,7 +151,10 @@ struct AccountsListView: View {
     }
 
     private func load() async {
-        await store.load { try await AccountRepository.fetchAllWithBalances(client: session.client) }
+        await store.load(
+            { try await AccountRepository.fetchAllWithBalances(client: session.client) },
+            cache: session.payloadCache
+        )
     }
 
     private func setArchived(_ account: PublicSchema.AccountsWithBalancesSelect, archived: Bool) async {

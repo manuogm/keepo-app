@@ -1,4 +1,39 @@
 import Foundation
+import Supabase
+
+public extension TransactionRepository {
+    /// The only transaction kind with an RPC — both legs, signed in SQL, in
+    /// one call. `toAmount` is `nil` for a same-currency transfer (the DB
+    /// infers it equals `fromAmount`); required when currencies differ.
+    /// `fromId`/`toId` are the two legs' own client-generated ids — omitted
+    /// (`nil`) by every ordinary online caller, in which case the DB
+    /// generates them itself exactly as before. The offline outbox
+    /// (Phase 11) is the one caller that supplies them: generating them
+    /// once, before the first send attempt, is what makes a retry of this
+    /// exact call idempotent — a repeat hits `transactions`' primary key
+    /// instead of silently duplicating the transfer.
+    static func createTransfer(
+        client: SupabaseClient,
+        fromAccountId: UUID,
+        toAccountId: UUID,
+        fromAmount: Decimal,
+        toAmount: Decimal? = nil,
+        occurredAt: Date = Date(),
+        fromId: UUID? = nil,
+        toId: UUID? = nil
+    ) async throws {
+        let params = CreateTransferParams(
+            fromAccountId: fromAccountId,
+            toAccountId: toAccountId,
+            fromAmount: fromAmount,
+            toAmount: toAmount,
+            occurredAt: PostgresDate.timestampString(occurredAt),
+            fromId: fromId,
+            toId: toId
+        )
+        try await client.rpc("create_transfer", params: params).execute()
+    }
+}
 
 /// The outcome of a version-checked write (edit or delete). `.conflict`
 /// means the row changed since it was loaded — the DB already logged it to
@@ -83,5 +118,24 @@ struct DeleteTransferParams: Encodable {
         case transferGroupId = "p_transfer_group_id"
         case fromExpectedVersion = "p_from_expected_version"
         case toExpectedVersion = "p_to_expected_version"
+    }
+}
+
+private struct CreateTransferParams: Encodable {
+    let fromAccountId: UUID
+    let toAccountId: UUID
+    let fromAmount: Decimal
+    let toAmount: Decimal?
+    let occurredAt: String
+    let fromId: UUID?
+    let toId: UUID?
+    enum CodingKeys: String, CodingKey {
+        case fromAccountId = "p_from_account_id"
+        case toAccountId = "p_to_account_id"
+        case fromAmount = "p_from_amount"
+        case toAmount = "p_to_amount"
+        case occurredAt = "p_occurred_at"
+        case fromId = "p_from_id"
+        case toId = "p_to_id"
     }
 }

@@ -2,6 +2,7 @@ import Foundation
 import KeepoCore
 import Observation
 import Supabase
+import SwiftData
 
 /// App-level session state: builds the Supabase client from Info.plist
 /// (xcconfig-injected), signs in via whichever `AuthProvider` is active, and
@@ -25,6 +26,11 @@ public final class SessionStore {
     /// Bumped by every successful write; every list screen's `.task(id:)`
     /// keys off it. See RefreshCoordinator's own doc comment.
     public let refresh = RefreshCoordinator()
+    /// Offline write queue + read-through cache (Phase 11). Built once, at
+    /// the same point the Supabase client is — both are session-lifetime,
+    /// not per-screen.
+    public let outbox: Outbox
+    public let payloadCache: PayloadCache
     private let authProvider: AuthProvider
     private var userId: UUID?
 
@@ -40,6 +46,20 @@ public final class SessionStore {
         self.authProvider = config.isLocal
             ? StubAuthProvider(client: client, config: config)
             : PasswordAuthProvider(client: client)
+        // A container failure here (disk full, corrupt store) would make
+        // the entire app unusable either way — no code path exists that
+        // doesn't eventually need the outbox once offline writes matter,
+        // so this fatalError matches the one in loadConfig() below rather
+        // than limping along with an outbox that silently never persists.
+        let container: ModelContainer
+        do {
+            container = try OfflineStore.makeContainer()
+        } catch {
+            fatalError("Failed to create the offline store: \(error)")
+        }
+        let context = ModelContext(container)
+        self.payloadCache = PayloadCache(context: context)
+        self.outbox = Outbox(context: context, sender: LiveTransactionOutboxSender(client: client))
     }
 
     public func start() async {
@@ -47,6 +67,10 @@ public final class SessionStore {
             let session = try await authProvider.signIn()
             userId = session.user.id
             try await refreshProfile()
+            // "Only syncs once a valid session exists" is structural, not a
+            // separate check — this line only runs after signIn() above
+            // already succeeded.
+            await outbox.drainAll()
         } catch {
             phase = .failed(String(describing: error))
         }
