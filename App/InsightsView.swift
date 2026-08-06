@@ -1,0 +1,199 @@
+import Charts
+import KeepoCore
+import SwiftUI
+
+/// Reached from Home's toolbar, not a tab — the same "not every feature is
+/// a top-level tab" precedent Household/Sync Ritual/Recurring already
+/// established. Trailing 90-day window, matching Home's own trajectory
+/// (`rangeDays`) — no date-range picker, same reasoning: bucket
+/// granularity and range are derived, never a user control
+/// (app-architecture.md §5).
+struct InsightsView: View {
+    let session: SessionStore
+
+    @State private var scope: PublicSchema.AccountScope = .total
+    @State private var categorySpending: [CategorySpending] = []
+    @State private var seriesPoints: [IncomeExpensePoint] = []
+    @State private var savingsRate: Decimal?
+    @State private var investmentAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var unrealizedGains: [UUID: Decimal?] = [:]
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    private let rangeDays = 90
+
+    var body: some View {
+        ZStack {
+            Color("BGCanvas").ignoresSafeArea()
+
+            if isLoading {
+                ProgressView()
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        Picker("Scope", selection: $scope) {
+                            Text("Total").tag(PublicSchema.AccountScope.total)
+                            Text("Me").tag(PublicSchema.AccountScope.me)
+                            Text("Household").tag(PublicSchema.AccountScope.household)
+                        }
+                        .pickerStyle(.segmented)
+
+                        savingsRateSection
+                        incomeExpenseSection
+                        categorySpendingSection
+
+                        if !investmentAccounts.isEmpty {
+                            unrealizedGainSection
+                        }
+
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    .padding()
+                }
+                .refreshable { await load() }
+            }
+        }
+        .navigationTitle("Insights")
+        .task(id: InsightsLoadKey(token: session.refresh.token, scope: scope)) { await load() }
+    }
+
+    private var savingsRateSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Savings rate").font(.headline).foregroundStyle(Color("TextPrimary"))
+            Text(savingsRateText)
+                .font(.largeTitle).fontWeight(.bold)
+                .foregroundStyle(Color("BrandPrimary"))
+            Text("Excludes transfers and investment valuation changes.")
+                .font(.caption)
+                .foregroundStyle(Color("TextSecondary"))
+        }
+    }
+
+    private var savingsRateText: String {
+        guard let savingsRate else { return "—" }
+        return savingsRate.formatted(.percent.precision(.fractionLength(0)))
+    }
+
+    private var incomeExpenseSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Income & Expense").font(.headline).foregroundStyle(Color("TextPrimary"))
+            if seriesPoints.isEmpty {
+                Text("Nothing in this window yet.")
+                    .font(.callout)
+                    .foregroundStyle(Color("TextSecondary"))
+            } else {
+                Chart(seriesPoints, id: \.bucketStart) { point in
+                    if let income = point.income {
+                        BarMark(x: .value("Period", point.bucketStart), y: .value("Income", income))
+                            .foregroundStyle(Color("IncomeColor"))
+                            .position(by: .value("Kind", "Income"))
+                    }
+                    if let expense = point.expense {
+                        BarMark(x: .value("Period", point.bucketStart), y: .value("Expense", expense))
+                            .foregroundStyle(Color("BrandPrimary"))
+                            .position(by: .value("Kind", "Expense"))
+                    }
+                }
+                .chartYAxis { AxisMarks(position: .leading) }
+                .frame(height: 200)
+            }
+        }
+    }
+
+    private var categorySpendingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Spending by Category").font(.headline).foregroundStyle(Color("TextPrimary"))
+            if categorySpending.isEmpty {
+                Text("No expenses in this window yet.")
+                    .font(.callout)
+                    .foregroundStyle(Color("TextSecondary"))
+            } else {
+                // Category bars carry name + value as text (app-architecture.md
+                // §5) — color alone is never the only identity channel, which
+                // is also why every bar shares one color here rather than an
+                // unvalidated per-category palette.
+                Chart(categorySpending, id: \.categoryId) { entry in
+                    BarMark(
+                        x: .value("Amount", entry.total ?? 0),
+                        y: .value("Category", entry.categoryName)
+                    )
+                    .foregroundStyle(Color("BrandPrimary"))
+                    .annotation(position: .trailing) {
+                        Text(categoryLabel(entry))
+                            .font(.caption)
+                            .foregroundStyle(Color("TextSecondary"))
+                    }
+                }
+                .frame(height: CGFloat(categorySpending.count * 44))
+            }
+        }
+    }
+
+    private func categoryLabel(_ entry: CategorySpending) -> String {
+        guard let total = entry.total else { return "—" }
+        let currency = CurrencyInfo(code: entry.currency, minorUnit: 2)
+        return MoneyFormatter.format(total, currency: currency)
+    }
+
+    private var unrealizedGainSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Unrealized Gain").font(.headline).foregroundStyle(Color("TextPrimary"))
+            ForEach(investmentAccounts, id: \.accountId) { account in
+                HStack {
+                    Text(account.name ?? "—").foregroundStyle(Color("TextPrimary"))
+                    Spacer()
+                    Text(unrealizedGainText(for: account))
+                        .monospacedDigit()
+                        .foregroundStyle(Color("TextSecondary"))
+                }
+            }
+        }
+    }
+
+    private func unrealizedGainText(for account: PublicSchema.AccountsWithBalancesSelect) -> String {
+        guard let accountId = account.accountId, let gain = unrealizedGains[accountId], let gain else { return "—" }
+        let currency = CurrencyInfo(code: account.currency ?? "EUR", minorUnit: Int(account.minorUnit ?? 2))
+        return MoneyFormatter.format(gain, currency: currency)
+    }
+
+    private func load() async {
+        let today = Date()
+        let from = Calendar.current.date(byAdding: .day, value: -(rangeDays - 1), to: today) ?? today
+        let granularity = DateBucketing.granularity(from: from, through: today)
+
+        async let categoryResult = InsightsRepository.spendingByCategory(
+            client: session.client, scope: scope, from: from, through: today
+        )
+        async let seriesResult = InsightsRepository.incomeExpenseSeries(
+            client: session.client, scope: scope, from: from, through: today, granularity: granularity
+        )
+        async let rateResult = InsightsRepository.savingsRate(
+            client: session.client, scope: scope, from: from, through: today
+        )
+        async let accountsResult = AccountRepository.fetchAllWithBalances(client: session.client)
+
+        categorySpending = (try? await categoryResult) ?? []
+        seriesPoints = (try? await seriesResult) ?? []
+        savingsRate = try? await rateResult
+        let accounts = (try? await accountsResult) ?? []
+        investmentAccounts = accounts.filter { $0.kind == .valuation && $0.archivedAt == nil }
+
+        for account in investmentAccounts {
+            guard let accountId = account.accountId else { continue }
+            unrealizedGains[accountId] = try? await InsightsRepository.unrealizedGain(
+                client: session.client, accountId: accountId
+            )
+        }
+
+        isLoading = false
+    }
+}
+
+private struct InsightsLoadKey: Equatable {
+    let token: Int
+    let scope: PublicSchema.AccountScope
+}

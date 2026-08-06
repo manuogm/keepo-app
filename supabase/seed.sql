@@ -126,26 +126,33 @@ values (
 );
 
 -- A handful of transactions against user A's default "Other" categories.
+-- `is_default` (not just `kind`) is required here — Phase 9/12 added
+-- Adjustment/Uncategorized categories of the same kind for every user, and
+-- a bare `kind = 'expense'` filter on a SELECT feeding an INSERT ... SELECT
+-- silently multiplies one intended row into one per matching category
+-- (confirmed empirically: this exact query tripled every seeded expense
+-- transaction until this fix, only noticed once Phase 15's insights RPCs
+-- summed the duplicates).
 insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
 select
   '99999999-9999-9999-9999-999999999999', '99999999-9999-9999-9999-999999999999',
   'aaaaaaaa-0000-0000-0000-000000000001', c.id, -42.50, 'EUR', now() - interval '2 days', 'manual'
 from categories c
-where c.owner_id = '99999999-9999-9999-9999-999999999999' and c.kind = 'expense';
+where c.owner_id = '99999999-9999-9999-9999-999999999999' and c.kind = 'expense' and c.is_default;
 
 insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
 select
   '99999999-9999-9999-9999-999999999999', '99999999-9999-9999-9999-999999999999',
   'aaaaaaaa-0000-0000-0000-000000000001', c.id, 2500.00, 'EUR', now() - interval '5 days', 'manual'
 from categories c
-where c.owner_id = '99999999-9999-9999-9999-999999999999' and c.kind = 'income';
+where c.owner_id = '99999999-9999-9999-9999-999999999999' and c.kind = 'income' and c.is_default;
 
 insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
 select
   '88888888-8888-8888-8888-888888888888', '88888888-8888-8888-8888-888888888888',
   'bbbbbbbb-0000-0000-0000-000000000001', c.id, -18.20, 'USD', now() - interval '1 days', 'manual'
 from categories c
-where c.owner_id = '88888888-8888-8888-8888-888888888888' and c.kind = 'expense';
+where c.owner_id = '88888888-8888-8888-8888-888888888888' and c.kind = 'expense' and c.is_default;
 
 -- A handful of fx_rates so the two USD-denominated rows above convert to a
 -- real number instead of "—" when a screen renders them. Deliberately

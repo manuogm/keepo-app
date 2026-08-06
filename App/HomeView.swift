@@ -87,6 +87,13 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink {
+                    InsightsView(session: session)
+                } label: {
+                    Image(systemName: "chart.bar")
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
                     SyncRitualView(session: session)
                 } label: {
                     Image(systemName: "arrow.triangle.2.circlepath")
