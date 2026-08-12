@@ -74,7 +74,9 @@ struct BudgetsView: View {
         do {
             progress = try await BudgetRepository.fetchProgress(client: session.client, periodMonth: Date())
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            // Offline is ambient state, surfaced by the persistent status
+            // indicator elsewhere on screen — not a per-fetch red error.
+            errorMessage = UserFacingError.isOffline(error) ? nil : UserFacingError.describe(error)
         }
         isLoading = false
     }

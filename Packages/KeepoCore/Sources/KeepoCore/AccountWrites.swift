@@ -66,6 +66,28 @@ struct DeleteAccountParams: Encodable {
     }
 }
 
+struct SetAccountBalanceParams: Encodable {
+    let accountId: UUID
+    let newBalance: Decimal
+    let id: UUID
+    enum CodingKeys: String, CodingKey {
+        case accountId = "p_account_id"
+        case newBalance = "p_new_balance"
+        case id = "p_id"
+    }
+}
+
+/// Exactly one of the two is non-nil — which one depends on the account's
+/// kind, decided server-side (see the migration's own header comment).
+public struct SetAccountBalanceResult: Decodable, Sendable {
+    public let transactionId: UUID?
+    public let snapshotId: UUID?
+    enum CodingKeys: String, CodingKey {
+        case transactionId = "transaction_id"
+        case snapshotId = "snapshot_id"
+    }
+}
+
 public extension AccountRepository {
     /// Editable: name, subtype, opening_balance, include_in_total,
     /// counts_toward_fi. Not editable, by omission from this call's
@@ -117,5 +139,23 @@ public extension AccountRepository {
         let params = DeleteAccountParams(id: id, expectedVersion: expectedVersion)
         let rows: [AccountDeleteConflictFlag] = try await client.rpc("delete_account", params: params).execute().value
         return !(rows.first?.conflict ?? true)
+    }
+
+    /// "This account is worth X right now" — for a ledger account the gap
+    /// against its own computed balance becomes an adjustment transaction
+    /// (filed under "Other"); for a valuation account it's a new balance
+    /// snapshot. Which one happens is decided server-side from the
+    /// account's kind, not by the caller. `id` is the same client-
+    /// generated idempotency key every outbox write uses — replaying it
+    /// twice (e.g. a queued write synced, then retried) has no double
+    /// effect (see the migration's `on conflict (id) do nothing`).
+    @discardableResult
+    static func setBalance(
+        client: SupabaseClient, accountId: UUID, newBalance: Decimal, id: UUID
+    ) async throws -> SetAccountBalanceResult {
+        let params = SetAccountBalanceParams(accountId: accountId, newBalance: newBalance, id: id)
+        let rows: [SetAccountBalanceResult] = try await client.rpc("set_account_balance", params: params)
+            .execute().value
+        return rows.first ?? SetAccountBalanceResult(transactionId: nil, snapshotId: nil)
     }
 }

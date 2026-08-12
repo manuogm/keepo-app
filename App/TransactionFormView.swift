@@ -179,10 +179,10 @@ struct TransactionFormView: View {
     /// Falls back to `TransactionFormCache` when the live fetch fails — an
     /// offline create otherwise has no way to populate its own pickers.
     private func load() async {
-        async let accountsResult = withTimeout(seconds: 6) {
+        async let accountsResult = withTimeout(seconds: 3) {
             try await AccountRepository.fetchAllWithBalances(client: session.client)
         }
-        async let categoriesResult = withTimeout(seconds: 6) {
+        async let categoriesResult = withTimeout(seconds: 3) {
             try await CategoryRepository.fetchAll(client: session.client)
         }
         accounts = (try? await accountsResult) ?? TransactionFormCache.accounts(session: session)

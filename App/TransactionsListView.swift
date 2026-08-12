@@ -6,16 +6,19 @@ struct TransactionsListView: View {
 
     // MARK: - Transactions state
 
-    @State private var store = DataStore<PublicSchema.TransactionsWithDetailsSelect>(cacheKey: "transactions_page_0")
+    // Not `private` — read/written from TransactionsListView+Loading.swift,
+    // an extension in a different file (kept there purely for file-length,
+    // same reasoning as the Needs-review state below).
+    @State var store = DataStore<PublicSchema.TransactionsWithDetailsSelect>(cacheKey: "transactions_page_0")
+    @State var filterAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State var filterCategories: [PublicSchema.CategoriesSelect] = []
+    @State var showConflictAlert = false
     @State private var isAddingTransaction = false
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
     @State private var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
     @State private var editingRecurringRule: PublicSchema.RecurringRulesSelect?
-    @State private var showConflictAlert = false
-    @State private var filter = TransactionFilter()
+    @State var filter = TransactionFilter()
     @State private var isFilterSheetPresented = false
-    @State private var filterAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
-    @State private var filterCategories: [PublicSchema.CategoriesSelect] = []
 
     // MARK: - Needs-review inbox state
 
@@ -31,7 +34,37 @@ struct TransactionsListView: View {
 
     // MARK: - Computed
 
-    private var transactions: [PublicSchema.TransactionsWithDetailsSelect] { store.items }
+    var transactions: [PublicSchema.TransactionsWithDetailsSelect] { store.items }
+
+    /// Which cached rows have a queued edit or delete against them — the
+    /// counterpart to `pendingRows` (pending *creates*) for rows that
+    /// already exist in the cached list.
+    private var pendingRowStates: [UUID: PendingOverlayAdapter.PendingRowState] {
+        PendingOverlayAdapter.pendingRowStates(outbox: session.outbox)
+    }
+
+    /// A row with a pending delete queued is hidden immediately rather
+    /// than left showing until the delete actually syncs.
+    private var visibleTransactions: [PublicSchema.TransactionsWithDetailsSelect] {
+        let states = pendingRowStates
+        return transactions.filter { states[$0.transactionId ?? UUID()] != .deleted }
+    }
+
+    /// The default page is already ordered newest-first (Phase 6's keyset
+    /// index) — this is just the head of it. The full history lives one
+    /// tap away in `TransactionRegisterView`, grouped by day with its own
+    /// period navigator.
+    private let recentLimit = 10
+
+    private var recentTransactions: [PublicSchema.TransactionsWithDetailsSelect] {
+        Array(visibleTransactions.prefix(recentLimit))
+    }
+
+    private func category(
+        for transaction: PublicSchema.TransactionsWithDetailsSelect
+    ) -> PublicSchema.CategoriesSelect? {
+        filterCategories.first { $0.id == transaction.categoryId }
+    }
 
     private var reviewDisplayItems: [PublicSchema.NeedsReviewSelect] {
         reviewStore.items.filter { $0.kind != "reconciliation_gap" }
@@ -64,17 +97,11 @@ struct TransactionsListView: View {
 
             if store.isLoading && reviewStore.isLoading {
                 ProgressView()
-            } else if transactions.isEmpty && pendingRows.isEmpty && reviewDisplayItems.isEmpty {
+            } else if visibleTransactions.isEmpty && pendingRows.isEmpty && reviewDisplayItems.isEmpty {
                 Text("No transactions yet")
                     .foregroundStyle(Color.secondary)
             } else {
                 List {
-                    if let asOf = store.asOf {
-                        Text("Showing data as of \(asOf.formatted(date: .omitted, time: .shortened))")
-                            .font(.caption)
-                            .foregroundStyle(Color.secondary)
-                    }
-
                     // Needs-review inbox — most actionable items first
                     if !reviewDisplayItems.isEmpty {
                         Section("Needs Review") {
@@ -92,13 +119,30 @@ struct TransactionsListView: View {
                         }
                     }
 
-                    ForEach(transactions, id: \.transactionId) { transaction in
-                        TransactionRow(transaction: transaction)
+                    Section {
+                        ForEach(recentTransactions, id: \.transactionId) { transaction in
+                            TransactionRow(
+                                transaction: transaction,
+                                category: category(for: transaction),
+                                isPendingUpdate: pendingRowStates[transaction.transactionId ?? UUID()] == .updated
+                            )
                             .contentShape(Rectangle())
                             .onTapGesture { handleTap(on: transaction) }
-                    }
-                    .onDelete { offsets in
-                        Task { await delete(at: offsets) }
+                        }
+                        .onDelete { offsets in
+                            Task { await delete(at: offsets, in: recentTransactions) }
+                        }
+                    } header: {
+                        HStack {
+                            Text("Recent")
+                            Spacer()
+                            NavigationLink {
+                                TransactionRegisterView(session: session)
+                            } label: {
+                                Text("See All")
+                            }
+                            .textCase(nil)
+                        }
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -120,7 +164,10 @@ struct TransactionsListView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                PrivacyToggleButton(session: session)
+                ScopeSwitcherButton(session: session)
+            }
+            ToolbarItem(placement: .principal) {
+                ScreenTitleBar(title: "Transactions", session: session)
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -200,7 +247,7 @@ struct TransactionsListView: View {
         filter.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill"
     }
 
-    private func sibling(
+    func sibling(
         of transaction: PublicSchema.TransactionsWithDetailsSelect
     ) -> PublicSchema.TransactionsWithDetailsSelect? {
         guard let groupId = transaction.transferGroupId else { return nil }
@@ -224,60 +271,6 @@ struct TransactionsListView: View {
         editingRecurringRule = try? await RecurringRuleRepository.fetchOne(client: session.client, id: ruleId)
     }
 
-    private func load() async {
-        if filterAccounts.isEmpty {
-            let fetched = try? await AccountRepository.fetchAllWithBalances(client: session.client)
-            filterAccounts = fetched ?? cachedAccounts()
-        }
-        if filterCategories.isEmpty {
-            let fetched = try? await CategoryRepository.fetchAll(client: session.client)
-            filterCategories = fetched ?? cachedCategories()
-        }
-        if reviewCurrencies.isEmpty {
-            let currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
-            reviewCurrencies = Dictionary(uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) })
-        }
-        await reviewStore.load { try await NeedsReviewRepository.fetchAll(client: session.client) }
-        // Caching only applies to the default, unfiltered page — a filtered
-        // view has no offline fallback beyond whatever's already shown.
-        await store.load(
-            { try await TransactionRepository.fetchFiltered(client: session.client, filter: filter) },
-            cache: filter.isEmpty ? session.payloadCache : nil
-        )
-    }
-
-    private func cachedAccounts() -> [PublicSchema.AccountsWithBalancesSelect] {
-        guard let (data, _) = session.payloadCache.load(key: "accounts_with_balances") else { return [] }
-        return (try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data)) ?? []
-    }
-
-    private func cachedCategories() -> [PublicSchema.CategoriesSelect] {
-        guard let (data, _) = session.payloadCache.load(key: "categories") else { return [] }
-        return (try? JSONDecoder().decode([PublicSchema.CategoriesSelect].self, from: data)) ?? []
-    }
-
-    private func delete(at offsets: IndexSet) async {
-        var hadConflict = false
-        for index in offsets {
-            let transaction = transactions[index]
-            guard let id = transaction.transactionId, let version = transaction.version else { continue }
-            let result: OutboxSubmitResult
-            if let groupId = transaction.transferGroupId, let siblingVersion = sibling(of: transaction)?.version {
-                let payload = DeleteTransferPayload(
-                    transferGroupId: groupId,
-                    fromExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(version) : Int(siblingVersion),
-                    toExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(siblingVersion) : Int(version)
-                )
-                result = await session.outbox.submitDeleteTransfer(payload)
-            } else {
-                let payload = DeleteTransactionPayload(id: id, expectedVersion: Int(version))
-                result = await session.outbox.submitDeleteTransaction(payload)
-            }
-            if result == .conflict { hadConflict = true }
-        }
-        session.refresh.bump()
-        if hadConflict { showConflictAlert = true }
-    }
 }
 
 // MARK: - Supporting types
@@ -289,50 +282,4 @@ extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
 private struct TransactionsLoadKey: Equatable {
     let token: Int
     let filter: TransactionFilter
-}
-
-private struct TransactionRow: View {
-    let transaction: PublicSchema.TransactionsWithDetailsSelect
-
-    @Environment(\.isPrivacyMode) private var isPrivacyMode
-
-    private var isTransfer: Bool { transaction.kind == "transfer" }
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(isTransfer ? "Transfer" : (transaction.categoryName ?? "—"))
-                    .foregroundStyle(Color.primary)
-                Text(transaction.accountName ?? "—")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(isPrivacyMode ? "••••" : formattedAmount)
-                    .monospacedDigit()
-                    .foregroundStyle(amountColor)
-                if !isPrivacyMode {
-                    CurrencyConversionLabel(
-                        nativeCurrency: transaction.currency,
-                        amountBase: transaction.amountBase,
-                        baseCurrency: transaction.baseCurrency,
-                        baseMinorUnit: transaction.baseMinorUnit,
-                        hasMissingRate: transaction.hasMissingRate ?? false
-                    )
-                }
-            }
-        }
-    }
-
-    private var formattedAmount: String {
-        guard let currencyCode = transaction.currency, let minorUnit = transaction.minorUnit else { return "—" }
-        let currency = CurrencyInfo(code: currencyCode, minorUnit: Int(minorUnit))
-        return MoneyFormatter.format(transaction.amount, currency: currency)
-    }
-
-    private var amountColor: Color {
-        guard let amount = transaction.amount, amount < 0 else { return Color.primary }
-        return Color.primary
-    }
 }

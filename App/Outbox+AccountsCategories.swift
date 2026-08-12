@@ -42,6 +42,12 @@ extension LiveOutboxSender {
         }
     }
 
+    public func setAccountBalance(_ payload: SetAccountBalancePayload) async throws {
+        try await AccountRepository.setBalance(
+            client: client, accountId: payload.accountId, newBalance: payload.newBalance, id: payload.id
+        )
+    }
+
     public func createCategory(_ payload: CreateCategoryPayload) async throws {
         do {
             try await CategoryRepository.create(
@@ -81,6 +87,21 @@ extension Outbox {
         }
     }
 
+    /// `id` is the adjustment-transaction/snapshot id, freshly generated
+    /// per edit — two balance edits made offline before either syncs are
+    /// deliberately NOT collapsed into one queued item the way an edit to
+    /// the same row normally is. Each queues and applies its own gap
+    /// against whatever the account's true balance is when it finally
+    /// runs, in order; the net result still lands on the last-entered
+    /// value, just via two adjustment transactions instead of one.
+    @discardableResult
+    public func submitSetAccountBalance(_ payload: SetAccountBalancePayload) async -> OutboxSubmitResult {
+        await attempt(id: payload.id, kind: .setAccountBalance, payload: payload) {
+            try await self.sender.setAccountBalance(payload)
+            return true
+        }
+    }
+
     @discardableResult
     public func submitCreateCategory(_ payload: CreateCategoryPayload) async -> OutboxSubmitResult {
         await attempt(id: payload.id, kind: .createCategory, payload: payload) {
@@ -107,6 +128,9 @@ extension Outbox {
             return true
         case .updateAccount:
             return try await sender.updateAccount(decoder.decode(UpdateAccountPayload.self, from: data))
+        case .setAccountBalance:
+            try await sender.setAccountBalance(decoder.decode(SetAccountBalancePayload.self, from: data))
+            return true
         case .createCategory:
             try await sender.createCategory(decoder.decode(CreateCategoryPayload.self, from: data))
             return true

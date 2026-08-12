@@ -16,9 +16,9 @@ extension EnvironmentValues {
 
 // MARK: - Button
 
-/// Top-bar leading button: tap toggles financial data visibility; long-press
-/// (context menu) selects the scope that all financial screens compute totals
-/// for (Total / Personal / Household).
+/// Sits beside the screen title: tap toggles financial data visibility.
+/// Scope switching (Total/Personal/Household) lives in `ScopeSwitcherButton`
+/// on the opposite corner — this button only ever does one thing.
 struct PrivacyToggleButton: View {
     let session: SessionStore
 
@@ -33,32 +33,29 @@ struct PrivacyToggleButton: View {
             Button {
                 session.isPrivacyMode.toggle()
             } label: {
-                Image(systemName: session.isPrivacyMode ? "eye.slash.fill" : "eye.fill")
-                    .foregroundStyle(Color.primary)
+                Image(systemName: session.isPrivacyMode ? "eye.slash" : "eye")
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
             }
-            .contextMenu {
-                Section("Scope") {
-                    scopeButton(.total, label: "Total Net Worth", icon: "globe")
-                    scopeButton(.me, label: "Personal", icon: "person.fill")
-                    scopeButton(.household, label: "Household", icon: "person.2.fill")
-                }
-            }
+            .buttonStyle(.plain)
         }
     }
+}
 
-    private func scopeButton(
-        _ scope: PublicSchema.AccountScope,
-        label: String,
-        icon: String
-    ) -> some View {
-        Button {
-            session.scope = scope
-        } label: {
-            Label {
-                Text(label)
-            } icon: {
-                Image(systemName: session.scope == scope ? "checkmark" : icon)
-            }
+// MARK: - Title bar
+
+/// The screen title plus its privacy toggle, as one `.principal` toolbar
+/// item — every financial screen (Home, Accounts, Transactions) renders its
+/// title this way instead of each hand-assembling the same `HStack`.
+struct ScreenTitleBar: View {
+    let title: String
+    let session: SessionStore
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.headline)
+            PrivacyToggleButton(session: session)
         }
     }
 }

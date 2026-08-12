@@ -230,3 +230,22 @@ public struct UpdateCategoryPayload: Codable, Sendable {
         self.color = color
     }
 }
+
+/// No `expectedVersion` — a balance edit has nothing to conflict against
+/// beyond what `set_account_balance` already is: the RPC recomputes the
+/// account's *actual* balance at whatever moment it finally runs (not
+/// whatever the client guessed while offline) and derives the adjustment
+/// from that, so replaying it late is still correct. `id` is the
+/// idempotency key: it becomes the adjustment transaction's id for a
+/// ledger account, or the snapshot's id for a valuation account.
+public struct SetAccountBalancePayload: Codable, Sendable {
+    public let id: UUID
+    public let accountId: UUID
+    public let newBalance: Decimal
+
+    public init(id: UUID, accountId: UUID, newBalance: Decimal) {
+        self.id = id
+        self.accountId = accountId
+        self.newBalance = newBalance
+    }
+}

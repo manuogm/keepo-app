@@ -192,7 +192,9 @@ struct HouseholdView: View {
             sharedAccountIds = state.sharedAccountIds
             events = state.events
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            // Offline is ambient state, surfaced by the persistent status
+            // indicator elsewhere on screen — not a per-fetch red error.
+            errorMessage = UserFacingError.isOffline(error) ? nil : UserFacingError.describe(error)
         }
         isLoading = false
     }

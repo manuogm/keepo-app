@@ -3,9 +3,9 @@ import KeepoCore
 import SwiftUI
 
 /// Dashboard — hero net-worth balance + 90-day trajectory for the scope the
-/// user selected via the PrivacyToggleButton's long-press context menu.
-/// Scope lives in SessionStore so it persists across tab switches and drives
-/// every financial screen from the same source of truth.
+/// user selected via `ScopeSwitcherButton`. Scope lives in SessionStore so
+/// it persists across tab switches and drives every financial screen from
+/// the same source of truth.
 struct HomeView: View {
     let session: SessionStore
 
@@ -14,12 +14,53 @@ struct HomeView: View {
     @State private var baseCurrencyInfo: CurrencyInfo?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    /// Non-nil means the hero figure/trajectory are the last successful
-    /// fetch's cached copy, not a live read — Phase 11's "as of HH:mm"
-    /// marker for the Home summary specifically.
-    @State private var summaryAsOf: Date?
+    @State private var fxRates: [String: Decimal] = [:]
 
     private let rangeDays = 90
+
+    /// Net worth overlaid with whatever's still queued in the outbox — the
+    /// hero figure moves the instant an offline edit changes a balance,
+    /// not just once it syncs. Falls back to the plain `netWorth` (server
+    /// or cache) if the accounts cache needed to know per-account scope
+    /// membership (`is_shared`) isn't available. Only accounts already in
+    /// base currency are guaranteed exact here; a cross-currency account
+    /// needs `fxRates` to have that currency cached, same "—" fallback
+    /// money rule 5 already governs everywhere else in this overlay.
+    private var overlaidNetWorth: Decimal? {
+        guard let netWorth, let baseCurrencyInfo,
+              let (data, _) = session.payloadCache.load(key: "accounts_with_balances"),
+              let cachedAccounts = try? JSONDecoder().decode(
+                [PublicSchema.AccountsWithBalancesSelect].self, from: data
+              )
+        else { return netWorth }
+
+        let inScope = cachedAccounts.filter { account in
+            switch session.scope {
+            case .me: return account.isShared != true
+            case .household: return account.isShared == true
+            case .total: return true
+            }
+        }
+        let cachedBalances = Dictionary(uniqueKeysWithValues: inScope.compactMap { account in
+            account.accountId.flatMap { id in account.balance.map { (id, $0) } }
+        })
+        let cachedTransactions = PendingOverlayAdapter.cachedTransactionLookup(session: session)
+        let overlay = PendingOverlayAdapter.overlaidBalances(
+            cached: cachedBalances, outbox: session.outbox, cachedTransactions: cachedTransactions
+        )
+
+        var total: Decimal = 0
+        for account in inScope {
+            guard let id = account.accountId, let currency = account.currency else { return netWorth }
+            let balance = overlay[id] ?? account.balance
+            guard let balance else { return netWorth }
+            guard let converted = LocalFxConvert.convert(
+                balance, from: currency, to: baseCurrencyInfo.code, rates: fxRates
+            ) else { return netWorth }
+            total += converted
+        }
+        return total
+    }
 
     var body: some View {
         ZStack {
@@ -30,13 +71,7 @@ struct HomeView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        if let summaryAsOf {
-                            Text("Showing data as of \(summaryAsOf.formatted(date: .omitted, time: .shortened))")
-                                .font(.caption)
-                                .foregroundStyle(Color.secondary)
-                        }
-
-                        BalanceHeaderView(amount: netWorth, currency: baseCurrencyInfo)
+                        BalanceHeaderView(amount: overlaidNetWorth, currency: baseCurrencyInfo)
 
                         // A gap in the line (a day this scope has no rows
                         // for, or an unresolvable rate) is left as a gap,
@@ -73,7 +108,10 @@ struct HomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                PrivacyToggleButton(session: session)
+                ScopeSwitcherButton(session: session)
+            }
+            ToolbarItem(placement: .principal) {
+                ScreenTitleBar(title: "Dashboard", session: session)
             }
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink {
@@ -85,6 +123,7 @@ struct HomeView: View {
         }
         .task { restoreSummaryCache() }
         .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
+        .task { fxRates = await FxRateCache.fetchLatestRates(session: session) }
     }
 
     private func load() async {
@@ -98,7 +137,7 @@ struct HomeView: View {
         let from = Calendar.current.date(byAdding: .day, value: -(rangeDays - 1), to: today) ?? today
 
         if let baseCurrency = session.profile?.baseCurrency {
-            let currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
+            let currencies = await CurrencyCache.fetchAll(session: session)
             if let row = currencies.first(where: { $0.code == baseCurrency }) {
                 baseCurrencyInfo = CurrencyInfo(code: row.code, minorUnit: Int(row.minorUnit))
             }
@@ -125,10 +164,11 @@ struct HomeView: View {
             }
             let granularity = DateBucketing.granularity(from: from, through: today)
             seriesPoints = DateBucketing.bucket(parsed, granularity: granularity)
-            summaryAsOf = nil
             saveSummaryCache()
         } catch {
-            if !restoreSummaryCache() {
+            // Offline is ambient state, surfaced by the persistent status
+            // indicator elsewhere on screen — not a per-fetch red error.
+            if !restoreSummaryCache() && !UserFacingError.isOffline(error) {
                 errorMessage = UserFacingError.describe(error)
             }
         }
@@ -150,12 +190,13 @@ struct HomeView: View {
 
     /// Returns whether a cached summary existed to restore — the caller
     /// uses this to decide whether a live-fetch failure should still show
-    /// an error (no cache to fall back on) or can stay silent behind the
-    /// "as of" marker instead.
+    /// an error (no cache to fall back on) or can stay silent instead.
+    /// The offline indicator elsewhere on screen is what tells the user
+    /// the data might be stale; this screen no longer repeats that itself.
     @discardableResult
     private func restoreSummaryCache() -> Bool {
         guard
-            let (data, fetchedAt) = session.payloadCache.load(key: summaryCacheKey),
+            let (data, _) = session.payloadCache.load(key: summaryCacheKey),
             let payload = try? JSONDecoder().decode(HomeSummaryCache.self, from: data)
         else { return false }
         netWorth = payload.netWorth
@@ -163,7 +204,6 @@ struct HomeView: View {
         if let code = payload.baseCurrencyCode, let minorUnit = payload.baseCurrencyMinorUnit {
             baseCurrencyInfo = CurrencyInfo(code: code, minorUnit: minorUnit)
         }
-        summaryAsOf = fetchedAt
         isLoading = false
         return true
     }

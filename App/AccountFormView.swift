@@ -36,6 +36,10 @@ struct AccountFormView: View {
     @State private var errorMessage: String?
     @State private var showConflictAlert = false
 
+    @State private var currentBalanceText = ""
+    @State private var isUpdatingBalance = false
+    @State private var balanceUpdateMessage: String?
+
     private var isEditing: Bool {
         if case .edit = mode { return true }
         return false
@@ -92,6 +96,35 @@ struct AccountFormView: View {
                     Section("Opening balance") {
                         TextField("0.00", text: $openingBalanceText)
                             .keyboardType(.decimalPad)
+                    }
+
+                    // "What's this account worth right now" — a different
+                    // question from the static fields above, and answered
+                    // by its own RPC (set_account_balance), so it gets its
+                    // own section and its own button rather than folding
+                    // into the main Save action. Edit mode only: a new
+                    // account's current balance already equals its
+                    // opening balance, there's nothing to reconcile yet.
+                    if isEditing {
+                        Section("Current Balance") {
+                            TextField("0.00", text: $currentBalanceText)
+                                .keyboardType(.decimalPad)
+                            Button {
+                                Task { await updateBalance() }
+                            } label: {
+                                if isUpdatingBalance {
+                                    ProgressView()
+                                } else {
+                                    Text("Update Balance")
+                                }
+                            }
+                            .disabled(isUpdatingBalance || currentBalanceText.isEmpty)
+                            if let balanceUpdateMessage {
+                                Text(balanceUpdateMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(Color.secondary)
+                            }
+                        }
                     }
 
                     Section {
@@ -152,14 +185,14 @@ struct AccountFormView: View {
     /// (see AccountFormCache's own header comment on why this can't reuse
     /// the accounts list's own cache).
     private func load() async {
-        currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
+        currencies = await CurrencyCache.fetchAll(session: session)
 
         switch mode {
         case .create:
             currency = session.profile?.baseCurrency ?? currencies.first?.code ?? "USD"
             openingBalanceText = AmountFormatter.editableString(0, minorUnit: selectedCurrencyMinorUnit)
         case .edit(let id):
-            let fetched = try? await withTimeout(seconds: 6, operation: {
+            let fetched = try? await withTimeout(seconds: 3, operation: {
                 try await AccountRepository.fetchOne(client: session.client, id: id)
             })
             if let account = fetched {
@@ -168,8 +201,33 @@ struct AccountFormView: View {
             } else if let cached = AccountFormCache.load(id: id, session: session) {
                 apply(cached)
             }
+            prefillCurrentBalance(accountId: id)
         }
         isLoading = false
+    }
+
+    /// "What does this account look like right now" — the overlaid
+    /// balance (cached server figure + whatever's already queued in the
+    /// outbox), read from the accounts list's own cache rather than a
+    /// fresh fetch. Falls back to the opening balance already loaded by
+    /// `apply` if that list cache has never been populated (e.g. this
+    /// screen opened before Accounts ever loaded) — best-effort, not
+    /// exact, same posture as every other cache-miss fallback here.
+    private func prefillCurrentBalance(accountId: UUID) {
+        guard
+            let (data, _) = session.payloadCache.load(key: "accounts_with_balances"),
+            let rows = try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data),
+            let cachedBalance = rows.first(where: { $0.accountId == accountId })?.balance
+        else {
+            currentBalanceText = openingBalanceText
+            return
+        }
+        let cachedTransactions = PendingOverlayAdapter.cachedTransactionLookup(session: session)
+        let overlaid = PendingOverlayAdapter.overlaidBalance(
+            accountId: accountId, cachedBalance: cachedBalance, outbox: session.outbox,
+            cachedTransactions: cachedTransactions
+        )
+        currentBalanceText = AmountFormatter.editableString(overlaid, minorUnit: selectedCurrencyMinorUnit)
     }
 
     /// Shared by the initial edit-mode prefill and by a post-conflict reload.
@@ -242,6 +300,36 @@ extension AccountFormView {
         if result == .conflict {
             await reloadAfterConflict(id: id)
         }
+    }
+
+    /// A separate action from Save, on purpose — "this account is worth X
+    /// right now" doesn't touch name/subtype/opening balance, and
+    /// `set_account_balance` computes the actual gap server-side (or, for
+    /// a valuation account, just writes a new snapshot) rather than this
+    /// form guessing one. Offline-capable like every other write here: it
+    /// queues through the outbox and the RPC recomputes the true gap
+    /// fresh whenever it finally runs, so a queued edit is never stale by
+    /// the time it lands.
+    fileprivate func updateBalance() async {
+        guard let id = editingId, let newBalance = AmountParser.parse(currentBalanceText) else {
+            balanceUpdateMessage = "Enter a valid balance."
+            return
+        }
+        isUpdatingBalance = true
+        balanceUpdateMessage = nil
+        let payload = SetAccountBalancePayload(id: UUID(), accountId: id, newBalance: newBalance)
+        let result = await session.outbox.submitSetAccountBalance(payload)
+        switch result {
+        case .applied:
+            balanceUpdateMessage = "Balance updated."
+            session.refresh.bump()
+        case .queued:
+            balanceUpdateMessage = "Saved — will sync once you're back online."
+            session.refresh.bump()
+        case .conflict:
+            balanceUpdateMessage = "Couldn't update the balance — try again."
+        }
+        isUpdatingBalance = false
     }
 
     /// A stale version means someone else changed this account since it

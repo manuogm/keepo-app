@@ -32,7 +32,15 @@ public enum UserFacingError {
         return "Something went wrong. Please try again."
     }
 
-    private static func isOffline(_ error: Error) -> Bool {
+    /// Exposed so callers with their own offline affordance (a persistent
+    /// status indicator, a cache fallback already on screen) can skip
+    /// showing `describe`'s offline sentence as an alarming, one-off red
+    /// error — being offline is ambient state, not a per-action failure.
+    public static func isOffline(_ error: Error) -> Bool {
+        isOfflineNetworkError(error)
+    }
+
+    private static func isOfflineNetworkError(_ error: Error) -> Bool {
         let nsError = error as NSError
         guard nsError.domain == NSURLErrorDomain else { return false }
         return [

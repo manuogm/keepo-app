@@ -46,7 +46,7 @@ struct OnboardingView: View {
             .padding(24)
         }
         .task {
-            currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
+            currencies = await CurrencyCache.fetchAll(session: session)
         }
     }
 

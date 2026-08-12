@@ -198,6 +198,7 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
 
     var createAccountResult: Result<Void, Error> = .success(())
     var updateAccountResult: Result<Bool, Error> = .success(true)
+    var setAccountBalanceResult: Result<Void, Error> = .success(())
     var createCategoryResult: Result<Void, Error> = .success(())
     var updateCategoryResult: Result<Void, Error> = .success(())
 
@@ -207,6 +208,10 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
 
     func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool {
         try updateAccountResult.get()
+    }
+
+    func setAccountBalance(_ payload: SetAccountBalancePayload) async throws {
+        try setAccountBalanceResult.get()
     }
 
     func createCategory(_ payload: CreateCategoryPayload) async throws {

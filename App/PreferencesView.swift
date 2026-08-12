@@ -65,7 +65,7 @@ struct PreferencesView: View {
     }
 
     private func load() async {
-        currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
+        currencies = await CurrencyCache.fetchAll(session: session)
         selectedCurrency = session.profile?.baseCurrency ?? currencies.first?.code ?? "USD"
     }
 

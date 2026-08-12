@@ -31,6 +31,17 @@ public final class PayloadCache {
         return (row.payloadJSON, row.fetchedAt)
     }
 
+    /// The most recent successful fetch across every cached query — used by
+    /// the offline status indicator's "last synced" timestamp. Not scoped
+    /// to one screen's cache key: whatever last talked to the server,
+    /// anywhere in the app, is what "synced" means to the user.
+    public func latestFetchedAt() -> Date? {
+        let descriptor = FetchDescriptor<CachedPayload>(sortBy: [SortDescriptor(\.fetchedAt, order: .reverse)])
+        var limited = descriptor
+        limited.fetchLimit = 1
+        return try? context.fetch(limited).first?.fetchedAt
+    }
+
     private func existing(for key: String) -> CachedPayload? {
         var descriptor = FetchDescriptor<CachedPayload>(predicate: #Predicate { $0.key == key })
         descriptor.fetchLimit = 1

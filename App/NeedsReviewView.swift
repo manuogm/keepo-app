@@ -131,7 +131,7 @@ struct NeedsReviewView: View {
 
     private func load() async {
         if currencyMinorUnits.isEmpty {
-            let currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
+            let currencies = await CurrencyCache.fetchAll(session: session)
             currencyMinorUnits = Dictionary(uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) })
         }
         await store.load { try await NeedsReviewRepository.fetchAll(client: session.client) }

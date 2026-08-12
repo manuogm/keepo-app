@@ -23,6 +23,7 @@ public protocol OutboxSending: Sendable {
     func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult
     func createAccount(_ payload: CreateAccountPayload) async throws
     func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool
+    func setAccountBalance(_ payload: SetAccountBalancePayload) async throws
     func createCategory(_ payload: CreateCategoryPayload) async throws
     /// No applied/conflict distinction — see `UpdateCategoryPayload`'s own
     /// header comment on why a rename has nothing to conflict against.
@@ -142,7 +143,7 @@ public enum OutboxCaptureResult: Equatable, Sendable {
 enum OutboxKind: String {
     case createTransaction, createTransfer, updateTransaction, updateTransfer, deleteTransaction, deleteTransfer
     case captureTransaction
-    case createAccount, updateAccount, createCategory, updateCategory
+    case createAccount, updateAccount, setAccountBalance, createCategory, updateCategory
 }
 
 /// Every write attempts to send immediately; only a thrown error (offline,
@@ -336,7 +337,7 @@ public final class Outbox {
             let payload = try decoder.decode(CaptureTransactionPayload.self, from: item.payloadJSON)
             _ = try await sender.captureTransaction(payload)
             return true
-        case .createAccount, .updateAccount, .createCategory, .updateCategory:
+        case .createAccount, .updateAccount, .setAccountBalance, .createCategory, .updateCategory:
             return try await replayAccountOrCategory(kind, data: item.payloadJSON)
         }
     }
@@ -344,6 +345,17 @@ public final class Outbox {
     private func pendingItems() -> [OutboxItem] {
         let descriptor = FetchDescriptor<OutboxItem>(sortBy: [SortDescriptor(\.createdAt)])
         return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Every currently-queued write's kind + raw payload, in FIFO order —
+    /// the seam the pending-delta overlay (`PendingOverlayAdapter`) reads
+    /// to know what hasn't synced yet. Exposed narrowly rather than the
+    /// `OutboxItem` model itself, so nothing outside this file can mutate
+    /// a queued item directly.
+    func queuedKindsAndPayloads() -> [(kind: OutboxKind, payloadJSON: Data)] {
+        pendingItems().compactMap { item in
+            OutboxKind(rawValue: item.kind).map { ($0, item.payloadJSON) }
+        }
     }
 
     private func existingItem(id: UUID) -> OutboxItem? {

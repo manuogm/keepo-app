@@ -53,7 +53,10 @@ public final class DataStore<Item: Codable> {
                 cache.save(key: cacheKey, data: data)
             }
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            // Offline is ambient state, surfaced by the persistent status
+            // indicator elsewhere on screen — not a per-fetch red error.
+            // Any other failure (RLS, a genuine server error) still shows.
+            errorMessage = UserFacingError.isOffline(error) ? nil : UserFacingError.describe(error)
         }
         isLoading = false
     }
