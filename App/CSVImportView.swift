@@ -39,7 +39,7 @@ struct CSVImportView: View {
                 if !parsedRows.isEmpty {
                     Text("\(parsedRows.count) row(s) parsed")
                         .font(.footnote)
-                        .foregroundStyle(Color("TextSecondary"))
+                        .foregroundStyle(Color.secondary)
                 }
             } header: {
                 Text("Statement")
@@ -63,7 +63,7 @@ struct CSVImportView: View {
             }
 
             if let resultMessage {
-                Text(resultMessage).foregroundStyle(Color("BrandPrimary"))
+                Text(resultMessage).foregroundStyle(Color.primary)
             }
             if let errorMessage {
                 Text(errorMessage).foregroundStyle(.red)

@@ -10,23 +10,44 @@ struct ExportView: View {
 
     @State private var accounts: [PublicSchema.AccountsWithBalancesSelect] = []
     @State private var selectedAccountIds: Set<UUID> = []
+    @State private var exportAllAccounts = true
+    @State private var exportAllTime = true
+    @State private var from = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    @State private var through = Date()
     @State private var isExporting = false
     @State private var errorMessage: String?
     @State private var exportedFileURL: URL?
     @State private var showShareSheet = false
 
+    private var isExportDisabled: Bool {
+        isExporting || (!exportAllAccounts && selectedAccountIds.isEmpty)
+    }
+
     var body: some View {
         Form {
             Section {
-                ForEach(accounts, id: \.accountId) { account in
-                    if let accountId = account.accountId {
-                        Toggle(account.name ?? "—", isOn: selectionBinding(for: accountId))
+                Toggle("All Accounts", isOn: $exportAllAccounts)
+                if !exportAllAccounts {
+                    ForEach(accounts, id: \.accountId) { account in
+                        if let accountId = account.accountId {
+                            Toggle(account.name ?? "—", isOn: selectionBinding(for: accountId))
+                        }
                     }
                 }
             } header: {
                 Text("Accounts")
             } footer: {
                 Text("Requires a fresh biometric check, and every export is logged.")
+            }
+
+            Section {
+                Toggle("All Time", isOn: $exportAllTime)
+                if !exportAllTime {
+                    DatePicker("From", selection: $from, displayedComponents: .date)
+                    DatePicker("Through", selection: $through, displayedComponents: .date)
+                }
+            } header: {
+                Text("Time Frame")
             }
 
             Section {
@@ -39,7 +60,7 @@ struct ExportView: View {
                         Text("Export CSV")
                     }
                 }
-                .disabled(isExporting || selectedAccountIds.isEmpty)
+                .disabled(isExportDisabled)
             }
 
             if let errorMessage {
@@ -71,8 +92,13 @@ struct ExportView: View {
         errorMessage = nil
         do {
             try await session.stepUp(reason: "Confirm it's you to export your financial data")
-            let accountIds = Array(selectedAccountIds)
-            let rows = try await ExportRepository.fetchTransactions(client: session.client, accountIds: accountIds)
+            let accountIds = exportAllAccounts
+                ? accounts.compactMap(\.accountId)
+                : Array(selectedAccountIds)
+            let rows = try await ExportRepository.fetchTransactions(
+                client: session.client, accountIds: accountIds,
+                from: exportAllTime ? nil : from, through: exportAllTime ? nil : through
+            )
             let csv = ExportRepository.csv(from: rows)
             let url = try writeTempFile(csv)
             try await ExportRepository.logExport(client: session.client, accountIds: accountIds, rowCount: rows.count)

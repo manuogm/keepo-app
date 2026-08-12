@@ -2,19 +2,16 @@ import Charts
 import KeepoCore
 import SwiftUI
 
-/// The first screen whose entire purpose is a large balance — the
-/// app-switcher privacy curtain (RootView) exists because of this screen.
-/// Trailing 90-day trajectory, bucketed per app-architecture.md §5 (weekly
-/// ≤ 90 days, monthly beyond — always weekly here, since the range itself
-/// is fixed at 90 days for v1; a date-range picker is a later phase).
+/// Dashboard — hero net-worth balance + 90-day trajectory for the scope the
+/// user selected via the PrivacyToggleButton's long-press context menu.
+/// Scope lives in SessionStore so it persists across tab switches and drives
+/// every financial screen from the same source of truth.
 struct HomeView: View {
     let session: SessionStore
 
-    @State private var scope: PublicSchema.AccountScope = .total
     @State private var netWorth: Decimal?
     @State private var seriesPoints: [(date: Date, value: Decimal)] = []
     @State private var baseCurrencyInfo: CurrencyInfo?
-    @State private var hasStaleFeedingAccount = false
     @State private var isLoading = true
     @State private var errorMessage: String?
     /// Non-nil means the hero figure/trajectory are the last successful
@@ -26,28 +23,17 @@ struct HomeView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        Picker("Scope", selection: $scope) {
-                            Text("Total").tag(PublicSchema.AccountScope.total)
-                            Text("Me").tag(PublicSchema.AccountScope.me)
-                            Text("Household").tag(PublicSchema.AccountScope.household)
-                        }
-                        .pickerStyle(.segmented)
-
-                        if hasStaleFeedingAccount {
-                            staleBanner
-                        }
-
                         if let summaryAsOf {
                             Text("Showing data as of \(summaryAsOf.formatted(date: .omitted, time: .shortened))")
                                 .font(.caption)
-                                .foregroundStyle(Color("TextSecondary"))
+                                .foregroundStyle(Color.secondary)
                         }
 
                         BalanceHeaderView(amount: netWorth, currency: baseCurrencyInfo)
@@ -60,12 +46,12 @@ struct HomeView: View {
                         if seriesPoints.isEmpty {
                             Text("No trajectory yet for this scope.")
                                 .font(.callout)
-                                .foregroundStyle(Color("TextSecondary"))
+                                .foregroundStyle(Color.secondary)
                         } else {
                             Chart(seriesPoints, id: \.date) { point in
                                 LineMark(x: .value("Date", point.date), y: .value("Net worth", point.value))
                             }
-                            .foregroundStyle(Color("BrandPrimary"))
+                            .foregroundStyle(Color.primary)
                             .chartYAxis {
                                 AxisMarks(position: .leading)
                             }
@@ -83,8 +69,11 @@ struct HomeView: View {
                 .refreshable { await load() }
             }
         }
-        .navigationTitle("Home")
+        .navigationTitle("Dashboard")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                PrivacyToggleButton(session: session)
+            }
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink {
                     InsightsView(session: session)
@@ -92,36 +81,9 @@ struct HomeView: View {
                     Image(systemName: "chart.bar")
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
-                NavigationLink {
-                    SyncRitualView(session: session)
-                } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                }
-            }
         }
         .task { restoreSummaryCache() }
-        .task(id: HomeLoadKey(token: session.refresh.token, scope: scope)) { await load() }
-    }
-
-    /// Factual, not alarmist — names what's stale rather than just showing
-    /// amber. "Feeding" means include_in_total: an archived or excluded
-    /// account going stale is invisible here on purpose, same reasoning as
-    /// net worth itself only summing accounts the user asked to count.
-    private var staleBanner: some View {
-        NavigationLink {
-            SyncRitualView(session: session)
-        } label: {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                Text("A balance feeding this total needs verifying.")
-                    .font(.footnote)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-            }
-            .foregroundStyle(Color("BrandSecondary"))
-        }
+        .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
     }
 
     private func load() async {
@@ -148,15 +110,10 @@ struct HomeView: View {
             client: session.client, userId: userId, from: from, through: today
         )
 
-        let syncStatus = (try? await ReconciliationRepository.fetchSyncStatus(client: session.client)) ?? []
-        hasStaleFeedingAccount = syncStatus.contains {
-            $0.archivedAt == nil && ($0.includeInTotal ?? false) && ($0.isStale ?? false)
-        }
-
         do {
-            async let netWorthResult = HouseholdRepository.netWorth(client: session.client, scope: scope)
+            async let netWorthResult = HouseholdRepository.netWorth(client: session.client, scope: session.scope)
             async let seriesResult = HouseholdRepository.netWorthSeries(
-                client: session.client, scope: scope, from: from, through: today
+                client: session.client, scope: session.scope, from: from, through: today
             )
             netWorth = try await netWorthResult
             let points = try await seriesResult
@@ -177,7 +134,7 @@ struct HomeView: View {
         isLoading = false
     }
 
-    private var summaryCacheKey: String { "home_summary_\(scope.rawValue)" }
+    private var summaryCacheKey: String { "home_summary_\(session.scope.rawValue)" }
 
     private func saveSummaryCache() {
         let payload = HomeSummaryCache(
@@ -227,7 +184,7 @@ private struct HomeSummaryCache: Codable {
 }
 
 /// `.task(id:)` needs an `Equatable` id — bundles the refresh token and the
-/// scope picker together so either changing triggers exactly one reload.
+/// scope so either changing triggers exactly one reload.
 private struct HomeLoadKey: Equatable {
     let token: Int
     let scope: PublicSchema.AccountScope

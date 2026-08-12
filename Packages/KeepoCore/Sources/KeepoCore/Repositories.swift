@@ -72,13 +72,21 @@ public enum AccountRepository {
     /// in the same call, reusing the just-generated id rather than a
     /// round-trip insert-then-fetch.
     ///
-    /// Seven named, self-explanatory parameters describing one new account —
-    /// splitting into a params struct here would be an indirection layer
-    /// with no reader benefit, not a simplification.
+    /// `id` defaults to a fresh `UUID()` for an ordinary online caller; the
+    /// offline outbox is the one caller that supplies its own, generated
+    /// once before the first send attempt, so a retry of this exact call
+    /// reuses the same id and hits `accounts`' primary key instead of
+    /// inserting a duplicate row — same convention as
+    /// `TransactionRepository.create`.
+    ///
+    /// Otherwise seven named, self-explanatory parameters describing one new
+    /// account — splitting into a params struct here would be an
+    /// indirection layer with no reader benefit, not a simplification.
     @discardableResult
     // swiftlint:disable:next function_parameter_count
     public static func create(
         client: SupabaseClient,
+        id: UUID = UUID(),
         ownerId: UUID,
         kind: PublicSchema.AccountKind,
         subtype: PublicSchema.AccountSubtype,
@@ -86,7 +94,7 @@ public enum AccountRepository {
         currency: String,
         openingBalance: Decimal
     ) async throws -> UUID {
-        let accountId = UUID()
+        let accountId = id
         let row = NewAccountRow(
             id: accountId,
             ownerId: ownerId,
@@ -158,61 +166,6 @@ private struct NewSnapshotRow: Encodable {
         case currency, value
         case asOf = "as_of"
         case createdBy = "created_by"
-    }
-}
-
-public enum CategoryRepository {
-    public static func fetchAll(client: SupabaseClient) async throws -> [PublicSchema.CategoriesSelect] {
-        try await client.from("categories").select().order("kind").order("name").execute().value
-    }
-
-    @discardableResult
-    public static func create(
-        client: SupabaseClient,
-        ownerId: UUID,
-        kind: PublicSchema.CategoryKind,
-        name: String
-    ) async throws -> UUID {
-        let id = UUID()
-        let row = NewCategoryRow(id: id, ownerId: ownerId, kind: kind, name: name)
-        try await client.from("categories").insert(row).execute()
-        return id
-    }
-
-    public static func rename(client: SupabaseClient, categoryId: UUID, name: String) async throws {
-        try await client.from("categories").update(NamePatch(name: name)).eq("id", value: categoryId).execute()
-    }
-
-    /// Rejected by the DB (prevent_default_category_deletion trigger, not
-    /// just a hidden UI affordance) if this is one of the two default
-    /// "Other" categories.
-    public static func softDelete(client: SupabaseClient, categoryId: UUID) async throws {
-        try await client.from("categories")
-            .update(DeletedAtPatch(deletedAt: PostgresDate.timestampString(Date())))
-            .eq("id", value: categoryId)
-            .execute()
-    }
-}
-
-private struct NewCategoryRow: Encodable {
-    let id: UUID
-    let ownerId: UUID
-    let kind: PublicSchema.CategoryKind
-    let name: String
-    enum CodingKeys: String, CodingKey {
-        case id, kind, name
-        case ownerId = "owner_id"
-    }
-}
-
-private struct NamePatch: Encodable {
-    let name: String
-}
-
-private struct DeletedAtPatch: Encodable {
-    let deletedAt: String
-    enum CodingKeys: String, CodingKey {
-        case deletedAt = "deleted_at"
     }
 }
 

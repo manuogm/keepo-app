@@ -26,7 +26,7 @@ struct HouseholdView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
@@ -80,7 +80,7 @@ struct HouseholdView: View {
                 .disabled(isCreatingHousehold)
             } else {
                 ForEach(members, id: \.userId) { member in
-                    Text(memberLabel(member)).foregroundStyle(Color("TextPrimary"))
+                    Text(memberLabel(member)).foregroundStyle(Color.primary)
                 }
             }
         }
@@ -105,7 +105,7 @@ struct HouseholdView: View {
             if let generatedToken {
                 Text(generatedToken).font(.system(.body, design: .monospaced)).textSelection(.enabled)
                 Text("Share this code — it expires in 7 days and works once.")
-                    .font(.footnote).foregroundStyle(Color("TextSecondary"))
+                    .font(.footnote).foregroundStyle(Color.secondary)
             } else {
                 Button {
                     Task { await createInvite() }
@@ -139,7 +139,7 @@ struct HouseholdView: View {
         if !events.isEmpty {
             Section("Recent Activity") {
                 ForEach(events, id: \.id) { event in
-                    Text(eventLabel(event)).font(.footnote).foregroundStyle(Color("TextSecondary"))
+                    Text(eventLabel(event)).font(.footnote).foregroundStyle(Color.secondary)
                 }
             }
         }

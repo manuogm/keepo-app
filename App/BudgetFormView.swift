@@ -46,7 +46,7 @@ struct BudgetFormView: View {
                     if isEditing {
                         Section("Category") {
                             Text(selectedCategoryName)
-                                .foregroundStyle(Color("TextSecondary"))
+                                .foregroundStyle(Color.secondary)
                         }
                     } else {
                         Section {
@@ -70,7 +70,7 @@ struct BudgetFormView: View {
                     }
 
                     Section("Currency") {
-                        Text(currency).foregroundStyle(Color("TextSecondary"))
+                        Text(currency).foregroundStyle(Color.secondary)
                     }
 
                     if let errorMessage {

@@ -123,7 +123,7 @@ struct TransactionFormView: View {
                 }
 
                 if addedByHouseholdMember {
-                    Text("Added by your household member").font(.footnote).foregroundStyle(Color("TextSecondary"))
+                    Text("Added by your household member").font(.footnote).foregroundStyle(Color.secondary)
                 }
 
                 if let errorMessage {
@@ -180,8 +180,12 @@ struct TransactionFormView: View {
     /// Falls back to `TransactionFormCache` when the live fetch fails — an
     /// offline create otherwise has no way to populate its own pickers.
     private func load() async {
-        async let accountsResult = AccountRepository.fetchAllWithBalances(client: session.client)
-        async let categoriesResult = CategoryRepository.fetchAll(client: session.client)
+        async let accountsResult = withTimeout(seconds: 6) {
+            try await AccountRepository.fetchAllWithBalances(client: session.client)
+        }
+        async let categoriesResult = withTimeout(seconds: 6) {
+            try await CategoryRepository.fetchAll(client: session.client)
+        }
         accounts = (try? await accountsResult) ?? TransactionFormCache.accounts(session: session)
         categories = (try? await categoriesResult) ?? TransactionFormCache.categories(session: session)
 

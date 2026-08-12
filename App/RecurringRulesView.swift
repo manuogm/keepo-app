@@ -20,13 +20,13 @@ struct RecurringRulesView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             if store.isLoading {
                 ProgressView()
             } else if rules.isEmpty {
                 Text("No recurring transactions yet")
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             } else {
                 List {
                     ForEach(rules, id: \.id) { rule in
@@ -124,19 +124,19 @@ private struct RecurringRuleRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(category?.name ?? "—")
-                    .foregroundStyle(Color("TextPrimary"))
+                    .foregroundStyle(Color.primary)
                 Text("\(account?.name ?? "—") · \(frequencyLabel) · next \(nextDueLabel)")
                     .font(.caption)
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             }
             Spacer()
             let currencyInfo = CurrencyInfo(code: rule.currency, minorUnit: Int(account?.minorUnit ?? 2))
             Text(MoneyFormatter.format(rule.amount, currency: currencyInfo))
                 .monospacedDigit()
-                .foregroundStyle(rule.active ? Color("BrandPrimary") : Color("TextSecondary"))
+                .foregroundStyle(rule.active ? Color.primary : Color.secondary)
             if !rule.active {
                 Image(systemName: "pause.circle")
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             }
         }
     }

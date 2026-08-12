@@ -21,7 +21,7 @@ struct CurrencyConversionLabel: View {
         if let text {
             Text(text)
                 .font(.caption)
-                .foregroundStyle(Color("TextSecondary"))
+                .foregroundStyle(Color.secondary)
         }
     }
 

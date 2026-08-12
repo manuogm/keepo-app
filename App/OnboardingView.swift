@@ -25,7 +25,7 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             VStack(spacing: 24) {
                 switch step {
@@ -54,10 +54,10 @@ struct OnboardingView: View {
         VStack(spacing: 16) {
             Text("Welcome to Keepo")
                 .font(.title).fontWeight(.bold)
-                .foregroundStyle(Color("TextPrimary"))
+                .foregroundStyle(Color.primary)
             Text("What's your base currency? Every balance converts into this.")
                 .font(.callout)
-                .foregroundStyle(Color("TextSecondary"))
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
 
             // Currency picker is restricted to `currencies` — the ECB set —
@@ -71,7 +71,7 @@ struct OnboardingView: View {
 
             Button("Continue") { step = .firstAccount }
                 .buttonStyle(.borderedProminent)
-                .tint(Color("BrandPrimary"))
+                .tint(Color.primary)
                 .disabled(currencies.isEmpty)
         }
     }
@@ -80,7 +80,7 @@ struct OnboardingView: View {
         VStack(spacing: 16) {
             Text("Add your first account")
                 .font(.title2).fontWeight(.bold)
-                .foregroundStyle(Color("TextPrimary"))
+                .foregroundStyle(Color.primary)
 
             TextField("Account name (e.g. Checking)", text: $accountName)
                 .textFieldStyle(.roundedBorder)
@@ -100,7 +100,7 @@ struct OnboardingView: View {
 
             Text("Required — without it, the first Sync Ritual would have nothing to reconcile against.")
                 .font(.caption)
-                .foregroundStyle(Color("TextSecondary"))
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
 
             Button {
@@ -113,7 +113,7 @@ struct OnboardingView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color("BrandPrimary"))
+            .tint(Color.primary)
             .disabled(isFinishDisabled)
         }
     }
@@ -152,12 +152,12 @@ struct OnboardingView: View {
         VStack(spacing: 16) {
             Text("Log Apple Pay purchases automatically")
                 .font(.title2).fontWeight(.bold)
-                .foregroundStyle(Color("TextPrimary"))
+                .foregroundStyle(Color.primary)
                 .multilineTextAlignment(.center)
 
             Text("Optional — set it up now, or skip and find it later in Settings.")
                 .font(.callout)
-                .foregroundStyle(Color("TextSecondary"))
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
 
             NavigationStack {
@@ -167,7 +167,7 @@ struct OnboardingView: View {
 
             Button("Done") { onComplete() }
                 .buttonStyle(.borderedProminent)
-                .tint(Color("BrandPrimary"))
+                .tint(Color.primary)
         }
         .task {
             // A capture confirms via local notification, not by the app

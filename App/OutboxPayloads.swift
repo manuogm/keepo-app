@@ -1,4 +1,5 @@
 import Foundation
+import KeepoCore
 
 // MARK: - Payloads (whole-row, never a per-field merge)
 
@@ -139,5 +140,85 @@ public struct DeleteTransferPayload: Codable, Sendable {
         self.transferGroupId = transferGroupId
         self.fromExpectedVersion = fromExpectedVersion
         self.toExpectedVersion = toExpectedVersion
+    }
+}
+
+/// Delete/archive are deliberately absent — both need a live server check
+/// (does this account still have transactions?) that a queued write can't
+/// answer truthfully offline, so they stay online-only (see AccountsListView).
+public struct CreateAccountPayload: Codable, Sendable {
+    public let id: UUID
+    public let ownerId: UUID
+    public let kind: PublicSchema.AccountKind
+    public let subtype: PublicSchema.AccountSubtype
+    public let name: String
+    public let currency: String
+    public let openingBalance: Decimal
+
+    public init(
+        id: UUID, ownerId: UUID, kind: PublicSchema.AccountKind, subtype: PublicSchema.AccountSubtype,
+        name: String, currency: String, openingBalance: Decimal
+    ) {
+        self.id = id
+        self.ownerId = ownerId
+        self.kind = kind
+        self.subtype = subtype
+        self.name = name
+        self.currency = currency
+        self.openingBalance = openingBalance
+    }
+}
+
+public struct UpdateAccountPayload: Codable, Sendable {
+    public let id: UUID
+    public let expectedVersion: Int
+    public let name: String
+    public let subtype: PublicSchema.AccountSubtype
+    public let openingBalance: Decimal
+    public let includeInTotal: Bool
+    public let countsTowardFi: Bool
+
+    public init(
+        id: UUID, expectedVersion: Int, name: String, subtype: PublicSchema.AccountSubtype,
+        openingBalance: Decimal, includeInTotal: Bool, countsTowardFi: Bool
+    ) {
+        self.id = id
+        self.expectedVersion = expectedVersion
+        self.name = name
+        self.subtype = subtype
+        self.openingBalance = openingBalance
+        self.includeInTotal = includeInTotal
+        self.countsTowardFi = countsTowardFi
+    }
+}
+
+/// Delete is deliberately absent here too — same reasoning as accounts: the
+/// "N transactions will move to Other" warning is only honest with a live
+/// count, so category delete stays online-only (see CategoriesView).
+public struct CreateCategoryPayload: Codable, Sendable {
+    public let id: UUID
+    public let ownerId: UUID
+    public let kind: PublicSchema.CategoryKind
+    public let name: String
+
+    public init(id: UUID, ownerId: UUID, kind: PublicSchema.CategoryKind, name: String) {
+        self.id = id
+        self.ownerId = ownerId
+        self.kind = kind
+        self.name = name
+    }
+}
+
+/// No `expectedVersion` — a rename has nothing to conflict against beyond
+/// what `CategoryRepository.rename` already is: a plain, no-conflict-
+/// tracked update, same simplicity level the endpoint already had before
+/// this went through the outbox.
+public struct UpdateCategoryPayload: Codable, Sendable {
+    public let id: UUID
+    public let name: String
+
+    public init(id: UUID, name: String) {
+        self.id = id
+        self.name = name
     }
 }

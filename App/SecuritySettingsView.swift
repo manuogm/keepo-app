@@ -2,149 +2,82 @@ import KeepoCore
 import Supabase
 import SwiftUI
 
-/// Phase 17: base-currency change (triggers Phase 13's FX backfill
-/// automatically, server-side — nothing extra to call from here), the
-/// biometric step-up mechanism, and email-OTP as a linked recovery
-/// identity. Reached from Settings, not folded into the main list — this
-/// screen is entirely about the account's security/identity posture, a
-/// distinct concern from Household/Recurring/Budgets.
+/// Biometric step-up and recovery identity settings. Base currency lives in
+/// Preferences now (an inline picker there, no push) — this screen is
+/// purely about the account's security posture.
 struct SecuritySettingsView: View {
     let session: SessionStore
 
-    @State private var currencies: [PublicSchema.CurrenciesSelect] = []
-    @State private var selectedCurrency = ""
+    @AppStorage(AppSettingsKeys.isFaceIDEnabled) private var isFaceIDEnabled = true
+    @AppStorage(AppSettingsKeys.isHideBalanceEnabled) private var isHideBalanceEnabled = true
     @State private var recoveryEmail = ""
-    @State private var isSavingCurrency = false
     @State private var isSendingRecoveryEmail = false
-    @State private var isTestingStepUp = false
-    @State private var stepUpResultMessage: String?
     @State private var errorMessage: String?
-    @State private var isLoading = true
 
     var body: some View {
         Form {
-            if isLoading {
-                ProgressView()
-            } else {
-                Section {
-                    Picker("Base currency", selection: $selectedCurrency) {
-                        ForEach(currencies, id: \.code) { currency in
-                            Text(currency.code).tag(currency.code)
-                        }
-                    }
-                    Button {
-                        Task { await saveBaseCurrency() }
-                    } label: {
-                        if isSavingCurrency {
-                            ProgressView()
-                        } else {
-                            Text("Save")
-                        }
-                    }
-                    .disabled(isSavingCurrency || selectedCurrency == session.profile?.baseCurrency)
-                } header: {
-                    Text("Base Currency")
-                } footer: {
-                    Text(
-                        "Every balance and chart converts into this currency. Changing it refreshes exchange "
-                            + "rate history for the new currency automatically."
-                    )
+            Section {
+                if session.authCapabilities.requiresBiometricStepUp {
+                    Toggle("Enable Face ID", isOn: $isFaceIDEnabled)
+                } else {
+                    Text("Biometric step-up isn't available with this account type.")
+                        .foregroundStyle(Color.secondary)
                 }
+            } header: {
+                Text("Security")
+            } footer: {
+                Text(
+                    "When enabled, export, account deletion, and household actions require a fresh "
+                        + "biometric check. When disabled, Face ID is never requested."
+                )
+            }
 
-                Section {
-                    if session.authCapabilities.requiresBiometricStepUp {
-                        Button {
-                            Task { await testStepUp() }
-                        } label: {
-                            if isTestingStepUp {
-                                ProgressView()
-                            } else {
-                                Text("Test Step-Up Authentication")
-                            }
-                        }
-                        .disabled(isTestingStepUp)
+            Section {
+                Toggle("Enable Hiding Balance", isOn: $isHideBalanceEnabled)
+            } footer: {
+                Text(
+                    "Adds a button to Home, Accounts, and Transactions to hide financial figures "
+                        + "when using the app in public. Turning this off also un-hides anything "
+                        + "currently hidden."
+                )
+            }
+            .onChange(of: isHideBalanceEnabled) { _, enabled in
+                // The button that would normally let the user reveal it
+                // again is the very thing being turned off here — force it
+                // back on so nothing stays stuck hidden with no affordance
+                // to undo it.
+                if !enabled { session.isPrivacyMode = false }
+            }
+
+            Section {
+                TextField("Recovery email", text: $recoveryEmail)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .autocorrectionDisabled()
+                Button {
+                    Task { await sendRecoveryEmail() }
+                } label: {
+                    if isSendingRecoveryEmail {
+                        ProgressView()
                     } else {
-                        Text("Biometric step-up isn't available with this account type.")
-                            .foregroundStyle(Color("TextSecondary"))
+                        Text("Add Recovery Email")
                     }
-                    if let stepUpResultMessage {
-                        Text(stepUpResultMessage).font(.footnote).foregroundStyle(Color("TextSecondary"))
-                    }
-                } header: {
-                    Text("Security")
-                } footer: {
-                    Text(
-                        "Export, account deletion, and household actions require a fresh biometric check, "
-                            + "never a cached one."
-                    )
                 }
+                .disabled(isSendingRecoveryEmail || recoveryEmail.isEmpty)
+            } header: {
+                Text("Recovery Identity")
+            } footer: {
+                Text(
+                    "A linked recovery contact — not a login method. Without one, losing your sign-in "
+                        + "identity means losing access to your financial history."
+                )
+            }
 
-                Section {
-                    TextField("Recovery email", text: $recoveryEmail)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .autocorrectionDisabled()
-                    Button {
-                        Task { await sendRecoveryEmail() }
-                    } label: {
-                        if isSendingRecoveryEmail {
-                            ProgressView()
-                        } else {
-                            Text("Add Recovery Email")
-                        }
-                    }
-                    .disabled(isSendingRecoveryEmail || recoveryEmail.isEmpty)
-                } header: {
-                    Text("Recovery Identity")
-                } footer: {
-                    Text(
-                        "A linked recovery contact — not a login method. Without one, losing your sign-in "
-                            + "identity means losing access to your financial history."
-                    )
-                }
-
-                if let errorMessage {
-                    Text(errorMessage).font(.footnote).foregroundStyle(.red)
-                }
+            if let errorMessage {
+                Text(errorMessage).font(.footnote).foregroundStyle(.red)
             }
         }
         .navigationTitle("Security")
-        .task { await load() }
-    }
-
-    private func load() async {
-        currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
-        selectedCurrency = session.profile?.baseCurrency ?? currencies.first?.code ?? "USD"
-        isLoading = false
-    }
-
-    private func saveBaseCurrency() async {
-        guard let userId = session.profile?.id else { return }
-        isSavingCurrency = true
-        errorMessage = nil
-        do {
-            try await ProfileRepository.updateBaseCurrency(
-                client: session.client, userId: userId, baseCurrency: selectedCurrency
-            )
-            try await session.refreshProfile()
-            session.refresh.bump()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
-        isSavingCurrency = false
-    }
-
-    private func testStepUp() async {
-        isTestingStepUp = true
-        stepUpResultMessage = nil
-        errorMessage = nil
-        do {
-            try await session.stepUp(reason: "Confirm it's you")
-            stepUpResultMessage = "Step-up succeeded."
-        } catch {
-            stepUpResultMessage = "Step-up declined: \(UserFacingError.describe(error))"
-        }
-        isTestingStepUp = false
     }
 
     /// `enable_manual_linking = false` locally (config.toml) means this is

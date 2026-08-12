@@ -19,16 +19,16 @@ struct NeedsReviewView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             if store.isLoading {
                 ProgressView()
-            } else if store.items.isEmpty {
+            } else if displayItems.isEmpty {
                 Text("Nothing needs review")
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             } else {
                 List {
-                    ForEach(store.items, id: \.itemId) { item in
+                    ForEach(displayItems, id: \.itemId) { item in
                         row(item)
                     }
                 }
@@ -64,16 +64,14 @@ struct NeedsReviewView: View {
         }
     }
 
+    private var displayItems: [PublicSchema.NeedsReviewSelect] {
+        store.items.filter { $0.kind != "reconciliation_gap" }
+    }
+
     @ViewBuilder
     private func row(_ item: PublicSchema.NeedsReviewSelect) -> some View {
         Group {
-            if item.kind == "reconciliation_gap" {
-                NavigationLink {
-                    SyncRitualView(session: session)
-                } label: {
-                    NeedsReviewRow(item: item, minorUnit: minorUnit(for: item.currency))
-                }
-            } else if item.kind == "pending_capture" {
+            if item.kind == "pending_capture" {
                 Button {
                     Task { await openForReview(item) }
                 } label: {
@@ -102,17 +100,17 @@ struct NeedsReviewView: View {
             Button("Resolve") {
                 Task { await resolve(item) }
             }
-            .tint(Color("BrandPrimary"))
+            .tint(Color.primary)
         } else if item.kind == "pending_capture" {
             Button("Confirm") {
                 Task { await confirmCapture(item) }
             }
-            .tint(Color("BrandPrimary"))
+            .tint(Color.primary)
         } else if item.kind == "csv_import_candidate" {
             Button("Accept") {
                 Task { await acceptImportCandidate(item) }
             }
-            .tint(Color("BrandPrimary"))
+            .tint(Color.primary)
         }
     }
 
@@ -212,7 +210,7 @@ struct NeedsReviewView: View {
 /// `card_identifier` (see migration 20260807160000's comment on why it's
 /// there and not parsed out of `title`). Only ledger (spendable) accounts
 /// are offered — `map_card` itself refuses anything else.
-private struct MapCardSheet: View {
+struct MapCardSheet: View {
     let session: SessionStore
     let item: PublicSchema.NeedsReviewSelect
     let onMapped: () -> Void
@@ -280,28 +278,28 @@ private struct MapCardSheet: View {
     }
 }
 
-private struct NeedsReviewRow: View {
+struct NeedsReviewRow: View {
     let item: PublicSchema.NeedsReviewSelect
     let minorUnit: Int
 
     var body: some View {
         HStack {
             Image(systemName: iconName)
-                .foregroundStyle(Color("BrandSecondary"))
+                .foregroundStyle(Color.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title ?? "—")
-                    .foregroundStyle(Color("TextPrimary"))
+                    .foregroundStyle(Color.primary)
                 if let subtitle = item.subtitle {
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(Color("TextSecondary"))
+                        .foregroundStyle(Color.secondary)
                 }
             }
             Spacer()
             if let amount = item.amount, let currencyCode = item.currency {
                 Text(MoneyFormatter.format(amount, currency: CurrencyInfo(code: currencyCode, minorUnit: minorUnit)))
                     .monospacedDigit()
-                    .foregroundStyle(Color("BrandPrimary"))
+                    .foregroundStyle(Color.primary)
             }
         }
     }
@@ -309,7 +307,6 @@ private struct NeedsReviewRow: View {
     private var iconName: String {
         switch item.kind {
         case "sync_conflict": return "exclamationmark.arrow.triangle.2.circlepath"
-        case "reconciliation_gap": return "arrow.triangle.2.circlepath"
         case "pending_capture": return "wallet.pass"
         case "ambiguous_card": return "creditcard.trianglebadge.exclamationmark"
         case "csv_import_candidate": return "doc.text.magnifyingglass"

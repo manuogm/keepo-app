@@ -26,7 +26,7 @@ struct InsightsView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
@@ -75,7 +75,7 @@ struct InsightsView: View {
     private var financialIndependenceSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Financial Independence").font(.headline).foregroundStyle(Color("TextPrimary"))
+                Text("Financial Independence").font(.headline).foregroundStyle(Color.primary)
                 Spacer()
                 Button("Assumptions") { isEditingFISettings = true }
                     .font(.caption)
@@ -86,16 +86,16 @@ struct InsightsView: View {
                 fiMetricRow("Years to FI", value: fiYearsText(fiMetrics.yearsToFi))
                 fiMetricRow("Coast FI number", value: fiCurrencyText(fiMetrics.coastFiNumber))
             } else {
-                Text("—").foregroundStyle(Color("TextSecondary"))
+                Text("—").foregroundStyle(Color.secondary)
             }
         }
     }
 
     private func fiMetricRow(_ label: String, value: String) -> some View {
         HStack {
-            Text(label).foregroundStyle(Color("TextSecondary"))
+            Text(label).foregroundStyle(Color.secondary)
             Spacer()
-            Text(value).monospacedDigit().foregroundStyle(Color("TextPrimary"))
+            Text(value).monospacedDigit().foregroundStyle(Color.primary)
         }
     }
 
@@ -117,13 +117,13 @@ struct InsightsView: View {
 
     private var savingsRateSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Savings rate").font(.headline).foregroundStyle(Color("TextPrimary"))
+            Text("Savings rate").font(.headline).foregroundStyle(Color.primary)
             Text(savingsRateText)
                 .font(.largeTitle).fontWeight(.bold)
-                .foregroundStyle(Color("BrandPrimary"))
+                .foregroundStyle(Color.primary)
             Text("Excludes transfers and investment valuation changes.")
                 .font(.caption)
-                .foregroundStyle(Color("TextSecondary"))
+                .foregroundStyle(Color.secondary)
         }
     }
 
@@ -134,21 +134,21 @@ struct InsightsView: View {
 
     private var incomeExpenseSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Income & Expense").font(.headline).foregroundStyle(Color("TextPrimary"))
+            Text("Income & Expense").font(.headline).foregroundStyle(Color.primary)
             if seriesPoints.isEmpty {
                 Text("Nothing in this window yet.")
                     .font(.callout)
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             } else {
                 Chart(seriesPoints, id: \.bucketStart) { point in
                     if let income = point.income {
                         BarMark(x: .value("Period", point.bucketStart), y: .value("Income", income))
-                            .foregroundStyle(Color("IncomeColor"))
+                            .foregroundStyle(Color.primary)
                             .position(by: .value("Kind", "Income"))
                     }
                     if let expense = point.expense {
                         BarMark(x: .value("Period", point.bucketStart), y: .value("Expense", expense))
-                            .foregroundStyle(Color("BrandPrimary"))
+                            .foregroundStyle(Color.primary)
                             .position(by: .value("Kind", "Expense"))
                     }
                 }
@@ -160,11 +160,11 @@ struct InsightsView: View {
 
     private var categorySpendingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Spending by Category").font(.headline).foregroundStyle(Color("TextPrimary"))
+            Text("Spending by Category").font(.headline).foregroundStyle(Color.primary)
             if categorySpending.isEmpty {
                 Text("No expenses in this window yet.")
                     .font(.callout)
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             } else {
                 // Category bars carry name + value as text (app-architecture.md
                 // §5) — color alone is never the only identity channel, which
@@ -175,11 +175,11 @@ struct InsightsView: View {
                         x: .value("Amount", entry.total ?? 0),
                         y: .value("Category", entry.categoryName)
                     )
-                    .foregroundStyle(Color("BrandPrimary"))
+                    .foregroundStyle(Color.primary)
                     .annotation(position: .trailing) {
                         Text(categoryLabel(entry))
                             .font(.caption)
-                            .foregroundStyle(Color("TextSecondary"))
+                            .foregroundStyle(Color.secondary)
                     }
                 }
                 .frame(height: CGFloat(categorySpending.count * 44))
@@ -195,14 +195,14 @@ struct InsightsView: View {
 
     private var unrealizedGainSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Unrealized Gain").font(.headline).foregroundStyle(Color("TextPrimary"))
+            Text("Unrealized Gain").font(.headline).foregroundStyle(Color.primary)
             ForEach(investmentAccounts, id: \.accountId) { account in
                 HStack {
-                    Text(account.name ?? "—").foregroundStyle(Color("TextPrimary"))
+                    Text(account.name ?? "—").foregroundStyle(Color.primary)
                     Spacer()
                     Text(unrealizedGainText(for: account))
                         .monospacedDigit()
-                        .foregroundStyle(Color("TextSecondary"))
+                        .foregroundStyle(Color.secondary)
                 }
             }
         }

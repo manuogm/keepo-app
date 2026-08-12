@@ -9,11 +9,15 @@ struct BalanceHeaderView: View {
     let amount: Decimal?
     let currency: CurrencyInfo?
 
+    @Environment(\.isPrivacyMode) private var isPrivacyMode
+
     var body: some View {
-        Text(formatted)
+        Text(isPrivacyMode ? "••••" : formatted)
             .font(.system(size: 44, weight: .bold))
             .monospacedDigit()
-            .foregroundStyle(Color("TextPrimary"))
+            .foregroundStyle(Color.primary)
+            .contentTransition(.numericText())
+            .animation(.easeInOut(duration: 0.2), value: isPrivacyMode)
     }
 
     private var formatted: String {

@@ -9,7 +9,7 @@ import SwiftData
 /// mean applied (`true`)/conflict (`false`) — conflict-as-data, never
 /// thrown, exactly like the RPCs themselves (a thrown error here means a
 /// real failure — offline, a 5xx, ... — and leaves the item queued).
-public protocol TransactionOutboxSending: Sendable {
+public protocol OutboxSending: Sendable {
     func createTransaction(_ payload: CreateTransactionPayload) async throws
     func createTransfer(_ payload: CreateTransferPayload) async throws
     func updateTransaction(_ payload: UpdateTransactionPayload) async throws -> Bool
@@ -21,6 +21,12 @@ public protocol TransactionOutboxSending: Sendable {
     /// tells the caller (the App Intent, composing its local notification)
     /// whether the card was already known; it is not a retry signal.
     func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult
+    func createAccount(_ payload: CreateAccountPayload) async throws
+    func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool
+    func createCategory(_ payload: CreateCategoryPayload) async throws
+    /// No applied/conflict distinction — see `UpdateCategoryPayload`'s own
+    /// header comment on why a rename has nothing to conflict against.
+    func updateCategory(_ payload: UpdateCategoryPayload) async throws
 }
 
 /// The real, network-backed sender — a thin wrapper around
@@ -29,7 +35,7 @@ public protocol TransactionOutboxSending: Sendable {
 /// primary key (23505); that specific error is swallowed here rather than
 /// surfaced as a failure, since it means the write already landed, not that
 /// it failed (migration 20260807140000's whole reason for existing).
-public struct LiveTransactionOutboxSender: TransactionOutboxSending {
+public struct LiveOutboxSender: OutboxSending {
     let client: SupabaseClient
 
     public init(client: SupabaseClient) {
@@ -115,7 +121,7 @@ public struct LiveTransactionOutboxSender: TransactionOutboxSending {
         }
     }
 
-    private static func isDuplicateKey(_ error: Error) -> Bool {
+    static func isDuplicateKey(_ error: Error) -> Bool {
         (error as? PostgrestError)?.code == "23505"
     }
 }
@@ -133,9 +139,10 @@ public enum OutboxCaptureResult: Equatable, Sendable {
     case queued
 }
 
-private enum OutboxKind: String {
+enum OutboxKind: String {
     case createTransaction, createTransfer, updateTransaction, updateTransfer, deleteTransaction, deleteTransfer
     case captureTransaction
+    case createAccount, updateAccount, createCategory, updateCategory
 }
 
 /// Every write attempts to send immediately; only a thrown error (offline,
@@ -158,11 +165,11 @@ public final class Outbox {
     public private(set) var pendingCreateTransactions: [CreateTransactionPayload] = []
 
     private let context: ModelContext
-    private let sender: TransactionOutboxSending
+    let sender: OutboxSending
     private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
+    let decoder = JSONDecoder()
 
-    public init(context: ModelContext, sender: TransactionOutboxSending) {
+    public init(context: ModelContext, sender: OutboxSending) {
         self.context = context
         self.sender = sender
         refreshCounts()
@@ -253,7 +260,7 @@ public final class Outbox {
         refreshCounts()
     }
 
-    private func attempt<P: Encodable>(
+    func attempt<P: Encodable>(
         id: UUID, kind: OutboxKind, payload: P, expectedVersion: Int? = nil, send: () async throws -> Bool
     ) async -> OutboxSubmitResult {
         do {
@@ -329,6 +336,8 @@ public final class Outbox {
             let payload = try decoder.decode(CaptureTransactionPayload.self, from: item.payloadJSON)
             _ = try await sender.captureTransaction(payload)
             return true
+        case .createAccount, .updateAccount, .createCategory, .updateCategory:
+            return try await replayAccountOrCategory(kind, data: item.payloadJSON)
         }
     }
 

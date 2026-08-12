@@ -12,7 +12,7 @@ struct WalletAutomationGuideView: View {
                     "Keepo can log Apple Pay purchases automatically, but the automation itself lives in "
                         + "Apple's Shortcuts app — this is a one-time setup."
                 )
-                .foregroundStyle(Color("TextSecondary"))
+                .foregroundStyle(Color.secondary)
             }
 
             Section("Setup") {
@@ -29,7 +29,7 @@ struct WalletAutomationGuideView: View {
                         + "and can't trigger this automation."
                 )
                 .font(.footnote)
-                .foregroundStyle(Color("TextSecondary"))
+                .foregroundStyle(Color.secondary)
             }
         }
         .navigationTitle("Apple Pay Capture")
@@ -39,9 +39,9 @@ struct WalletAutomationGuideView: View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.footnote).fontWeight(.semibold)
-                .foregroundStyle(Color("BrandPrimary"))
+                .foregroundStyle(Color.primary)
             Text(text)
-                .foregroundStyle(Color("TextPrimary"))
+                .foregroundStyle(Color.primary)
         }
     }
 }

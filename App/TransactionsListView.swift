@@ -4,6 +4,8 @@ import SwiftUI
 struct TransactionsListView: View {
     let session: SessionStore
 
+    // MARK: - Transactions state
+
     @State private var store = DataStore<PublicSchema.TransactionsWithDetailsSelect>(cacheKey: "transactions_page_0")
     @State private var isAddingTransaction = false
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
@@ -15,13 +17,30 @@ struct TransactionsListView: View {
     @State private var filterAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
     @State private var filterCategories: [PublicSchema.CategoriesSelect] = []
 
+    // MARK: - Needs-review inbox state
+
+    // Not `private` — read/written from TransactionsListView+NeedsReview.swift,
+    // an extension in a different file (kept there purely for file-length).
+    @State var reviewStore = DataStore<PublicSchema.NeedsReviewSelect>()
+    @State var reviewCurrencies: [String: Int] = [:]
+    @State var reviewActionError: String?
+    @State var reviewEditingTransaction: PublicSchema.TransactionsWithDetailsSelect?
+    @State var showReviewEditing = false
+    @State var reviewMappingCard: PublicSchema.NeedsReviewSelect?
+    @State var showReviewCardMapping = false
+
+    // MARK: - Computed
+
     private var transactions: [PublicSchema.TransactionsWithDetailsSelect] { store.items }
+
+    private var reviewDisplayItems: [PublicSchema.NeedsReviewSelect] {
+        reviewStore.items.filter { $0.kind != "reconciliation_gap" }
+    }
 
     /// Pending *creates* only (Phase 11) — resolved against whatever
     /// accounts/categories are already loaded for the filter sheet, since
     /// those already carry names and are refreshed the same way this
-    /// screen refreshes everything else. Updates/deletes stay invisible
-    /// until drained; see Outbox.pendingCreateTransactions' own doc comment.
+    /// screen refreshes everything else.
     private var pendingRows: [PendingTransactionDisplay] {
         session.outbox.pendingCreateTransactions.map { pending in
             let account = filterAccounts.first { $0.accountId == pending.accountId }
@@ -37,22 +56,34 @@ struct TransactionsListView: View {
         }
     }
 
+    // MARK: - Body
+
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if store.isLoading {
+            if store.isLoading && reviewStore.isLoading {
                 ProgressView()
-            } else if transactions.isEmpty && pendingRows.isEmpty {
+            } else if transactions.isEmpty && pendingRows.isEmpty && reviewDisplayItems.isEmpty {
                 Text("No transactions yet")
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             } else {
                 List {
                     if let asOf = store.asOf {
                         Text("Showing data as of \(asOf.formatted(date: .omitted, time: .shortened))")
                             .font(.caption)
-                            .foregroundStyle(Color("TextSecondary"))
+                            .foregroundStyle(Color.secondary)
                     }
+
+                    // Needs-review inbox — most actionable items first
+                    if !reviewDisplayItems.isEmpty {
+                        Section("Needs Review") {
+                            ForEach(reviewDisplayItems, id: \.itemId) { item in
+                                reviewRow(item)
+                            }
+                        }
+                    }
+
                     if !pendingRows.isEmpty {
                         Section("Pending sync") {
                             ForEach(pendingRows) { pending in
@@ -60,6 +91,7 @@ struct TransactionsListView: View {
                             }
                         }
                     }
+
                     ForEach(transactions, id: \.transactionId) { transaction in
                         TransactionRow(transaction: transaction)
                             .contentShape(Rectangle())
@@ -73,7 +105,7 @@ struct TransactionsListView: View {
                 .refreshable { await load() }
             }
 
-            if let errorMessage = store.errorMessage {
+            if let errorMessage = store.errorMessage ?? reviewActionError {
                 VStack {
                     Spacer()
                     Text(errorMessage)
@@ -86,6 +118,9 @@ struct TransactionsListView: View {
         .searchable(text: searchBinding, prompt: "Merchant, category, or account")
         .navigationTitle("Transactions")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                PrivacyToggleButton(session: session)
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     isAddingTransaction = true
@@ -133,12 +168,29 @@ struct TransactionsListView: View {
         } message: {
             Text("The list has been refreshed with the latest version.")
         }
+        .navigationDestination(isPresented: $showReviewEditing) {
+            if let reviewEditingTransaction {
+                TransactionFormView(
+                    session: session,
+                    mode: .edit(reviewEditingTransaction, sibling: nil)
+                ) {
+                    session.refresh.bump()
+                }
+            }
+        }
+        .sheet(isPresented: $showReviewCardMapping) {
+            if let reviewMappingCard {
+                MapCardSheet(session: session, item: reviewMappingCard) {
+                    session.refresh.bump()
+                }
+            }
+        }
         .task { store.restore(from: session.payloadCache) }
         .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter)) { await load() }
     }
 
-    /// `.searchable` needs a plain `Binding<String>`; `filter.search` is an
-    /// `Optional` (nil means "no search filter" everywhere else it's read).
+    // MARK: - Transaction helpers
+
     private var searchBinding: Binding<String> {
         Binding(get: { filter.search ?? "" }, set: { filter.search = $0.isEmpty ? nil : $0 })
     }
@@ -154,10 +206,6 @@ struct TransactionsListView: View {
         return transactions.first { $0.transferGroupId == groupId && $0.transactionId != transaction.transactionId }
     }
 
-    /// A row materialized from a recurring rule needs a choice before
-    /// editing at all — "this one" (the historical row, unaffected by any
-    /// future rule change) vs "all future" (the rule itself). An ordinary
-    /// manual/capture/transfer row skips straight to the normal edit sheet.
     private func handleTap(on transaction: PublicSchema.TransactionsWithDetailsSelect) {
         if transaction.recurringRuleId != nil {
             recurringEditChoice = transaction
@@ -184,18 +232,19 @@ struct TransactionsListView: View {
             let fetched = try? await CategoryRepository.fetchAll(client: session.client)
             filterCategories = fetched ?? cachedCategories()
         }
-        // Caching only applies to the default, unfiltered page — caching
-        // every filter permutation would be pointless; a filtered view
-        // simply has no offline fallback beyond whatever's already shown.
+        if reviewCurrencies.isEmpty {
+            let currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
+            reviewCurrencies = Dictionary(uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) })
+        }
+        await reviewStore.load { try await NeedsReviewRepository.fetchAll(client: session.client) }
+        // Caching only applies to the default, unfiltered page — a filtered
+        // view has no offline fallback beyond whatever's already shown.
         await store.load(
             { try await TransactionRepository.fetchFiltered(client: session.client, filter: filter) },
             cache: filter.isEmpty ? session.payloadCache : nil
         )
     }
 
-    /// Same on-device cache `TransactionFormView` falls back to — needed
-    /// here too so a pending-create row (Phase 11) can resolve its account/
-    /// category names even on a cold, fully-offline start.
     private func cachedAccounts() -> [PublicSchema.AccountsWithBalancesSelect] {
         guard let (data, _) = session.payloadCache.load(key: "accounts_with_balances") else { return [] }
         return (try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data)) ?? []
@@ -206,8 +255,6 @@ struct TransactionsListView: View {
         return (try? JSONDecoder().decode([PublicSchema.CategoriesSelect].self, from: data)) ?? []
     }
 
-    /// Routed through `session.outbox` (Phase 11), same as every write in
-    /// `TransactionFormView` — an offline delete queues instead of erroring.
     private func delete(at offsets: IndexSet) async {
         var hadConflict = false
         for index in offsets {
@@ -232,95 +279,21 @@ struct TransactionsListView: View {
     }
 }
 
+// MARK: - Supporting types
+
 extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
     public var id: UUID { transactionId ?? UUID() }
 }
 
-/// `.task(id:)` needs an `Equatable` id — bundles the refresh token and the
-/// filter together so either changing triggers exactly one reload, same
-/// convention as `HomeLoadKey`.
 private struct TransactionsLoadKey: Equatable {
     let token: Int
     let filter: TransactionFilter
 }
 
-/// Account/category/kind/date-range — every field optional, AND'd
-/// together server-side (`TransactionRepository.fetchFiltered`). Search
-/// lives on the list's own `.searchable`, not in this sheet.
-private struct TransactionFilterView: View {
-    @Binding var filter: TransactionFilter
-    let accounts: [PublicSchema.AccountsWithBalancesSelect]
-    let categories: [PublicSchema.CategoriesSelect]
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var hasDateRange = false
-    @State private var from = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
-    @State private var through = Date()
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Account") {
-                    Picker("Account", selection: $filter.accountId) {
-                        Text("Any").tag(UUID?.none)
-                        ForEach(accounts, id: \.accountId) { account in
-                            Text(account.name ?? "—").tag(account.accountId)
-                        }
-                    }
-                }
-                Section("Category") {
-                    Picker("Category", selection: $filter.categoryId) {
-                        Text("Any").tag(UUID?.none)
-                        ForEach(categories, id: \.id) { category in
-                            Text(category.name).tag(UUID?.some(category.id))
-                        }
-                    }
-                }
-                Section("Kind") {
-                    Picker("Kind", selection: $filter.kind) {
-                        Text("Any").tag(String?.none)
-                        Text("Expense").tag(String?.some("expense"))
-                        Text("Income").tag(String?.some("income"))
-                        Text("Transfer").tag(String?.some("transfer"))
-                    }
-                    .pickerStyle(.segmented)
-                }
-                Section("Date range") {
-                    Toggle("Limit to a date range", isOn: $hasDateRange)
-                    if hasDateRange {
-                        DatePicker("From", selection: $from, displayedComponents: .date)
-                        DatePicker("Through", selection: $through, displayedComponents: .date)
-                    }
-                }
-            }
-            .navigationTitle("Filter")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear") {
-                        filter = TransactionFilter(search: filter.search)
-                        hasDateRange = false
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        filter.from = hasDateRange ? from : nil
-                        filter.through = hasDateRange ? through : nil
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .task {
-            hasDateRange = filter.from != nil || filter.through != nil
-            from = filter.from ?? from
-            through = filter.through ?? through
-        }
-    }
-}
-
 private struct TransactionRow: View {
     let transaction: PublicSchema.TransactionsWithDetailsSelect
+
+    @Environment(\.isPrivacyMode) private var isPrivacyMode
 
     private var isTransfer: Bool { transaction.kind == "transfer" }
 
@@ -328,26 +301,25 @@ private struct TransactionRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(isTransfer ? "Transfer" : (transaction.categoryName ?? "—"))
-                    .foregroundStyle(Color("TextPrimary"))
+                    .foregroundStyle(Color.primary)
                 Text(transaction.accountName ?? "—")
                     .font(.caption)
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                // MoneyFormatter is the one place amounts render (Engineering
-                // Principles) — the same call AccountsListView and
-                // TransactionFormView use, not a per-screen formatter.
-                Text(formattedAmount)
+                Text(isPrivacyMode ? "••••" : formattedAmount)
                     .monospacedDigit()
                     .foregroundStyle(amountColor)
-                CurrencyConversionLabel(
-                    nativeCurrency: transaction.currency,
-                    amountBase: transaction.amountBase,
-                    baseCurrency: transaction.baseCurrency,
-                    baseMinorUnit: transaction.baseMinorUnit,
-                    hasMissingRate: transaction.hasMissingRate ?? false
-                )
+                if !isPrivacyMode {
+                    CurrencyConversionLabel(
+                        nativeCurrency: transaction.currency,
+                        amountBase: transaction.amountBase,
+                        baseCurrency: transaction.baseCurrency,
+                        baseMinorUnit: transaction.baseMinorUnit,
+                        hasMissingRate: transaction.hasMissingRate ?? false
+                    )
+                }
             }
         }
     }
@@ -359,7 +331,7 @@ private struct TransactionRow: View {
     }
 
     private var amountColor: Color {
-        guard let amount = transaction.amount, amount < 0 else { return Color("TextPrimary") }
-        return Color("BrandPrimary")
+        guard let amount = transaction.amount, amount < 0 else { return Color.primary }
+        return Color.primary
     }
 }

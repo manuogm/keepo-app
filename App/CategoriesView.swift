@@ -12,6 +12,9 @@ struct CategoriesView: View {
 
     @State private var store = DataStore<PublicSchema.CategoriesSelect>(cacheKey: "categories")
     @State private var isAddingCategory = false
+    @State private var editingCategoryId: UUID?
+    @State private var deleteCandidate: PublicSchema.CategoriesSelect?
+    @State private var deleteTransactionCount = 0
     @State private var deleteErrorMessage: String?
 
     private var categories: [PublicSchema.CategoriesSelect] { store.items }
@@ -26,7 +29,7 @@ struct CategoriesView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             if store.isLoading {
                 ProgressView()
@@ -34,30 +37,12 @@ struct CategoriesView: View {
                 List {
                     Section("Expense") {
                         ForEach(expenseCategories, id: \.id) { category in
-                            CategoryRow(category: category)
-                                .swipeActions(edge: .trailing) {
-                                    if !category.isDefault {
-                                        Button(role: .destructive) {
-                                            Task { await delete(category) }
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                    }
-                                }
+                            categoryRow(category)
                         }
                     }
                     Section("Income") {
                         ForEach(incomeCategories, id: \.id) { category in
-                            CategoryRow(category: category)
-                                .swipeActions(edge: .trailing) {
-                                    if !category.isDefault {
-                                        Button(role: .destructive) {
-                                            Task { await delete(category) }
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                    }
-                                }
+                            categoryRow(category)
                         }
                     }
                 }
@@ -86,12 +71,52 @@ struct CategoriesView: View {
             }
         }
         .sheet(isPresented: $isAddingCategory) {
-            AddCategorySheet(session: session) {
+            CategoryFormView(session: session) {
                 session.refresh.bump()
             }
         }
+        .sheet(item: $editingCategoryId.map(EditingCategoryId.init)) { wrapped in
+            if let category = categories.first(where: { $0.id == wrapped.id }) {
+                CategoryFormView(session: session, mode: .edit(category)) {
+                    session.refresh.bump()
+                }
+            }
+        }
+        .alert(
+            "Delete \"\(deleteCandidate?.name ?? "")\"?",
+            isPresented: Binding(get: { deleteCandidate != nil }, set: { if !$0 { deleteCandidate = nil } }),
+            presenting: deleteCandidate
+        ) { category in
+            Button("Delete", role: .destructive) {
+                Task { await performDelete(category) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text(
+                deleteTransactionCount > 0
+                    ? "\(deleteTransactionCount) transaction"
+                        + "\(deleteTransactionCount == 1 ? "" : "s") will move to Other."
+                    : "This category has no transactions."
+            )
+        }
         .task { store.restore(from: session.payloadCache) }
         .task(id: session.refresh.token) { await load() }
+    }
+
+    @ViewBuilder
+    private func categoryRow(_ category: PublicSchema.CategoriesSelect) -> some View {
+        CategoryRow(category: category)
+            .contentShape(Rectangle())
+            .onTapGesture { editingCategoryId = category.id }
+            .swipeActions(edge: .trailing) {
+                if !category.isDefault && category.systemKey == nil {
+                    Button(role: .destructive) {
+                        Task { await confirmDelete(category) }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
     }
 
     private func load() async {
@@ -101,14 +126,48 @@ struct CategoriesView: View {
         )
     }
 
-    private func delete(_ category: PublicSchema.CategoriesSelect) async {
+    /// Reads a live transaction count before showing the warning — offline,
+    /// this throws and surfaces the existing "you appear to be offline"
+    /// message rather than presenting a stale or missing count, which is
+    /// exactly why category deletion is never routed through the outbox
+    /// (see CategoryRepository.deleteWithReassign's own header comment).
+    private func confirmDelete(_ category: PublicSchema.CategoriesSelect) async {
         deleteErrorMessage = nil
         do {
-            try await CategoryRepository.softDelete(client: session.client, categoryId: category.id)
+            deleteTransactionCount = try await CategoryRepository.transactionCount(
+                client: session.client, categoryId: category.id
+            )
+            deleteCandidate = category
+        } catch {
+            deleteErrorMessage = UserFacingError.describe(error)
+        }
+    }
+
+    private func performDelete(_ category: PublicSchema.CategoriesSelect) async {
+        deleteErrorMessage = nil
+        do {
+            try await CategoryRepository.deleteWithReassign(client: session.client, categoryId: category.id)
             session.refresh.bump()
         } catch {
             deleteErrorMessage = UserFacingError.describe(error)
         }
+        deleteCandidate = nil
+    }
+}
+
+/// `.sheet(item:)` needs an `Identifiable`; a bare `UUID?` binding isn't
+/// one — same wrapper AccountsListView already uses for the identical
+/// reason.
+private struct EditingCategoryId: Identifiable {
+    let id: UUID
+}
+
+private extension Binding where Value == UUID? {
+    func map(_ transform: @escaping (UUID) -> EditingCategoryId) -> Binding<EditingCategoryId?> {
+        Binding<EditingCategoryId?>(
+            get: { wrappedValue.map(transform) },
+            set: { wrappedValue = $0?.id }
+        )
     }
 }
 
@@ -118,69 +177,13 @@ private struct CategoryRow: View {
     var body: some View {
         HStack {
             Text(category.name)
-                .foregroundStyle(Color("TextPrimary"))
+                .foregroundStyle(Color.primary)
             if category.isDefault {
                 Spacer()
                 Text("Default")
                     .font(.caption)
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             }
         }
-    }
-}
-
-private struct AddCategorySheet: View {
-    let session: SessionStore
-    var onSaved: () async -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var kind: PublicSchema.CategoryKind = .expense
-    @State private var isSaving = false
-    @State private var errorMessage: String?
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Name", text: $name)
-                Picker("Kind", selection: $kind) {
-                    Text("Expense").tag(PublicSchema.CategoryKind.expense)
-                    Text("Income").tag(PublicSchema.CategoryKind.income)
-                }
-                .pickerStyle(.segmented)
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-            }
-            .navigationTitle("New Category")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task { await save() }
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
-                }
-            }
-        }
-    }
-
-    private func save() async {
-        guard let userId = session.profile?.id else { return }
-        isSaving = true
-        errorMessage = nil
-        do {
-            try await CategoryRepository.create(client: session.client, ownerId: userId, kind: kind, name: name)
-            await onSaved()
-            dismiss()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
-        isSaving = false
     }
 }

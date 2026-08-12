@@ -14,6 +14,7 @@ import SwiftData
 public final class SessionStore {
     public enum Phase: Equatable {
         case loading
+        case needsSignIn      // no cached session; show the OTP sign-in UI
         case needsOnboarding
         case ready
         case failed(String)
@@ -21,6 +22,19 @@ public final class SessionStore {
 
     public private(set) var phase: Phase = .loading
     public private(set) var profile: PublicSchema.ProfilesSelect?
+    /// Set when a magic-link deep link arrives but `session(from:)` fails
+    /// (expired or malformed link). Observed by `OTPSignInView`.
+    public private(set) var linkError: String?
+    /// Email address of the currently signed-in user, populated at session
+    /// start / magic-link completion. Displayed in ProfileView.
+    public private(set) var userEmail: String?
+    /// Whether the user has toggled financial data out of view (privacy mode).
+    /// Injected into the view hierarchy via the `isPrivacyMode` environment key.
+    public var isPrivacyMode: Bool = false
+    /// The net-worth scope all financial screens compute totals for.
+    /// Lifted from HomeView so the PrivacyToggleButton's long-press scope
+    /// selector works across tabs without prop drilling.
+    public var scope: PublicSchema.AccountScope = .total
 
     public let client: SupabaseClient
     /// Bumped by every successful write; every list screen's `.task(id:)`
@@ -33,14 +47,19 @@ public final class SessionStore {
     public let payloadCache: PayloadCache
     private let authProvider: AuthProvider
     private var userId: UUID?
+    /// True when pointed at the local dev stack — controls whether startup
+    /// auto-signs in via StubAuthProvider or waits for the OTP UI.
+    private let isLocal: Bool
 
     public init() {
         let config = Self.loadConfig()
-        // `StubAuthProvider`'s local dev flow must never require Face ID
-        // enrollment just to run the app — only a non-local (hosted-
-        // capable) provider gets the real, biometric-gated Keychain
-        // storage. Same `config.isLocal` branch that already chooses the
-        // provider itself, mirrored here for storage.
+        self.isLocal = config.isLocal
+        // Only a non-local (hosted-capable) provider gets the stronger,
+        // non-default-accessibility Keychain storage — the local dev stub
+        // keeps the SDK's own plain storage. Same `config.isLocal` branch
+        // that already chooses the provider itself, mirrored here for
+        // storage. Never biometric-gated (see `KeychainSessionStorage`'s
+        // own header comment for why that broke real-device use entirely).
         let client = makeSupabaseClient(config: config, localStorage: config.isLocal ? nil : KeychainSessionStorage())
         self.client = client
         // The only place this branches: StubAuthProvider refuses to run
@@ -64,36 +83,88 @@ public final class SessionStore {
         }
         let context = ModelContext(container)
         self.payloadCache = PayloadCache(context: context)
-        self.outbox = Outbox(context: context, sender: LiveTransactionOutboxSender(client: client))
+        self.outbox = Outbox(context: context, sender: LiveOutboxSender(client: client))
     }
 
     public func start() async {
         do {
-            // The silent, biometric-gated cold-start path first — only
-            // falls back to the full interactive signIn() (which may
-            // present a SIWA sheet) when there's genuinely no cached
-            // session, e.g. first launch or after an explicit sign-out.
-            let session: Session
             if let restored = try await authProvider.restoreSession() {
-                session = restored
+                userId = restored.user.id
+                userEmail = restored.user.email
+                try await refreshProfile()
+                await outbox.drainAll()
+            } else if isLocal {
+                // Local dev stack: auto-sign in via StubAuthProvider's fixed
+                // credentials — no UI needed, no email confirmation required.
+                let session = try await authProvider.signIn()
+                userId = session.user.id
+                userEmail = session.user.email
+                try await refreshProfile()
+                await outbox.drainAll()
             } else {
-                session = try await authProvider.signIn()
+                // Hosted: no cached session — present the OTP sign-in UI.
+                // The signIn() path on PasswordAuthProvider fails against
+                // hosted Supabase (email confirmation required by default).
+                phase = .needsSignIn
             }
-            userId = session.user.id
-            try await refreshProfile()
-            // "Only syncs once a valid session exists" is structural, not a
-            // separate check — this line only runs after signIn() above
-            // already succeeded.
-            await outbox.drainAll()
         } catch {
             phase = .failed(UserFacingError.describe(error))
         }
     }
 
+    /// Sends a magic-link email to `email`. The link opens the app via the
+    /// `com.manuogm.keepo://` URL scheme; `handleMagicLink(url:)` completes
+    /// the session from there. Also requires `com.manuogm.keepo://auth-callback`
+    /// to be listed in the Supabase dashboard under Authentication → URL Configuration.
+    public func sendOTP(email: String) async throws {
+        try await client.auth.signInWithOTP(
+            email: email,
+            redirectTo: URL(string: "com.manuogm.keepo://auth-callback"),
+            shouldCreateUser: true
+        )
+    }
+
+    /// Called by `RootView.onOpenURL` when the magic link opens the app.
+    /// Extracts the session from the URL and advances the phase.
+    public func handleMagicLink(url: URL) async {
+        do {
+            let session = try await client.auth.session(from: url)
+            linkError = nil
+            userId = session.user.id
+            userEmail = session.user.email
+            try await refreshProfile()
+            await outbox.drainAll()
+        } catch {
+            linkError = UserFacingError.describe(error)
+        }
+    }
+
+    public func signOut() async throws {
+        try await client.auth.signOut()
+        userId = nil
+        userEmail = nil
+        profile = nil
+        phase = .needsSignIn
+    }
+
+    /// Deletes all of the user's data server-side and signs out locally.
+    /// Requires a step-up auth challenge before being called.
+    public func deleteAccount() async throws {
+        guard let userId else { return }
+        try await client.rpc("delete_own_account", params: ["p_user": userId.uuidString]).execute()
+        try await signOut()
+    }
+
     /// Forces a fresh biometric check before a high-value action (export,
     /// account deletion, household invite accept/leave) — spec. Never
     /// satisfied by anything cached in memory; see `StepUpAuthenticator`.
+    ///
+    /// The one choke point every one of those call sites already goes
+    /// through — disabling the "Enable Face ID" setting short-circuits
+    /// here, so it genuinely means Face ID is never invoked anywhere, not
+    /// just skipped at whichever call site happened to be touched.
     public func stepUp(reason: String) async throws {
+        guard AppSettings.isFaceIDEnabled else { return }
         try await authProvider.stepUp(reason: reason)
     }
 

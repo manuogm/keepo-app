@@ -3,37 +3,29 @@ import Foundation
 import LocalAuthentication
 import Security
 
-/// A Keychain-backed `AuthLocalStorage` whose item is protected by a real
-/// `SecAccessControl`, not the SDK's own plain `KeychainLocalStorage`
-/// (`makeSupabaseClient` passed no options at all before this phase, so the
-/// refresh token sat in the default Keychain item with default
-/// accessibility). `.biometryCurrentSet` is what makes this a genuine
-/// device-changed-hands signal: it auto-invalidates the moment a new face
-/// is enrolled, forcing a real re-login — the OS enforces that, not app
-/// code (spec).
+/// A Keychain-backed `AuthLocalStorage` using `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+/// — stronger than the SDK's own plain `KeychainLocalStorage` (`makeSupabaseClient`
+/// passed no options at all before Phase 17, so the refresh token sat in
+/// the default Keychain item with default accessibility), but deliberately
+/// **not** behind a biometric `SecAccessControl`.
 ///
-/// `accessControlFlags` is a constructor parameter, not a hardcoded
-/// literal — an empty set stores under plain `kSecAttrAccessible` (no ACL
-/// object at all), which is what a non-biometric-hardware fallback would
-/// use; the production call site (`SessionStore`) passes
-/// `[.biometryCurrentSet]`. Note this doesn't make writes unit-testable
-/// either way — see `KeychainSessionStorageTests`' own header comment for
-/// why real `SecItemAdd` calls aren't exercisable from `swift test` at all.
+/// An earlier design protected this item with `.biometryCurrentSet` and
+/// implemented step-up (`StepUpAuthenticator`) as a forced re-read of it.
+/// That broke the app on a real device: `supabase-swift` reads the stored
+/// session before *every* authenticated request to attach the bearer
+/// token, so a biometric-gated session item meant Face ID fired on every
+/// single API call, not just step-up — invisible in the Simulator (no
+/// biometric hardware to gate against at all), only surfacing on real
+/// hardware. See `lessons-learned.md`'s "first real-device run" entry.
+/// Step-up is now a fully independent `LAContext` policy evaluation with no
+/// coupling to how the session itself is stored.
 public struct KeychainSessionStorage: AuthLocalStorage {
-    /// The one key both `SessionStore` (via `SupabaseClientOptions`) and
-    /// `StepUpAuthenticator` must agree on — GoTrue itself would otherwise
-    /// pick its own default, and a step-up re-read against the wrong key
-    /// would silently never find the real session.
     public static let sessionStorageKey = "keepo-session"
 
     private let service: String
-    private let accessControlFlags: SecAccessControlCreateFlags
 
-    public init(
-        service: String = "app.keepo.session", accessControlFlags: SecAccessControlCreateFlags = [.biometryCurrentSet]
-    ) {
+    public init(service: String = "app.keepo.session") {
         self.service = service
-        self.accessControlFlags = accessControlFlags
     }
 
     /// `kSecUseDataProtectionKeychain` — without it, a bare SPM test
@@ -52,35 +44,14 @@ public struct KeychainSessionStorage: AuthLocalStorage {
     }
 
     public func store(key: String, value: Data) throws {
-        // A delete-then-add, not SecItemUpdate — updating an existing
-        // biometric-protected item's VALUE still requires evaluating its
-        // current access control to authorize the update, exactly the
-        // repeated-prompt problem this avoids. Deleting by primary key
-        // (service+account) needs no such evaluation; SecItemDelete never
-        // touches the protected value.
+        // A delete-then-add, not SecItemUpdate — simpler and consistent
+        // regardless of whether the item exists yet, no ACL-evaluation
+        // subtlety to reason about now that there's no ACL at all.
         try? remove(key: key)
 
         var query = baseQuery(for: key)
         query[kSecValueData as String] = value
-
-        // An empty flag set (the test-only configuration) skips
-        // `SecAccessControl` entirely rather than constructing one with no
-        // flags — an unsigned SPM test binary can't create an ACL-protected
-        // item at all (`errSecMissingEntitlement`, confirmed empirically),
-        // ACL or not, so plain `kSecAttrAccessible` is what actually lets
-        // `KeychainSessionStorageTests` exercise real store/retrieve/remove
-        // calls. The production path (non-empty flags) still gets a real
-        // `SecAccessControl`.
-        if accessControlFlags.isEmpty {
-            query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        } else {
-            guard let access = SecAccessControlCreateWithFlags(
-                nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, accessControlFlags, nil
-            ) else {
-                throw KeychainSessionStorageError.accessControlCreationFailed
-            }
-            query[kSecAttrAccessControl as String] = access
-        }
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
 
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
@@ -89,21 +60,18 @@ public struct KeychainSessionStorage: AuthLocalStorage {
     }
 
     public func retrieve(key: String) throws -> Data? {
-        try retrieve(key: key, prompt: nil)
-    }
-
-    /// Not part of `AuthLocalStorage` — `StepUpAuthenticator` calls this
-    /// overload directly so the system Face ID sheet shows the actual
-    /// reason for the re-check ("Confirm it's you to export your data")
-    /// instead of a generic prompt.
-    public func retrieve(key: String, prompt: String?) throws -> Data? {
+        // LAContext.interactionNotAllowed = true prevents a Face ID prompt —
+        // if the stored item has a biometric SecAccessControl from an older
+        // build, this returns errSecInteractionNotAllowed instead of
+        // triggering the system biometric sheet. We delete that stale item
+        // and return nil so the caller falls through to a fresh sign-in,
+        // which stores a new item under the plain
+        // kSecAttrAccessibleWhenUnlockedThisDeviceOnly ACL.
+        let noInteractionContext = LAContext()
+        noInteractionContext.interactionNotAllowed = true
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
-        if let prompt {
-            let context = LAContext()
-            context.localizedReason = prompt
-            query[kSecUseAuthenticationContext as String] = context
-        }
+        query[kSecUseAuthenticationContext as String] = noInteractionContext
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -112,6 +80,9 @@ public struct KeychainSessionStorage: AuthLocalStorage {
         case errSecSuccess:
             return result as? Data
         case errSecItemNotFound:
+            return nil
+        case errSecInteractionNotAllowed:
+            try? remove(key: key)
             return nil
         default:
             throw KeychainSessionStorageError.osStatus(status)

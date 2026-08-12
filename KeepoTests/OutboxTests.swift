@@ -156,7 +156,7 @@ private enum StubSenderError: Error {
     case network
 }
 
-private final class StubTransactionSender: TransactionOutboxSending, @unchecked Sendable {
+private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
     var createTransactionResult: Result<Void, Error> = .success(())
     var createTransferResult: Result<Void, Error> = .success(())
     var updateTransactionResult: Result<Bool, Error> = .success(true)
@@ -194,5 +194,26 @@ private final class StubTransactionSender: TransactionOutboxSending, @unchecked 
 
     func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult {
         try captureTransactionResult.get()
+    }
+
+    var createAccountResult: Result<Void, Error> = .success(())
+    var updateAccountResult: Result<Bool, Error> = .success(true)
+    var createCategoryResult: Result<Void, Error> = .success(())
+    var updateCategoryResult: Result<Void, Error> = .success(())
+
+    func createAccount(_ payload: CreateAccountPayload) async throws {
+        try createAccountResult.get()
+    }
+
+    func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool {
+        try updateAccountResult.get()
+    }
+
+    func createCategory(_ payload: CreateCategoryPayload) async throws {
+        try createCategoryResult.get()
+    }
+
+    func updateCategory(_ payload: UpdateCategoryPayload) async throws {
+        try updateCategoryResult.get()
     }
 }

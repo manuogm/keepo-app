@@ -12,5 +12,27 @@
 	<string>$(SUPABASE_URL)</string>
 	<key>SupabaseAnonKey</key>
 	<string>$(SUPABASE_ANON_KEY)</string>
+	<!-- Required the moment any Keychain item uses a biometric SecAccessControl
+	     (KeychainSessionStorage, Phase 17) — iOS hard-crashes on the first
+	     Face ID-gated Keychain access without this key, rather than
+	     returning an error. Never surfaced until the first real-device run
+	     (the simulator/StubAuthProvider path never touches this code). -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Keepo uses Face ID to confirm it's you before showing or exporting your financial data.</string>
+	<!-- Custom URL scheme so Supabase magic-link emails can re-open the app
+	     after the user taps the confirmation link. Must match the redirectTo
+	     URL passed to signInWithOTP and the Allowed Redirect URL in the
+	     Supabase dashboard (Authentication → URL Configuration). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.manuogm.keepo</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.manuogm.keepo</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

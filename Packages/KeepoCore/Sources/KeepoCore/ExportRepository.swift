@@ -10,14 +10,22 @@ import Supabase
 /// only that `logExport` is called once the CSV actually exists.
 public enum ExportRepository {
     /// Every transaction on one or more of the caller's own/shared
-    /// accounts — scoped server-side via `.in`, not fetched in full and
-    /// filtered client-side.
+    /// accounts — scoped server-side via `.in` and, when given, an
+    /// `occurred_at` range — never fetched in full and filtered
+    /// client-side. `from`/`through` both `nil` means all time.
     public static func fetchTransactions(
-        client: SupabaseClient, accountIds: [UUID]
+        client: SupabaseClient, accountIds: [UUID], from: Date? = nil, through: Date? = nil
     ) async throws -> [PublicSchema.TransactionsWithDetailsSelect] {
-        try await client.from("transactions_with_details")
+        var query = client.from("transactions_with_details")
             .select()
             .in("account_id", values: accountIds)
+        if let from {
+            query = query.gte("occurred_at", value: PostgresDate.timestampString(from))
+        }
+        if let through {
+            query = query.lte("occurred_at", value: PostgresDate.timestampString(through))
+        }
+        return try await query
             .order("occurred_at", ascending: false)
             .execute()
             .value

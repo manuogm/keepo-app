@@ -38,7 +38,7 @@ struct CaptureIntent: AppIntent {
             let config = try SupabaseConfig.fromInfoPlist()
             let client = makeSupabaseClient(config: config)
             let context = ModelContext(try OfflineStore.makeContainer())
-            let outbox = await Outbox(context: context, sender: LiveTransactionOutboxSender(client: client))
+            let outbox = await Outbox(context: context, sender: LiveOutboxSender(client: client))
 
             guard let parsedAmount = AmountParser.parseFormattedCurrency(amount) else {
                 await notify(title: "Capture failed", body: "Couldn't read the amount \"\(amount)\".")
@@ -77,7 +77,12 @@ struct CaptureIntent: AppIntent {
         }
     }
 
+    /// Capture confirmations are a "functional" notification (spec:
+    /// automatic payment capture) — suppressed only at the "No
+    /// Notifications" level, unlike the monthly balance reminder which
+    /// needs the "Full Experience" level specifically.
     private func notify(title: String, body: String) async {
+        guard AppSettings.notificationLevel != .none else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

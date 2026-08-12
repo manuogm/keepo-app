@@ -79,7 +79,7 @@ struct AccountFormView: View {
                     Section("Currency") {
                         if isEditing {
                             Text(currency)
-                                .foregroundStyle(Color("TextSecondary"))
+                                .foregroundStyle(Color.secondary)
                         } else {
                             Picker("Currency", selection: $currency) {
                                 ForEach(currencies, id: \.code) { currencyRow in
@@ -144,6 +144,10 @@ struct AccountFormView: View {
             || (!isEditing && currency.isEmpty)
     }
 
+    /// Falls back to `AccountFormCache` when the live fetch fails or is too
+    /// slow — an offline edit otherwise leaves the form permanently blank
+    /// (see AccountFormCache's own header comment on why this can't reuse
+    /// the accounts list's own cache).
     private func load() async {
         currencies = (try? await CurrencyRepository.fetchAll(client: session.client)) ?? []
 
@@ -152,8 +156,14 @@ struct AccountFormView: View {
             currency = session.profile?.baseCurrency ?? currencies.first?.code ?? "USD"
             openingBalanceText = AmountFormatter.editableString(0, minorUnit: selectedCurrencyMinorUnit)
         case .edit(let id):
-            if let account = try? await AccountRepository.fetchOne(client: session.client, id: id) {
+            let fetched = try? await withTimeout(seconds: 6, operation: {
+                try await AccountRepository.fetchOne(client: session.client, id: id)
+            })
+            if let account = fetched {
                 apply(account)
+                AccountFormCache.save(account, session: session)
+            } else if let cached = AccountFormCache.load(id: id, session: session) {
+                apply(cached)
             }
         }
         isLoading = false
@@ -203,18 +213,17 @@ extension AccountFormView {
         isSaving = false
     }
 
+    /// Goes through `session.outbox`, never `AccountRepository` directly —
+    /// same reasoning as TransactionFormView's writes: an offline create
+    /// queues instead of erroring.
     fileprivate func createAccount(openingBalance: Decimal) async throws {
         guard let userId = session.profile?.id else { return }
         let kind: PublicSchema.AccountKind = subtype == .investment ? .valuation : .ledger
-        try await AccountRepository.create(
-            client: session.client,
-            ownerId: userId,
-            kind: kind,
-            subtype: subtype,
-            name: name,
-            currency: currency,
-            openingBalance: openingBalance
+        let payload = CreateAccountPayload(
+            id: UUID(), ownerId: userId, kind: kind, subtype: subtype,
+            name: name, currency: currency, openingBalance: openingBalance
         )
+        await session.outbox.submitCreateAccount(payload)
     }
 
     fileprivate func updateAccount(openingBalance: Decimal) async throws {
@@ -222,20 +231,12 @@ extension AccountFormView {
             errorMessage = "Missing account details."
             return
         }
-        let result = try await AccountRepository.update(
-            client: session.client,
-            id: id,
-            expectedVersion: expectedVersion,
-            name: name,
-            subtype: subtype,
-            openingBalance: openingBalance,
-            includeInTotal: includeInTotal,
-            countsTowardFi: countsTowardFi
+        let payload = UpdateAccountPayload(
+            id: id, expectedVersion: expectedVersion, name: name, subtype: subtype,
+            openingBalance: openingBalance, includeInTotal: includeInTotal, countsTowardFi: countsTowardFi
         )
-        switch result {
-        case .saved:
-            break
-        case .conflict:
+        let result = await session.outbox.submitUpdateAccount(payload)
+        if result == .conflict {
             await reloadAfterConflict(id: id)
         }
     }

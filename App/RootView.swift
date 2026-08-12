@@ -2,17 +2,20 @@ import KeepoCore
 import SwiftUI
 
 /// Routes on SessionStore.phase: loading while signing in, OnboardingView
-/// until a base currency + first account exist, AccountsListView after.
+/// until a base currency + first account exist, main TabView after.
 struct RootView: View {
     @State private var session = SessionStore()
     @State private var needsReviewCount = 0
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
 
     var body: some View {
         Group {
             switch session.phase {
             case .loading:
                 loadingView
+            case .needsSignIn:
+                OTPSignInView(session: session)
             case .needsOnboarding:
                 OnboardingView(session: session) {
                     Task { try? await session.refreshProfile() }
@@ -22,7 +25,7 @@ struct RootView: View {
                     NavigationStack {
                         HomeView(session: session)
                     }
-                    .tabItem { Label("Home", systemImage: "house") }
+                    .tabItem { Label("Dashboard", systemImage: "house") }
 
                     NavigationStack {
                         AccountsListView(session: session)
@@ -33,40 +36,29 @@ struct RootView: View {
                         TransactionsListView(session: session)
                     }
                     .tabItem { Label("Transactions", systemImage: "list.bullet") }
+                    .badge(needsReviewCount > 0 ? needsReviewCount : 0)
 
                     NavigationStack {
-                        CategoriesView(session: session)
+                        ProfileView(session: session)
                     }
-                    .tabItem { Label("Categories", systemImage: "tag") }
-
-                    NavigationStack {
-                        NeedsReviewView(session: session)
-                    }
-                    .tabItem { Label("Needs Review", systemImage: "tray.full") }
-                    .badge(needsReviewCount)
-
-                    NavigationStack {
-                        SettingsView(session: session)
-                    }
-                    .tabItem { Label("Settings", systemImage: "gearshape") }
+                    .tabItem { Label("My Profile", systemImage: "person.circle") }
                 }
-                .tint(Color("BrandPrimary"))
+                .tint(Color.primary)
+                .environment(\.isPrivacyMode, session.isPrivacyMode)
                 .task(id: session.refresh.token) { await loadNeedsReviewCount() }
-                .overlay(alignment: .bottom) {
-                    if session.outbox.hasStalePending(threshold: staleOutboxThreshold) {
-                        stalePendingBanner
-                    }
-                }
             case .failed(let message):
                 errorView(message)
             }
         }
+        .preferredColorScheme(appearanceMode.colorScheme)
         .task { await session.start() }
-        // Home (Phase 8) is the first screen whose whole purpose is a large
-        // balance — the OS captures the app-switcher snapshot the instant
-        // the scene stops being .active, so the curtain has to cover both
-        // .inactive (switcher gesture starting) and .background, not just
-        // the latter.
+        .onOpenURL { url in
+            Task { await session.handleMagicLink(url: url) }
+        }
+        // Dashboard (Phase 8) is the first screen whose whole purpose is a
+        // large balance — the OS captures the app-switcher snapshot the
+        // instant the scene stops being .active, so the curtain has to cover
+        // both .inactive (switcher gesture starting) and .background.
         .overlay {
             if scenePhase != .active {
                 privacyCurtain
@@ -82,59 +74,42 @@ struct RootView: View {
         }
     }
 
-    /// Pending past 5 minutes reads as "probably actually offline," not
-    /// "a normal in-flight request" — short enough to be useful, long
-    /// enough that a momentary network blip never flashes it.
-    private var staleOutboxThreshold: TimeInterval { 5 * 60 }
-
-    private var stalePendingBanner: some View {
-        HStack {
-            Image(systemName: "icloud.slash")
-            Text("\(session.outbox.pendingCount) change(s) waiting to sync")
-                .font(.footnote)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color("BrandSecondary").opacity(0.15), in: Capsule())
-        .foregroundStyle(Color("BrandSecondary"))
-        .padding(.bottom, 8)
-    }
-
     private func loadNeedsReviewCount() async {
-        needsReviewCount = (try? await NeedsReviewRepository.fetchAll(client: session.client))?.count ?? 0
+        let items = (try? await NeedsReviewRepository.fetchAll(client: session.client)) ?? []
+        needsReviewCount = items.filter { $0.kind != "reconciliation_gap" }.count
     }
 
     private var loadingView: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
             VStack(spacing: 12) {
                 ProgressView()
                 Text("Keepo")
                     .font(.title2).fontWeight(.bold)
-                    .foregroundStyle(Color("TextPrimary"))
+                    .foregroundStyle(Color.primary)
             }
         }
     }
 
     private var privacyCurtain: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
             Text("Keepo")
                 .font(.title2).fontWeight(.bold)
-                .foregroundStyle(Color("TextPrimary"))
+                .foregroundStyle(Color.primary)
         }
     }
 
     private func errorView(_ message: String) -> some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
             VStack(spacing: 12) {
                 Text("Couldn't connect")
                     .font(.title2).fontWeight(.bold)
-                    .foregroundStyle(Color("TextPrimary"))
+                    .foregroundStyle(Color.primary)
                 Text(message)
                     .font(.footnote)
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }

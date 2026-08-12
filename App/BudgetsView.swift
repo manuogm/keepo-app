@@ -16,13 +16,13 @@ struct BudgetsView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
             } else if progress.isEmpty {
                 Text("No budgets set for this month")
-                    .foregroundStyle(Color("TextSecondary"))
+                    .foregroundStyle(Color.secondary)
             } else {
                 List {
                     ForEach(progress, id: \.budgetId) { entry in
@@ -93,14 +93,14 @@ private struct BudgetRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(entry.categoryName ?? "Overall")
-                    .foregroundStyle(Color("TextPrimary"))
+                    .foregroundStyle(Color.primary)
                 Spacer()
                 Text(spentOfBudgetedText)
                     .monospacedDigit()
-                    .foregroundStyle(isOverBudget ? Color("BrandPrimary") : Color("TextSecondary"))
+                    .foregroundStyle(isOverBudget ? Color.primary : Color.secondary)
             }
             ProgressView(value: fraction)
-                .tint(isOverBudget ? Color("BrandPrimary") : Color("BrandSecondary"))
+                .tint(isOverBudget ? Color.primary : Color.secondary)
         }
     }
 

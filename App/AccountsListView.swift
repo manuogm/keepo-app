@@ -28,7 +28,7 @@ struct AccountsListView: View {
 
     var body: some View {
         ZStack {
-            Color("BGCanvas").ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             if store.isLoading {
                 ProgressView()
@@ -37,7 +37,7 @@ struct AccountsListView: View {
                     if let asOf = store.asOf {
                         Text("Showing data as of \(asOf.formatted(date: .omitted, time: .shortened))")
                             .font(.caption)
-                            .foregroundStyle(Color("TextSecondary"))
+                            .foregroundStyle(Color.secondary)
                     }
                     if !everyday.isEmpty {
                         Section {
@@ -81,6 +81,9 @@ struct AccountsListView: View {
         }
         .navigationTitle("Accounts")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                PrivacyToggleButton(session: session)
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     isAddingAccount = true
@@ -126,11 +129,13 @@ struct AccountsListView: View {
             }
     }
 
+    @Environment(\.isPrivacyMode) private var isPrivacyMode
+
     private func sectionHeader(_ title: String, accounts: [PublicSchema.AccountsWithBalancesSelect]) -> some View {
         HStack {
             Text(title)
             Spacer()
-            Text(subtotalText(for: accounts))
+            Text(isPrivacyMode ? "••••" : subtotalText(for: accounts))
         }
     }
 
@@ -191,11 +196,13 @@ private extension Binding where Value == UUID? {
 private struct AccountRow: View {
     let account: PublicSchema.AccountsWithBalancesSelect
 
+    @Environment(\.isPrivacyMode) private var isPrivacyMode
+
     var body: some View {
         HStack {
             HStack(spacing: 4) {
                 Text(account.name ?? "—")
-                    .foregroundStyle(account.archivedAt == nil ? Color("TextPrimary") : Color("TextSecondary"))
+                    .foregroundStyle(account.archivedAt == nil ? Color.primary : Color.secondary)
                 // Shared/private indicator (Phase 7) — a household member
                 // never has to guess whether an account is visible to their
                 // partner; this reads accounts_with_balances.is_shared
@@ -203,25 +210,23 @@ private struct AccountRow: View {
                 if account.isShared == true {
                     Image(systemName: "person.2.fill")
                         .font(.caption)
-                        .foregroundStyle(Color("TextSecondary"))
+                        .foregroundStyle(Color.secondary)
                 }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                // Balance and currency both come from the row — MoneyFormatter
-                // is the one place amounts render, per CLAUDE.md's Engineering
-                // Principles. A nil balance (e.g. an unsnapshotted valuation
-                // account) renders as "—", never "0" (money rule 5).
-                Text(formattedBalance)
+                Text(isPrivacyMode ? "••••" : formattedBalance)
                     .monospacedDigit()
-                    .foregroundStyle(Color("BrandPrimary"))
-                CurrencyConversionLabel(
-                    nativeCurrency: account.currency,
-                    amountBase: account.balanceBase,
-                    baseCurrency: account.baseCurrency,
-                    baseMinorUnit: account.baseMinorUnit,
-                    hasMissingRate: account.hasMissingRate ?? false
-                )
+                    .foregroundStyle(Color.primary)
+                if !isPrivacyMode {
+                    CurrencyConversionLabel(
+                        nativeCurrency: account.currency,
+                        amountBase: account.balanceBase,
+                        baseCurrency: account.baseCurrency,
+                        baseMinorUnit: account.baseMinorUnit,
+                        hasMissingRate: account.hasMissingRate ?? false
+                    )
+                }
             }
         }
     }

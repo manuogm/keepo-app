@@ -26,10 +26,9 @@ public final class PasswordAuthProvider: AuthProvider {
     /// GoTrue's email validator rejects `.test` as an invalid address
     /// (confirmed empirically; the local stack is more permissive).
     ///
-    /// `stepUpAuthenticator` must be built against the exact same
-    /// `KeychainSessionStorage`/key `SessionStore` configured this
-    /// provider's `client` with — otherwise a step-up re-read would target
-    /// a Keychain item the session was never actually written to.
+    /// `stepUpAuthenticator` is a standalone biometric gate (Phase 19
+    /// correction) — no coupling to how or where the session itself is
+    /// stored, so there's nothing to keep in sync with `client` here.
     public init(
         client: SupabaseClient, email: String = "hosted-proof@keepo.dev",
         stepUpAuthenticator: StepUpAuthenticator = StepUpAuthenticator()

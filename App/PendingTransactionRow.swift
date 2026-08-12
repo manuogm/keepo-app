@@ -20,24 +20,24 @@ struct PendingTransactionRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(pending.categoryName)
-                    .foregroundStyle(Color("TextPrimary"))
+                    .foregroundStyle(Color.primary)
                 HStack(spacing: 4) {
                     Text(pending.accountName)
                         .font(.caption)
-                        .foregroundStyle(Color("TextSecondary"))
+                        .foregroundStyle(Color.secondary)
                     Image(systemName: "icloud.slash")
                         .font(.caption2)
-                        .foregroundStyle(Color("BrandSecondary"))
+                        .foregroundStyle(Color.secondary)
                     Text("Not synced")
                         .font(.caption2)
-                        .foregroundStyle(Color("BrandSecondary"))
+                        .foregroundStyle(Color.secondary)
                 }
             }
             Spacer()
             let currency = CurrencyInfo(code: pending.currency, minorUnit: pending.minorUnit)
             Text(MoneyFormatter.format(pending.amount, currency: currency))
                 .monospacedDigit()
-                .foregroundStyle(pending.amount < 0 ? Color("TextPrimary") : Color("BrandPrimary"))
+                .foregroundStyle(pending.amount < 0 ? Color.primary : Color.primary)
         }
     }
 }

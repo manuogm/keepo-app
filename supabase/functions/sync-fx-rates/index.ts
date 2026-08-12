@@ -33,10 +33,32 @@ interface FrankfurterResponse {
   rates: Record<string, Record<string, number>>;
 }
 
-Deno.serve(async (req) => {
+// Two auth paths:
+//   1. X-Fx-Sync-Secret header — used by pg_cron / ops_http_post (requires
+//      Vault secret provisioning on the hosted project; see ops_platform
+//      migration). Keeps the cron path working once secrets are set.
+//   2. Bearer JWT — lets the app's own authenticated client invoke the
+//      function on demand without embedding the sync secret in the binary.
+//      Any valid Supabase session is enough; the rate limiter still applies.
+async function isAuthorized(req: Request): Promise<boolean> {
   const expectedSecret = Deno.env.get("FX_SYNC_SECRET");
   const providedSecret = req.headers.get("x-fx-sync-secret");
-  if (!expectedSecret || providedSecret !== expectedSecret) {
+  if (expectedSecret && providedSecret === expectedSecret) return true;
+
+  const authHeader = req.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const { data: { user } } = await createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+    ).auth.getUser(authHeader.slice("Bearer ".length));
+    if (user) return true;
+  }
+
+  return false;
+}
+
+Deno.serve(async (req) => {
+  if (!await isAuthorized(req)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "content-type": "application/json" },
