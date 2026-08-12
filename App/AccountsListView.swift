@@ -80,6 +80,7 @@ struct AccountsListView: View {
             }
         }
         .navigationTitle("Accounts")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 PrivacyToggleButton(session: session)

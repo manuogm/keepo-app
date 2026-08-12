@@ -1,21 +1,17 @@
 import KeepoCore
 import SwiftUI
 
-/// Expense and income sections; the two default "Other" rows have no delete
-/// affordance at all — not just a blocked action — matching
-/// keepo-v1-feature-spec.md §Transaction Entry & Automation. The DB's
-/// prevent_default_category_deletion trigger is the actual enforcement;
-/// omitting the swipe action here is the honest UI reflection of that, not
-/// a substitute for it.
+/// Square icon+color tiles rather than plain rows — tap opens the edit
+/// sheet, which is also where deletion now lives (see CategoryFormView):
+/// a `LazyVGrid` tile has no swipe-actions affordance the way a `List` row
+/// does, so consolidating delete into the sheet isn't a compromise, it's
+/// the natural consequence of the tile layout.
 struct CategoriesView: View {
     let session: SessionStore
 
     @State private var store = DataStore<PublicSchema.CategoriesSelect>(cacheKey: "categories")
     @State private var isAddingCategory = false
     @State private var editingCategoryId: UUID?
-    @State private var deleteCandidate: PublicSchema.CategoriesSelect?
-    @State private var deleteTransactionCount = 0
-    @State private var deleteErrorMessage: String?
 
     private var categories: [PublicSchema.CategoriesSelect] { store.items }
 
@@ -27,6 +23,8 @@ struct CategoriesView: View {
         categories.filter { $0.kind == .income }
     }
 
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
+
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
@@ -34,23 +32,17 @@ struct CategoriesView: View {
             if store.isLoading {
                 ProgressView()
             } else {
-                List {
-                    Section("Expense") {
-                        ForEach(expenseCategories, id: \.id) { category in
-                            categoryRow(category)
-                        }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        categorySection(title: "Expense", categories: expenseCategories)
+                        categorySection(title: "Income", categories: incomeCategories)
                     }
-                    Section("Income") {
-                        ForEach(incomeCategories, id: \.id) { category in
-                            categoryRow(category)
-                        }
-                    }
+                    .padding()
                 }
-                .scrollContentBackground(.hidden)
                 .refreshable { await load() }
             }
 
-            if let errorMessage = store.errorMessage ?? deleteErrorMessage {
+            if let errorMessage = store.errorMessage {
                 VStack {
                     Spacer()
                     Text(errorMessage)
@@ -61,6 +53,7 @@ struct CategoriesView: View {
             }
         }
         .navigationTitle("Categories")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -82,41 +75,25 @@ struct CategoriesView: View {
                 }
             }
         }
-        .alert(
-            "Delete \"\(deleteCandidate?.name ?? "")\"?",
-            isPresented: Binding(get: { deleteCandidate != nil }, set: { if !$0 { deleteCandidate = nil } }),
-            presenting: deleteCandidate
-        ) { category in
-            Button("Delete", role: .destructive) {
-                Task { await performDelete(category) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text(
-                deleteTransactionCount > 0
-                    ? "\(deleteTransactionCount) transaction"
-                        + "\(deleteTransactionCount == 1 ? "" : "s") will move to Other."
-                    : "This category has no transactions."
-            )
-        }
         .task { store.restore(from: session.payloadCache) }
         .task(id: session.refresh.token) { await load() }
     }
 
     @ViewBuilder
-    private func categoryRow(_ category: PublicSchema.CategoriesSelect) -> some View {
-        CategoryRow(category: category)
-            .contentShape(Rectangle())
-            .onTapGesture { editingCategoryId = category.id }
-            .swipeActions(edge: .trailing) {
-                if !category.isDefault && category.systemKey == nil {
-                    Button(role: .destructive) {
-                        Task { await confirmDelete(category) }
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+    private func categorySection(title: String, categories: [PublicSchema.CategoriesSelect]) -> some View {
+        if !categories.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(Color.secondary)
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(categories, id: \.id) { category in
+                        CategoryTile(category: category)
+                            .onTapGesture { editingCategoryId = category.id }
                     }
                 }
             }
+        }
     }
 
     private func load() async {
@@ -124,34 +101,6 @@ struct CategoriesView: View {
             { try await CategoryRepository.fetchAll(client: session.client) },
             cache: session.payloadCache
         )
-    }
-
-    /// Reads a live transaction count before showing the warning — offline,
-    /// this throws and surfaces the existing "you appear to be offline"
-    /// message rather than presenting a stale or missing count, which is
-    /// exactly why category deletion is never routed through the outbox
-    /// (see CategoryRepository.deleteWithReassign's own header comment).
-    private func confirmDelete(_ category: PublicSchema.CategoriesSelect) async {
-        deleteErrorMessage = nil
-        do {
-            deleteTransactionCount = try await CategoryRepository.transactionCount(
-                client: session.client, categoryId: category.id
-            )
-            deleteCandidate = category
-        } catch {
-            deleteErrorMessage = UserFacingError.describe(error)
-        }
-    }
-
-    private func performDelete(_ category: PublicSchema.CategoriesSelect) async {
-        deleteErrorMessage = nil
-        do {
-            try await CategoryRepository.deleteWithReassign(client: session.client, categoryId: category.id)
-            session.refresh.bump()
-        } catch {
-            deleteErrorMessage = UserFacingError.describe(error)
-        }
-        deleteCandidate = nil
     }
 }
 
@@ -171,19 +120,26 @@ private extension Binding where Value == UUID? {
     }
 }
 
-private struct CategoryRow: View {
+private struct CategoryTile: View {
     let category: PublicSchema.CategoriesSelect
 
     var body: some View {
-        HStack {
+        VStack(spacing: 8) {
+            Image(systemName: category.icon)
+                .font(.title2)
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(Color(hex: category.color))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             Text(category.name)
+                .font(.footnote)
                 .foregroundStyle(Color.primary)
-            if category.isDefault {
-                Spacer()
-                Text("Default")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
-            }
+                .lineLimit(1)
+                .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }

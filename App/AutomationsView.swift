@@ -35,5 +35,6 @@ struct AutomationsView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Automations")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

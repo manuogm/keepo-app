@@ -45,6 +45,7 @@
 		A5FFBD48BD9FE9D8281754EE /* AccountsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A0D5880530458F27A93E14 /* AccountsListView.swift */; };
 		A6774885935170E1206B4D19 /* HouseholdViewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136D79B8A96DF200ACDE60BA /* HouseholdViewLoader.swift */; };
 		A6D18059042BEA16DF2B6B2D /* PendingTransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 083E5EEC99F5162DE2F35D00 /* PendingTransactionRow.swift */; };
+		A84A63EA9F34755A0DFB9067 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E416B10D5153DF1638B0ED9 /* ColorHex.swift */; };
 		B2972500ABD0C917D1224199 /* TransactionsListView+NeedsReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449EE6DD8C7A3D022AB8219E /* TransactionsListView+NeedsReview.swift */; };
 		B54F02C80D3D973B33154960 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5BCEA514344BDBF220342E /* HouseholdView.swift */; };
 		C886AE5DBD13E41BFE14BA54 /* CSVImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */; };
@@ -115,6 +116,7 @@
 		62788FB5EF130F2FD05DED15 /* DataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStore.swift; sourceTree = "<group>"; };
 		66A0AEC925B7A3FF79E7F977 /* NeedsReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsReviewView.swift; sourceTree = "<group>"; };
 		68C5239FB8E94D256E60F0EF /* AutomationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationsView.swift; sourceTree = "<group>"; };
+		6E416B10D5153DF1638B0ED9 /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
 		735529C00019B4CABBA21C30 /* CategoryFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryFormView.swift; sourceTree = "<group>"; };
 		768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7742491A185D240463F3F936 /* KeepoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -133,7 +135,7 @@
 		B2A2FE5321B9AA09B7118722 /* SecuritySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettingsView.swift; sourceTree = "<group>"; };
 		B74F9A6C1456B3EC4ED7C6C1 /* OfflineStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStoreTests.swift; sourceTree = "<group>"; };
 		B88C7E86C0F680D0F63F4135 /* TransferDivergenceAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferDivergenceAlert.swift; sourceTree = "<group>"; };
-		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4437A523DE24A64B83A5D54 /* BudgetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetsView.swift; sourceTree = "<group>"; };
 		C4ADFA49D22C598E055F5FB9 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		C91440E871E1BD48AB796B63 /* Keepo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Keepo.entitlements; sourceTree = "<group>"; };
@@ -217,6 +219,7 @@
 				EDED98D97ACE3A89820BBD09 /* CaptureIntent.swift */,
 				037CD275DF695BA082E13AE5 /* CategoriesView.swift */,
 				735529C00019B4CABBA21C30 /* CategoryFormView.swift */,
+				6E416B10D5153DF1638B0ED9 /* ColorHex.swift */,
 				5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */,
 				E9EFFACF34C66AE4CCA5245E /* CurrencyConversionLabel.swift */,
 				A27663EBB8FB0BA605B81BDE /* DataPrivacyView.swift */,
@@ -435,6 +438,7 @@
 				CA271C456719F30FF84B8FF5 /* CaptureIntent.swift in Sources */,
 				4184AA431DA561F69AE2C593 /* CategoriesView.swift in Sources */,
 				475B1C8ADEBEC90129CDBB89 /* CategoryFormView.swift in Sources */,
+				A84A63EA9F34755A0DFB9067 /* ColorHex.swift in Sources */,
 				E9B90B45B2064ED05EA757BE /* CurrencyConversionLabel.swift in Sources */,
 				7C5F40F75BBB39A3364D07AD /* DataPrivacyView.swift in Sources */,
 				A3DAB11A62E215ECC049AEC0 /* DataStore.swift in Sources */,
@@ -620,6 +624,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -661,6 +666,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;

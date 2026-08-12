@@ -117,6 +117,7 @@ struct TransactionsListView: View {
         }
         .searchable(text: searchBinding, prompt: "Merchant, category, or account")
         .navigationTitle("Transactions")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 PrivacyToggleButton(session: session)

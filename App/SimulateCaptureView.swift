@@ -48,6 +48,7 @@ struct SimulateCaptureView: View {
             }
         }
         .navigationTitle("Simulate Capture")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func simulate() async {

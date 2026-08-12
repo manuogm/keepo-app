@@ -78,6 +78,7 @@ struct SecuritySettingsView: View {
             }
         }
         .navigationTitle("Security")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     /// `enable_manual_linking = false` locally (config.toml) means this is

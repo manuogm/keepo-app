@@ -341,73 +341,79 @@ public enum PublicSchema {
     }
   }
   public struct CategoriesSelect: Codable, Hashable, Sendable {
+    public let color: String
     public let createdAt: String
     public let deletedAt: String?
+    public let icon: String
     public let id: UUID
     public let isDefault: Bool
     public let kind: CategoryKind
     public let name: String
     public let ownerId: UUID
-    public let systemKey: String?
     public let updatedAt: String
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
+      case color = "color"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
+      case icon = "icon"
       case id = "id"
       case isDefault = "is_default"
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
-      case systemKey = "system_key"
       case updatedAt = "updated_at"
       case version = "version"
     }
   }
   public struct CategoriesInsert: Codable, Hashable, Sendable {
+    public let color: String?
     public let createdAt: String?
     public let deletedAt: String?
+    public let icon: String?
     public let id: UUID?
     public let isDefault: Bool?
     public let kind: CategoryKind
     public let name: String
     public let ownerId: UUID
-    public let systemKey: String?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
+      case color = "color"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
+      case icon = "icon"
       case id = "id"
       case isDefault = "is_default"
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
-      case systemKey = "system_key"
       case updatedAt = "updated_at"
       case version = "version"
     }
   }
   public struct CategoriesUpdate: Codable, Hashable, Sendable {
+    public let color: String?
     public let createdAt: String?
     public let deletedAt: String?
+    public let icon: String?
     public let id: UUID?
     public let isDefault: Bool?
     public let kind: CategoryKind?
     public let name: String?
     public let ownerId: UUID?
-    public let systemKey: String?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
+      case color = "color"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
+      case icon = "icon"
       case id = "id"
       case isDefault = "is_default"
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
-      case systemKey = "system_key"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -1102,78 +1108,6 @@ public enum PublicSchema {
       case updatedAt = "updated_at"
     }
   }
-  public struct ReconciliationsSelect: Codable, Hashable, Sendable {
-    public let accountId: UUID
-    public let adjustmentTxnId: UUID?
-    public let asOf: String
-    public let computedBalance: Decimal
-    public let createdAt: String
-    public let createdBy: UUID
-    public let currency: String
-    public let enteredBalance: Decimal
-    public let id: UUID
-    public let snapshotId: UUID?
-    public enum CodingKeys: String, CodingKey {
-      case accountId = "account_id"
-      case adjustmentTxnId = "adjustment_txn_id"
-      case asOf = "as_of"
-      case computedBalance = "computed_balance"
-      case createdAt = "created_at"
-      case createdBy = "created_by"
-      case currency = "currency"
-      case enteredBalance = "entered_balance"
-      case id = "id"
-      case snapshotId = "snapshot_id"
-    }
-  }
-  public struct ReconciliationsInsert: Codable, Hashable, Sendable {
-    public let accountId: UUID
-    public let adjustmentTxnId: UUID?
-    public let asOf: String?
-    public let computedBalance: Decimal
-    public let createdAt: String?
-    public let createdBy: UUID
-    public let currency: String
-    public let enteredBalance: Decimal
-    public let id: UUID?
-    public let snapshotId: UUID?
-    public enum CodingKeys: String, CodingKey {
-      case accountId = "account_id"
-      case adjustmentTxnId = "adjustment_txn_id"
-      case asOf = "as_of"
-      case computedBalance = "computed_balance"
-      case createdAt = "created_at"
-      case createdBy = "created_by"
-      case currency = "currency"
-      case enteredBalance = "entered_balance"
-      case id = "id"
-      case snapshotId = "snapshot_id"
-    }
-  }
-  public struct ReconciliationsUpdate: Codable, Hashable, Sendable {
-    public let accountId: UUID?
-    public let adjustmentTxnId: UUID?
-    public let asOf: String?
-    public let computedBalance: Decimal?
-    public let createdAt: String?
-    public let createdBy: UUID?
-    public let currency: String?
-    public let enteredBalance: Decimal?
-    public let id: UUID?
-    public let snapshotId: UUID?
-    public enum CodingKeys: String, CodingKey {
-      case accountId = "account_id"
-      case adjustmentTxnId = "adjustment_txn_id"
-      case asOf = "as_of"
-      case computedBalance = "computed_balance"
-      case createdAt = "created_at"
-      case createdBy = "created_by"
-      case currency = "currency"
-      case enteredBalance = "entered_balance"
-      case id = "id"
-      case snapshotId = "snapshot_id"
-    }
-  }
   public struct RecurringRulesSelect: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let active: Bool
@@ -1494,34 +1428,6 @@ public enum PublicSchema {
       case currency = "currency"
       case hasMissingRate = "has_missing_rate"
       case ownerId = "owner_id"
-    }
-  }
-  public struct AccountsSyncStatusSelect: Codable, Hashable, Sendable {
-    public let accountId: UUID?
-    public let archivedAt: String?
-    public let balance: Decimal?
-    public let currency: String?
-    public let includeInTotal: Bool?
-    public let isStale: Bool?
-    public let kind: AccountKind?
-    public let lastReconciliationId: UUID?
-    public let lastVerifiedAt: String?
-    public let minorUnit: Int16?
-    public let name: String?
-    public let subtype: AccountSubtype?
-    public enum CodingKeys: String, CodingKey {
-      case accountId = "account_id"
-      case archivedAt = "archived_at"
-      case balance = "balance"
-      case currency = "currency"
-      case includeInTotal = "include_in_total"
-      case isStale = "is_stale"
-      case kind = "kind"
-      case lastReconciliationId = "last_reconciliation_id"
-      case lastVerifiedAt = "last_verified_at"
-      case minorUnit = "minor_unit"
-      case name = "name"
-      case subtype = "subtype"
     }
   }
   public struct AccountsWithBalancesSelect: Codable, Hashable, Sendable {

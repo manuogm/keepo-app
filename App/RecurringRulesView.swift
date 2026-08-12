@@ -53,6 +53,7 @@ struct RecurringRulesView: View {
             }
         }
         .navigationTitle("Recurring")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

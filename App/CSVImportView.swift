@@ -70,6 +70,7 @@ struct CSVImportView: View {
             }
         }
         .navigationTitle("Import CSV")
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             accounts = (try? await AccountRepository.fetchAllWithBalances(client: session.client)) ?? []
         }

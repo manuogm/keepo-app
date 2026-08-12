@@ -45,7 +45,8 @@ extension LiveOutboxSender {
     public func createCategory(_ payload: CreateCategoryPayload) async throws {
         do {
             try await CategoryRepository.create(
-                client: client, id: payload.id, ownerId: payload.ownerId, kind: payload.kind, name: payload.name
+                client: client, id: payload.id, ownerId: payload.ownerId, kind: payload.kind,
+                name: payload.name, icon: payload.icon, color: payload.color
             )
         } catch {
             if Self.isDuplicateKey(error) { return }
@@ -54,7 +55,9 @@ extension LiveOutboxSender {
     }
 
     public func updateCategory(_ payload: UpdateCategoryPayload) async throws {
-        try await CategoryRepository.rename(client: client, categoryId: payload.id, name: payload.name)
+        try await CategoryRepository.update(
+            client: client, categoryId: payload.id, name: payload.name, icon: payload.icon, color: payload.color
+        )
     }
 }
 

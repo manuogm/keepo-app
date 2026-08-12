@@ -51,6 +51,7 @@ struct HouseholdView: View {
             }
         }
         .navigationTitle("Household")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .confirmationDialog(
             "Leave this household?", isPresented: $showLeaveConfirm, titleVisibility: .visible

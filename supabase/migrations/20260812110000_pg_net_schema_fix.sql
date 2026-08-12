@@ -1,0 +1,17 @@
+-- Fix: "schema net does not exist" on base-currency change (and every
+-- other ops_http_post caller). Phase 13's migration comment assumed pg_net
+-- was "preloaded/installed already" and never actually ran `create
+-- extension pg_net` — true locally (the CLI's Docker image preinstalls
+-- it), but not on this linked hosted project: `supabase db query --linked`
+-- against `pg_extension` shows only `supabase_vault` and `pg_cron`, no
+-- `pg_net` at all, so `net.http_post(...)` (Phase 13's one call site) was
+-- always going to fail there with exactly this error.
+--
+-- No explicit `schema` clause — pg_net's own install script creates its
+-- `net` schema and every net.* function as part of the extension itself,
+-- regardless of which schema the *extension* object nominally lands in
+-- (confirmed locally: `pg_extension.extnamespace` reads `extensions`, yet
+-- `net.http_post` already exists and resolves correctly — forcing a
+-- schema move fails outright with "the extension contains the schema").
+-- `if not exists` makes this a no-op wherever it's already installed.
+create extension if not exists pg_net;

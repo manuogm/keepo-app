@@ -70,6 +70,7 @@ struct HomeView: View {
             }
         }
         .navigationTitle("Dashboard")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 PrivacyToggleButton(session: session)

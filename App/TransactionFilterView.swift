@@ -51,6 +51,7 @@ struct TransactionFilterView: View {
                 }
             }
             .navigationTitle("Filter")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Clear") {

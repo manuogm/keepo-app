@@ -47,6 +47,7 @@ struct NeedsReviewView: View {
             }
         }
         .navigationTitle("Needs Review")
+        .navigationBarTitleDisplayMode(.inline)
         .task(id: session.refresh.token) { await load() }
         .navigationDestination(isPresented: $showEditingTransaction) {
             if let editingTransaction {
@@ -242,12 +243,13 @@ struct MapCardSheet: View {
                 }
             }
             .navigationTitle("Map Card")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Map") { Task { await mapCard() } }
+                    Button { Task { await mapCard() } } label: { Image(systemName: "checkmark") }
                         .disabled(selectedAccountId == nil || isSaving)
                 }
             }

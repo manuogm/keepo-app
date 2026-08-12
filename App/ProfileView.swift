@@ -78,6 +78,7 @@ struct ProfileView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("My Profile")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var avatarInitial: String {

@@ -68,6 +68,7 @@ struct ExportView: View {
             }
         }
         .navigationTitle("Export")
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             accounts = (try? await AccountRepository.fetchAllWithBalances(client: session.client)) ?? []
         }

@@ -22,22 +22,35 @@ public enum CategoryRepository {
     /// once before the first send attempt, so a retry of this exact call
     /// reuses the same id and hits `categories`' primary key instead of
     /// inserting a duplicate row — same convention as
-    /// `TransactionRepository.create`.
+    /// `TransactionRepository.create`. `icon`/`color` default to the
+    /// name-based heuristic / a random palette entry (`CategoryAppearance`)
+    /// when omitted — the caller only ever needs to pass them explicitly
+    /// if the user picked something other than the default before saving.
     @discardableResult
     public static func create(
         client: SupabaseClient,
         id: UUID = UUID(),
         ownerId: UUID,
         kind: PublicSchema.CategoryKind,
-        name: String
+        name: String,
+        icon: String? = nil,
+        color: String = CategoryAppearance.randomColor()
     ) async throws -> UUID {
-        let row = NewCategoryRow(id: id, ownerId: ownerId, kind: kind, name: name)
+        let resolvedIcon = icon ?? CategoryAppearance.defaultIcon(forName: name, kind: kind)
+        let row = NewCategoryRow(id: id, ownerId: ownerId, kind: kind, name: name, icon: resolvedIcon, color: color)
         try await client.from("categories").insert(row).execute()
         return id
     }
 
-    public static func rename(client: SupabaseClient, categoryId: UUID, name: String) async throws {
-        try await client.from("categories").update(NamePatch(name: name)).eq("id", value: categoryId).execute()
+    /// Name, icon, and color always saved together — the edit sheet has
+    /// nothing to gain from three separate round trips for one Save tap.
+    public static func update(
+        client: SupabaseClient, categoryId: UUID, name: String, icon: String, color: String
+    ) async throws {
+        try await client.from("categories")
+            .update(AppearancePatch(name: name, icon: icon, color: color))
+            .eq("id", value: categoryId)
+            .execute()
     }
 
     /// Rejected by the DB (prevent_default_category_deletion trigger, not
@@ -56,14 +69,18 @@ private struct NewCategoryRow: Encodable {
     let ownerId: UUID
     let kind: PublicSchema.CategoryKind
     let name: String
+    let icon: String
+    let color: String
     enum CodingKeys: String, CodingKey {
-        case id, kind, name
+        case id, kind, name, icon, color
         case ownerId = "owner_id"
     }
 }
 
-private struct NamePatch: Encodable {
+private struct AppearancePatch: Encodable {
     let name: String
+    let icon: String
+    let color: String
 }
 
 private struct DeletedAtPatch: Encodable {

@@ -35,6 +35,7 @@ struct NotificationSettingsView: View {
             }
         }
         .navigationTitle("Notifications")
+        .navigationBarTitleDisplayMode(.inline)
         .onChange(of: level) { _, newLevel in
             Task {
                 if newLevel == .full {

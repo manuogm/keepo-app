@@ -105,6 +105,7 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func syncFXRates() async {

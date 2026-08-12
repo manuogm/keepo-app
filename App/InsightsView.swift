@@ -62,6 +62,7 @@ struct InsightsView: View {
             }
         }
         .navigationTitle("Insights")
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $isEditingFISettings) {
             FISettingsView(session: session) {
                 Task { await loadFIMetrics() }

@@ -46,6 +46,7 @@ struct BudgetsView: View {
             }
         }
         .navigationTitle("Budgets")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

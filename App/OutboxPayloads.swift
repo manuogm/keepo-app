@@ -200,25 +200,33 @@ public struct CreateCategoryPayload: Codable, Sendable {
     public let ownerId: UUID
     public let kind: PublicSchema.CategoryKind
     public let name: String
+    public let icon: String
+    public let color: String
 
-    public init(id: UUID, ownerId: UUID, kind: PublicSchema.CategoryKind, name: String) {
+    public init(id: UUID, ownerId: UUID, kind: PublicSchema.CategoryKind, name: String, icon: String, color: String) {
         self.id = id
         self.ownerId = ownerId
         self.kind = kind
         self.name = name
+        self.icon = icon
+        self.color = color
     }
 }
 
-/// No `expectedVersion` — a rename has nothing to conflict against beyond
-/// what `CategoryRepository.rename` already is: a plain, no-conflict-
-/// tracked update, same simplicity level the endpoint already had before
-/// this went through the outbox.
+/// No `expectedVersion` — an appearance/name update has nothing to
+/// conflict against beyond what `CategoryRepository.update` already is: a
+/// plain, no-conflict-tracked update, same simplicity level the endpoint
+/// already had before this went through the outbox.
 public struct UpdateCategoryPayload: Codable, Sendable {
     public let id: UUID
     public let name: String
+    public let icon: String
+    public let color: String
 
-    public init(id: UUID, name: String) {
+    public init(id: UUID, name: String, icon: String, color: String) {
         self.id = id
         self.name = name
+        self.icon = icon
+        self.color = color
     }
 }

@@ -60,6 +60,7 @@ struct PreferencesView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Preferences")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 

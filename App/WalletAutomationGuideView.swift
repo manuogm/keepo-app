@@ -33,6 +33,7 @@ struct WalletAutomationGuideView: View {
             }
         }
         .navigationTitle("Apple Pay Capture")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func step(_ number: Int, _ text: String) -> some View {

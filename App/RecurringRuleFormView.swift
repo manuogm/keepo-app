@@ -116,13 +116,16 @@ struct RecurringRuleFormView: View {
                 }
             }
             .navigationTitle(isEditing ? "Edit Recurring Rule" : "New Recurring Rule")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button {
                         Task { await save() }
+                    } label: {
+                        Image(systemName: "checkmark")
                     }
                     .disabled(isSaveDisabled)
                 }

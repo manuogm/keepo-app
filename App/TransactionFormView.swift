@@ -133,15 +133,14 @@ struct TransactionFormView: View {
                 }
             }
             .navigationTitle(isEditing ? "Edit \(kind.rawValue)" : "New \(kind.rawValue)")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task { await save() }
-                    }
-                    .disabled(isSaveDisabled)
+                    Button { Task { await save() } } label: { Image(systemName: "checkmark") }
+                        .disabled(isSaveDisabled)
                 }
             }
             .alert("This transaction changed elsewhere", isPresented: $showConflictAlert) {

@@ -65,14 +65,13 @@ select throws_like(
   'delete_category_and_reassign refuses the default category'
 );
 
--- 6. Deleting the system "Adjustment" category is refused.
+-- 6. Creating a second category named "Other" (any case, plural or not) is
+-- refused — it's reserved for the one true default, per
+-- 20260814100000_remove_sync_ritual_and_system_categories.sql.
 select throws_like(
-  $$ select delete_category_and_reassign(
-       (select id from categories where owner_id = '11111111-1111-1111-1111-111111111111'
-        and system_key = 'adjustment_expense')
-     ) $$,
-  '%cannot be deleted%',
-  'delete_category_and_reassign refuses a system category'
+  $$ insert into categories (owner_id, kind, name) values (auth.uid(), 'expense', 'others') $$,
+  '%reserved%',
+  'a custom category cannot be named "Other"/"Others"'
 );
 
 -- 7. A category with zero transactions still deletes cleanly, reporting 0.

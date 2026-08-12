@@ -112,6 +112,7 @@ struct DataPrivacyView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Data & Privacy")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await loadLastSyncedAt() }
         .confirmationDialog(
             "Delete your account?",

@@ -77,8 +77,8 @@ select throws_like(
 );
 
 -- ----------------------------------------------------------------------------
--- Build up real history on the shared account before leaving: a transaction,
--- a balance snapshot (via reconcile), a recurring rule.
+-- Build up real history on the shared account before leaving: a
+-- transaction and a recurring rule.
 -- ----------------------------------------------------------------------------
 
 insert into transactions (id, owner_id, created_by, account_id, category_id, amount, currency, occurred_at)

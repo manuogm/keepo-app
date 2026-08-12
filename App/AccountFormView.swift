@@ -107,13 +107,16 @@ struct AccountFormView: View {
                 }
             }
             .navigationTitle(isEditing ? "Edit Account" : "New Account")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button {
                         Task { await save() }
+                    } label: {
+                        Image(systemName: "checkmark")
                     }
                     .disabled(isSaveDisabled)
                 }
