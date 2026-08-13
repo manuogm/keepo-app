@@ -6,35 +6,36 @@ import KeepoCore
 /// `TransactionsListView+NeedsReview.swift`.
 extension TransactionsListView {
     func load() async {
-        if filterAccounts.isEmpty {
-            let fetched = try? await AccountRepository.fetchAllWithBalances(client: session.client)
-            filterAccounts = fetched ?? cachedAccounts()
+        loadErrorMessage = nil
+        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
+            isLoading = false
+            return
         }
-        if filterCategories.isEmpty {
-            let fetched = try? await CategoryRepository.fetchAll(client: session.client)
-            filterCategories = fetched ?? cachedCategories()
+        let dbQueue = session.dbQueue
+        let currentFilter = filter
+        do {
+            let loaded: LoadedTransactionsState = try await dbQueue.read { database in
+                LoadedTransactionsState(
+                    transactions: try LocalTransactionRow.fetchFiltered(
+                        database, filter: currentFilter, baseCurrency: baseCurrency
+                    ),
+                    accounts: try LocalAccountRow.fetchAll(
+                        database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
+                    ),
+                    categories: try LocalTableQueries.categories(database),
+                    reviewRows: try LocalMoneyQueries.needsReview(database),
+                    currencies: try LocalTableQueries.currencies(database)
+                )
+            }
+            transactions = loaded.transactions
+            filterAccounts = loaded.accounts
+            filterCategories = loaded.categories
+            reviewItems = try loaded.reviewRows.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
+            reviewCurrencies = Dictionary(uniqueKeysWithValues: loaded.currencies.map { ($0.code, Int($0.minorUnit)) })
+        } catch {
+            loadErrorMessage = UserFacingError.describe(error)
         }
-        if reviewCurrencies.isEmpty {
-            let currencies = await CurrencyCache.fetchAll(session: session)
-            reviewCurrencies = Dictionary(uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) })
-        }
-        await reviewStore.load { try await NeedsReviewRepository.fetchAll(client: session.client) }
-        // Caching only applies to the default, unfiltered page — a filtered
-        // view has no offline fallback beyond whatever's already shown.
-        await store.load(
-            { try await TransactionRepository.fetchFiltered(client: session.client, filter: filter) },
-            cache: filter.isEmpty ? session.payloadCache : nil
-        )
-    }
-
-    func cachedAccounts() -> [PublicSchema.AccountsWithBalancesSelect] {
-        guard let (data, _) = session.payloadCache.load(key: "accounts_with_balances") else { return [] }
-        return (try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data)) ?? []
-    }
-
-    func cachedCategories() -> [PublicSchema.CategoriesSelect] {
-        guard let (data, _) = session.payloadCache.load(key: "categories") else { return [] }
-        return (try? JSONDecoder().decode([PublicSchema.CategoriesSelect].self, from: data)) ?? []
+        isLoading = false
     }
 
     func delete(
@@ -61,4 +62,12 @@ extension TransactionsListView {
         session.refresh.bump()
         if hadConflict { showConflictAlert = true }
     }
+}
+
+private struct LoadedTransactionsState {
+    let transactions: [PublicSchema.TransactionsWithDetailsSelect]
+    let accounts: [LocalAccountRow]
+    let categories: [PublicSchema.CategoriesSelect]
+    let reviewRows: [NeedsReviewLocalRow]
+    let currencies: [PublicSchema.CurrenciesSelect]
 }

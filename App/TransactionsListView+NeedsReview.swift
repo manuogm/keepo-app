@@ -4,6 +4,12 @@ import SwiftUI
 /// The Needs Review inline section — split out of TransactionsListView.swift
 /// purely to keep that file under the project's file-length/type-body-length
 /// lint thresholds. Reads/writes the `review*` `@State` declared there.
+///
+/// The list itself (`reviewItems`) is a local read (Phase L6). The actions
+/// below stay network calls — `confirm_capture`/`resolve_sync_conflict`/
+/// accept/reject import have real server-side logic (merchant learning,
+/// audit rows, CSV-candidate matching) `Outbox`'s write-through never
+/// modeled, unlike the plain create/update/delete paths it covers.
 extension TransactionsListView {
     @ViewBuilder
     func reviewRow(_ item: PublicSchema.NeedsReviewSelect) -> some View {
@@ -66,12 +72,12 @@ extension TransactionsListView {
     }
 
     func openForReview(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId else { return }
+        guard let id = item.itemId, let baseCurrency = session.profile?.baseCurrency else { return }
         reviewActionError = nil
         do {
-            guard let transaction = try await TransactionRepository.fetchOne(client: session.client, id: id) else {
-                return
-            }
+            guard let transaction = try await session.dbQueue.read({ database in
+                try LocalTransactionRow.fetchOne(database, id: id.uuidString, baseCurrency: baseCurrency)
+            }) else { return }
             reviewEditingTransaction = transaction
             showReviewEditing = true
         } catch {
@@ -80,11 +86,12 @@ extension TransactionsListView {
     }
 
     func confirmCapture(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId else { return }
+        guard let id = item.itemId, let baseCurrency = session.profile?.baseCurrency else { return }
         reviewActionError = nil
         do {
-            guard let transaction = try await TransactionRepository.fetchOne(client: session.client, id: id),
-                  let version = transaction.version else { return }
+            guard let transaction = try await session.dbQueue.read({ database in
+                try LocalTransactionRow.fetchOne(database, id: id.uuidString, baseCurrency: baseCurrency)
+            }), let version = transaction.version else { return }
             _ = try await CaptureRepository.confirmCapture(
                 client: session.client, id: id, expectedVersion: Int(version)
             )

@@ -1,6 +1,12 @@
 import KeepoCore
 import SwiftUI
 
+/// Reads straight off the local GRDB mirror (Phase L6) — no server round
+/// trip, no payload cache. `Outbox`'s optimistic write-through means a
+/// queued-but-unsynced create/edit/delete is already reflected in the same
+/// `transactions` rows this screen queries, so there is no separate
+/// "pending" row/marker to overlay anymore — a transaction created offline
+/// simply appears in Recent like any other, the moment it's submitted.
 struct TransactionsListView: View {
     let session: SessionStore
 
@@ -9,8 +15,10 @@ struct TransactionsListView: View {
     // Not `private` — read/written from TransactionsListView+Loading.swift,
     // an extension in a different file (kept there purely for file-length,
     // same reasoning as the Needs-review state below).
-    @State var store = DataStore<PublicSchema.TransactionsWithDetailsSelect>(cacheKey: "transactions_page_0")
-    @State var filterAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State var transactions: [PublicSchema.TransactionsWithDetailsSelect] = []
+    @State var isLoading = true
+    @State var loadErrorMessage: String?
+    @State var filterAccounts: [LocalAccountRow] = []
     @State var filterCategories: [PublicSchema.CategoriesSelect] = []
     @State var showConflictAlert = false
     @State private var isAddingTransaction = false
@@ -24,7 +32,7 @@ struct TransactionsListView: View {
 
     // Not `private` — read/written from TransactionsListView+NeedsReview.swift,
     // an extension in a different file (kept there purely for file-length).
-    @State var reviewStore = DataStore<PublicSchema.NeedsReviewSelect>()
+    @State var reviewItems: [PublicSchema.NeedsReviewSelect] = []
     @State var reviewCurrencies: [String: Int] = [:]
     @State var reviewActionError: String?
     @State var reviewEditingTransaction: PublicSchema.TransactionsWithDetailsSelect?
@@ -34,22 +42,6 @@ struct TransactionsListView: View {
 
     // MARK: - Computed
 
-    var transactions: [PublicSchema.TransactionsWithDetailsSelect] { store.items }
-
-    /// Which cached rows have a queued edit or delete against them — the
-    /// counterpart to `pendingRows` (pending *creates*) for rows that
-    /// already exist in the cached list.
-    private var pendingRowStates: [UUID: PendingOverlayAdapter.PendingRowState] {
-        PendingOverlayAdapter.pendingRowStates(outbox: session.outbox)
-    }
-
-    /// A row with a pending delete queued is hidden immediately rather
-    /// than left showing until the delete actually syncs.
-    private var visibleTransactions: [PublicSchema.TransactionsWithDetailsSelect] {
-        let states = pendingRowStates
-        return transactions.filter { states[$0.transactionId ?? UUID()] != .deleted }
-    }
-
     /// The default page is already ordered newest-first (Phase 6's keyset
     /// index) — this is just the head of it. The full history lives one
     /// tap away in `TransactionRegisterView`, grouped by day with its own
@@ -57,7 +49,7 @@ struct TransactionsListView: View {
     private let recentLimit = 10
 
     private var recentTransactions: [PublicSchema.TransactionsWithDetailsSelect] {
-        Array(visibleTransactions.prefix(recentLimit))
+        Array(transactions.prefix(recentLimit))
     }
 
     private func category(
@@ -67,26 +59,7 @@ struct TransactionsListView: View {
     }
 
     private var reviewDisplayItems: [PublicSchema.NeedsReviewSelect] {
-        reviewStore.items.filter { $0.kind != "reconciliation_gap" }
-    }
-
-    /// Pending *creates* only (Phase 11) — resolved against whatever
-    /// accounts/categories are already loaded for the filter sheet, since
-    /// those already carry names and are refreshed the same way this
-    /// screen refreshes everything else.
-    private var pendingRows: [PendingTransactionDisplay] {
-        session.outbox.pendingCreateTransactions.map { pending in
-            let account = filterAccounts.first { $0.accountId == pending.accountId }
-            let category = filterCategories.first { $0.id == pending.categoryId }
-            return PendingTransactionDisplay(
-                id: pending.id,
-                accountName: account?.name ?? "—",
-                categoryName: category?.name ?? "—",
-                amountE4: pending.amountE4,
-                currency: pending.currency,
-                minorUnit: Int(account?.minorUnit ?? 2)
-            )
-        }
+        reviewItems.filter { $0.kind != "reconciliation_gap" }
     }
 
     // MARK: - Body
@@ -95,9 +68,9 @@ struct TransactionsListView: View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if store.isLoading && reviewStore.isLoading {
+            if isLoading {
                 ProgressView()
-            } else if visibleTransactions.isEmpty && pendingRows.isEmpty && reviewDisplayItems.isEmpty {
+            } else if transactions.isEmpty && reviewDisplayItems.isEmpty {
                 Text("No transactions yet")
                     .foregroundStyle(Color.secondary)
             } else {
@@ -111,21 +84,9 @@ struct TransactionsListView: View {
                         }
                     }
 
-                    if !pendingRows.isEmpty {
-                        Section("Pending sync") {
-                            ForEach(pendingRows) { pending in
-                                PendingTransactionRow(pending: pending)
-                            }
-                        }
-                    }
-
                     Section {
                         ForEach(recentTransactions, id: \.transactionId) { transaction in
-                            TransactionRow(
-                                transaction: transaction,
-                                category: category(for: transaction),
-                                isPendingUpdate: pendingRowStates[transaction.transactionId ?? UUID()] == .updated
-                            )
+                            TransactionRow(transaction: transaction, category: category(for: transaction))
                             .contentShape(Rectangle())
                             .onTapGesture { handleTap(on: transaction) }
                         }
@@ -149,7 +110,7 @@ struct TransactionsListView: View {
                 .refreshable { await load() }
             }
 
-            if let errorMessage = store.errorMessage ?? reviewActionError {
+            if let errorMessage = loadErrorMessage ?? reviewActionError {
                 VStack {
                     Spacer()
                     Text(errorMessage)
@@ -233,7 +194,6 @@ struct TransactionsListView: View {
                 }
             }
         }
-        .task { store.restore(from: session.payloadCache) }
         .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter)) { await load() }
     }
 
@@ -268,9 +228,10 @@ struct TransactionsListView: View {
 
     private func openRecurringRule(for transaction: PublicSchema.TransactionsWithDetailsSelect) async {
         guard let ruleId = transaction.recurringRuleId else { return }
-        editingRecurringRule = try? await RecurringRuleRepository.fetchOne(client: session.client, id: ruleId)
+        editingRecurringRule = try? await session.dbQueue.read { database in
+            try LocalTableQueries.recurringRule(database, id: ruleId.uuidString)
+        }
     }
-
 }
 
 // MARK: - Supporting types

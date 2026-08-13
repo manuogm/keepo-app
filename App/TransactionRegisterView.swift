@@ -2,10 +2,9 @@ import KeepoCore
 import SwiftUI
 
 /// The "See All" drill-down from `TransactionsListView`'s Recent section —
-/// full history for one week/month/year at a time, grouped by day. A
-/// filtered page has no offline cache fallback (same tradeoff
-/// `TransactionsListView.load()` already documents for its own filtered
-/// case) — this screen is a live, online-first view onto history.
+/// full history for one week/month/year at a time, grouped by day. Reads
+/// straight off the local GRDB mirror (Phase L6), same as the Recent
+/// section itself.
 struct TransactionRegisterView: View {
     let session: SessionStore
 
@@ -149,17 +148,24 @@ struct TransactionRegisterView: View {
     private func load() async {
         errorMessage = nil
         isLoading = true
-        if categories.isEmpty {
-            categories = (try? await CategoryRepository.fetchAll(client: session.client)) ?? []
+        guard let baseCurrency = session.profile?.baseCurrency else {
+            isLoading = false
+            return
         }
-        let filter = TransactionFilter(from: range.start, through: range.end)
+        let filterRange = TransactionFilter(from: range.start, through: range.end)
+        let dbQueue = session.dbQueue
         do {
-            transactions = try await TransactionRepository.fetchFiltered(client: session.client, filter: filter)
+            let (fetchedTransactions, fetchedCategories) = try await dbQueue.read { database in
+                (
+                    try LocalTransactionRow.fetchFiltered(database, filter: filterRange, baseCurrency: baseCurrency),
+                    categories.isEmpty ? try LocalTableQueries.categories(database) : categories
+                )
+            }
+            transactions = fetchedTransactions
+            categories = fetchedCategories
         } catch {
             transactions = []
-            if !UserFacingError.isOffline(error) {
-                errorMessage = UserFacingError.describe(error)
-            }
+            errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
     }

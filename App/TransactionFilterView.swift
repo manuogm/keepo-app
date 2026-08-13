@@ -6,7 +6,7 @@ import SwiftUI
 /// TransactionsListView's own state beyond the filter binding it's handed.
 struct TransactionFilterView: View {
     @Binding var filter: TransactionFilter
-    let accounts: [PublicSchema.AccountsWithBalancesSelect]
+    let accounts: [LocalAccountRow]
     let categories: [PublicSchema.CategoriesSelect]
 
     @Environment(\.dismiss) private var dismiss
@@ -20,8 +20,8 @@ struct TransactionFilterView: View {
                 Section("Account") {
                     Picker("Account", selection: $filter.accountId) {
                         Text("Any").tag(UUID?.none)
-                        ForEach(accounts, id: \.accountId) { account in
-                            Text(account.name ?? "—").tag(account.accountId)
+                        ForEach(accounts) { account in
+                            Text(account.name).tag(UUID?.some(account.id))
                         }
                     }
                 }
