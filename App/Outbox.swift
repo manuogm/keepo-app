@@ -183,7 +183,8 @@ public final class Outbox {
 
     @discardableResult
     public func submitCreateTransaction(_ payload: CreateTransactionPayload) async -> OutboxSubmitResult {
-        await attempt(id: payload.id, kind: .createTransaction, payload: payload) {
+        applyLocally { try OutboxLocalWrite.createTransaction(payload, in: $0) }
+        return await attempt(id: payload.id, kind: .createTransaction, payload: payload) {
             try await self.sender.createTransaction(payload)
             return true
         }
@@ -191,7 +192,8 @@ public final class Outbox {
 
     @discardableResult
     public func submitCreateTransfer(_ payload: CreateTransferPayload) async -> OutboxSubmitResult {
-        await attempt(id: payload.fromId, kind: .createTransfer, payload: payload) {
+        applyLocally { try OutboxLocalWrite.createTransfer(payload, in: $0) }
+        return await attempt(id: payload.fromId, kind: .createTransfer, payload: payload) {
             try await self.sender.createTransfer(payload)
             return true
         }
@@ -199,7 +201,8 @@ public final class Outbox {
 
     @discardableResult
     public func submitUpdateTransaction(_ payload: UpdateTransactionPayload) async -> OutboxSubmitResult {
-        await attempt(
+        applyLocally { try OutboxLocalWrite.updateTransaction(payload, in: $0) }
+        return await attempt(
             id: payload.id, kind: .updateTransaction, payload: payload, expectedVersion: payload.expectedVersion
         ) {
             try await self.sender.updateTransaction(payload)
@@ -208,7 +211,8 @@ public final class Outbox {
 
     @discardableResult
     public func submitUpdateTransfer(_ payload: UpdateTransferPayload) async -> OutboxSubmitResult {
-        await attempt(
+        applyLocally { try OutboxLocalWrite.updateTransfer(payload, in: $0) }
+        return await attempt(
             id: payload.transferGroupId, kind: .updateTransfer, payload: payload,
             expectedVersion: payload.fromExpectedVersion
         ) {
@@ -218,7 +222,8 @@ public final class Outbox {
 
     @discardableResult
     public func submitDeleteTransaction(_ payload: DeleteTransactionPayload) async -> OutboxSubmitResult {
-        await attempt(
+        applyLocally { try OutboxLocalWrite.deleteTransaction(payload, in: $0) }
+        return await attempt(
             id: payload.id, kind: .deleteTransaction, payload: payload, expectedVersion: payload.expectedVersion
         ) {
             try await self.sender.deleteTransaction(payload)
@@ -227,7 +232,8 @@ public final class Outbox {
 
     @discardableResult
     public func submitDeleteTransfer(_ payload: DeleteTransferPayload) async -> OutboxSubmitResult {
-        await attempt(
+        applyLocally { try OutboxLocalWrite.deleteTransfer(payload, in: $0) }
+        return await attempt(
             id: payload.transferGroupId, kind: .deleteTransfer, payload: payload,
             expectedVersion: payload.fromExpectedVersion
         ) {
@@ -259,6 +265,15 @@ public final class Outbox {
             await drain(item)
         }
         refreshCounts()
+    }
+
+    /// Best-effort optimistic write into the local GRDB mirror — see
+    /// `OutboxLocalWrite`'s own header for why this exists and why it's
+    /// `try?`, never a thrown failure the caller has to handle. Internal,
+    /// not private: `Outbox+AccountsCategories.swift`'s submit methods call
+    /// it too.
+    func applyLocally(_ apply: @escaping (Database) throws -> Void) {
+        try? dbQueue.write { database in try apply(database) }
     }
 
     func attempt<P: Encodable>(

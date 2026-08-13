@@ -74,7 +74,8 @@ extension LiveOutboxSender {
 extension Outbox {
     @discardableResult
     public func submitCreateAccount(_ payload: CreateAccountPayload) async -> OutboxSubmitResult {
-        await attempt(id: payload.id, kind: .createAccount, payload: payload) {
+        applyLocally { try OutboxLocalWrite.createAccount(payload, in: $0) }
+        return await attempt(id: payload.id, kind: .createAccount, payload: payload) {
             try await self.sender.createAccount(payload)
             return true
         }
@@ -82,7 +83,8 @@ extension Outbox {
 
     @discardableResult
     public func submitUpdateAccount(_ payload: UpdateAccountPayload) async -> OutboxSubmitResult {
-        await attempt(
+        applyLocally { try OutboxLocalWrite.updateAccount(payload, in: $0) }
+        return await attempt(
             id: payload.id, kind: .updateAccount, payload: payload, expectedVersion: payload.expectedVersion
         ) {
             try await self.sender.updateAccount(payload)
@@ -98,14 +100,16 @@ extension Outbox {
     /// value, just via two adjustment transactions instead of one.
     @discardableResult
     public func submitSetAccountBalance(_ payload: SetAccountBalancePayload) async -> OutboxSubmitResult {
-        await attempt(id: payload.id, kind: .setAccountBalance, payload: payload) {
+        applyLocally { try OutboxLocalWrite.setAccountBalance(payload, in: $0) }
+        return await attempt(id: payload.id, kind: .setAccountBalance, payload: payload) {
             try await self.sender.setAccountBalance(payload)
         }
     }
 
     @discardableResult
     public func submitCreateCategory(_ payload: CreateCategoryPayload) async -> OutboxSubmitResult {
-        await attempt(id: payload.id, kind: .createCategory, payload: payload) {
+        applyLocally { try OutboxLocalWrite.createCategory(payload, in: $0) }
+        return await attempt(id: payload.id, kind: .createCategory, payload: payload) {
             try await self.sender.createCategory(payload)
             return true
         }
@@ -113,7 +117,8 @@ extension Outbox {
 
     @discardableResult
     public func submitUpdateCategory(_ payload: UpdateCategoryPayload) async -> OutboxSubmitResult {
-        await attempt(id: payload.id, kind: .updateCategory, payload: payload) {
+        applyLocally { try OutboxLocalWrite.updateCategory(payload, in: $0) }
+        return await attempt(id: payload.id, kind: .updateCategory, payload: payload) {
             try await self.sender.updateCategory(payload)
             return true
         }

@@ -100,6 +100,16 @@ enum SyncApply {
         }
     }
 
+    /// Single-row entry point for `Outbox`'s optimistic local write-through
+    /// (Phase L6) — the same whitelist-guarded upsert `apply` uses per pull
+    /// row, callable directly for one table without a full `pull_changes`
+    /// payload shape. Silently no-ops on an unknown table or a row missing
+    /// its primary key, exactly like `apply`'s own per-row handling.
+    static func upsertRow(_ row: JSONObject, table: String, in database: Database) throws {
+        guard let columns = tableColumns[table] else { return }
+        try upsert(row, table: table, allowedColumns: columns, database)
+    }
+
     private static func upsert(
         _ row: JSONObject, table: String, allowedColumns: Set<String>, _ database: Database
     ) throws {

@@ -23,7 +23,9 @@
 		32384D1C333E36EFC326C01E /* WalletAutomationGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDA9FDB15C2C5D6B5B18466D /* WalletAutomationGuideView.swift */; };
 		35FBFA6ED12189BE76D60F92 /* TransactionsListView+Loading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E0C66C1771B2C113D912E35 /* TransactionsListView+Loading.swift */; };
 		383777059A4B7DB8F5855881 /* FxRateCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F760AA31794C2A99E46D9C18 /* FxRateCache.swift */; };
+		3A9AACA2AC8D02F3ED6645C3 /* OutboxLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A3C001E043B35FE6CF03CC /* OutboxLocalWriteTests.swift */; };
 		3E3EBFE9AEF4D74B36D3097B /* CurrencyCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C313D0CBF03F3D41389A6F /* CurrencyCache.swift */; };
+		3ECB038FFEE93D5A2897E950 /* OutboxLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13730E415ACEB27F1646E3CE /* OutboxLocalWrite.swift */; };
 		3F28EF46A43EE7AF81CD656B /* CategoryIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A78A0F12025B9E97E5A5B859 /* CategoryIconView.swift */; };
 		4184AA431DA561F69AE2C593 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037CD275DF695BA082E13AE5 /* CategoriesView.swift */; };
 		45123E973A54142DB5AD78C9 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEF4B309BD81A9566743401 /* ExportView.swift */; };
@@ -124,9 +126,11 @@
 		0A3FA3E05923A1E586BEE2BA /* MetricKitSubscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitSubscriber.swift; sourceTree = "<group>"; };
 		0A97072C145C825A7BC117C5 /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
 		0ABA32C5D1B5DFF5297CA7CC /* OutboxPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxPayloads.swift; sourceTree = "<group>"; };
+		10A3C001E043B35FE6CF03CC /* OutboxLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxLocalWriteTests.swift; sourceTree = "<group>"; };
 		11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		12FF29F32E42DD3CA5E20B7D /* KeepoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		136D79B8A96DF200ACDE60BA /* HouseholdViewLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdViewLoader.swift; sourceTree = "<group>"; };
+		13730E415ACEB27F1646E3CE /* OutboxLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxLocalWrite.swift; sourceTree = "<group>"; };
 		192A9246EB85747C42D7E97D /* TransactionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionsListView.swift; sourceTree = "<group>"; };
 		1F7E462D55BFB72F55965EFE /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
 		2022ED7EAFC392568FE06C52 /* LocalMoneyRefereeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyRefereeTests.swift; sourceTree = "<group>"; };
@@ -315,6 +319,7 @@
 				864D74AE697E673562039C23 /* OTPSignInView.swift */,
 				0A97072C145C825A7BC117C5 /* Outbox.swift */,
 				CF23EF5C13D50D95393B5ABF /* Outbox+AccountsCategories.swift */,
+				13730E415ACEB27F1646E3CE /* OutboxLocalWrite.swift */,
 				99345A8328BECF736129DE7F /* OutboxMigration.swift */,
 				0ABA32C5D1B5DFF5297CA7CC /* OutboxPayloads.swift */,
 				AE1026D20E157E9DB3FA7C00 /* PayloadCache.swift */,
@@ -368,6 +373,7 @@
 				C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */,
 				F3D1996C00A3B200872FFDA8 /* LocalTableQueriesTests.swift */,
 				B74F9A6C1456B3EC4ED7C6C1 /* OfflineStoreTests.swift */,
+				10A3C001E043B35FE6CF03CC /* OutboxLocalWriteTests.swift */,
 				B8E38E1BEBD69551349E9D4E /* OutboxMigrationTests.swift */,
 				5A43338D7EE342E9D02ACC23 /* OutboxTests.swift */,
 				9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */,
@@ -506,6 +512,7 @@
 				CDEAFC8D83E97D3B04E20CFD /* LocalStoreTests.swift in Sources */,
 				E9C9D4B3DF078A1CC161900E /* LocalTableQueriesTests.swift in Sources */,
 				EA430EC5D2F03C8C3197B7D0 /* OfflineStoreTests.swift in Sources */,
+				3A9AACA2AC8D02F3ED6645C3 /* OutboxLocalWriteTests.swift in Sources */,
 				E923E0F08CF810D2921A687A /* OutboxMigrationTests.swift in Sources */,
 				A38417E3409C44AC9E74975E /* OutboxTests.swift in Sources */,
 				F621BD7F9360149A762CDA34 /* SyncEngineTests.swift in Sources */,
@@ -567,6 +574,7 @@
 				D870CF193CABA5CA3A2B649C /* OnboardingView.swift in Sources */,
 				916606BE115D52894CF13E4A /* Outbox+AccountsCategories.swift in Sources */,
 				5A2180249656BC92A8318CC6 /* Outbox.swift in Sources */,
+				3ECB038FFEE93D5A2897E950 /* OutboxLocalWrite.swift in Sources */,
 				015458CD49918309F410CBAF /* OutboxMigration.swift in Sources */,
 				ED0C39EA3E52A60BC689B4EA /* OutboxPayloads.swift in Sources */,
 				6F01446CE50EF94F45A694FA /* PayloadCache.swift in Sources */,
