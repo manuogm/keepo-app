@@ -227,6 +227,17 @@ on its own, before any sync work starts** — two large changes serialized rathe
 - **Verify:** unit tests for the store and the outbox migration path, including "upgrade with three
   queued items while offline".
 
+**Shipped 2026-08-16 — one correction found while building:** `ValueObservation` → SwiftUI was not
+built. Investigated first (per this plan's own reuse-before-writing discipline): a repo-wide grep
+found zero `@Query` usages anywhere in the app target, so there was nothing for `ValueObservation` to
+replace. `Outbox` already refreshes its `@Observable` properties synchronously after every write and
+is the only writer to `outbox_items` today — there's no second writer for a SwiftUI view to need to
+observe independently until L5's pull loop starts writing into the syncable-table mirror. Revisit this
+bullet in L5/L6 once that second writer exists; wiring it now would have been unmotivated. See
+`version-logs/phase-L3-log.md` Findings #4 for the full reasoning, and its Findings #3 for a real
+schema-level bug found and fixed along the way (a `TEXT`-affinity column silently rounding a stored
+timestamp forward, caught via a flaking unit test rather than by inspection).
+
 ## Phase L4 — Port the money layer to SQLite, and the referee
 
 The make-or-break phase.

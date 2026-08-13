@@ -18,6 +18,9 @@ settings:
 packages:
   KeepoCore:
     path: Packages/KeepoCore
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.0.0
 
 targets:
   Keepo:
@@ -30,6 +33,8 @@ targets:
       Release: Config/Release.xcconfig
     dependencies:
       - package: KeepoCore
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.manuogm.keepo
@@ -55,6 +60,8 @@ targets:
       - path: KeepoTests
     dependencies:
       - target: Keepo
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

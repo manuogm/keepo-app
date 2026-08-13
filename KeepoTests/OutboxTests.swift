@@ -1,6 +1,6 @@
 import Foundation
+import GRDB
 import KeepoCore
-import SwiftData
 import Testing
 @testable import Keepo
 
@@ -11,12 +11,11 @@ import Testing
 @MainActor
 struct OutboxTests {
     private func makeOutbox(sender: StubTransactionSender) throws -> Outbox {
-        let schema = Schema(versionedSchema: OfflineSchemaV1.self)
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(
-            for: schema, migrationPlan: OfflineMigrationPlan.self, configurations: configuration
-        )
-        return Outbox(context: ModelContext(container), sender: sender)
+        var migrator = DatabaseMigrator()
+        migrator.registerMigration("v1") { database in try LocalSchemaV1.migrate(database) }
+        let dbQueue = try DatabaseQueue()
+        try migrator.migrate(dbQueue)
+        return Outbox(dbQueue: dbQueue, sender: sender)
     }
 
     @Test("a failed send queues the item; a later successful drain removes it")
@@ -147,6 +146,11 @@ struct OutboxTests {
 
         #expect(outbox.hasStalePending(threshold: 0) == false)
         _ = await outbox.submitCreateTransaction(payload)
+        // A real clock tick between `enqueue`'s `Date()` and this one — on a
+        // fast in-memory GRDB write, both can otherwise land in the same
+        // clock tick and make a `threshold: 0` comparison flake at the
+        // boundary; this isn't testing anything about that boundary itself.
+        try await Task.sleep(nanoseconds: 1_000_000)
         #expect(outbox.hasStalePending(threshold: 0) == true)
         #expect(outbox.hasStalePending(threshold: 60 * 60) == false)
     }

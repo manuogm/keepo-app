@@ -1,7 +1,7 @@
 import Foundation
+import GRDB
 import KeepoCore
 import Supabase
-import SwiftData
 
 // MARK: - The testable seam
 
@@ -165,13 +165,13 @@ public final class Outbox {
     /// not-yet-built piece of UI (see version-logs/phase-11-log.md).
     public private(set) var pendingCreateTransactions: [CreateTransactionPayload] = []
 
-    private let context: ModelContext
+    private let dbQueue: DatabaseQueue
     let sender: OutboxSending
     private let encoder = JSONEncoder()
     let decoder = JSONDecoder()
 
-    public init(context: ModelContext, sender: OutboxSending) {
-        self.context = context
+    public init(dbQueue: DatabaseQueue, sender: OutboxSending) {
+        self.dbQueue = dbQueue
         self.sender = sender
         refreshCounts()
     }
@@ -280,33 +280,36 @@ public final class Outbox {
         id: UUID, kind: OutboxKind, payload: P, expectedVersion: Int?, lastError: String?
     ) {
         guard let data = try? encoder.encode(payload) else { return }
-        if let existing = existingItem(id: id) {
-            existing.kind = kind.rawValue
-            existing.payloadJSON = data
-            existing.expectedVersion = expectedVersion
-            existing.attempts += 1
-            existing.lastError = lastError
-        } else {
-            context.insert(
-                OutboxItem(
-                    id: id, kind: kind.rawValue, payloadJSON: data,
-                    expectedVersion: expectedVersion, attempts: 1, lastError: lastError
-                )
-            )
+        try? dbQueue.write { database in
+            if var existing = try OutboxItemRecord.fetchOne(database, key: id) {
+                existing.kind = kind.rawValue
+                existing.payloadJSON = data
+                existing.expectedVersion = expectedVersion
+                existing.attempts += 1
+                existing.lastError = lastError
+                try existing.update(database)
+            } else {
+                try OutboxItemRecord(
+                    id: id, kind: kind.rawValue, payloadJSON: data, expectedVersion: expectedVersion,
+                    createdAt: Date(), attempts: 1, lastError: lastError
+                ).insert(database)
+            }
         }
-        try? context.save()
         refreshCounts()
     }
 
-    private func drain(_ item: OutboxItem) async {
+    private func drain(_ item: OutboxItemRecord) async {
         do {
             _ = try await replay(item)
-            context.delete(item)
-            try? context.save()
+            try? await dbQueue.write { database in _ = try item.delete(database) }
         } catch {
-            item.attempts += 1
-            item.lastError = String(describing: error)
-            try? context.save()
+            try? await dbQueue.write { database in
+                if var current = try OutboxItemRecord.fetchOne(database, key: item.id) {
+                    current.attempts += 1
+                    current.lastError = String(describing: error)
+                    try current.update(database)
+                }
+            }
         }
     }
 
@@ -314,7 +317,7 @@ public final class Outbox {
     /// dequeues either way. An unrecognized `kind` (should never happen;
     /// nothing removes cases from `OutboxKind`) is dropped rather than
     /// retried forever against a decoder that can never succeed.
-    private func replay(_ item: OutboxItem) async throws -> Bool {
+    private func replay(_ item: OutboxItemRecord) async throws -> Bool {
         guard let kind = OutboxKind(rawValue: item.kind) else { return true }
         switch kind {
         case .createTransaction:
@@ -342,26 +345,21 @@ public final class Outbox {
         }
     }
 
-    private func pendingItems() -> [OutboxItem] {
-        let descriptor = FetchDescriptor<OutboxItem>(sortBy: [SortDescriptor(\.createdAt)])
-        return (try? context.fetch(descriptor)) ?? []
+    private func pendingItems() -> [OutboxItemRecord] {
+        (try? dbQueue.read { database in
+            try OutboxItemRecord.order(Column("created_at")).fetchAll(database)
+        }) ?? []
     }
 
     /// Every currently-queued write's kind + raw payload, in FIFO order —
     /// the seam the pending-delta overlay (`PendingOverlayAdapter`) reads
     /// to know what hasn't synced yet. Exposed narrowly rather than the
-    /// `OutboxItem` model itself, so nothing outside this file can mutate
+    /// `OutboxItemRecord` itself, so nothing outside this file can mutate
     /// a queued item directly.
     func queuedKindsAndPayloads() -> [(kind: OutboxKind, payloadJSON: Data)] {
         pendingItems().compactMap { item in
             OutboxKind(rawValue: item.kind).map { ($0, item.payloadJSON) }
         }
-    }
-
-    private func existingItem(id: UUID) -> OutboxItem? {
-        var descriptor = FetchDescriptor<OutboxItem>(predicate: #Predicate { $0.id == id })
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
     }
 
     private func refreshCounts() {

@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import KeepoCore
 import Observation
 import Supabase
@@ -76,14 +77,17 @@ public final class SessionStore {
         // so this fatalError matches the one in loadConfig() below rather
         // than limping along with an outbox that silently never persists.
         let container: ModelContainer
+        let dbQueue: DatabaseQueue
         do {
             container = try OfflineStore.makeContainer()
+            dbQueue = try LocalStore.makeQueue()
         } catch {
             fatalError("Failed to create the offline store: \(error)")
         }
         let context = ModelContext(container)
         self.payloadCache = PayloadCache(context: context)
-        self.outbox = Outbox(context: context, sender: LiveOutboxSender(client: client))
+        OutboxMigration.migrateIfNeeded(swiftDataContext: context, to: dbQueue)
+        self.outbox = Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
     }
 
     public func start() async {

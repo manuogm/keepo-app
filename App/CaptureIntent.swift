@@ -37,8 +37,10 @@ struct CaptureIntent: AppIntent {
         do {
             let config = try SupabaseConfig.fromInfoPlist()
             let client = makeSupabaseClient(config: config)
-            let context = ModelContext(try OfflineStore.makeContainer())
-            let outbox = await Outbox(context: context, sender: LiveOutboxSender(client: client))
+            let swiftDataContext = ModelContext(try OfflineStore.makeContainer())
+            let dbQueue = try LocalStore.makeQueue()
+            await OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue)
+            let outbox = await Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
 
             guard let parsedAmount = AmountParser.parseFormattedCurrency(amount) else {
                 await notify(title: "Capture failed", body: "Couldn't read the amount \"\(amount)\".")
