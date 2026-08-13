@@ -12,12 +12,12 @@ struct InsightsView: View {
     let session: SessionStore
 
     @State private var scope: PublicSchema.AccountScope = .total
-    @State private var categorySpending: [CategorySpending] = []
-    @State private var seriesPoints: [IncomeExpensePoint] = []
+    @State private var categorySpending: [CategorySpendingLocal] = []
+    @State private var seriesPoints: [IncomeExpensePointLocal] = []
     @State private var savingsRate: Decimal?
-    @State private var investmentAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var investmentAccounts: [LocalAccountRow] = []
     @State private var unrealizedGains: [UUID: Int64?] = [:]
-    @State private var fiMetrics: FIMetrics?
+    @State private var fiMetrics: FIMetricsLocal?
     @State private var isEditingFISettings = false
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -84,7 +84,7 @@ struct InsightsView: View {
             if let fiMetrics {
                 fiMetricRow("FI number", value: fiCurrencyText(fiMetrics.fiNumberE4))
                 fiMetricRow("Progress", value: fiPercentText(fiMetrics.percentProgress))
-                fiMetricRow("Years to FI", value: fiYearsText(fiMetrics.yearsToFi))
+                fiMetricRow("Years to FI", value: fiYearsText(fiMetrics.yearsToFi.map { Decimal($0) }))
                 fiMetricRow("Coast FI number", value: fiCurrencyText(fiMetrics.coastFiNumberE4))
             } else {
                 Text("—").foregroundStyle(Color.secondary)
@@ -192,7 +192,7 @@ struct InsightsView: View {
         }
     }
 
-    private func categoryLabel(_ entry: CategorySpending) -> String {
+    private func categoryLabel(_ entry: CategorySpendingLocal) -> String {
         guard let total = entry.totalE4 else { return "—" }
         let currency = CurrencyInfo(code: entry.currency, minorUnit: 2)
         return MoneyFormatter.format(total, currency: currency)
@@ -201,9 +201,9 @@ struct InsightsView: View {
     private var unrealizedGainSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Unrealized Gain").font(.headline).foregroundStyle(Color.primary)
-            ForEach(investmentAccounts, id: \.accountId) { account in
+            ForEach(investmentAccounts) { account in
                 HStack {
-                    Text(account.name ?? "—").foregroundStyle(Color.primary)
+                    Text(account.name).foregroundStyle(Color.primary)
                     Spacer()
                     Text(unrealizedGainText(for: account))
                         .monospacedDigit()
@@ -213,52 +213,84 @@ struct InsightsView: View {
         }
     }
 
-    private func unrealizedGainText(for account: PublicSchema.AccountsWithBalancesSelect) -> String {
-        guard let accountId = account.accountId, let gain = unrealizedGains[accountId], let gain else { return "—" }
-        let currency = CurrencyInfo(code: account.currency ?? "EUR", minorUnit: Int(account.minorUnit ?? 2))
-        return MoneyFormatter.format(gain, currency: currency)
+    private func unrealizedGainText(for account: LocalAccountRow) -> String {
+        guard let gain = unrealizedGains[account.id], let gain else { return "—" }
+        return MoneyFormatter.format(gain, currency: account.currencyInfo)
     }
 
     private func load() async {
-        let today = Date()
-        let from = Calendar.current.date(byAdding: .day, value: -(rangeDays - 1), to: today) ?? today
-        let granularity = DateBucketing.granularity(from: from, through: today)
-
-        async let categoryResult = InsightsRepository.spendingByCategory(
-            client: session.client, scope: scope, from: from, through: today
-        )
-        async let seriesResult = InsightsRepository.incomeExpenseSeries(
-            client: session.client, scope: scope, from: from, through: today, granularity: granularity
-        )
-        async let rateResult = InsightsRepository.savingsRate(
-            client: session.client, scope: scope, from: from, through: today
-        )
-        async let accountsResult = AccountRepository.fetchAllWithBalances(client: session.client)
-
-        categorySpending = (try? await categoryResult) ?? []
-        seriesPoints = (try? await seriesResult) ?? []
-        savingsRate = try? await rateResult
-        let accounts = (try? await accountsResult) ?? []
-        investmentAccounts = accounts.filter { $0.kind == .valuation && $0.archivedAt == nil }
-
-        for account in investmentAccounts {
-            guard let accountId = account.accountId else { continue }
-            unrealizedGains[accountId] = try? await InsightsRepository.unrealizedGain(
-                client: session.client, accountId: accountId
-            )
+        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
+            isLoading = false
+            return
         }
+        let today = Date()
+        let from = utcCalendar.date(byAdding: .day, value: -(rangeDays - 1), to: today) ?? today
+        let fromString = PostgresDate.dateOnlyString(from, calendar: utcCalendar)
+        let todayString = PostgresDate.dateOnlyString(today, calendar: utcCalendar)
+        let granularity = DateBucketing.granularity(from: from, through: today) == .monthly ? "monthly" : "weekly"
+        let moneyScope = LocalMoneyScope(scope: scope, baseCurrency: baseCurrency)
+        let dbQueue = session.dbQueue
 
-        await loadFIMetrics()
+        do {
+            let loaded: LoadedInsightsState = try await dbQueue.read { database in
+                let accounts = try LocalAccountRow.fetchAll(
+                    database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
+                )
+                let investments = accounts.filter { $0.kind == .valuation && $0.archivedAt == nil }
+                var gains: [UUID: Int64?] = [:]
+                for account in investments {
+                    gains[account.id] = try LocalMoneyQueries.unrealizedGain(
+                        database, accountId: account.id.uuidString
+                    )
+                }
+                return LoadedInsightsState(
+                    categorySpending: try LocalMoneyConversion.spendingByCategory(
+                        database, moneyScope, from: fromString, through: todayString
+                    ),
+                    seriesPoints: try LocalMoneyConversion.incomeExpenseSeries(
+                        database, moneyScope, from: fromString, through: todayString, granularity: granularity
+                    ),
+                    savingsRate: try LocalMoneyConversion.savingsRate(
+                        database, moneyScope, from: fromString, through: todayString
+                    ),
+                    investmentAccounts: investments, unrealizedGains: gains,
+                    fiMetrics: try LocalMoneyConversion.fiMetrics(
+                        database, ownerId: ownerId.uuidString, moneyScope, today: today
+                    )
+                )
+            }
+            categorySpending = loaded.categorySpending
+            seriesPoints = loaded.seriesPoints
+            savingsRate = loaded.savingsRate
+            investmentAccounts = loaded.investmentAccounts
+            unrealizedGains = loaded.unrealizedGains
+            fiMetrics = loaded.fiMetrics
+        } catch {
+            errorMessage = UserFacingError.describe(error)
+        }
 
         isLoading = false
     }
 
     private func loadFIMetrics() async {
-        fiMetrics = try? await FIRepository.fetchMetrics(client: session.client, scope: scope)
+        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else { return }
+        let moneyScope = LocalMoneyScope(scope: scope, baseCurrency: baseCurrency)
+        fiMetrics = try? await session.dbQueue.read { database in
+            try LocalMoneyConversion.fiMetrics(database, ownerId: ownerId.uuidString, moneyScope, today: Date())
+        }
     }
 }
 
 private struct InsightsLoadKey: Equatable {
     let token: Int
     let scope: PublicSchema.AccountScope
+}
+
+private struct LoadedInsightsState {
+    let categorySpending: [CategorySpendingLocal]
+    let seriesPoints: [IncomeExpensePointLocal]
+    let savingsRate: Decimal?
+    let investmentAccounts: [LocalAccountRow]
+    let unrealizedGains: [UUID: Int64?]
+    let fiMetrics: FIMetricsLocal
 }

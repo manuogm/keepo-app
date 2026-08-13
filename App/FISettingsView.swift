@@ -71,11 +71,14 @@ struct FISettingsView: View {
     }
 
     private func load() async {
-        if let settings = try? await FIRepository.fetchSettings(client: session.client) {
-            hasTarget = settings.targetAnnualSpendE4 != nil
-            targetAnnualSpendText = settings.targetAnnualSpendE4
+        if let ownerId = session.profile?.id,
+           let settings = try? await session.dbQueue.read({ database in
+               try LocalMoneyConversion.fiSettings(database, ownerId: ownerId.uuidString)
+           }) {
+            hasTarget = settings.targetSpendE4 != nil
+            targetAnnualSpendText = settings.targetSpendE4
                 .map { AmountFormatter.editableString($0, minorUnit: 2) } ?? ""
-            withdrawalRateText = "\(settings.withdrawalRate)"
+            withdrawalRateText = settings.withdrawalRateDecimal.map { "\($0)" } ?? ""
             realReturnRateText = "\(settings.realReturnRate)"
         }
         isLoading = false

@@ -8,7 +8,7 @@ import SwiftUI
 struct BudgetsView: View {
     let session: SessionStore
 
-    @State private var progress: [BudgetProgress] = []
+    @State private var progress: [BudgetProgressLocal] = []
     @State private var isLoading = true
     @State private var isAddingBudget = false
     @State private var editingBudget: PublicSchema.BudgetsSelect?
@@ -71,26 +71,35 @@ struct BudgetsView: View {
 
     private func load() async {
         errorMessage = nil
+        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
+            isLoading = false
+            return
+        }
         do {
-            progress = try await BudgetRepository.fetchProgress(client: session.client, periodMonth: Date())
+            progress = try await session.dbQueue.read { database in
+                try LocalMoneyConversion.budgetProgress(
+                    database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency, periodMonth: Date()
+                )
+            }
         } catch {
-            // Offline is ambient state, surfaced by the persistent status
-            // indicator elsewhere on screen — not a per-fetch red error.
-            errorMessage = UserFacingError.isOffline(error) ? nil : UserFacingError.describe(error)
+            errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
     }
 
-    private func openForEdit(_ entry: BudgetProgress) async {
-        let budgets = (try? await BudgetRepository.fetchAll(client: session.client)) ?? []
-        editingBudget = budgets.first { $0.id == entry.budgetId }
+    private func openForEdit(_ entry: BudgetProgressLocal) async {
+        guard let ownerId = session.profile?.id else { return }
+        let budgets = (try? await session.dbQueue.read { database in
+            try LocalTableQueries.budgets(database, ownerId: ownerId.uuidString)
+        }) ?? []
+        editingBudget = budgets.first { $0.id.uuidString.lowercased() == entry.budgetId.lowercased() }
     }
 }
 
 extension PublicSchema.BudgetsSelect: Identifiable {}
 
 private struct BudgetRow: View {
-    let entry: BudgetProgress
+    let entry: BudgetProgressLocal
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
