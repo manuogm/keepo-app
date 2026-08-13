@@ -20,7 +20,9 @@ struct LocalTransactionRowTests {
         return dbQueue
     }
 
-    private func seed(_ database: Database, ownerId: String) throws -> (accountId: String, categoryId: String) {
+    private func seed(
+        _ database: Database, ownerId: String, seedCurrency: Bool = true
+    ) throws -> (accountId: String, categoryId: String) {
         let accountId = UUID().uuidString
         let categoryId = UUID().uuidString
         try database.execute(
@@ -42,7 +44,9 @@ struct LocalTransactionRowTests {
             """,
             arguments: [categoryId, ownerId]
         )
-        try database.execute(sql: "INSERT INTO currencies (code, minor_unit, sync_seq) VALUES ('EUR', 2, 1)")
+        if seedCurrency {
+            try database.execute(sql: "INSERT INTO currencies (code, minor_unit, sync_seq) VALUES ('EUR', 2, 1)")
+        }
         return (accountId, categoryId)
     }
 
@@ -75,7 +79,9 @@ struct LocalTransactionRowTests {
         }
 
         let rows = try await dbQueue.read { database in
-            try LocalTransactionRow.fetchFiltered(database, filter: TransactionFilter(), baseCurrency: "EUR")
+            try LocalTransactionRow.fetchFiltered(
+                database, filter: TransactionFilter(), baseCurrency: "EUR", ownerId: ownerId
+            )
         }
 
         #expect(rows.count == 1)
@@ -109,7 +115,9 @@ struct LocalTransactionRowTests {
         }
 
         let rows = try await dbQueue.read { database in
-            try LocalTransactionRow.fetchFiltered(database, filter: TransactionFilter(), baseCurrency: "EUR")
+            try LocalTransactionRow.fetchFiltered(
+                database, filter: TransactionFilter(), baseCurrency: "EUR", ownerId: ownerId
+            )
         }
 
         #expect(rows.first?.kind == "transfer")
@@ -130,7 +138,9 @@ struct LocalTransactionRowTests {
 
         // Base currency GBP has no fx_rates row and isn't the seeded EUR.
         let rows = try await dbQueue.read { database in
-            try LocalTransactionRow.fetchFiltered(database, filter: TransactionFilter(), baseCurrency: "GBP")
+            try LocalTransactionRow.fetchFiltered(
+                database, filter: TransactionFilter(), baseCurrency: "GBP", ownerId: ownerId
+            )
         }
 
         #expect(rows.first?.amountBaseE4 == nil)
@@ -151,14 +161,52 @@ struct LocalTransactionRowTests {
         }
 
         let found = try await dbQueue.read { database in
-            try LocalTransactionRow.fetchOne(database, id: transactionId, baseCurrency: "EUR")
+            try LocalTransactionRow.fetchOne(database, id: transactionId, baseCurrency: "EUR", ownerId: ownerId)
         }
         let missing = try await dbQueue.read { database in
-            try LocalTransactionRow.fetchOne(database, id: UUID().uuidString, baseCurrency: "EUR")
+            try LocalTransactionRow.fetchOne(database, id: UUID().uuidString, baseCurrency: "EUR", ownerId: ownerId)
         }
 
         #expect(found?.kind == "income")
         #expect(missing == nil)
+    }
+
+    @Test("a transaction whose account belongs to a different owner is excluded, not just its account")
+    func excludesTransactionsForAnotherOwnersAccount() async throws {
+        let dbQueue = try makeDatabase()
+        let ownerId = UUID().uuidString
+        let staleOwnerId = UUID().uuidString
+        let transactionId = UUID().uuidString
+        let staleTransactionId = UUID().uuidString
+        let (accountId, categoryId) = try await dbQueue.write { database in try seed(database, ownerId: ownerId) }
+        let (staleAccountId, staleCategoryId) = try await dbQueue.write { database in
+            try seed(database, ownerId: staleOwnerId, seedCurrency: false)
+        }
+        try await dbQueue.write { database in
+            try insertTransaction(
+                database, id: transactionId, ownerId: ownerId, accountId: accountId, categoryId: categoryId,
+                amountE4: -50000
+            )
+            try insertTransaction(
+                database, id: staleTransactionId, ownerId: staleOwnerId, accountId: staleAccountId,
+                categoryId: staleCategoryId, amountE4: -10000
+            )
+        }
+
+        let rows = try await dbQueue.read { database in
+            try LocalTransactionRow.fetchFiltered(
+                database, filter: TransactionFilter(), baseCurrency: "EUR", ownerId: ownerId
+            )
+        }
+        let fetchedStale = try await dbQueue.read { database in
+            try LocalTransactionRow.fetchOne(
+                database, id: staleTransactionId, baseCurrency: "EUR", ownerId: ownerId
+            )
+        }
+
+        #expect(rows.count == 1)
+        #expect(rows.first?.transactionId?.uuidString.lowercased() == transactionId.lowercased())
+        #expect(fetchedStale == nil)
     }
 
     @Test("fetchByTransferGroup returns both legs of a transfer")
@@ -195,7 +243,9 @@ struct LocalTransactionRowTests {
         }
 
         let legs = try await dbQueue.read { database in
-            try LocalTransactionRow.fetchByTransferGroup(database, transferGroupId: groupId, baseCurrency: "EUR")
+            try LocalTransactionRow.fetchByTransferGroup(
+                database, transferGroupId: groupId, baseCurrency: "EUR", ownerId: ownerId
+            )
         }
 
         #expect(legs.count == 2)

@@ -162,11 +162,14 @@ struct NeedsReviewView: View {
     /// bespoke capture-review screen (app-architecture.md) — this only
     /// fetches the one row `needs_review` doesn't carry in full.
     private func openForReview(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId, let baseCurrency = session.profile?.baseCurrency else { return }
+        guard let id = item.itemId, let ownerId = session.profile?.id,
+              let baseCurrency = session.profile?.baseCurrency else { return }
         actionErrorMessage = nil
         do {
             guard let transaction = try await session.dbQueue.read({ database in
-                try LocalTransactionRow.fetchOne(database, id: id.uuidString, baseCurrency: baseCurrency)
+                try LocalTransactionRow.fetchOne(
+                    database, id: id.uuidString, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
+                )
             }) else { return }
             editingTransaction = transaction
             showEditingTransaction = true
@@ -180,11 +183,14 @@ struct NeedsReviewView: View {
     /// row's current version, which `needs_review` doesn't carry, hence
     /// the extra fetch.
     private func confirmCapture(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId, let baseCurrency = session.profile?.baseCurrency else { return }
+        guard let id = item.itemId, let ownerId = session.profile?.id,
+              let baseCurrency = session.profile?.baseCurrency else { return }
         actionErrorMessage = nil
         do {
             guard let transaction = try await session.dbQueue.read({ database in
-                try LocalTransactionRow.fetchOne(database, id: id.uuidString, baseCurrency: baseCurrency)
+                try LocalTransactionRow.fetchOne(
+                    database, id: id.uuidString, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
+                )
             }), let version = transaction.version else { return }
             _ = try await CaptureRepository.confirmCapture(
                 client: session.client, id: id, expectedVersion: Int(version)

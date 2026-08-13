@@ -14,7 +14,7 @@ extension TransactionFormView {
     /// than silently discarding what they typed or clobbering the newer data.
     func reloadAfterConflict() async {
         await session.syncEngine?.pull()
-        guard let baseCurrency = session.profile?.baseCurrency else {
+        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
             showConflictAlert = true
             return
         }
@@ -25,14 +25,17 @@ extension TransactionFormView {
         if let groupId {
             let legs = (try? await session.dbQueue.read { database in
                 try LocalTransactionRow.fetchByTransferGroup(
-                    database, transferGroupId: groupId.uuidString, baseCurrency: baseCurrency
+                    database, transferGroupId: groupId.uuidString, baseCurrency: baseCurrency,
+                    ownerId: ownerId.uuidString
                 )
             }) ?? []
             transaction = legs.first { $0.transactionId == id } ?? legs.first
             sibling = legs.first { $0.transactionId != transaction?.transactionId }
         } else if let id {
             transaction = try? await session.dbQueue.read { database in
-                try LocalTransactionRow.fetchOne(database, id: id.uuidString, baseCurrency: baseCurrency)
+                try LocalTransactionRow.fetchOne(
+                    database, id: id.uuidString, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
+                )
             }
             sibling = nil
         } else {

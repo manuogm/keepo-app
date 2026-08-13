@@ -168,7 +168,7 @@ public final class Outbox {
     public init(dbQueue: DatabaseQueue, sender: OutboxSending) {
         self.dbQueue = dbQueue
         self.sender = sender
-        refreshCounts()
+        Task { await refreshCounts() }
     }
 
     public func hasStalePending(threshold: TimeInterval) -> Bool {
@@ -178,7 +178,7 @@ public final class Outbox {
 
     @discardableResult
     public func submitCreateTransaction(_ payload: CreateTransactionPayload) async -> OutboxSubmitResult {
-        applyLocally { try OutboxLocalWrite.createTransaction(payload, in: $0) }
+        await applyLocally { try OutboxLocalWrite.createTransaction(payload, in: $0) }
         return await attempt(id: payload.id, kind: .createTransaction, payload: payload) {
             try await self.sender.createTransaction(payload)
             return true
@@ -187,7 +187,7 @@ public final class Outbox {
 
     @discardableResult
     public func submitCreateTransfer(_ payload: CreateTransferPayload) async -> OutboxSubmitResult {
-        applyLocally { try OutboxLocalWrite.createTransfer(payload, in: $0) }
+        await applyLocally { try OutboxLocalWrite.createTransfer(payload, in: $0) }
         return await attempt(id: payload.fromId, kind: .createTransfer, payload: payload) {
             try await self.sender.createTransfer(payload)
             return true
@@ -196,7 +196,7 @@ public final class Outbox {
 
     @discardableResult
     public func submitUpdateTransaction(_ payload: UpdateTransactionPayload) async -> OutboxSubmitResult {
-        applyLocally { try OutboxLocalWrite.updateTransaction(payload, in: $0) }
+        await applyLocally { try OutboxLocalWrite.updateTransaction(payload, in: $0) }
         return await attempt(
             id: payload.id, kind: .updateTransaction, payload: payload, expectedVersion: payload.expectedVersion
         ) {
@@ -206,7 +206,7 @@ public final class Outbox {
 
     @discardableResult
     public func submitUpdateTransfer(_ payload: UpdateTransferPayload) async -> OutboxSubmitResult {
-        applyLocally { try OutboxLocalWrite.updateTransfer(payload, in: $0) }
+        await applyLocally { try OutboxLocalWrite.updateTransfer(payload, in: $0) }
         return await attempt(
             id: payload.transferGroupId, kind: .updateTransfer, payload: payload,
             expectedVersion: payload.fromExpectedVersion
@@ -217,7 +217,7 @@ public final class Outbox {
 
     @discardableResult
     public func submitDeleteTransaction(_ payload: DeleteTransactionPayload) async -> OutboxSubmitResult {
-        applyLocally { try OutboxLocalWrite.deleteTransaction(payload, in: $0) }
+        await applyLocally { try OutboxLocalWrite.deleteTransaction(payload, in: $0) }
         return await attempt(
             id: payload.id, kind: .deleteTransaction, payload: payload, expectedVersion: payload.expectedVersion
         ) {
@@ -227,7 +227,7 @@ public final class Outbox {
 
     @discardableResult
     public func submitDeleteTransfer(_ payload: DeleteTransferPayload) async -> OutboxSubmitResult {
-        applyLocally { try OutboxLocalWrite.deleteTransfer(payload, in: $0) }
+        await applyLocally { try OutboxLocalWrite.deleteTransfer(payload, in: $0) }
         return await attempt(
             id: payload.transferGroupId, kind: .deleteTransfer, payload: payload,
             expectedVersion: payload.fromExpectedVersion
@@ -245,7 +245,7 @@ public final class Outbox {
             let result = try await sender.captureTransaction(payload)
             return .applied(mapped: result.mapped)
         } catch {
-            enqueue(
+            await enqueue(
                 id: payload.id, kind: .captureTransaction, payload: payload, expectedVersion: nil,
                 lastError: String(describing: error)
             )
@@ -256,10 +256,10 @@ public final class Outbox {
     /// FIFO by `createdAt` — the order rows first needed syncing, not the
     /// order they were last edited.
     public func drainAll() async {
-        for item in pendingItems() {
+        for item in await pendingItems() {
             await drain(item)
         }
-        refreshCounts()
+        await refreshCounts()
     }
 
     /// Best-effort optimistic write into the local GRDB mirror — see
@@ -267,8 +267,8 @@ public final class Outbox {
     /// `try?`, never a thrown failure the caller has to handle. Internal,
     /// not private: `Outbox+AccountsCategories.swift`'s submit methods call
     /// it too.
-    func applyLocally(_ apply: @escaping (Database) throws -> Void) {
-        try? dbQueue.write { database in try apply(database) }
+    func applyLocally(_ apply: @escaping @Sendable (Database) throws -> Void) async {
+        try? await dbQueue.write { database in try apply(database) }
     }
 
     func attempt<P: Encodable>(
@@ -278,7 +278,7 @@ public final class Outbox {
             let applied = try await send()
             return applied ? .applied : .conflict
         } catch {
-            enqueue(
+            await enqueue(
                 id: id, kind: kind, payload: payload, expectedVersion: expectedVersion,
                 lastError: String(describing: error)
             )
@@ -288,9 +288,9 @@ public final class Outbox {
 
     private func enqueue<P: Encodable>(
         id: UUID, kind: OutboxKind, payload: P, expectedVersion: Int?, lastError: String?
-    ) {
+    ) async {
         guard let data = try? encoder.encode(payload) else { return }
-        try? dbQueue.write { database in
+        try? await dbQueue.write { database in
             if var existing = try OutboxItemRecord.fetchOne(database, key: id) {
                 existing.kind = kind.rawValue
                 existing.payloadJSON = data
@@ -305,7 +305,7 @@ public final class Outbox {
                 ).insert(database)
             }
         }
-        refreshCounts()
+        await refreshCounts()
     }
 
     private func drain(_ item: OutboxItemRecord) async {
@@ -355,14 +355,14 @@ public final class Outbox {
         }
     }
 
-    private func pendingItems() -> [OutboxItemRecord] {
-        (try? dbQueue.read { database in
+    private func pendingItems() async -> [OutboxItemRecord] {
+        (try? await dbQueue.read { database in
             try OutboxItemRecord.order(Column("created_at")).fetchAll(database)
         }) ?? []
     }
 
-    private func refreshCounts() {
-        let items = pendingItems()
+    private func refreshCounts() async {
+        let items = await pendingItems()
         pendingCount = items.count
         oldestPendingAt = items.first?.createdAt
     }

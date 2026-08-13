@@ -25,8 +25,24 @@ import Supabase
 /// through, at the transaction's own `occurred_at` date, exactly like the
 /// view's `fx_convert(..., t.occurred_at::date)`.
 enum LocalTransactionRow {
+    /// Every local read here is scoped to accounts the signed-in user can
+    /// currently see (owned, or shared into one of their households) — the
+    /// same visibility rule `LocalAccountRow.fetchAll` already applies.
+    /// Without it, a transaction whose account belongs to a different (e.g.
+    /// stale, no-longer-current) identity still satisfies the plain
+    /// `JOIN accounts` and stays visible forever with no way to delete it,
+    /// since the server correctly refuses a write against an account this
+    /// user can't write to.
+    private static let visibleAccountClause = """
+    (a.owner_id = ? OR a.id IN (
+        SELECT ha.account_id FROM household_accounts ha
+        JOIN household_members hm ON hm.household_id = ha.household_id
+        WHERE hm.user_id = ? AND hm.deleted_at IS NULL AND ha.deleted_at IS NULL
+    ))
+    """
+
     static func fetchFiltered(
-        _ database: Database, filter: TransactionFilter, baseCurrency: String
+        _ database: Database, filter: TransactionFilter, baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
         var sql = """
         SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
@@ -35,12 +51,12 @@ enum LocalTransactionRow {
                CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                     WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
         FROM transactions t
-        JOIN accounts a ON a.id = t.account_id
+        JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
         LEFT JOIN categories c ON c.id = t.category_id
         JOIN currencies cur ON cur.code = t.currency
         WHERE t.deleted_at IS NULL
         """
-        var arguments: [DatabaseValueConvertible] = []
+        var arguments: [DatabaseValueConvertible] = [ownerId, ownerId]
         if let accountId = filter.accountId {
             sql += " AND t.account_id = ?"
             arguments.append(accountId.uuidString)
@@ -81,7 +97,7 @@ enum LocalTransactionRow {
     /// post-conflict reload needs both sides re-fetched together, the same
     /// way it originally opened via `sibling(of:)`.
     static func fetchByTransferGroup(
-        _ database: Database, transferGroupId: String, baseCurrency: String
+        _ database: Database, transferGroupId: String, baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
         let rows = try Row.fetchAll(
             database,
@@ -92,18 +108,18 @@ enum LocalTransactionRow {
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                         WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
             FROM transactions t
-            JOIN accounts a ON a.id = t.account_id
+            JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
             JOIN currencies cur ON cur.code = t.currency
             WHERE t.deleted_at IS NULL AND t.transfer_group_id = ?
             """,
-            arguments: [transferGroupId]
+            arguments: [ownerId, ownerId, transferGroupId]
         )
         return try rows.map { try build($0, database: database, baseCurrency: baseCurrency) }
     }
 
     static func fetchOne(
-        _ database: Database, id: String, baseCurrency: String
+        _ database: Database, id: String, baseCurrency: String, ownerId: String
     ) throws -> PublicSchema.TransactionsWithDetailsSelect? {
         guard let row = try Row.fetchOne(
             database,
@@ -114,12 +130,12 @@ enum LocalTransactionRow {
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                         WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
             FROM transactions t
-            JOIN accounts a ON a.id = t.account_id
+            JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
             JOIN currencies cur ON cur.code = t.currency
             WHERE t.deleted_at IS NULL AND t.id = ?
             """,
-            arguments: [id]
+            arguments: [ownerId, ownerId, id]
         ) else { return nil }
         return try build(row, database: database, baseCurrency: baseCurrency)
     }

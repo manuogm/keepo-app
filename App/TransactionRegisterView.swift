@@ -148,7 +148,7 @@ struct TransactionRegisterView: View {
     private func load() async {
         errorMessage = nil
         isLoading = true
-        guard let baseCurrency = session.profile?.baseCurrency else {
+        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
             isLoading = false
             return
         }
@@ -157,7 +157,9 @@ struct TransactionRegisterView: View {
         do {
             let (fetchedTransactions, fetchedCategories) = try await dbQueue.read { database in
                 (
-                    try LocalTransactionRow.fetchFiltered(database, filter: filterRange, baseCurrency: baseCurrency),
+                    try LocalTransactionRow.fetchFiltered(
+                        database, filter: filterRange, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
+                    ),
                     categories.isEmpty ? try LocalTableQueries.categories(database) : categories
                 )
             }

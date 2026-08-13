@@ -17,7 +17,7 @@ extension TransactionsListView {
             let loaded: LoadedTransactionsState = try await dbQueue.read { database in
                 LoadedTransactionsState(
                     transactions: try LocalTransactionRow.fetchFiltered(
-                        database, filter: currentFilter, baseCurrency: baseCurrency
+                        database, filter: currentFilter, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
                     ),
                     accounts: try LocalAccountRow.fetchAll(
                         database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
