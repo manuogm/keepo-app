@@ -180,54 +180,42 @@ struct AccountFormView: View {
             || (!isEditing && currency.isEmpty)
     }
 
-    /// Falls back to `AccountFormCache` when the live fetch fails or is too
-    /// slow — an offline edit otherwise leaves the form permanently blank
-    /// (see AccountFormCache's own header comment on why this can't reuse
-    /// the accounts list's own cache).
+    /// Reads straight off the local GRDB mirror (Phase L6) — `Outbox`'s
+    /// write-through means this is always current, including a still-
+    /// unsynced edit, so there's no separate cache-fallback chain needed
+    /// the way a network fetch used to require.
     private func load() async {
-        currencies = await CurrencyCache.fetchAll(session: session)
+        currencies = (try? await session.dbQueue.read { database in try LocalTableQueries.currencies(database) }) ?? []
 
         switch mode {
         case .create:
             currency = session.profile?.baseCurrency ?? currencies.first?.code ?? "USD"
             openingBalanceText = AmountFormatter.editableString(0, minorUnit: selectedCurrencyMinorUnit)
         case .edit(let id):
-            let fetched = try? await withTimeout(seconds: 3, operation: {
-                try await AccountRepository.fetchOne(client: session.client, id: id)
-            })
-            if let account = fetched {
+            if let account = try? await session.dbQueue.read({ database in
+                try LocalTableQueries.account(database, id: id.uuidString)
+            }) {
                 apply(account)
-                AccountFormCache.save(account, session: session)
-            } else if let cached = AccountFormCache.load(id: id, session: session) {
-                apply(cached)
             }
-            prefillCurrentBalance(accountId: id)
+            await prefillCurrentBalance(accountId: id)
         }
         isLoading = false
     }
 
-    /// "What does this account look like right now" — the overlaid
-    /// balance (cached server figure + whatever's already queued in the
-    /// outbox), read from the accounts list's own cache rather than a
-    /// fresh fetch. Falls back to the opening balance already loaded by
-    /// `apply` if that list cache has never been populated (e.g. this
-    /// screen opened before Accounts ever loaded) — best-effort, not
-    /// exact, same posture as every other cache-miss fallback here.
-    private func prefillCurrentBalance(accountId: UUID) {
-        guard
-            let (data, _) = session.payloadCache.load(key: "accounts_with_balances"),
-            let rows = try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data),
-            let cachedBalance = rows.first(where: { $0.accountId == accountId })?.balanceE4
-        else {
+    /// "What does this account look like right now" — the local balance,
+    /// which already includes any still-unsynced write (`Outbox`'s
+    /// write-through). Falls back to the opening balance already loaded by
+    /// `apply` if the account has no computable balance yet.
+    private func prefillCurrentBalance(accountId: UUID) async {
+        let today = PostgresDate.dateOnlyString(Date(), calendar: utcCalendar)
+        let balance = try? await session.dbQueue.read { database in
+            try LocalMoneyQueries.accountBalance(database, accountId: accountId.uuidString, asOf: today, now: Date())
+        }
+        guard let balance = balance ?? nil else {
             currentBalanceText = openingBalanceText
             return
         }
-        let cachedTransactions = PendingOverlayAdapter.cachedTransactionLookup(session: session)
-        let overlaid = PendingOverlayAdapter.overlaidBalance(
-            accountId: accountId, cachedBalance: cachedBalance, outbox: session.outbox,
-            cachedTransactions: cachedTransactions
-        )
-        currentBalanceText = AmountFormatter.editableString(overlaid, minorUnit: selectedCurrencyMinorUnit)
+        currentBalanceText = AmountFormatter.editableString(balance, minorUnit: selectedCurrencyMinorUnit)
     }
 
     /// Shared by the initial edit-mode prefill and by a post-conflict reload.
@@ -338,10 +326,16 @@ extension AccountFormView {
     }
 
     /// A stale version means someone else changed this account since it
-    /// loaded — reload the current row and repopulate the form, same
-    /// convention as TransactionFormView.reloadAfterConflict.
+    /// loaded. `Outbox`'s write-through already applied OUR attempted edit
+    /// to the local mirror optimistically (before the conflict was known),
+    /// so a plain local re-read would just show that same wrong guess back
+    /// — a sync pull is what actually corrects the local row to the real
+    /// server state; only then is a local re-read meaningful.
     fileprivate func reloadAfterConflict(id: UUID) async {
-        if let account = try? await AccountRepository.fetchOne(client: session.client, id: id) {
+        await session.syncEngine?.pull()
+        if let account = try? await session.dbQueue.read({ database in
+            try LocalTableQueries.account(database, id: id.uuidString)
+        }) {
             apply(account)
         }
         showConflictAlert = true

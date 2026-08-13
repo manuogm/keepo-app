@@ -23,7 +23,7 @@ struct RecurringRuleFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var kind: Kind = .expense
-    @State private var accounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var accounts: [LocalAccountRow] = []
     @State private var categories: [PublicSchema.CategoriesSelect] = []
 
     @State private var selectedAccountId: UUID?
@@ -44,8 +44,8 @@ struct RecurringRuleFormView: View {
         return false
     }
 
-    private var selectedAccount: PublicSchema.AccountsWithBalancesSelect? {
-        accounts.first { $0.accountId == selectedAccountId }
+    private var selectedAccount: LocalAccountRow? {
+        accounts.first { $0.id == selectedAccountId }
     }
 
     private var categoriesForKind: [PublicSchema.CategoriesSelect] {
@@ -54,7 +54,7 @@ struct RecurringRuleFormView: View {
     }
 
     private var minorUnit: Int {
-        Int(selectedAccount?.minorUnit ?? 2)
+        selectedAccount?.currencyInfo.minorUnit ?? 2
     }
 
     var body: some View {
@@ -71,8 +71,8 @@ struct RecurringRuleFormView: View {
                     Section("Account") {
                         Picker("Account", selection: $selectedAccountId) {
                             Text("Select…").tag(UUID?.none)
-                            ForEach(accounts.filter { $0.kind == .ledger }, id: \.accountId) { account in
-                                Text(account.name ?? "—").tag(account.accountId)
+                            ForEach(accounts.filter { $0.kind == .ledger }) { account in
+                                Text(account.name).tag(UUID?.some(account.id))
                             }
                         }
                     }
@@ -139,10 +139,16 @@ struct RecurringRuleFormView: View {
     }
 
     private func load() async {
-        async let accountsResult = AccountRepository.fetchAllWithBalances(client: session.client)
-        async let categoriesResult = CategoryRepository.fetchAll(client: session.client)
-        accounts = (try? await accountsResult) ?? []
-        categories = (try? await categoriesResult) ?? []
+        if let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency {
+            let loaded = try? await session.dbQueue.read { database in
+                (
+                    try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency),
+                    try LocalTableQueries.categories(database)
+                )
+            }
+            accounts = loaded?.0 ?? []
+            categories = loaded?.1 ?? []
+        }
 
         if case .edit(let rule) = mode {
             apply(rule)

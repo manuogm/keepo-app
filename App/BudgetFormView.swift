@@ -109,7 +109,7 @@ struct BudgetFormView: View {
     }
 
     private func load() async {
-        categories = (try? await CategoryRepository.fetchAll(client: session.client)) ?? []
+        categories = (try? await session.dbQueue.read { database in try LocalTableQueries.categories(database) }) ?? []
         currency = session.profile?.baseCurrency ?? "USD"
 
         if case .edit(let budget) = mode {

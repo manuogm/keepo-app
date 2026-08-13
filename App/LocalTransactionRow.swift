@@ -77,6 +77,31 @@ enum LocalTransactionRow {
         return try rows.map { try build($0, database: database, baseCurrency: baseCurrency) }
     }
 
+    /// Both legs of a transfer, by group id — `TransactionFormView`'s
+    /// post-conflict reload needs both sides re-fetched together, the same
+    /// way it originally opened via `sibling(of:)`.
+    static func fetchByTransferGroup(
+        _ database: Database, transferGroupId: String, baseCurrency: String
+    ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
+        let rows = try Row.fetchAll(
+            database,
+            sql: """
+            SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
+                   t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
+                   t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version, t.recurring_rule_id,
+                   CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
+                        WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
+            FROM transactions t
+            JOIN accounts a ON a.id = t.account_id
+            LEFT JOIN categories c ON c.id = t.category_id
+            JOIN currencies cur ON cur.code = t.currency
+            WHERE t.deleted_at IS NULL AND t.transfer_group_id = ?
+            """,
+            arguments: [transferGroupId]
+        )
+        return try rows.map { try build($0, database: database, baseCurrency: baseCurrency) }
+    }
+
     static func fetchOne(
         _ database: Database, id: String, baseCurrency: String
     ) throws -> PublicSchema.TransactionsWithDetailsSelect? {

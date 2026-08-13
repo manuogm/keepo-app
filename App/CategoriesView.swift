@@ -9,11 +9,11 @@ import SwiftUI
 struct CategoriesView: View {
     let session: SessionStore
 
-    @State private var store = DataStore<PublicSchema.CategoriesSelect>(cacheKey: "categories")
+    @State private var categories: [PublicSchema.CategoriesSelect] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
     @State private var isAddingCategory = false
     @State private var editingCategoryId: UUID?
-
-    private var categories: [PublicSchema.CategoriesSelect] { store.items }
 
     private var expenseCategories: [PublicSchema.CategoriesSelect] {
         categories.filter { $0.kind == .expense }
@@ -29,7 +29,7 @@ struct CategoriesView: View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if store.isLoading {
+            if isLoading {
                 ProgressView()
             } else {
                 ScrollView {
@@ -42,7 +42,7 @@ struct CategoriesView: View {
                 .refreshable { await load() }
             }
 
-            if let errorMessage = store.errorMessage {
+            if let errorMessage {
                 VStack {
                     Spacer()
                     Text(errorMessage)
@@ -75,7 +75,6 @@ struct CategoriesView: View {
                 }
             }
         }
-        .task { store.restore(from: session.payloadCache) }
         .task(id: session.refresh.token) { await load() }
     }
 
@@ -97,10 +96,13 @@ struct CategoriesView: View {
     }
 
     private func load() async {
-        await store.load(
-            { try await CategoryRepository.fetchAll(client: session.client) },
-            cache: session.payloadCache
-        )
+        errorMessage = nil
+        do {
+            categories = try await session.dbQueue.read { database in try LocalTableQueries.categories(database) }
+        } catch {
+            errorMessage = UserFacingError.describe(error)
+        }
+        isLoading = false
     }
 }
 

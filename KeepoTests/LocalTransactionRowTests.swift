@@ -160,4 +160,46 @@ struct LocalTransactionRowTests {
         #expect(found?.kind == "income")
         #expect(missing == nil)
     }
+
+    @Test("fetchByTransferGroup returns both legs of a transfer")
+    func fetchByTransferGroupReturnsBothLegs() async throws {
+        let dbQueue = try makeDatabase()
+        let ownerId = UUID().uuidString
+        let groupId = UUID().uuidString
+        let (fromAccountId, _) = try await dbQueue.write { database in try seed(database, ownerId: ownerId) }
+        let toAccountId = UUID().uuidString
+        try await dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO accounts (id, owner_id, created_by, kind, subtype, name, currency,
+                    opening_balance_e4, opening_balance_at, include_in_total, counts_toward_fi, version,
+                    created_at, updated_at, sync_seq)
+                VALUES (?, ?, ?, 'ledger', 'checking', 'Savings', 'EUR', 0, '2026-01-01', 1, 1, 1,
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [toAccountId, ownerId, ownerId]
+            )
+            for (id, accountId, amount) in [
+                (UUID().uuidString, fromAccountId, Int64(-40000)), (UUID().uuidString, toAccountId, Int64(40000))
+            ] {
+                try database.execute(
+                    sql: """
+                    INSERT INTO transactions (id, owner_id, created_by, account_id, category_id, amount_e4, currency,
+                        occurred_at, transfer_group_id, source, status, version, created_at, updated_at, sync_seq)
+                    VALUES (?, ?, ?, ?, NULL, ?, 'EUR', '2026-06-15T12:00:00.000000+00:00', ?, 'manual', 'confirmed',
+                        1, '2026-06-15T12:00:00.000000+00:00', '2026-06-15T12:00:00.000000+00:00', 1)
+                    """,
+                    arguments: [id, ownerId, ownerId, accountId, amount, groupId]
+                )
+            }
+        }
+
+        let legs = try await dbQueue.read { database in
+            try LocalTransactionRow.fetchByTransferGroup(database, transferGroupId: groupId, baseCurrency: "EUR")
+        }
+
+        #expect(legs.count == 2)
+        #expect(legs.allSatisfy { $0.kind == "transfer" })
+        #expect(Set(legs.map { $0.amountE4 }) == [-40000, 40000])
+    }
 }

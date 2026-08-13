@@ -28,7 +28,7 @@ struct TransactionFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var kind: Kind = .expense
-    @State private var accounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var accounts: [LocalAccountRow] = []
     @State private var categories: [PublicSchema.CategoriesSelect] = []
 
     @State private var selectedAccountId: UUID?
@@ -41,16 +41,18 @@ struct TransactionFormView: View {
     @State private var receivedAmountText = ""
 
     // Edit-mode versions the save call sends back for lost-update detection.
-    @State private var editingId: UUID?
-    @State private var editingFromVersion: Int?
-    @State private var editingToVersion: Int?
-    @State private var editingTransferGroupId: UUID?
+    // Not `private` — read by the conflict-reload path in
+    // TransactionFormView+Conflict.swift.
+    @State var editingId: UUID?
+    @State var editingFromVersion: Int?
+    @State var editingToVersion: Int?
+    @State var editingTransferGroupId: UUID?
     // created_by (who entered it) differs from the viewer on a shared account.
     @State private var addedByHouseholdMember = false
 
     @State private var isSaving = false
     @State private var errorMessage: String?
-    @State private var showConflictAlert = false
+    @State var showConflictAlert = false
     @State private var divergenceWarning: RateDivergence?
     @State private var transferDivergenceConfirmed = false
 
@@ -59,12 +61,12 @@ struct TransactionFormView: View {
         return false
     }
 
-    private var fromAccount: PublicSchema.AccountsWithBalancesSelect? {
-        accounts.first { $0.accountId == selectedAccountId }
+    private var fromAccount: LocalAccountRow? {
+        accounts.first { $0.id == selectedAccountId }
     }
 
-    private var toAccount: PublicSchema.AccountsWithBalancesSelect? {
-        accounts.first { $0.accountId == selectedToAccountId }
+    private var toAccount: LocalAccountRow? {
+        accounts.first { $0.id == selectedToAccountId }
     }
 
     private var needsReceivedAmount: Bool {
@@ -159,8 +161,8 @@ struct TransactionFormView: View {
     private func accountPicker(selection: Binding<UUID?>, excluding: UUID?) -> some View {
         Picker("Account", selection: selection) {
             Text("Select…").tag(UUID?.none)
-            ForEach(accounts.filter { $0.accountId != excluding }, id: \.accountId) { account in
-                Text(account.name ?? "—").tag(account.accountId)
+            ForEach(accounts.filter { $0.id != excluding }) { account in
+                Text(account.name).tag(UUID?.some(account.id))
             }
         }
     }
@@ -176,17 +178,20 @@ struct TransactionFormView: View {
         return false
     }
 
-    /// Falls back to `TransactionFormCache` when the live fetch fails — an
-    /// offline create otherwise has no way to populate its own pickers.
+    /// Reads straight off the local GRDB mirror (Phase L6) — always
+    /// current, never needs a cache-fallback chain the way a network fetch
+    /// used to.
     private func load() async {
-        async let accountsResult = withTimeout(seconds: 3) {
-            try await AccountRepository.fetchAllWithBalances(client: session.client)
+        if let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency {
+            let loaded = try? await session.dbQueue.read { database in
+                (
+                    try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency),
+                    try LocalTableQueries.categories(database)
+                )
+            }
+            accounts = loaded?.0 ?? []
+            categories = loaded?.1 ?? []
         }
-        async let categoriesResult = withTimeout(seconds: 3) {
-            try await CategoryRepository.fetchAll(client: session.client)
-        }
-        accounts = (try? await accountsResult) ?? TransactionFormCache.accounts(session: session)
-        categories = (try? await categoriesResult) ?? TransactionFormCache.categories(session: session)
 
         if case .edit(let transaction, let sibling) = mode {
             apply(transaction: transaction, sibling: sibling)
@@ -194,8 +199,10 @@ struct TransactionFormView: View {
     }
 
     /// Shared by the initial edit-mode prefill and by a post-conflict
-    /// reload — both are "populate the form from a server row."
-    private func apply(
+    /// reload (`TransactionFormView+Conflict.swift`) — both are "populate
+    /// the form from a server row." Not `private`: the conflict-reload path
+    /// calls it cross-file.
+    func apply(
         transaction: PublicSchema.TransactionsWithDetailsSelect,
         sibling: PublicSchema.TransactionsWithDetailsSelect?
     ) {
@@ -294,7 +301,7 @@ extension TransactionFormView {
         let signedAmountE4 = kind == .expense ? -magnitude : magnitude
         let payload = CreateTransactionPayload(
             id: UUID(), ownerId: userId, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency ?? "USD", occurredAt: occurredAt
+            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt
         )
         await session.outbox.submitCreateTransaction(payload)
     }
@@ -311,10 +318,9 @@ extension TransactionFormView {
         }
 
         if !transferDivergenceConfirmed, needsReceivedAmount, let toAmount = receivedAmount,
-           let source = fromAccount, let destination = toAccount,
-           let sourceCurrency = source.currency, let destinationCurrency = destination.currency {
+           let source = fromAccount, let destination = toAccount {
             divergenceWarning = await TransferDivergenceCheck.evaluate(
-                client: session.client, sourceCurrency: sourceCurrency, destinationCurrency: destinationCurrency,
+                client: session.client, sourceCurrency: source.currency, destinationCurrency: destination.currency,
                 fromAmountE4: magnitude, toAmountE4: toAmount, occurredAt: occurredAt
             )
             if divergenceWarning != nil { return }
@@ -341,7 +347,7 @@ extension TransactionFormView {
         let signedAmountE4 = kind == .expense ? -magnitude : magnitude
         let payload = UpdateTransactionPayload(
             id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency ?? "USD", occurredAt: occurredAt,
+            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
             merchantRaw: merchantRaw
         )
         let result = await session.outbox.submitUpdateTransaction(payload)
@@ -374,27 +380,4 @@ extension TransactionFormView {
         }
     }
 
-    /// A stale version means someone else changed this transaction since it
-    /// loaded — reload the current row from the server, repopulate the
-    /// form with it, and let the user decide whether to reapply their edit,
-    /// rather than silently discarding what they typed or clobbering the
-    /// newer data.
-    fileprivate func reloadAfterConflict() async {
-        guard let all = try? await TransactionRepository.fetchAll(client: session.client) else {
-            showConflictAlert = true
-            return
-        }
-        let groupId = editingTransferGroupId
-        let id = editingId
-        let transaction = all.first {
-            $0.transactionId == id || ($0.transferGroupId != nil && $0.transferGroupId == groupId)
-        }
-        let sibling = groupId.flatMap { group in
-            all.first { $0.transferGroupId == group && $0.transactionId != transaction?.transactionId }
-        }
-        if let transaction {
-            apply(transaction: transaction, sibling: sibling)
-        }
-        showConflictAlert = true
-    }
 }

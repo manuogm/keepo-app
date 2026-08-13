@@ -8,7 +8,7 @@ import SwiftUI
 struct ExportView: View {
     let session: SessionStore
 
-    @State private var accounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var accounts: [LocalAccountRow] = []
     @State private var selectedAccountIds: Set<UUID> = []
     @State private var exportAllAccounts = true
     @State private var exportAllTime = true
@@ -28,10 +28,8 @@ struct ExportView: View {
             Section {
                 Toggle("All Accounts", isOn: $exportAllAccounts)
                 if !exportAllAccounts {
-                    ForEach(accounts, id: \.accountId) { account in
-                        if let accountId = account.accountId {
-                            Toggle(account.name ?? "—", isOn: selectionBinding(for: accountId))
-                        }
+                    ForEach(accounts) { account in
+                        Toggle(account.name, isOn: selectionBinding(for: account.id))
                     }
                 }
             } header: {
@@ -70,7 +68,10 @@ struct ExportView: View {
         .navigationTitle("Export")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            accounts = (try? await AccountRepository.fetchAllWithBalances(client: session.client)) ?? []
+            guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else { return }
+            accounts = (try? await session.dbQueue.read { database in
+                try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency)
+            }) ?? []
         }
         .sheet(isPresented: $showShareSheet) {
             if let exportedFileURL {
@@ -94,7 +95,7 @@ struct ExportView: View {
         do {
             try await session.stepUp(reason: "Confirm it's you to export your financial data")
             let accountIds = exportAllAccounts
-                ? accounts.compactMap(\.accountId)
+                ? accounts.map(\.id)
                 : Array(selectedAccountIds)
             let rows = try await ExportRepository.fetchTransactions(
                 client: session.client, accountIds: accountIds,

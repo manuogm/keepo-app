@@ -9,20 +9,19 @@ import SwiftUI
 struct RecurringRulesView: View {
     let session: SessionStore
 
-    @State private var store = DataStore<PublicSchema.RecurringRulesSelect>(cacheKey: "recurring_rules")
-    @State private var accounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var rules: [PublicSchema.RecurringRulesSelect] = []
+    @State private var isLoading = true
+    @State private var accounts: [LocalAccountRow] = []
     @State private var categories: [PublicSchema.CategoriesSelect] = []
     @State private var isAddingRule = false
     @State private var editingRule: PublicSchema.RecurringRulesSelect?
     @State private var actionErrorMessage: String?
 
-    private var rules: [PublicSchema.RecurringRulesSelect] { store.items }
-
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if store.isLoading {
+            if isLoading {
                 ProgressView()
             } else if rules.isEmpty {
                 Text("No recurring transactions yet")
@@ -73,12 +72,11 @@ struct RecurringRulesView: View {
                 session.refresh.bump()
             }
         }
-        .task { store.restore(from: session.payloadCache) }
         .task(id: session.refresh.token) { await load() }
     }
 
-    private func account(for rule: PublicSchema.RecurringRulesSelect) -> PublicSchema.AccountsWithBalancesSelect? {
-        accounts.first { $0.accountId == rule.accountId }
+    private func account(for rule: PublicSchema.RecurringRulesSelect) -> LocalAccountRow? {
+        accounts.first { $0.id == rule.accountId }
     }
 
     private func category(for rule: PublicSchema.RecurringRulesSelect) -> PublicSchema.CategoriesSelect? {
@@ -86,14 +84,28 @@ struct RecurringRulesView: View {
     }
 
     private func load() async {
-        async let accountsResult = AccountRepository.fetchAllWithBalances(client: session.client)
-        async let categoriesResult = CategoryRepository.fetchAll(client: session.client)
-        accounts = (try? await accountsResult) ?? []
-        categories = (try? await categoriesResult) ?? []
-        await store.load(
-            { try await RecurringRuleRepository.fetchAll(client: session.client) },
-            cache: session.payloadCache
-        )
+        actionErrorMessage = nil
+        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
+            isLoading = false
+            return
+        }
+        do {
+            let loaded: LoadedRecurringState = try await session.dbQueue.read { database in
+                LoadedRecurringState(
+                    rules: try LocalTableQueries.recurringRules(database),
+                    accounts: try LocalAccountRow.fetchAll(
+                        database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
+                    ),
+                    categories: try LocalTableQueries.categories(database)
+                )
+            }
+            rules = loaded.rules
+            accounts = loaded.accounts
+            categories = loaded.categories
+        } catch {
+            actionErrorMessage = UserFacingError.describe(error)
+        }
+        isLoading = false
     }
 
     /// "Delete" pauses, never removes — a recurring rule has already
@@ -116,9 +128,15 @@ struct RecurringRulesView: View {
 
 extension PublicSchema.RecurringRulesSelect: Identifiable {}
 
+private struct LoadedRecurringState {
+    let rules: [PublicSchema.RecurringRulesSelect]
+    let accounts: [LocalAccountRow]
+    let categories: [PublicSchema.CategoriesSelect]
+}
+
 private struct RecurringRuleRow: View {
     let rule: PublicSchema.RecurringRulesSelect
-    let account: PublicSchema.AccountsWithBalancesSelect?
+    let account: LocalAccountRow?
     let category: PublicSchema.CategoriesSelect?
 
     var body: some View {
@@ -131,7 +149,7 @@ private struct RecurringRuleRow: View {
                     .foregroundStyle(Color.secondary)
             }
             Spacer()
-            let currencyInfo = CurrencyInfo(code: rule.currency, minorUnit: Int(account?.minorUnit ?? 2))
+            let currencyInfo = CurrencyInfo(code: rule.currency, minorUnit: account?.currencyInfo.minorUnit ?? 2)
             Text(MoneyFormatter.format(rule.amountE4, currency: currencyInfo))
                 .monospacedDigit()
                 .foregroundStyle(rule.active ? Color.primary : Color.secondary)

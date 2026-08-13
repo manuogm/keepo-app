@@ -46,7 +46,9 @@ struct OnboardingView: View {
             .padding(24)
         }
         .task {
-            currencies = await CurrencyCache.fetchAll(session: session)
+            currencies = (try? await session.dbQueue.read { database in
+                try LocalTableQueries.currencies(database)
+            }) ?? []
         }
     }
 

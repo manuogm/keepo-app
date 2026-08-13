@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 struct CSVImportView: View {
     let session: SessionStore
 
-    @State private var accounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var accounts: [LocalAccountRow] = []
     @State private var selectedAccountId: UUID?
     @State private var isPickingFile = false
     @State private var filename: String?
@@ -24,8 +24,8 @@ struct CSVImportView: View {
             Section("Account") {
                 Picker("Import into", selection: $selectedAccountId) {
                     Text("Choose an account").tag(UUID?.none)
-                    ForEach(ledgerAccounts, id: \.accountId) { account in
-                        Text(account.name ?? "—").tag(account.accountId)
+                    ForEach(ledgerAccounts) { account in
+                        Text(account.name).tag(UUID?.some(account.id))
                     }
                 }
             }
@@ -72,14 +72,17 @@ struct CSVImportView: View {
         .navigationTitle("Import CSV")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            accounts = (try? await AccountRepository.fetchAllWithBalances(client: session.client)) ?? []
+            guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else { return }
+            accounts = (try? await session.dbQueue.read { database in
+                try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency)
+            }) ?? []
         }
         .fileImporter(isPresented: $isPickingFile, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
             handlePickedFile(result)
         }
     }
 
-    private var ledgerAccounts: [PublicSchema.AccountsWithBalancesSelect] {
+    private var ledgerAccounts: [LocalAccountRow] {
         accounts.filter { $0.kind == .ledger && $0.archivedAt == nil }
     }
 
@@ -101,7 +104,7 @@ struct CSVImportView: View {
 
     private func submit() async {
         guard let selectedAccountId else { return }
-        let currency = accounts.first { $0.accountId == selectedAccountId }?.currency ?? "USD"
+        let currency = accounts.first { $0.id == selectedAccountId }?.currency ?? "USD"
         isImporting = true
         errorMessage = nil
         do {
