@@ -264,6 +264,28 @@ The make-or-break phase.
 - **Human review stop.** If the referee cannot be made green, the architecture is wrong and we stop
   here rather than building on it.
 
+**Shipped 2026-08-13 — the referee is green; two scope corrections found while building, detailed in
+`version-logs/phase-L4-log.md`:**
+1. **`net_worth_daily`/`refresh_net_worth_daily` deletion deferred to L6, not done here.** This
+   phase's own bullet above says "nothing server-side reads it once `HomeView` moves to the local
+   query in L6" — but the app is still online-first through L4 (per L3's own architecture note), and
+   `HomeView`'s trajectory today calls `net_worth_series`, which still reads `net_worth_daily`
+   server-side. Dropping it now would break the live, shipping Home screen for no benefit, since
+   nothing local reads the new SQLite money layer until L6 either. Deferred to land in the same L6
+   commit that switches `HomeView` over — the "moved here from L1" correction this bullet documents
+   turns out to still be one step early.
+2. **`needs_review`'s `csv_import_candidate` branch not ported** — `csv_import_candidates`/
+   `csv_import_batches` were never added to L3's 16-table syncable schema (they're not in
+   `app-architecture.md`'s list), so there is no local table for this branch to read. Not a gap
+   introduced here; the local `needs_review` in `LocalMoneyQueries.swift` covers the three branches
+   whose source tables exist locally (`sync_conflicts`, pending captures, ambiguous `card_mappings`).
+   Revisit if CSV import ever needs a local table (out of scope for the current plan phases).
+3. **Dialect work turned out to need none of the specific techniques anticipated** (recursive CTEs,
+   correlated subqueries, `strftime`/`date`, text+CHECK) — the actual money functions decompose
+   cleanly into plain `SELECT`/`SUM`/`WHERE` against the local mirror plus Swift-side reduction for
+   FX (see app-architecture.md's new L4 section), so `generate_series`/`LATERAL`/Postgres-specific
+   date functions never came up as porting obstacles in practice.
+
 ## Phase L5 — Sync engine on device
 
 - Pull loop: cursor → apply upserts and tombstones in one transaction → advance cursor.

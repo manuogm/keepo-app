@@ -42,4 +42,28 @@ public enum PostgresDate {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.date(from: string)
     }
+
+    /// Same instant as `timestampString(_:)`, but formatted to match
+    /// PostgREST's own `timestamptz` rendering exactly: a fixed 6-digit
+    /// fractional-second field and a `+00:00` offset (`2026-08-11T13:38:16.320521+00:00`),
+    /// not `ISO8601DateFormatter`'s whole-second `Z`-suffixed default.
+    ///
+    /// The local SQLite store (`keepo-local-first-plan.md` L4) never
+    /// reparses its `TEXT` timestamp columns — it compares them as strings,
+    /// which is only correct if every string sharing a column was rendered
+    /// with the identical format. A `2026-08-11T13:38:16Z` boundary built
+    /// with the default formatter sorts *before* a same-second
+    /// `2026-08-11T13:38:16.320521+00:00` row (`.` < `Z` at that byte
+    /// position), silently excluding a transaction that occurred earlier in
+    /// the same second than the boundary's whole-second truncation implies.
+    /// This is the one place a boundary gets built for that comparison, so
+    /// it exists here rather than reintroducing the ad-hoc-formatter bug
+    /// `timestampString` itself was written to close.
+    public static func sqliteTimestampBoundaryString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+        return formatter.string(from: date) + "000+00:00"
+    }
 }
