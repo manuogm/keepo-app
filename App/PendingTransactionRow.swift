@@ -8,7 +8,7 @@ struct PendingTransactionDisplay: Identifiable {
     let id: UUID
     let accountName: String
     let categoryName: String
-    let amount: Decimal
+    let amountE4: Int64
     let currency: String
     let minorUnit: Int
 }
@@ -35,9 +35,9 @@ struct PendingTransactionRow: View {
             }
             Spacer()
             let currency = CurrencyInfo(code: pending.currency, minorUnit: pending.minorUnit)
-            Text(MoneyFormatter.format(pending.amount, currency: currency))
+            Text(MoneyFormatter.format(pending.amountE4, currency: currency))
                 .monospacedDigit()
-                .foregroundStyle(pending.amount < 0 ? Color.primary : Color.primary)
+                .foregroundStyle(pending.amountE4 < 0 ? Color.primary : Color.primary)
         }
     }
 }

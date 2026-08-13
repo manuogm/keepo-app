@@ -7,12 +7,12 @@ import Foundation
 /// money).
 public struct CSVImportRow: Sendable, Equatable {
     public let occurredAt: Date
-    public let amount: Decimal
+    public let amountE4: Int64
     public let merchantRaw: String?
 
-    public init(occurredAt: Date, amount: Decimal, merchantRaw: String?) {
+    public init(occurredAt: Date, amountE4: Int64, merchantRaw: String?) {
         self.occurredAt = occurredAt
-        self.amount = amount
+        self.amountE4 = amountE4
         self.merchantRaw = merchantRaw
     }
 }
@@ -72,7 +72,7 @@ public enum CSVImportParser {
             }
 
             let merchant = field(fields, at: resolvedMerchantIndex)
-            return CSVImportRow(occurredAt: date, amount: amount, merchantRaw: merchant.isEmpty ? nil : merchant)
+            return CSVImportRow(occurredAt: date, amountE4: amount, merchantRaw: merchant.isEmpty ? nil : merchant)
         }
     }
 

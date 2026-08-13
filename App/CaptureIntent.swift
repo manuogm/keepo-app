@@ -54,7 +54,7 @@ struct CaptureIntent: AppIntent {
             )
             let payload = CaptureTransactionPayload(
                 id: UUID(), cardIdentifier: card, merchantRaw: merchant, merchantNormalized: merchantNormalized,
-                amount: parsedAmount, occurredAt: occurredAt, externalId: externalId
+                amountE4: parsedAmount, occurredAt: occurredAt, externalId: externalId
             )
 
             await notify(for: await outbox.submitCaptureTransaction(payload), merchant: merchant)

@@ -154,8 +154,8 @@ struct RecurringRuleFormView: View {
         editingId = rule.id
         selectedAccountId = rule.accountId
         selectedCategoryId = rule.categoryId
-        kind = rule.amount < 0 ? .expense : .income
-        amountText = AmountFormatter.editableString(rule.amount, minorUnit: minorUnit)
+        kind = rule.amountE4 < 0 ? .expense : .income
+        amountText = AmountFormatter.editableString(rule.amountE4, minorUnit: minorUnit)
         frequency = rule.frequency
         nextDueAt = PostgresDate.dateOnly(from: rule.nextDueAt) ?? Date()
         active = rule.active
@@ -167,7 +167,8 @@ struct RecurringRuleFormView: View {
             errorMessage = "Fill in every field."
             return
         }
-        let signedAmount = kind == .expense ? -magnitude.magnitude : magnitude.magnitude
+        let unsignedMagnitude = abs(magnitude)
+        let signedAmountE4 = kind == .expense ? -unsignedMagnitude : unsignedMagnitude
 
         isSaving = true
         errorMessage = nil
@@ -177,14 +178,14 @@ struct RecurringRuleFormView: View {
                 guard let ownerId = session.profile?.id else { return }
                 try await RecurringRuleRepository.create(
                     client: session.client, ownerId: ownerId, accountId: accountId, categoryId: categoryId,
-                    amount: signedAmount, currency: selectedAccount?.currency ?? "EUR", frequency: frequency,
+                    amountE4: signedAmountE4, currency: selectedAccount?.currency ?? "EUR", frequency: frequency,
                     nextDueAt: nextDueAt
                 )
             case .edit:
                 guard let id = editingId else { return }
                 try await RecurringRuleRepository.update(
                     client: session.client, id: id, accountId: accountId, categoryId: categoryId,
-                    amount: signedAmount, currency: selectedAccount?.currency ?? "EUR", frequency: frequency,
+                    amountE4: signedAmountE4, currency: selectedAccount?.currency ?? "EUR", frequency: frequency,
                     nextDueAt: nextDueAt, active: active
                 )
             }

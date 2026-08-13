@@ -30,10 +30,10 @@ select throws_like(
   'create_household raises if the caller already belongs to one'
 );
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('a0000000-0000-0000-0000-00000000a001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Shared', 'EUR', 1000);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('a0000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Private', 'EUR', 500);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-00000000a001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Shared', 'EUR', 10000000);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Private', 'EUR', 5000000);
 insert into categories (id, owner_id, kind, name)
 values ('c0000000-0000-0000-0000-00000000a001', auth.uid(), 'expense', 'Test Expense');
 
@@ -44,8 +44,8 @@ select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('b0000000-0000-0000-0000-00000000b001', auth.uid(), auth.uid(), 'ledger', 'checking', 'B Private', 'USD', 2000);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('b0000000-0000-0000-0000-00000000b001', auth.uid(), auth.uid(), 'ledger', 'checking', 'B Private', 'USD', 20000000);
 
 -- 2. Before B joins any household, A's shared account is invisible to her —
 -- "shared" means shared into a household B actually belongs to, not a
@@ -115,17 +115,17 @@ select is(
 -- account. Must run here, before B shares her account below, or both
 -- accounts become mutually visible and this stops testing what it claims to.
 select throws_like(
-  $$ select create_transfer('a0000000-0000-0000-0000-00000000a002', 'b0000000-0000-0000-0000-00000000b001', 5) $$,
+  $$ select create_transfer('a0000000-0000-0000-0000-00000000a002', 'b0000000-0000-0000-0000-00000000b001', 50000) $$,
   '%not found or are not accessible%',
   'a transfer between two private accounts of different, unrelated owners is rejected'
 );
 
 -- 8. B can write a transaction on the shared account (can_write_account now
 -- recognizes household membership).
-insert into transactions (id, owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+insert into transactions (id, owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
 values (
   'd0000000-0000-0000-0000-00000000d001', '11111111-1111-1111-1111-111111111111', auth.uid(),
-  'a0000000-0000-0000-0000-00000000a001', 'c0000000-0000-0000-0000-00000000a001', -40, 'EUR', now()
+  'a0000000-0000-0000-0000-00000000a001', 'c0000000-0000-0000-0000-00000000a001', -400000, 'EUR', now()
 );
 
 select is(
@@ -154,7 +154,7 @@ select is(
 -- owns it (Phase 6's update_account/archive_account addendum to H2).
 select is(
   (select conflict from update_account(
-    'a0000000-0000-0000-0000-00000000a001', 1, 'A Shared (renamed by B)', 'checking', 1000, true, true
+    'a0000000-0000-0000-0000-00000000a001', 1, 'A Shared (renamed by B)', 'checking', 10000000, true, true
   )),
   false,
   'a household member can call update_account on a shared account she does not own'
@@ -183,7 +183,7 @@ select is(
 -- would pass vacuously regardless of whether the relaxed rule is correct.
 -- A's shared account is EUR, B's is USD — cross-currency, so to_amount must
 -- be supplied explicitly (create_transfer's own rule, unrelated to households).
-select create_transfer('a0000000-0000-0000-0000-00000000a001', 'b0000000-0000-0000-0000-00000000b001', 100, 90);
+select create_transfer('a0000000-0000-0000-0000-00000000a001', 'b0000000-0000-0000-0000-00000000b001', 1000000, 900000);
 set constraints all immediate;
 set constraints all deferred;
 
@@ -238,8 +238,8 @@ select is(
 );
 
 select isnt(
-  (select balance_base from account_balances_base where account_id = 'a0000000-0000-0000-0000-00000000a001'),
-  (select balance from account_balances_base where account_id = 'a0000000-0000-0000-0000-00000000a001'),
+  (select balance_base_e4 from account_balances_base where account_id = 'a0000000-0000-0000-0000-00000000a001'),
+  (select balance_e4 from account_balances_base where account_id = 'a0000000-0000-0000-0000-00000000a001'),
   'B''s converted balance for the shared EUR account differs from the raw EUR balance (a real conversion happened)'
 );
 

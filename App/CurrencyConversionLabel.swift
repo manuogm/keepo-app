@@ -12,7 +12,7 @@ import SwiftUI
 /// blank space (a missing rate and "nothing to show" must look different).
 struct CurrencyConversionLabel: View {
     let nativeCurrency: String?
-    let amountBase: Decimal?
+    let amountBase: Int64?
     let baseCurrency: String?
     let baseMinorUnit: Int16?
     let hasMissingRate: Bool

@@ -1,18 +1,24 @@
 -- set_account_balance: see supabase/migrations/20260814200000_
--- set_account_balance.sql. Fixture A = 11111111-...
+-- set_account_balance.sql, amended by 20260815100000_money_as_integers.sql
+-- to take p_expected_version (LH6: two concurrent balance edits must
+-- conflict like every other write, not silently apply and vanish) and to
+-- check idempotency BEFORE the version check, so a retried outbox write
+-- with the same client-generated id still succeeds even though the
+-- account's version has since moved past what the retry claims to expect.
+-- Fixture A = 11111111-...
 
 \ir _helpers.psql
 
 begin;
-select plan(12);
+select plan(14);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('a0000000-0000-0000-0000-000000000021', auth.uid(), auth.uid(), 'ledger', 'checking', 'Checking', 'EUR', 100);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000021', auth.uid(), auth.uid(), 'ledger', 'checking', 'Checking', 'EUR', 1000000);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a0000000-0000-0000-0000-000000000022', auth.uid(), auth.uid(), 'valuation', 'investment', 'Brokerage', 'EUR', 0);
 
 -- Backdated to yesterday, not today: `now()` is frozen for this whole test
@@ -21,15 +27,15 @@ values ('a0000000-0000-0000-0000-000000000022', auth.uid(), auth.uid(), 'valuati
 -- would carry an identical created_at too — as_of desc alone should be
 -- what disambiguates the common case, and created_at is only the tiebreak
 -- for the genuine same-day case, exercised separately below.
-insert into balance_snapshots (account_id, currency, as_of, value, created_by)
-values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date - 1, 1000, auth.uid());
+insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by)
+values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date - 1, 10000000, auth.uid());
 
 -- 1. Raising a ledger account's balance creates a positive adjustment
--- transaction for exactly the gap.
-select set_account_balance('a0000000-0000-0000-0000-000000000021', 150);
+-- transaction for exactly the gap. Both accounts start at version 1.
+select set_account_balance('a0000000-0000-0000-0000-000000000021', 1500000, 1);
 select is(
-  (select amount from transactions where account_id = 'a0000000-0000-0000-0000-000000000021' and source = 'adjustment'),
-  50::numeric,
+  (select amount_e4 from transactions where account_id = 'a0000000-0000-0000-0000-000000000021' and source = 'adjustment'),
+  500000::bigint,
   'raising a ledger balance by 50 creates a +50 adjustment transaction'
 );
 
@@ -44,22 +50,24 @@ select is(
 -- 3. account_balance_on now reflects the new balance exactly.
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000021', current_date)),
-  150::numeric,
+  1500000::bigint,
   'the ledger account''s computed balance matches the entered value'
 );
 
--- 4. Lowering the balance creates a negative (expense) adjustment.
-select set_account_balance('a0000000-0000-0000-0000-000000000021', 100);
+-- 4. Lowering the balance creates a negative (expense) adjustment. That
+-- first edit bumped the checking account to version 2.
+select set_account_balance('a0000000-0000-0000-0000-000000000021', 1000000, 2);
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000021', current_date)),
-  100::numeric,
+  1000000::bigint,
   'lowering the balance creates a negative adjustment reaching the new value'
 );
 
 -- 5. Setting the balance to its current value is a no-op — no zero-amount
--- transaction (the DB's own amount_not_zero CHECK would reject one anyway).
+-- transaction (the DB's own amount_not_zero CHECK would reject one anyway),
+-- and no version bump either. Now at version 3.
 select is(
-  (select transaction_id from set_account_balance('a0000000-0000-0000-0000-000000000021', 100)),
+  (select transaction_id from set_account_balance('a0000000-0000-0000-0000-000000000021', 1000000, 3)),
   null::uuid,
   'setting a ledger balance to its current value creates no transaction'
 );
@@ -71,11 +79,11 @@ select is(
 );
 
 -- 6. A valuation account's balance edit writes a new snapshot, not a
--- transaction.
-select set_account_balance('a0000000-0000-0000-0000-000000000022', 1200);
+-- transaction. Brokerage is still at version 1.
+select set_account_balance('a0000000-0000-0000-0000-000000000022', 12000000, 1);
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000022', current_date)),
-  1200::numeric,
+  12000000::bigint,
   'a valuation account''s computed balance matches the newly entered value'
 );
 
@@ -92,22 +100,25 @@ select is(
 -- call above, which already wrote a same-day snapshot at the frozen
 -- now() — so both rows here are inserted with an explicit `created_at`
 -- strictly after that frozen instant, not just after each other.
-insert into balance_snapshots (account_id, currency, as_of, value, created_by, created_at)
-values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date, 1150, auth.uid(), now() + interval '1 minute');
-insert into balance_snapshots (account_id, currency, as_of, value, created_by, created_at)
-values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date, 1300, auth.uid(), now() + interval '2 minutes');
+insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by, created_at)
+values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date, 11500000, auth.uid(), now() + interval '1 minute');
+insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by, created_at)
+values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date, 13000000, auth.uid(), now() + interval '2 minutes');
 
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000022', current_date)),
-  1300::numeric,
+  13000000::bigint,
   'two same-day snapshots resolve to the one with the later created_at'
 );
 
 -- 8. Idempotency: replaying the same client-supplied id twice does not
 -- double the effect (queued-write-replayed-twice safety, same pattern as
--- create_transfer's idempotent leg ids).
-select set_account_balance('a0000000-0000-0000-0000-000000000021', 250, 'b0000000-0000-0000-0000-000000000001');
-select set_account_balance('a0000000-0000-0000-0000-000000000021', 250, 'b0000000-0000-0000-0000-000000000001');
+-- create_transfer's idempotent leg ids) — and critically, the SECOND call
+-- still succeeds even though it passes the same p_expected_version=3 that
+-- the first call already advanced past (checking is now at version 4),
+-- because the idempotency check runs before the version check.
+select set_account_balance('a0000000-0000-0000-0000-000000000021', 2500000, 3, 'b0000000-0000-0000-0000-000000000001');
+select set_account_balance('a0000000-0000-0000-0000-000000000021', 2500000, 3, 'b0000000-0000-0000-0000-000000000001');
 select is(
   (select count(*) from transactions where id = 'b0000000-0000-0000-0000-000000000001'),
   1::bigint,
@@ -116,18 +127,32 @@ select is(
 
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000021', current_date)),
-  250::numeric,
+  2500000::bigint,
   'the balance after a duplicate replay still matches the single applied adjustment'
 );
 
--- 9. Fixture B cannot set fixture A's account balance.
+-- 9. A genuinely stale version (not a replay — a new id, an old version)
+-- reports conflict, applies nothing, and logs a sync_conflicts row.
+select is(
+  (select conflict from set_account_balance('a0000000-0000-0000-0000-000000000021', 9990000, 1)),
+  true,
+  'a genuinely stale expected_version reports conflict = true, not a silent apply'
+);
+
+select is(
+  (select account_balance_on('a0000000-0000-0000-0000-000000000021', current_date)),
+  2500000::bigint,
+  'a rejected stale-version balance edit leaves the account''s balance untouched'
+);
+
+-- 10. Fixture B cannot set fixture A's account balance.
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 
 select throws_like(
-  $$ select set_account_balance('a0000000-0000-0000-0000-000000000021', 999) $$,
+  $$ select set_account_balance('a0000000-0000-0000-0000-000000000021', 9990000, 4) $$,
   '%not found or not accessible%',
   'a different owner cannot set another user''s account balance'
 );

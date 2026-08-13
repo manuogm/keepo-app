@@ -16,7 +16,7 @@ struct InsightsView: View {
     @State private var seriesPoints: [IncomeExpensePoint] = []
     @State private var savingsRate: Decimal?
     @State private var investmentAccounts: [PublicSchema.AccountsWithBalancesSelect] = []
-    @State private var unrealizedGains: [UUID: Decimal?] = [:]
+    @State private var unrealizedGains: [UUID: Int64?] = [:]
     @State private var fiMetrics: FIMetrics?
     @State private var isEditingFISettings = false
     @State private var isLoading = true
@@ -82,10 +82,10 @@ struct InsightsView: View {
                     .font(.caption)
             }
             if let fiMetrics {
-                fiMetricRow("FI number", value: fiCurrencyText(fiMetrics.fiNumber))
+                fiMetricRow("FI number", value: fiCurrencyText(fiMetrics.fiNumberE4))
                 fiMetricRow("Progress", value: fiPercentText(fiMetrics.percentProgress))
                 fiMetricRow("Years to FI", value: fiYearsText(fiMetrics.yearsToFi))
-                fiMetricRow("Coast FI number", value: fiCurrencyText(fiMetrics.coastFiNumber))
+                fiMetricRow("Coast FI number", value: fiCurrencyText(fiMetrics.coastFiNumberE4))
             } else {
                 Text("—").foregroundStyle(Color.secondary)
             }
@@ -100,10 +100,10 @@ struct InsightsView: View {
         }
     }
 
-    private func fiCurrencyText(_ amount: Decimal?) -> String {
-        guard let amount else { return "—" }
+    private func fiCurrencyText(_ amountE4: Int64?) -> String {
+        guard let amountE4 else { return "—" }
         let currency = CurrencyInfo(code: session.profile?.baseCurrency ?? "USD", minorUnit: 0)
-        return MoneyFormatter.format(amount, currency: currency)
+        return MoneyFormatter.format(amountE4, currency: currency)
     }
 
     private func fiPercentText(_ value: Decimal?) -> String {
@@ -142,15 +142,19 @@ struct InsightsView: View {
                     .foregroundStyle(Color.secondary)
             } else {
                 Chart(seriesPoints, id: \.bucketStart) { point in
-                    if let income = point.income {
-                        BarMark(x: .value("Period", point.bucketStart), y: .value("Income", income))
-                            .foregroundStyle(Color.primary)
-                            .position(by: .value("Kind", "Income"))
+                    if let income = point.incomeE4 {
+                        BarMark(
+                            x: .value("Period", point.bucketStart), y: .value("Income", Double(income) / 10_000)
+                        )
+                        .foregroundStyle(Color.primary)
+                        .position(by: .value("Kind", "Income"))
                     }
-                    if let expense = point.expense {
-                        BarMark(x: .value("Period", point.bucketStart), y: .value("Expense", expense))
-                            .foregroundStyle(Color.primary)
-                            .position(by: .value("Kind", "Expense"))
+                    if let expense = point.expenseE4 {
+                        BarMark(
+                            x: .value("Period", point.bucketStart), y: .value("Expense", Double(expense) / 10_000)
+                        )
+                        .foregroundStyle(Color.primary)
+                        .position(by: .value("Kind", "Expense"))
                     }
                 }
                 .chartYAxis { AxisMarks(position: .leading) }
@@ -173,7 +177,7 @@ struct InsightsView: View {
                 // unvalidated per-category palette.
                 Chart(categorySpending, id: \.categoryId) { entry in
                     BarMark(
-                        x: .value("Amount", entry.total ?? 0),
+                        x: .value("Amount", Double(entry.totalE4 ?? 0) / 10_000),
                         y: .value("Category", entry.categoryName)
                     )
                     .foregroundStyle(Color.primary)
@@ -189,7 +193,7 @@ struct InsightsView: View {
     }
 
     private func categoryLabel(_ entry: CategorySpending) -> String {
-        guard let total = entry.total else { return "—" }
+        guard let total = entry.totalE4 else { return "—" }
         let currency = CurrencyInfo(code: entry.currency, minorUnit: 2)
         return MoneyFormatter.format(total, currency: currency)
     }

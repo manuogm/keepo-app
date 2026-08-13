@@ -48,8 +48,8 @@ extension TransactionsListView {
             if let groupId = transaction.transferGroupId, let siblingVersion = sibling(of: transaction)?.version {
                 let payload = DeleteTransferPayload(
                     transferGroupId: groupId,
-                    fromExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(version) : Int(siblingVersion),
-                    toExpectedVersion: (transaction.amount ?? 0) < 0 ? Int(siblingVersion) : Int(version)
+                    fromExpectedVersion: (transaction.amountE4 ?? 0) < 0 ? Int(version) : Int(siblingVersion),
+                    toExpectedVersion: (transaction.amountE4 ?? 0) < 0 ? Int(siblingVersion) : Int(version)
                 )
                 result = await session.outbox.submitDeleteTransfer(payload)
             } else {

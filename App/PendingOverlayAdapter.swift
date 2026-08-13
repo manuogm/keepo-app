@@ -25,7 +25,7 @@ enum PendingOverlayAdapter {
     /// creates/edits are walked in order, so a chain of edits to the same
     /// still-unsynced row nets out correctly too.
     private static func pendingOps(
-        outbox: Outbox, cachedTransactions: [UUID: (accountId: UUID, amount: Decimal)]
+        outbox: Outbox, cachedTransactions: [UUID: (accountId: UUID, amount: Int64)]
     ) -> [PendingOp] {
         var known = cachedTransactions
         var ops: [PendingOp] = []
@@ -40,21 +40,21 @@ enum PendingOverlayAdapter {
     // swiftlint:disable:next cyclomatic_complexity
     private static func appendOps(
         for kind: OutboxKind, data: Data, decoder: JSONDecoder,
-        known: inout [UUID: (accountId: UUID, amount: Decimal)], ops: inout [PendingOp]
+        known: inout [UUID: (accountId: UUID, amount: Int64)], ops: inout [PendingOp]
     ) {
         switch kind {
         case .createTransaction:
             guard let payload = try? decoder.decode(CreateTransactionPayload.self, from: data) else { return }
-            ops.append(.transactionDelta(accountId: payload.accountId, amount: payload.amount))
-            known[payload.id] = (payload.accountId, payload.amount)
+            ops.append(.transactionDelta(accountId: payload.accountId, amount: payload.amountE4))
+            known[payload.id] = (payload.accountId, payload.amountE4)
 
         case .updateTransaction:
             guard let payload = try? decoder.decode(UpdateTransactionPayload.self, from: data) else { return }
             if let old = known[payload.id] {
                 ops.append(.transactionDelta(accountId: old.accountId, amount: -old.amount))
             }
-            ops.append(.transactionDelta(accountId: payload.accountId, amount: payload.amount))
-            known[payload.id] = (payload.accountId, payload.amount)
+            ops.append(.transactionDelta(accountId: payload.accountId, amount: payload.amountE4))
+            known[payload.id] = (payload.accountId, payload.amountE4)
 
         case .deleteTransaction:
             guard let payload = try? decoder.decode(DeleteTransactionPayload.self, from: data) else { return }
@@ -65,17 +65,17 @@ enum PendingOverlayAdapter {
 
         case .createTransfer:
             guard let payload = try? decoder.decode(CreateTransferPayload.self, from: data) else { return }
-            let toAmount = payload.toAmount ?? payload.fromAmount
+            let toAmountE4 = payload.toAmountE4 ?? payload.fromAmountE4
             ops.append(.transferDelta(
-                fromAccountId: payload.fromAccountId, fromAmount: -payload.fromAmount,
-                toAccountId: payload.toAccountId, toAmount: toAmount
+                fromAccountId: payload.fromAccountId, fromAmount: -payload.fromAmountE4,
+                toAccountId: payload.toAccountId, toAmount: toAmountE4
             ))
-            known[payload.fromId] = (payload.fromAccountId, -payload.fromAmount)
-            known[payload.toId] = (payload.toAccountId, toAmount)
+            known[payload.fromId] = (payload.fromAccountId, -payload.fromAmountE4)
+            known[payload.toId] = (payload.toAccountId, toAmountE4)
 
         case .setAccountBalance:
             guard let payload = try? decoder.decode(SetAccountBalancePayload.self, from: data) else { return }
-            ops.append(.accountBalanceOverride(accountId: payload.accountId, newBalance: payload.newBalance))
+            ops.append(.accountBalanceOverride(accountId: payload.accountId, newBalance: payload.newBalanceE4))
 
         case .updateTransfer, .deleteTransfer, .captureTransaction,
              .createAccount, .updateAccount, .createCategory, .updateCategory:
@@ -88,14 +88,14 @@ enum PendingOverlayAdapter {
     /// the same `PayloadCache` key `TransactionsListView` itself writes,
     /// so this works without that screen being on screen or its `@State`
     /// list populated.
-    static func cachedTransactionLookup(session: SessionStore) -> [UUID: (accountId: UUID, amount: Decimal)] {
+    static func cachedTransactionLookup(session: SessionStore) -> [UUID: (accountId: UUID, amount: Int64)] {
         guard let (data, _) = session.payloadCache.load(key: "transactions_page_0") else { return [:] }
         guard let rows = try? JSONDecoder().decode(
             [PublicSchema.TransactionsWithDetailsSelect].self, from: data
         ) else { return [:] }
-        var result: [UUID: (accountId: UUID, amount: Decimal)] = [:]
+        var result: [UUID: (accountId: UUID, amount: Int64)] = [:]
         for row in rows {
-            guard let id = row.transactionId, let accountId = row.accountId, let amount = row.amount else { continue }
+            guard let id = row.transactionId, let accountId = row.accountId, let amount = row.amountE4 else { continue }
             result[id] = (accountId, amount)
         }
         return result
@@ -107,8 +107,8 @@ enum PendingOverlayAdapter {
     /// unsnapshotted valuation account — money rule 5, "—" not "0") stays
     /// absent unless a pending `set_account_balance` override touches it.
     static func overlaidBalances(
-        cached: [UUID: Decimal], outbox: Outbox, cachedTransactions: [UUID: (accountId: UUID, amount: Decimal)]
-    ) -> [UUID: Decimal] {
+        cached: [UUID: Int64], outbox: Outbox, cachedTransactions: [UUID: (accountId: UUID, amount: Int64)]
+    ) -> [UUID: Int64] {
         let ops = pendingOps(outbox: outbox, cachedTransactions: cachedTransactions)
         return PendingOverlay.accountBalances(cached: cached, ops: ops)
     }
@@ -146,9 +146,9 @@ enum PendingOverlayAdapter {
     /// prefill: "what does this account's balance look like right now,
     /// including whatever the user already queued while offline."
     static func overlaidBalance(
-        accountId: UUID, cachedBalance: Decimal, outbox: Outbox,
-        cachedTransactions: [UUID: (accountId: UUID, amount: Decimal)]
-    ) -> Decimal {
+        accountId: UUID, cachedBalance: Int64, outbox: Outbox,
+        cachedTransactions: [UUID: (accountId: UUID, amount: Int64)]
+    ) -> Int64 {
         let ops = pendingOps(outbox: outbox, cachedTransactions: cachedTransactions)
         let result = PendingOverlay.accountBalances(cached: [accountId: cachedBalance], ops: ops)
         return result[accountId] ?? cachedBalance

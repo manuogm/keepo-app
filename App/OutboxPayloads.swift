@@ -8,18 +8,19 @@ public struct CreateTransactionPayload: Codable, Sendable {
     public let ownerId: UUID
     public let accountId: UUID
     public let categoryId: UUID
-    public let amount: Decimal
+    public let amountE4: Int64
     public let currency: String
     public let occurredAt: Date
 
     public init(
-        id: UUID, ownerId: UUID, accountId: UUID, categoryId: UUID, amount: Decimal, currency: String, occurredAt: Date
+        id: UUID, ownerId: UUID, accountId: UUID, categoryId: UUID, amountE4: Int64, currency: String,
+        occurredAt: Date
     ) {
         self.id = id
         self.ownerId = ownerId
         self.accountId = accountId
         self.categoryId = categoryId
-        self.amount = amount
+        self.amountE4 = amountE4
         self.currency = currency
         self.occurredAt = occurredAt
     }
@@ -30,20 +31,20 @@ public struct CreateTransferPayload: Codable, Sendable {
     public let toId: UUID
     public let fromAccountId: UUID
     public let toAccountId: UUID
-    public let fromAmount: Decimal
-    public let toAmount: Decimal?
+    public let fromAmountE4: Int64
+    public let toAmountE4: Int64?
     public let occurredAt: Date
 
     public init(
         fromId: UUID, toId: UUID, fromAccountId: UUID, toAccountId: UUID,
-        fromAmount: Decimal, toAmount: Decimal?, occurredAt: Date
+        fromAmountE4: Int64, toAmountE4: Int64?, occurredAt: Date
     ) {
         self.fromId = fromId
         self.toId = toId
         self.fromAccountId = fromAccountId
         self.toAccountId = toAccountId
-        self.fromAmount = fromAmount
-        self.toAmount = toAmount
+        self.fromAmountE4 = fromAmountE4
+        self.toAmountE4 = toAmountE4
         self.occurredAt = occurredAt
     }
 }
@@ -53,20 +54,20 @@ public struct UpdateTransactionPayload: Codable, Sendable {
     public let expectedVersion: Int
     public let accountId: UUID
     public let categoryId: UUID
-    public let amount: Decimal
+    public let amountE4: Int64
     public let currency: String
     public let occurredAt: Date
     public let merchantRaw: String?
 
     public init(
         id: UUID, expectedVersion: Int, accountId: UUID, categoryId: UUID,
-        amount: Decimal, currency: String, occurredAt: Date, merchantRaw: String?
+        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
         self.accountId = accountId
         self.categoryId = categoryId
-        self.amount = amount
+        self.amountE4 = amountE4
         self.currency = currency
         self.occurredAt = occurredAt
         self.merchantRaw = merchantRaw
@@ -77,19 +78,19 @@ public struct UpdateTransferPayload: Codable, Sendable {
     public let transferGroupId: UUID
     public let fromExpectedVersion: Int
     public let toExpectedVersion: Int
-    public let fromAmount: Decimal
-    public let toAmount: Decimal
+    public let fromAmountE4: Int64
+    public let toAmountE4: Int64
     public let occurredAt: Date
 
     public init(
         transferGroupId: UUID, fromExpectedVersion: Int, toExpectedVersion: Int,
-        fromAmount: Decimal, toAmount: Decimal, occurredAt: Date
+        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date
     ) {
         self.transferGroupId = transferGroupId
         self.fromExpectedVersion = fromExpectedVersion
         self.toExpectedVersion = toExpectedVersion
-        self.fromAmount = fromAmount
-        self.toAmount = toAmount
+        self.fromAmountE4 = fromAmountE4
+        self.toAmountE4 = toAmountE4
         self.occurredAt = occurredAt
     }
 }
@@ -113,19 +114,19 @@ public struct CaptureTransactionPayload: Codable, Sendable {
     public let cardIdentifier: String
     public let merchantRaw: String
     public let merchantNormalized: String
-    public let amount: Decimal
+    public let amountE4: Int64
     public let occurredAt: Date
     public let externalId: String
 
     public init(
         id: UUID, cardIdentifier: String, merchantRaw: String, merchantNormalized: String,
-        amount: Decimal, occurredAt: Date, externalId: String
+        amountE4: Int64, occurredAt: Date, externalId: String
     ) {
         self.id = id
         self.cardIdentifier = cardIdentifier
         self.merchantRaw = merchantRaw
         self.merchantNormalized = merchantNormalized
-        self.amount = amount
+        self.amountE4 = amountE4
         self.occurredAt = occurredAt
         self.externalId = externalId
     }
@@ -153,11 +154,11 @@ public struct CreateAccountPayload: Codable, Sendable {
     public let subtype: PublicSchema.AccountSubtype
     public let name: String
     public let currency: String
-    public let openingBalance: Decimal
+    public let openingBalanceE4: Int64
 
     public init(
         id: UUID, ownerId: UUID, kind: PublicSchema.AccountKind, subtype: PublicSchema.AccountSubtype,
-        name: String, currency: String, openingBalance: Decimal
+        name: String, currency: String, openingBalanceE4: Int64
     ) {
         self.id = id
         self.ownerId = ownerId
@@ -165,7 +166,7 @@ public struct CreateAccountPayload: Codable, Sendable {
         self.subtype = subtype
         self.name = name
         self.currency = currency
-        self.openingBalance = openingBalance
+        self.openingBalanceE4 = openingBalanceE4
     }
 }
 
@@ -174,19 +175,19 @@ public struct UpdateAccountPayload: Codable, Sendable {
     public let expectedVersion: Int
     public let name: String
     public let subtype: PublicSchema.AccountSubtype
-    public let openingBalance: Decimal
+    public let openingBalanceE4: Int64
     public let includeInTotal: Bool
     public let countsTowardFi: Bool
 
     public init(
         id: UUID, expectedVersion: Int, name: String, subtype: PublicSchema.AccountSubtype,
-        openingBalance: Decimal, includeInTotal: Bool, countsTowardFi: Bool
+        openingBalanceE4: Int64, includeInTotal: Bool, countsTowardFi: Bool
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
         self.name = name
         self.subtype = subtype
-        self.openingBalance = openingBalance
+        self.openingBalanceE4 = openingBalanceE4
         self.includeInTotal = includeInTotal
         self.countsTowardFi = countsTowardFi
     }
@@ -231,21 +232,23 @@ public struct UpdateCategoryPayload: Codable, Sendable {
     }
 }
 
-/// No `expectedVersion` — a balance edit has nothing to conflict against
-/// beyond what `set_account_balance` already is: the RPC recomputes the
-/// account's *actual* balance at whatever moment it finally runs (not
-/// whatever the client guessed while offline) and derives the adjustment
-/// from that, so replaying it late is still correct. `id` is the
-/// idempotency key: it becomes the adjustment transaction's id for a
-/// ledger account, or the snapshot's id for a valuation account.
+/// `expectedVersion` (L1) closes a real gap: without it, two concurrent
+/// balance edits both apply and the first vanishes with nothing logged —
+/// now a stale version is rejected and logged to `sync_conflicts` like
+/// every other write. This never blocks an idempotent replay of the same
+/// `id`, even against a since-advanced version — `set_account_balance`
+/// checks idempotency before the version check server-side, specifically
+/// so a queued write can still be retried safely.
 public struct SetAccountBalancePayload: Codable, Sendable {
     public let id: UUID
     public let accountId: UUID
-    public let newBalance: Decimal
+    public let newBalanceE4: Int64
+    public let expectedVersion: Int
 
-    public init(id: UUID, accountId: UUID, newBalance: Decimal) {
+    public init(id: UUID, accountId: UUID, newBalanceE4: Int64, expectedVersion: Int) {
         self.id = id
         self.accountId = accountId
-        self.newBalance = newBalance
+        self.newBalanceE4 = newBalanceE4
+        self.expectedVersion = expectedVersion
     }
 }

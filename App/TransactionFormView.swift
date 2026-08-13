@@ -221,24 +221,24 @@ struct TransactionFormView: View {
             selectedAccountId = transaction.accountId
             selectedCategoryId = transaction.categoryId
             merchantRaw = transaction.merchantRaw
-            if let amount = transaction.amount {
+            if let amount = transaction.amountE4 {
                 amountText = AmountFormatter.editableString(amount, minorUnit: Int(transaction.minorUnit ?? 2))
             }
         case .transfer:
             let legs = [transaction, sibling].compactMap { $0 }
             guard
-                let from = legs.first(where: { ($0.amount ?? 0) < 0 }),
-                let destination = legs.first(where: { ($0.amount ?? 0) > 0 })
+                let from = legs.first(where: { ($0.amountE4 ?? 0) < 0 }),
+                let destination = legs.first(where: { ($0.amountE4 ?? 0) > 0 })
             else { return }
             editingTransferGroupId = transaction.transferGroupId
             editingFromVersion = from.version.map(Int.init)
             editingToVersion = destination.version.map(Int.init)
             selectedAccountId = from.accountId
             selectedToAccountId = destination.accountId
-            if let amount = from.amount {
+            if let amount = from.amountE4 {
                 amountText = AmountFormatter.editableString(amount, minorUnit: Int(from.minorUnit ?? 2))
             }
-            if from.currency != destination.currency, let amount = destination.amount {
+            if from.currency != destination.currency, let amount = destination.amountE4 {
                 receivedAmountText = AmountFormatter.editableString(amount, minorUnit: Int(destination.minorUnit ?? 2))
             }
         }
@@ -282,7 +282,7 @@ extension TransactionFormView {
     /// Every write below goes through `session.outbox` (Phase 11), never
     /// `TransactionRepository` directly — an offline save queues instead of
     /// erroring; the app-wide stale-pending banner surfaces that, not this.
-    fileprivate func saveLedgerTransaction(accountId: UUID, magnitude: Decimal) async throws {
+    fileprivate func saveLedgerTransaction(accountId: UUID, magnitude: Int64) async throws {
         guard let userId = session.profile?.id, let categoryId = selectedCategoryId, let account = fromAccount else {
             errorMessage = "Choose a category."
             return
@@ -291,15 +291,15 @@ extension TransactionFormView {
         // re-derived elsewhere (money rule: never re-sign in application
         // code beyond this single point; the DB's sign_matches_category_kind
         // CHECK is the actual backstop).
-        let signedAmount = kind == .expense ? -magnitude : magnitude
+        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
         let payload = CreateTransactionPayload(
             id: UUID(), ownerId: userId, accountId: accountId, categoryId: categoryId,
-            amount: signedAmount, currency: account.currency ?? "USD", occurredAt: occurredAt
+            amountE4: signedAmountE4, currency: account.currency ?? "USD", occurredAt: occurredAt
         )
         await session.outbox.submitCreateTransaction(payload)
     }
 
-    fileprivate func saveTransfer(accountId: UUID, magnitude: Decimal) async throws {
+    fileprivate func saveTransfer(accountId: UUID, magnitude: Int64) async throws {
         guard let toAccountId = selectedToAccountId else {
             errorMessage = "Choose a destination account."
             return
@@ -315,7 +315,7 @@ extension TransactionFormView {
            let sourceCurrency = source.currency, let destinationCurrency = destination.currency {
             divergenceWarning = await TransferDivergenceCheck.evaluate(
                 client: session.client, sourceCurrency: sourceCurrency, destinationCurrency: destinationCurrency,
-                fromAmount: magnitude, toAmount: toAmount, occurredAt: occurredAt
+                fromAmountE4: magnitude, toAmountE4: toAmount, occurredAt: occurredAt
             )
             if divergenceWarning != nil { return }
         }
@@ -323,12 +323,12 @@ extension TransactionFormView {
 
         let payload = CreateTransferPayload(
             fromId: UUID(), toId: UUID(), fromAccountId: accountId, toAccountId: toAccountId,
-            fromAmount: magnitude, toAmount: receivedAmount, occurredAt: occurredAt
+            fromAmountE4: magnitude, toAmountE4: receivedAmount, occurredAt: occurredAt
         )
         await session.outbox.submitCreateTransfer(payload)
     }
 
-    fileprivate func updateLedgerTransaction(accountId: UUID, magnitude: Decimal) async throws {
+    fileprivate func updateLedgerTransaction(accountId: UUID, magnitude: Int64) async throws {
         guard
             let categoryId = selectedCategoryId,
             let account = fromAccount,
@@ -338,10 +338,11 @@ extension TransactionFormView {
             errorMessage = "Choose a category."
             return
         }
-        let signedAmount = kind == .expense ? -magnitude : magnitude
+        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
         let payload = UpdateTransactionPayload(
             id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
-            amount: signedAmount, currency: account.currency ?? "USD", occurredAt: occurredAt, merchantRaw: merchantRaw
+            amountE4: signedAmountE4, currency: account.currency ?? "USD", occurredAt: occurredAt,
+            merchantRaw: merchantRaw
         )
         let result = await session.outbox.submitUpdateTransaction(payload)
         if result == .conflict {
@@ -349,7 +350,7 @@ extension TransactionFormView {
         }
     }
 
-    fileprivate func updateTransfer(magnitude: Decimal) async throws {
+    fileprivate func updateTransfer(magnitude: Int64) async throws {
         guard
             let transferGroupId = editingTransferGroupId,
             let fromExpectedVersion = editingFromVersion,
@@ -365,7 +366,7 @@ extension TransactionFormView {
         }
         let payload = UpdateTransferPayload(
             transferGroupId: transferGroupId, fromExpectedVersion: fromExpectedVersion,
-            toExpectedVersion: toExpectedVersion, fromAmount: magnitude, toAmount: toAmount, occurredAt: occurredAt
+            toExpectedVersion: toExpectedVersion, fromAmountE4: magnitude, toAmountE4: toAmount, occurredAt: occurredAt
         )
         let result = await session.outbox.submitUpdateTransfer(payload)
         if result == .conflict {

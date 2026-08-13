@@ -110,19 +110,19 @@ private struct BudgetRow: View {
     private var currencyInfo: CurrencyInfo { CurrencyInfo(code: entry.currency, minorUnit: 2) }
 
     private var spentOfBudgetedText: String {
-        guard let spent = entry.spent, let budgeted = entry.budgeted else { return "—" }
+        guard let spent = entry.spentE4, let budgeted = entry.budgetedE4 else { return "—" }
         let spentText = MoneyFormatter.format(spent, currency: currencyInfo)
         let budgetedText = MoneyFormatter.format(budgeted, currency: currencyInfo)
         return "\(spentText) of \(budgetedText)"
     }
 
     private var fraction: Double {
-        guard let spent = entry.spent, let budgeted = entry.budgeted, budgeted > 0 else { return 0 }
-        return min(NSDecimalNumber(decimal: spent / budgeted).doubleValue, 1)
+        guard let spent = entry.spentE4, let budgeted = entry.budgetedE4, budgeted > 0 else { return 0 }
+        return min(Double(spent) / Double(budgeted), 1)
     }
 
     private var isOverBudget: Bool {
-        guard let spent = entry.spent, let budgeted = entry.budgeted else { return false }
+        guard let spent = entry.spentE4, let budgeted = entry.budgetedE4 else { return false }
         return spent > budgeted
     }
 }

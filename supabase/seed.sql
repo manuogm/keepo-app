@@ -97,32 +97,34 @@ where id = '88888888-8888-8888-8888-888888888888';
 
 -- User A: EUR checking, USD checking, an investment account — covers the
 -- ledger/valuation split and a cross-currency FX line in one seed.
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+-- Money columns are bigint at fixed scale 4 (see the L1 migration) — 1000
+-- becomes 10000000, i.e. amount_e4 = decimal_amount * 10000.
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values
   (
     'aaaaaaaa-0000-0000-0000-000000000001', '99999999-9999-9999-9999-999999999999',
-    '99999999-9999-9999-9999-999999999999', 'ledger', 'checking', 'Everyday Checking', 'EUR', 1000
+    '99999999-9999-9999-9999-999999999999', 'ledger', 'checking', 'Everyday Checking', 'EUR', 10000000
   ),
   (
     'aaaaaaaa-0000-0000-0000-000000000002', '99999999-9999-9999-9999-999999999999',
-    '99999999-9999-9999-9999-999999999999', 'ledger', 'checking', 'US Checking', 'USD', 500
+    '99999999-9999-9999-9999-999999999999', 'ledger', 'checking', 'US Checking', 'USD', 5000000
   ),
   (
     'aaaaaaaa-0000-0000-0000-000000000003', '99999999-9999-9999-9999-999999999999',
     '99999999-9999-9999-9999-999999999999', 'valuation', 'investment', 'Brokerage', 'EUR', 0
   );
 
-insert into balance_snapshots (account_id, currency, as_of, value, created_by)
+insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by)
 values (
-  'aaaaaaaa-0000-0000-0000-000000000003', 'EUR', current_date, 5000,
+  'aaaaaaaa-0000-0000-0000-000000000003', 'EUR', current_date, 50000000,
   '99999999-9999-9999-9999-999999999999'
 );
 
 -- User B: a single USD checking account, kept simple.
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values (
   'bbbbbbbb-0000-0000-0000-000000000001', '88888888-8888-8888-8888-888888888888',
-  '88888888-8888-8888-8888-888888888888', 'ledger', 'checking', 'Checking', 'USD', 2000
+  '88888888-8888-8888-8888-888888888888', 'ledger', 'checking', 'Checking', 'USD', 20000000
 );
 
 -- A handful of transactions against user A's default "Other" categories.
@@ -133,24 +135,24 @@ values (
 -- (confirmed empirically: this exact query tripled every seeded expense
 -- transaction until this fix, only noticed once Phase 15's insights RPCs
 -- summed the duplicates).
-insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at, source)
 select
   '99999999-9999-9999-9999-999999999999', '99999999-9999-9999-9999-999999999999',
-  'aaaaaaaa-0000-0000-0000-000000000001', c.id, -42.50, 'EUR', now() - interval '2 days', 'manual'
+  'aaaaaaaa-0000-0000-0000-000000000001', c.id, -425000, 'EUR', now() - interval '2 days', 'manual'
 from categories c
 where c.owner_id = '99999999-9999-9999-9999-999999999999' and c.kind = 'expense' and c.is_default;
 
-insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at, source)
 select
   '99999999-9999-9999-9999-999999999999', '99999999-9999-9999-9999-999999999999',
-  'aaaaaaaa-0000-0000-0000-000000000001', c.id, 2500.00, 'EUR', now() - interval '5 days', 'manual'
+  'aaaaaaaa-0000-0000-0000-000000000001', c.id, 25000000, 'EUR', now() - interval '5 days', 'manual'
 from categories c
 where c.owner_id = '99999999-9999-9999-9999-999999999999' and c.kind = 'income' and c.is_default;
 
-insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, source)
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at, source)
 select
   '88888888-8888-8888-8888-888888888888', '88888888-8888-8888-8888-888888888888',
-  'bbbbbbbb-0000-0000-0000-000000000001', c.id, -18.20, 'USD', now() - interval '1 days', 'manual'
+  'bbbbbbbb-0000-0000-0000-000000000001', c.id, -182000, 'USD', now() - interval '1 days', 'manual'
 from categories c
 where c.owner_id = '88888888-8888-8888-8888-888888888888' and c.kind = 'expense' and c.is_default;
 

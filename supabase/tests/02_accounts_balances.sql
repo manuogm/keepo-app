@@ -1,6 +1,9 @@
 -- accounts / balance_snapshots: RLS visibility and the two balance formulas
 -- (money rule 1). Fixture A = 11111111-..., fixture B = 22222222-...
 -- (supabase/tests/_helpers.sql).
+--
+-- Money is bigint at fixed scale 4 (L1, migration 20260815100000) — 100.00
+-- is written as 1000000.
 
 \ir _helpers.psql
 
@@ -14,16 +17,16 @@ select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111
 -- RLS visibility
 -- ----------------------------------------------------------------------------
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 100);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 1000000);
 
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('b0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'B Checking', 'USD', 100);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('b0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'B Checking', 'USD', 1000000);
 
 select is(
   (select count(*) from accounts where id = 'a0000000-0000-0000-0000-000000000001'),
@@ -54,7 +57,7 @@ select is(
 );
 
 -- ----------------------------------------------------------------------------
--- Ledger balance: opening_balance + SUM(confirmed, non-deleted, occurred_at <= now())
+-- Ledger balance: opening_balance_e4 + SUM(confirmed, non-deleted, occurred_at <= now())
 -- ----------------------------------------------------------------------------
 
 reset role;
@@ -63,42 +66,42 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
 select is(
-  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
-  100.0000,
-  'ledger balance with zero transactions is exactly opening_balance'
+  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  1000000::bigint,
+  'ledger balance with zero transactions is exactly opening_balance_e4'
 );
 
 insert into categories (id, owner_id, kind, name)
 values ('c0000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Test Expense');
 
-insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
-values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -30, 'EUR', now());
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
+values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -300000, 'EUR', now());
 
 select is(
-  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
-  70.0000,
+  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  700000::bigint,
   'ledger balance reflects a confirmed expense'
 );
 
 -- A future-dated row must never move today's balance (recurring's guard,
 -- built in now since account_balances already filters on it — Phase 14
 -- inherits this for free rather than needing to add it later).
-insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
-values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -1000, 'EUR', now() + interval '10 days');
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
+values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -10000000, 'EUR', now() + interval '10 days');
 
 select is(
-  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
-  70.0000,
+  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  700000::bigint,
   'a future-dated transaction never moves today''s balance'
 );
 
 -- A pending (unconfirmed capture) row must never move the balance either.
-insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at, status, source)
-values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -500, 'EUR', now(), 'pending', 'capture');
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at, status, source)
+values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -5000000, 'EUR', now(), 'pending', 'capture');
 
 select is(
-  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
-  70.0000,
+  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  700000::bigint,
   'a pending transaction never moves the balance'
 );
 
@@ -107,12 +110,12 @@ select is(
 -- the snapshot's created_at, confirmed, occurred_at <= now())
 -- ----------------------------------------------------------------------------
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a0000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'valuation', 'investment', 'Brokerage', 'EUR', 0);
 
 select is(
-  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
-  null::numeric,
+  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
+  null::bigint,
   'an unsnapshotted valuation account renders no balance (never 0)'
 );
 
@@ -123,23 +126,23 @@ select is(
 -- false and silently failing to reproduce the same-day-transfer scenario
 -- this test exists to cover. Two separate client calls in production never
 -- have this problem — each gets its own transaction and its own now().
-insert into balance_snapshots (account_id, currency, as_of, value, created_by, created_at)
-values ('a0000000-0000-0000-0000-000000000002', 'EUR', current_date, 1000, auth.uid(), clock_timestamp() - interval '1 minute');
+insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by, created_at)
+values ('a0000000-0000-0000-0000-000000000002', 'EUR', current_date, 10000000, auth.uid(), clock_timestamp() - interval '1 minute');
 
 select is(
-  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
-  1000.0000,
+  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
+  10000000::bigint,
   'valuation balance with zero transfers after the snapshot is exactly the snapshot value'
 );
 
 -- A same-day transfer must count — the exact bug the Phase 2 log documents
 -- comparing occurred_at::date > as_of (both "today", so false) instead of
 -- occurred_at > created_at.
-select create_transfer('a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 50);
+select create_transfer('a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 500000);
 
 select is(
-  (select balance from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
-  1050.0000,
+  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
+  10500000::bigint,
   'a same-day transfer after the snapshot is included in the valuation balance'
 );
 
@@ -153,10 +156,10 @@ select is(
 -- 3-arg form failed here expecting the description text verbatim as the
 -- constraint's error message.
 select throws_ok(
-  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
      values (
        '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
-       'a0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000001', -10, 'EUR', now()
+       'a0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000001', -100000, 'EUR', now()
      ) $$,
   '23514', null,
   'a valuation account rejects a plain expense/income insert (transfers only)'

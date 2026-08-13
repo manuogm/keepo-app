@@ -47,7 +47,7 @@ struct TransactionRow: View {
                 if !isPrivacyMode {
                     CurrencyConversionLabel(
                         nativeCurrency: transaction.currency,
-                        amountBase: transaction.amountBase,
+                        amountBase: transaction.amountBaseE4,
                         baseCurrency: transaction.baseCurrency,
                         baseMinorUnit: transaction.baseMinorUnit,
                         hasMissingRate: transaction.hasMissingRate ?? false
@@ -60,11 +60,11 @@ struct TransactionRow: View {
     private var formattedAmount: String {
         guard let currencyCode = transaction.currency, let minorUnit = transaction.minorUnit else { return "—" }
         let currency = CurrencyInfo(code: currencyCode, minorUnit: Int(minorUnit))
-        return MoneyFormatter.format(transaction.amount, currency: currency)
+        return MoneyFormatter.format(transaction.amountE4, currency: currency)
     }
 
     private var amountColor: Color {
-        guard let amount = transaction.amount, amount < 0 else { return Color.primary }
+        guard let amount = transaction.amountE4, amount < 0 else { return Color.primary }
         return Color.primary
     }
 }

@@ -72,8 +72,8 @@ struct FISettingsView: View {
 
     private func load() async {
         if let settings = try? await FIRepository.fetchSettings(client: session.client) {
-            hasTarget = settings.targetAnnualSpend != nil
-            targetAnnualSpendText = settings.targetAnnualSpend
+            hasTarget = settings.targetAnnualSpendE4 != nil
+            targetAnnualSpendText = settings.targetAnnualSpendE4
                 .map { AmountFormatter.editableString($0, minorUnit: 2) } ?? ""
             withdrawalRateText = "\(settings.withdrawalRate)"
             realReturnRateText = "\(settings.realReturnRate)"
@@ -82,18 +82,18 @@ struct FISettingsView: View {
     }
 
     private func save() async {
-        guard let withdrawalRate = AmountParser.parse(withdrawalRateText),
-              let realReturnRate = AmountParser.parse(realReturnRateText) else {
+        guard let withdrawalRate = AmountParser.parseRate(withdrawalRateText),
+              let realReturnRate = AmountParser.parseRate(realReturnRateText) else {
             errorMessage = "Enter valid rates."
             return
         }
-        let targetAnnualSpend = hasTarget ? AmountParser.parse(targetAnnualSpendText) : nil
+        let targetAnnualSpendE4 = hasTarget ? AmountParser.parse(targetAnnualSpendText) : nil
 
         isSaving = true
         errorMessage = nil
         do {
             try await FIRepository.updateSettings(
-                client: session.client, targetAnnualSpend: targetAnnualSpend,
+                client: session.client, targetAnnualSpendE4: targetAnnualSpendE4,
                 withdrawalRate: withdrawalRate, realReturnRate: realReturnRate
             )
             onSaved()

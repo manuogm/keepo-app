@@ -82,7 +82,7 @@ public enum HouseholdRepository {
     /// scope) — money rule 5, renders as "—", never 0. A scope with zero
     /// accounts is a real, computable 0, distinct from that; net_worth()
     /// itself is what tells the two apart, not this call site.
-    public static func netWorth(client: SupabaseClient, scope: PublicSchema.AccountScope) async throws -> Decimal? {
+    public static func netWorth(client: SupabaseClient, scope: PublicSchema.AccountScope) async throws -> Int64? {
         try await client.rpc("net_worth", params: ScopeParam(scope: scope)).execute().value
     }
 
@@ -121,10 +121,10 @@ public enum HouseholdRepository {
 
 public struct NetWorthPoint: Decodable, Sendable {
     public let asOf: String
-    public let total: Decimal?
+    public let totalE4: Int64?
     enum CodingKeys: String, CodingKey {
         case asOf = "as_of"
-        case total
+        case totalE4 = "total_e4"
     }
 }
 

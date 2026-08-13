@@ -11,9 +11,9 @@ select plan(20);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a2000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'credit_card', 'A Card', 'EUR', 0);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a2000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'valuation', 'investment', 'A Brokerage', 'EUR', 0);
 insert into categories (id, owner_id, kind, name)
 values ('c2000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Coffee');
@@ -23,7 +23,7 @@ values ('c2000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Coffee')
 select is(
   (select mapped from capture_transaction(
     'd2000000-0000-0000-0000-000000000001', 'card-xyz', 'SQ *BLUE BOTTLE 001', 'BLUE BOTTLE',
-    4.50, now(), 'ext-1'
+    45000, now(), 'ext-1'
   )),
   false,
   'capturing on an unmapped card returns mapped = false'
@@ -71,15 +71,15 @@ select is(
 select is(
   (select mapped from capture_transaction(
     'd2000000-0000-0000-0000-000000000002', 'card-xyz', 'SQ *BLUE BOTTLE 001', 'BLUE BOTTLE',
-    4.50, now(), 'ext-2'
+    45000, now(), 'ext-2'
   )),
   true,
   'capturing on a mapped card returns mapped = true'
 );
 
 select is(
-  (select amount from transactions where id = 'd2000000-0000-0000-0000-000000000002'),
-  -4.50::numeric(20, 4),
+  (select amount_e4 from transactions where id = 'd2000000-0000-0000-0000-000000000002'),
+  -45000::bigint,
   'the captured row is negative-signed'
 );
 
@@ -113,7 +113,7 @@ insert into merchant_category_map (owner_id, merchant_pattern, category_id)
 values (auth.uid(), 'BLUE BOTTLE', 'c2000000-0000-0000-0000-000000000001');
 
 select capture_transaction(
-  'd2000000-0000-0000-0000-000000000003', 'card-xyz', 'SQ *BLUE BOTTLE 002', 'BLUE BOTTLE', 5.25, now(), 'ext-3'
+  'd2000000-0000-0000-0000-000000000003', 'card-xyz', 'SQ *BLUE BOTTLE 002', 'BLUE BOTTLE', 52500, now(), 'ext-3'
 );
 
 select is(
@@ -132,7 +132,7 @@ select is(
 -- primary key, not a duplicate row — same pattern as create_transaction.
 select throws_ok(
   $$ select capture_transaction(
-    'd2000000-0000-0000-0000-000000000003', 'card-xyz', 'SQ *BLUE BOTTLE 002', 'BLUE BOTTLE', 5.25, now(), 'ext-3'
+    'd2000000-0000-0000-0000-000000000003', 'card-xyz', 'SQ *BLUE BOTTLE 002', 'BLUE BOTTLE', 52500, now(), 'ext-3'
   ) $$,
   '23505', null,
   'retrying a capture with the same client-generated id raises a duplicate-key error, never a second row'
@@ -152,14 +152,14 @@ begin
 
   for i in 1..remaining loop
     perform capture_transaction(
-      gen_random_uuid(), 'card-xyz', 'RATE TEST', 'RATE TEST', 1.00, now(), 'rate-' || i
+      gen_random_uuid(), 'card-xyz', 'RATE TEST', 'RATE TEST', 10000, now(), 'rate-' || i
     );
   end loop;
 end;
 $$;
 
 select throws_like(
-  $$ select capture_transaction(gen_random_uuid(), 'card-xyz', 'RATE TEST', 'RATE TEST', 1.00, now(), 'rate-over') $$,
+  $$ select capture_transaction(gen_random_uuid(), 'card-xyz', 'RATE TEST', 'RATE TEST', 10000, now(), 'rate-over') $$,
   '%rate limit%',
   'the capture past the per-minute threshold is rejected by the rate guard'
 );

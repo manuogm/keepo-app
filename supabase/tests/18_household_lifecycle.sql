@@ -20,8 +20,8 @@ select throws_like(
 
 select create_household();
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('a4000000-0000-0000-0000-00000000a001', auth.uid(), auth.uid(), 'ledger', 'checking', 'Shared Checking', 'EUR', 1000);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('a4000000-0000-0000-0000-00000000a001', auth.uid(), auth.uid(), 'ledger', 'checking', 'Shared Checking', 'EUR', 10000000);
 insert into categories (id, owner_id, kind, name)
 values ('c4000000-0000-0000-0000-00000000a001', auth.uid(), 'expense', 'Groceries');
 select share_account('a4000000-0000-0000-0000-00000000a001');
@@ -81,16 +81,16 @@ select throws_like(
 -- transaction and a recurring rule.
 -- ----------------------------------------------------------------------------
 
-insert into transactions (id, owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+insert into transactions (id, owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
 values (
   'd4000000-0000-0000-0000-00000000d001', '11111111-1111-1111-1111-111111111111', auth.uid(),
-  'a4000000-0000-0000-0000-00000000a001', 'c4000000-0000-0000-0000-00000000a001', -50.00, 'EUR', now()
+  'a4000000-0000-0000-0000-00000000a001', 'c4000000-0000-0000-0000-00000000a001', -500000, 'EUR', now()
 );
 
-insert into recurring_rules (id, created_by, account_id, category_id, amount, currency, frequency, next_due_at)
+insert into recurring_rules (id, created_by, account_id, category_id, amount_e4, currency, frequency, next_due_at)
 values (
   'e4000000-0000-0000-0000-00000000e001', auth.uid(), 'a4000000-0000-0000-0000-00000000a001',
-  'c4000000-0000-0000-0000-00000000a001', -10.00, 'EUR', 'monthly', current_date + 30
+  'c4000000-0000-0000-0000-00000000a001', -100000, 'EUR', 'monthly', current_date + 30
 );
 
 -- 7. needs_review/other views aside, sanity-check the shared account now has
@@ -140,7 +140,7 @@ select is(
   (
     select count(*) from transactions t
     join accounts a on a.id = t.account_id
-    where a.owner_id = auth.uid() and a.name = 'Shared Checking' and t.amount = -50.00
+    where a.owner_id = auth.uid() and a.name = 'Shared Checking' and t.amount_e4 = -500000
   ),
   1::bigint,
   'the shared transaction was duplicated onto B''s new copy'
@@ -188,7 +188,7 @@ select is(
     select count(*) from transactions t
     join accounts a on a.id = t.account_id
     where a.owner_id = '11111111-1111-1111-1111-111111111111' and a.name = 'Shared Checking' and a.archived_at is null
-      and t.amount = -50.00
+      and t.amount_e4 = -500000
   ),
   1::bigint,
   'A also got her own fresh forked copy of the shared transaction'
@@ -213,13 +213,13 @@ select is(
 -- caller's own resulting copy without touching the other member's.
 -- ----------------------------------------------------------------------------
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('a4000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'ledger', 'checking', 'Erase Shared', 'EUR', 100);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('a4000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'ledger', 'checking', 'Erase Shared', 'EUR', 1000000);
 select share_account('a4000000-0000-0000-0000-00000000a002');
-insert into transactions (id, owner_id, created_by, account_id, category_id, amount, currency, occurred_at, merchant_raw)
+insert into transactions (id, owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at, merchant_raw)
 values (
   'd4000000-0000-0000-0000-00000000d002', auth.uid(), auth.uid(), 'a4000000-0000-0000-0000-00000000a002',
-  'c4000000-0000-0000-0000-00000000a001', -20.00, 'EUR', now(), 'Some Merchant'
+  'c4000000-0000-0000-0000-00000000a001', -200000, 'EUR', now(), 'Some Merchant'
 );
 
 create temp table erase_token (token text);

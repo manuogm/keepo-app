@@ -11,8 +11,8 @@ select plan(17);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('a4000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 1000);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('a4000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 10000000);
 insert into categories (id, owner_id, kind, name)
 values
   ('c4000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Subscriptions'),
@@ -22,10 +22,10 @@ values
 -- refused up front, not left to fail obscurely inside a later cron run.
 select throws_like(
   $$
-    insert into recurring_rules (account_id, category_id, amount, currency, frequency, next_due_at, created_by)
+    insert into recurring_rules (account_id, category_id, amount_e4, currency, frequency, next_due_at, created_by)
     values (
       'a4000000-0000-0000-0000-000000000001', 'c4000000-0000-0000-0000-000000000001',
-      12.99, 'EUR', 'monthly', current_date, '11111111-1111-1111-1111-111111111111'
+      129900, 'EUR', 'monthly', current_date, '11111111-1111-1111-1111-111111111111'
     )
   $$,
   '%must be negative%',
@@ -34,10 +34,10 @@ select throws_like(
 
 -- 2. owner_id is derived from the account, not client-supplied — confirms
 -- the trigger actually ran, not just that the column has a value.
-insert into recurring_rules (id, account_id, category_id, amount, currency, frequency, next_due_at, created_by)
+insert into recurring_rules (id, account_id, category_id, amount_e4, currency, frequency, next_due_at, created_by)
 values (
   'e4000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001',
-  'c4000000-0000-0000-0000-000000000001', -12.99, 'EUR', 'monthly', current_date - 65,
+  'c4000000-0000-0000-0000-000000000001', -129900, 'EUR', 'monthly', current_date - 65,
   '11111111-1111-1111-1111-111111111111'
 );
 
@@ -97,7 +97,7 @@ select is(
 -- 8-9. The future-dated guard: materializing 60 days ahead creates
 -- future-dated rows, but today's account_balances is untouched — Home's
 -- balance can never move because of a not-yet-due recurring occurrence.
-select balance from account_balances where account_id = 'a4000000-0000-0000-0000-000000000001' \gset before_
+select balance_e4 from account_balances where account_id = 'a4000000-0000-0000-0000-000000000001' \gset before_
 
 select materialize_recurring(current_date + 60);
 
@@ -109,8 +109,8 @@ select is(
 );
 
 select is(
-  (select balance from account_balances where account_id = 'a4000000-0000-0000-0000-000000000001'),
-  :'before_balance'::numeric,
+  (select balance_e4 from account_balances where account_id = 'a4000000-0000-0000-0000-000000000001'),
+  :'before_balance_e4'::bigint,
   'a future-dated materialized row never moves today''s account_balances'
 );
 
@@ -130,10 +130,10 @@ select is(
 
 -- 12. recurring_materialization_check reports unhealthy for a rule overdue
 -- by more than a day, healthy once caught up.
-insert into recurring_rules (id, account_id, category_id, amount, currency, frequency, next_due_at, created_by)
+insert into recurring_rules (id, account_id, category_id, amount_e4, currency, frequency, next_due_at, created_by)
 values (
   'e4000000-0000-0000-0000-000000000002', 'a4000000-0000-0000-0000-000000000001',
-  'c4000000-0000-0000-0000-000000000002', 3000, 'EUR', 'monthly', current_date - 10,
+  'c4000000-0000-0000-0000-000000000002', 30000000, 'EUR', 'monthly', current_date - 10,
   '11111111-1111-1111-1111-111111111111'
 );
 

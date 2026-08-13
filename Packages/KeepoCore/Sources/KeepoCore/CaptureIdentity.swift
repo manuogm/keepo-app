@@ -13,7 +13,7 @@ public enum CaptureIdentity {
     ///   nearest minute so a near-instant automation re-fire (the same tap,
     ///   retried by Shortcuts) still hashes identically, while two genuinely
     ///   separate purchases a minute or more apart never collide.
-    public static func externalId(card: String, amount: Decimal, merchant: String, at date: Date) -> String {
+    public static func externalId(card: String, amount: Int64, merchant: String, at date: Date) -> String {
         let bucket = Int((date.timeIntervalSinceReferenceDate / 60).rounded(.down))
         let raw = "\(card)|\(amount)|\(merchant)|\(bucket)"
         let digest = SHA256.hash(data: Data(raw.utf8))

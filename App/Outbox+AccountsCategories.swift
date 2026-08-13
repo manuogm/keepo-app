@@ -14,7 +14,7 @@ extension LiveOutboxSender {
             try await AccountRepository.create(
                 client: client, id: payload.id, ownerId: payload.ownerId, kind: payload.kind,
                 subtype: payload.subtype, name: payload.name, currency: payload.currency,
-                openingBalance: payload.openingBalance
+                openingBalanceE4: payload.openingBalanceE4
             )
         } catch {
             // A retried create that already landed hits `accounts`' primary
@@ -33,7 +33,7 @@ extension LiveOutboxSender {
     public func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool {
         let result = try await AccountRepository.update(
             client: client, id: payload.id, expectedVersion: payload.expectedVersion, name: payload.name,
-            subtype: payload.subtype, openingBalance: payload.openingBalance,
+            subtype: payload.subtype, openingBalanceE4: payload.openingBalanceE4,
             includeInTotal: payload.includeInTotal, countsTowardFi: payload.countsTowardFi
         )
         switch result {
@@ -42,10 +42,12 @@ extension LiveOutboxSender {
         }
     }
 
-    public func setAccountBalance(_ payload: SetAccountBalancePayload) async throws {
-        try await AccountRepository.setBalance(
-            client: client, accountId: payload.accountId, newBalance: payload.newBalance, id: payload.id
+    public func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool {
+        let result = try await AccountRepository.setBalance(
+            client: client, accountId: payload.accountId, newBalanceE4: payload.newBalanceE4,
+            expectedVersion: payload.expectedVersion, id: payload.id
         )
+        return !result.conflict
     }
 
     public func createCategory(_ payload: CreateCategoryPayload) async throws {
@@ -98,7 +100,6 @@ extension Outbox {
     public func submitSetAccountBalance(_ payload: SetAccountBalancePayload) async -> OutboxSubmitResult {
         await attempt(id: payload.id, kind: .setAccountBalance, payload: payload) {
             try await self.sender.setAccountBalance(payload)
-            return true
         }
     }
 
@@ -129,8 +130,7 @@ extension Outbox {
         case .updateAccount:
             return try await sender.updateAccount(decoder.decode(UpdateAccountPayload.self, from: data))
         case .setAccountBalance:
-            try await sender.setAccountBalance(decoder.decode(SetAccountBalancePayload.self, from: data))
-            return true
+            return try await sender.setAccountBalance(decoder.decode(SetAccountBalancePayload.self, from: data))
         case .createCategory:
             try await sender.createCategory(decoder.decode(CreateCategoryPayload.self, from: data))
             return true

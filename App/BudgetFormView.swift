@@ -115,14 +115,14 @@ struct BudgetFormView: View {
         if case .edit(let budget) = mode {
             selectedCategoryId = budget.categoryId
             isOverall = budget.categoryId == nil
-            amountText = AmountFormatter.editableString(budget.amount, minorUnit: 2)
+            amountText = AmountFormatter.editableString(budget.amountE4, minorUnit: 2)
             currency = budget.currency
         }
         isLoading = false
     }
 
     private func save() async {
-        guard let amount = AmountParser.parse(amountText), let ownerId = session.profile?.id else {
+        guard let amountE4 = AmountParser.parse(amountText), let ownerId = session.profile?.id else {
             errorMessage = "Enter a valid amount."
             return
         }
@@ -135,11 +135,11 @@ struct BudgetFormView: View {
                 try await BudgetRepository.create(
                     client: session.client, ownerId: ownerId,
                     categoryId: isOverall ? nil : selectedCategoryId, periodMonth: Date(),
-                    amount: amount, currency: currency
+                    amountE4: amountE4, currency: currency
                 )
             case .edit(let budget):
                 try await BudgetRepository.update(
-                    client: session.client, id: budget.id, amount: amount, currency: currency
+                    client: session.client, id: budget.id, amountE4: amountE4, currency: currency
                 )
             }
             onSaved()

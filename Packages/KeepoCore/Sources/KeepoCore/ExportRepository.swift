@@ -37,7 +37,7 @@ public enum ExportRepository {
     public static func csv(from rows: [PublicSchema.TransactionsWithDetailsSelect]) -> String {
         var lines = ["Date,Account,Category,Merchant,Amount,Currency"]
         for row in rows {
-            let amountText: String = row.amount.map { amount in "\(amount)" } ?? ""
+            let amountText: String = row.amountE4.map { amountE4 in "\(Decimal(amountE4) / Decimal(10_000))" } ?? ""
             let fields: [String] = [
                 row.occurredAt ?? "",
                 row.accountName ?? "",

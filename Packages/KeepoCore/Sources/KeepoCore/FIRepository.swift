@@ -11,10 +11,10 @@ public enum FIRepository {
     }
 
     public static func updateSettings(
-        client: SupabaseClient, targetAnnualSpend: Decimal?, withdrawalRate: Decimal, realReturnRate: Decimal
+        client: SupabaseClient, targetAnnualSpendE4: Int64?, withdrawalRate: Decimal, realReturnRate: Decimal
     ) async throws {
         let patch = PublicSchema.FiSettingsUpdate(
-            ownerId: nil, realReturnRate: realReturnRate, targetAnnualSpend: targetAnnualSpend, updatedAt: nil,
+            ownerId: nil, realReturnRate: realReturnRate, targetAnnualSpendE4: targetAnnualSpendE4, updatedAt: nil,
             withdrawalRate: withdrawalRate
         )
         try await client.from("fi_settings").update(patch).execute()
@@ -29,21 +29,21 @@ public enum FIRepository {
 }
 
 public struct FIMetrics: Decodable, Sendable {
-    public let annualSpend: Decimal?
-    public let fiNumber: Decimal?
-    public let currentNetWorth: Decimal?
+    public let annualSpendE4: Int64?
+    public let fiNumberE4: Int64?
+    public let currentNetWorthE4: Int64?
     public let percentProgress: Decimal?
-    public let annualSavings: Decimal?
+    public let annualSavingsE4: Int64?
     public let yearsToFi: Decimal?
-    public let coastFiNumber: Decimal?
+    public let coastFiNumberE4: Int64?
     enum CodingKeys: String, CodingKey {
-        case annualSpend = "annual_spend"
-        case fiNumber = "fi_number"
-        case currentNetWorth = "current_net_worth"
+        case annualSpendE4 = "annual_spend_e4"
+        case fiNumberE4 = "fi_number_e4"
+        case currentNetWorthE4 = "current_net_worth_e4"
         case percentProgress = "percent_progress"
-        case annualSavings = "annual_savings"
+        case annualSavingsE4 = "annual_savings_e4"
         case yearsToFi = "years_to_fi"
-        case coastFiNumber = "coast_fi_number"
+        case coastFiNumberE4 = "coast_fi_number_e4"
     }
 }
 

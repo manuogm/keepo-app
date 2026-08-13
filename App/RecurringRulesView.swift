@@ -132,7 +132,7 @@ private struct RecurringRuleRow: View {
             }
             Spacer()
             let currencyInfo = CurrencyInfo(code: rule.currency, minorUnit: Int(account?.minorUnit ?? 2))
-            Text(MoneyFormatter.format(rule.amount, currency: currencyInfo))
+            Text(MoneyFormatter.format(rule.amountE4, currency: currencyInfo))
                 .monospacedDigit()
                 .foregroundStyle(rule.active ? Color.primary : Color.secondary)
             if !rule.active {

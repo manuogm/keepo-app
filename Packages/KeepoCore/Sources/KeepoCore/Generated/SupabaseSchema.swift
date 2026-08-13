@@ -75,8 +75,8 @@ public enum PublicSchema {
     public let includeInTotal: Bool
     public let kind: AccountKind
     public let name: String
-    public let openingBalance: Decimal
     public let openingBalanceAt: String
+    public let openingBalanceE4: Int64
     public let ownerId: UUID
     public let subtype: AccountSubtype
     public let updatedAt: String
@@ -92,8 +92,8 @@ public enum PublicSchema {
       case includeInTotal = "include_in_total"
       case kind = "kind"
       case name = "name"
-      case openingBalance = "opening_balance"
       case openingBalanceAt = "opening_balance_at"
+      case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
       case subtype = "subtype"
       case updatedAt = "updated_at"
@@ -111,8 +111,8 @@ public enum PublicSchema {
     public let includeInTotal: Bool?
     public let kind: AccountKind
     public let name: String
-    public let openingBalance: Decimal?
     public let openingBalanceAt: String?
+    public let openingBalanceE4: Int64?
     public let ownerId: UUID
     public let subtype: AccountSubtype
     public let updatedAt: String?
@@ -128,8 +128,8 @@ public enum PublicSchema {
       case includeInTotal = "include_in_total"
       case kind = "kind"
       case name = "name"
-      case openingBalance = "opening_balance"
       case openingBalanceAt = "opening_balance_at"
+      case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
       case subtype = "subtype"
       case updatedAt = "updated_at"
@@ -147,8 +147,8 @@ public enum PublicSchema {
     public let includeInTotal: Bool?
     public let kind: AccountKind?
     public let name: String?
-    public let openingBalance: Decimal?
     public let openingBalanceAt: String?
+    public let openingBalanceE4: Int64?
     public let ownerId: UUID?
     public let subtype: AccountSubtype?
     public let updatedAt: String?
@@ -164,8 +164,8 @@ public enum PublicSchema {
       case includeInTotal = "include_in_total"
       case kind = "kind"
       case name = "name"
-      case openingBalance = "opening_balance"
       case openingBalanceAt = "opening_balance_at"
+      case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
       case subtype = "subtype"
       case updatedAt = "updated_at"
@@ -179,7 +179,7 @@ public enum PublicSchema {
     public let createdBy: UUID
     public let currency: String
     public let id: UUID
-    public let value: Decimal
+    public let valueE4: Int64
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case asOf = "as_of"
@@ -187,7 +187,7 @@ public enum PublicSchema {
       case createdBy = "created_by"
       case currency = "currency"
       case id = "id"
-      case value = "value"
+      case valueE4 = "value_e4"
     }
   }
   public struct BalanceSnapshotsInsert: Codable, Hashable, Sendable {
@@ -197,7 +197,7 @@ public enum PublicSchema {
     public let createdBy: UUID
     public let currency: String
     public let id: UUID?
-    public let value: Decimal
+    public let valueE4: Int64
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case asOf = "as_of"
@@ -205,7 +205,7 @@ public enum PublicSchema {
       case createdBy = "created_by"
       case currency = "currency"
       case id = "id"
-      case value = "value"
+      case valueE4 = "value_e4"
     }
   }
   public struct BalanceSnapshotsUpdate: Codable, Hashable, Sendable {
@@ -215,7 +215,7 @@ public enum PublicSchema {
     public let createdBy: UUID?
     public let currency: String?
     public let id: UUID?
-    public let value: Decimal?
+    public let valueE4: Int64?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case asOf = "as_of"
@@ -223,11 +223,11 @@ public enum PublicSchema {
       case createdBy = "created_by"
       case currency = "currency"
       case id = "id"
-      case value = "value"
+      case valueE4 = "value_e4"
     }
   }
   public struct BudgetsSelect: Codable, Hashable, Sendable {
-    public let amount: Decimal
+    public let amountE4: Int64
     public let categoryId: UUID?
     public let createdAt: String
     public let currency: String
@@ -237,7 +237,7 @@ public enum PublicSchema {
     public let updatedAt: String
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case createdAt = "created_at"
       case currency = "currency"
@@ -249,7 +249,7 @@ public enum PublicSchema {
     }
   }
   public struct BudgetsInsert: Codable, Hashable, Sendable {
-    public let amount: Decimal
+    public let amountE4: Int64
     public let categoryId: UUID?
     public let createdAt: String?
     public let currency: String
@@ -259,7 +259,7 @@ public enum PublicSchema {
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case createdAt = "created_at"
       case currency = "currency"
@@ -271,7 +271,7 @@ public enum PublicSchema {
     }
   }
   public struct BudgetsUpdate: Codable, Hashable, Sendable {
-    public let amount: Decimal?
+    public let amountE4: Int64?
     public let categoryId: UUID?
     public let createdAt: String?
     public let currency: String?
@@ -281,7 +281,7 @@ public enum PublicSchema {
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case createdAt = "created_at"
       case currency = "currency"
@@ -462,7 +462,7 @@ public enum PublicSchema {
   }
   public struct CsvImportCandidatesSelect: Codable, Hashable, Sendable {
     public let accountId: UUID
-    public let amount: Decimal
+    public let amountE4: Int64
     public let batchId: UUID
     public let createdAt: String
     public let currency: String
@@ -476,7 +476,7 @@ public enum PublicSchema {
     public let status: ImportCandidateStatus
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case batchId = "batch_id"
       case createdAt = "created_at"
       case currency = "currency"
@@ -492,7 +492,7 @@ public enum PublicSchema {
   }
   public struct CsvImportCandidatesInsert: Codable, Hashable, Sendable {
     public let accountId: UUID
-    public let amount: Decimal
+    public let amountE4: Int64
     public let batchId: UUID
     public let createdAt: String?
     public let currency: String
@@ -506,7 +506,7 @@ public enum PublicSchema {
     public let status: ImportCandidateStatus?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case batchId = "batch_id"
       case createdAt = "created_at"
       case currency = "currency"
@@ -522,7 +522,7 @@ public enum PublicSchema {
   }
   public struct CsvImportCandidatesUpdate: Codable, Hashable, Sendable {
     public let accountId: UUID?
-    public let amount: Decimal?
+    public let amountE4: Int64?
     public let batchId: UUID?
     public let createdAt: String?
     public let currency: String?
@@ -536,7 +536,7 @@ public enum PublicSchema {
     public let status: ImportCandidateStatus?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case batchId = "batch_id"
       case createdAt = "created_at"
       case currency = "currency"
@@ -619,13 +619,13 @@ public enum PublicSchema {
   public struct FiSettingsSelect: Codable, Hashable, Sendable {
     public let ownerId: UUID
     public let realReturnRate: Decimal
-    public let targetAnnualSpend: Decimal?
+    public let targetAnnualSpendE4: Int64?
     public let updatedAt: String
     public let withdrawalRate: Decimal
     public enum CodingKeys: String, CodingKey {
       case ownerId = "owner_id"
       case realReturnRate = "real_return_rate"
-      case targetAnnualSpend = "target_annual_spend"
+      case targetAnnualSpendE4 = "target_annual_spend_e4"
       case updatedAt = "updated_at"
       case withdrawalRate = "withdrawal_rate"
     }
@@ -633,13 +633,13 @@ public enum PublicSchema {
   public struct FiSettingsInsert: Codable, Hashable, Sendable {
     public let ownerId: UUID
     public let realReturnRate: Decimal?
-    public let targetAnnualSpend: Decimal?
+    public let targetAnnualSpendE4: Int64?
     public let updatedAt: String?
     public let withdrawalRate: Decimal?
     public enum CodingKeys: String, CodingKey {
       case ownerId = "owner_id"
       case realReturnRate = "real_return_rate"
-      case targetAnnualSpend = "target_annual_spend"
+      case targetAnnualSpendE4 = "target_annual_spend_e4"
       case updatedAt = "updated_at"
       case withdrawalRate = "withdrawal_rate"
     }
@@ -647,13 +647,13 @@ public enum PublicSchema {
   public struct FiSettingsUpdate: Codable, Hashable, Sendable {
     public let ownerId: UUID?
     public let realReturnRate: Decimal?
-    public let targetAnnualSpend: Decimal?
+    public let targetAnnualSpendE4: Int64?
     public let updatedAt: String?
     public let withdrawalRate: Decimal?
     public enum CodingKeys: String, CodingKey {
       case ownerId = "owner_id"
       case realReturnRate = "real_return_rate"
-      case targetAnnualSpend = "target_annual_spend"
+      case targetAnnualSpendE4 = "target_annual_spend_e4"
       case updatedAt = "updated_at"
       case withdrawalRate = "withdrawal_rate"
     }
@@ -943,14 +943,14 @@ public enum PublicSchema {
   public struct NetWorthDailySelect: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let asOf: String
-    public let balance: Decimal?
+    public let balanceE4: Int64?
     public let currency: String
     public let ownerId: UUID
     public let updatedAt: String
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case asOf = "as_of"
-      case balance = "balance"
+      case balanceE4 = "balance_e4"
       case currency = "currency"
       case ownerId = "owner_id"
       case updatedAt = "updated_at"
@@ -959,14 +959,14 @@ public enum PublicSchema {
   public struct NetWorthDailyInsert: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let asOf: String
-    public let balance: Decimal?
+    public let balanceE4: Int64?
     public let currency: String
     public let ownerId: UUID
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case asOf = "as_of"
-      case balance = "balance"
+      case balanceE4 = "balance_e4"
       case currency = "currency"
       case ownerId = "owner_id"
       case updatedAt = "updated_at"
@@ -975,14 +975,14 @@ public enum PublicSchema {
   public struct NetWorthDailyUpdate: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let asOf: String?
-    public let balance: Decimal?
+    public let balanceE4: Int64?
     public let currency: String?
     public let ownerId: UUID?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case asOf = "as_of"
-      case balance = "balance"
+      case balanceE4 = "balance_e4"
       case currency = "currency"
       case ownerId = "owner_id"
       case updatedAt = "updated_at"
@@ -1111,7 +1111,7 @@ public enum PublicSchema {
   public struct RecurringRulesSelect: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let active: Bool
-    public let amount: Decimal
+    public let amountE4: Int64
     public let categoryId: UUID
     public let createdAt: String
     public let createdBy: UUID
@@ -1126,7 +1126,7 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case active = "active"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case createdAt = "created_at"
       case createdBy = "created_by"
@@ -1143,7 +1143,7 @@ public enum PublicSchema {
   public struct RecurringRulesInsert: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let active: Bool?
-    public let amount: Decimal
+    public let amountE4: Int64
     public let categoryId: UUID
     public let createdAt: String?
     public let createdBy: UUID
@@ -1158,7 +1158,7 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case active = "active"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case createdAt = "created_at"
       case createdBy = "created_by"
@@ -1175,7 +1175,7 @@ public enum PublicSchema {
   public struct RecurringRulesUpdate: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let active: Bool?
-    public let amount: Decimal?
+    public let amountE4: Int64?
     public let categoryId: UUID?
     public let createdAt: String?
     public let createdBy: UUID?
@@ -1190,7 +1190,7 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case active = "active"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case createdAt = "created_at"
       case createdBy = "created_by"
@@ -1267,7 +1267,7 @@ public enum PublicSchema {
   public struct TransactionsSelect: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let accountKind: AccountKind?
-    public let amount: Decimal
+    public let amountE4: Int64
     public let categoryId: UUID?
     public let categoryKind: CategoryKind?
     public let createdAt: String
@@ -1289,7 +1289,7 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case accountKind = "account_kind"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case categoryKind = "category_kind"
       case createdAt = "created_at"
@@ -1313,7 +1313,7 @@ public enum PublicSchema {
   public struct TransactionsInsert: Codable, Hashable, Sendable {
     public let accountId: UUID
     public let accountKind: AccountKind?
-    public let amount: Decimal
+    public let amountE4: Int64
     public let categoryId: UUID?
     public let categoryKind: CategoryKind?
     public let createdAt: String?
@@ -1335,7 +1335,7 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case accountKind = "account_kind"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case categoryKind = "category_kind"
       case createdAt = "created_at"
@@ -1359,7 +1359,7 @@ public enum PublicSchema {
   public struct TransactionsUpdate: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let accountKind: AccountKind?
-    public let amount: Decimal?
+    public let amountE4: Int64?
     public let categoryId: UUID?
     public let categoryKind: CategoryKind?
     public let createdAt: String?
@@ -1381,7 +1381,7 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case accountKind = "account_kind"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case categoryId = "category_id"
       case categoryKind = "category_kind"
       case createdAt = "created_at"
@@ -1404,26 +1404,26 @@ public enum PublicSchema {
   }
   public struct AccountBalancesSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
-    public let balance: Decimal?
+    public let balanceE4: Int64?
     public let currency: String?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case balance = "balance"
+      case balanceE4 = "balance_e4"
       case currency = "currency"
     }
   }
   public struct AccountBalancesBaseSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
-    public let balance: Decimal?
-    public let balanceBase: Decimal?
+    public let balanceBaseE4: Int64?
+    public let balanceE4: Int64?
     public let baseCurrency: String?
     public let currency: String?
     public let hasMissingRate: Bool?
     public let ownerId: UUID?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case balance = "balance"
-      case balanceBase = "balance_base"
+      case balanceBaseE4 = "balance_base_e4"
+      case balanceE4 = "balance_e4"
       case baseCurrency = "base_currency"
       case currency = "currency"
       case hasMissingRate = "has_missing_rate"
@@ -1433,8 +1433,8 @@ public enum PublicSchema {
   public struct AccountsWithBalancesSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let archivedAt: String?
-    public let balance: Decimal?
-    public let balanceBase: Decimal?
+    public let balanceBaseE4: Int64?
+    public let balanceE4: Int64?
     public let baseCurrency: String?
     public let baseMinorUnit: Int16?
     public let countsTowardFi: Bool?
@@ -1450,8 +1450,8 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case archivedAt = "archived_at"
-      case balance = "balance"
-      case balanceBase = "balance_base"
+      case balanceBaseE4 = "balance_base_e4"
+      case balanceE4 = "balance_e4"
       case baseCurrency = "base_currency"
       case baseMinorUnit = "base_minor_unit"
       case countsTowardFi = "counts_toward_fi"
@@ -1468,7 +1468,7 @@ public enum PublicSchema {
   }
   public struct NeedsReviewSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
-    public let amount: Decimal?
+    public let amountE4: Int64?
     public let currency: String?
     public let itemId: UUID?
     public let kind: String?
@@ -1477,7 +1477,7 @@ public enum PublicSchema {
     public let title: String?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case amount = "amount"
+      case amountE4 = "amount_e4"
       case currency = "currency"
       case itemId = "item_id"
       case kind = "kind"
@@ -1489,8 +1489,8 @@ public enum PublicSchema {
   public struct TransactionsWithDetailsSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let accountName: String?
-    public let amount: Decimal?
-    public let amountBase: Decimal?
+    public let amountBaseE4: Int64?
+    public let amountE4: Int64?
     public let baseCurrency: String?
     public let baseMinorUnit: Int16?
     public let categoryId: UUID?
@@ -1513,8 +1513,8 @@ public enum PublicSchema {
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case accountName = "account_name"
-      case amount = "amount"
-      case amountBase = "amount_base"
+      case amountBaseE4 = "amount_base_e4"
+      case amountE4 = "amount_e4"
       case baseCurrency = "base_currency"
       case baseMinorUnit = "base_minor_unit"
       case categoryId = "category_id"

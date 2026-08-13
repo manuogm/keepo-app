@@ -123,7 +123,7 @@ struct OnboardingView: View {
     }
 
     private func createFirstAccount() async {
-        guard let userId = session.profile?.id, let openingBalance = AmountParser.parse(openingBalanceText) else {
+        guard let userId = session.profile?.id, let openingBalanceE4 = AmountParser.parse(openingBalanceText) else {
             errorMessage = "Enter a valid opening balance."
             return
         }
@@ -138,7 +138,7 @@ struct OnboardingView: View {
                 subtype: accountSubtype,
                 name: accountName,
                 currency: selectedCurrency,
-                openingBalance: openingBalance
+                openingBalanceE4: openingBalanceE4
             )
             try await session.completeOnboarding(baseCurrency: selectedCurrency)
             step = .captureWalkthrough

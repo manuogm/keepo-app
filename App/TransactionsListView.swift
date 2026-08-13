@@ -82,7 +82,7 @@ struct TransactionsListView: View {
                 id: pending.id,
                 accountName: account?.name ?? "—",
                 categoryName: category?.name ?? "—",
-                amount: pending.amount,
+                amountE4: pending.amountE4,
                 currency: pending.currency,
                 minorUnit: Int(account?.minorUnit ?? 2)
             )

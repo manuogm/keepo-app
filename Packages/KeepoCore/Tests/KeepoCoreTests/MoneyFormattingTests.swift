@@ -30,28 +30,22 @@ struct MoneyFormatterTests {
 
     @Test("rounds display to the currency's minor unit")
     func roundsToMinorUnit() {
-        let result = MoneyFormatter.format(
-            Decimal(string: "12.345"),
-            currency: usd,
-            locale: usLocale
-        )
+        // 12.345 at e4 scale is 123450.
+        let result = MoneyFormatter.format(123_450, currency: usd, locale: usLocale)
         #expect(result.contains("12.35") || result.contains("12.34"))
         #expect(!result.contains("12.345"))
     }
 
     @Test("zero-decimal currencies show no fraction digits")
     func zeroDecimalCurrency() {
-        let result = MoneyFormatter.format(
-            Decimal(string: "1500"),
-            currency: jpy,
-            locale: usLocale
-        )
+        // 1500 JPY at e4 scale is 15000000.
+        let result = MoneyFormatter.format(15_000_000, currency: jpy, locale: usLocale)
         #expect(!result.contains("."))
     }
 
     @Test("a real zero balance still renders as zero, not a dash")
     func actualZeroIsNotDash() {
-        let result = MoneyFormatter.format(Decimal(0), currency: usd, locale: usLocale)
+        let result = MoneyFormatter.format(0, currency: usd, locale: usLocale)
         #expect(result != "—")
     }
 }

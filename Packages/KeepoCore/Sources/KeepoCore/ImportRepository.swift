@@ -14,7 +14,7 @@ public enum ImportRepository {
         let payload = rows.map { row in
             ImportRowPayload(
                 occurredAt: PostgresDate.timestampString(row.occurredAt),
-                amount: row.amount,
+                amountE4: row.amountE4,
                 currency: currency,
                 merchantRaw: row.merchantRaw,
                 merchantNormalized: row.merchantRaw.map(MerchantNormalizer.normalize)
@@ -50,13 +50,14 @@ public enum ImportRepository {
 
 private struct ImportRowPayload: Encodable {
     let occurredAt: String
-    let amount: Decimal
+    let amountE4: Int64
     let currency: String
     let merchantRaw: String?
     let merchantNormalized: String?
     enum CodingKeys: String, CodingKey {
         case occurredAt = "occurred_at"
-        case amount, currency
+        case amountE4 = "amount_e4"
+        case currency
         case merchantRaw = "merchant_raw"
         case merchantNormalized = "merchant_normalized"
     }

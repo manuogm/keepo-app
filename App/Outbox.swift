@@ -23,7 +23,7 @@ public protocol OutboxSending: Sendable {
     func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult
     func createAccount(_ payload: CreateAccountPayload) async throws
     func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool
-    func setAccountBalance(_ payload: SetAccountBalancePayload) async throws
+    func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool
     func createCategory(_ payload: CreateCategoryPayload) async throws
     /// No applied/conflict distinction — see `UpdateCategoryPayload`'s own
     /// header comment on why a rename has nothing to conflict against.
@@ -47,7 +47,7 @@ public struct LiveOutboxSender: OutboxSending {
         do {
             try await TransactionRepository.create(
                 client: client, id: payload.id, ownerId: payload.ownerId, accountId: payload.accountId,
-                categoryId: payload.categoryId, amount: payload.amount, currency: payload.currency,
+                categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
                 occurredAt: payload.occurredAt
             )
         } catch {
@@ -60,7 +60,7 @@ public struct LiveOutboxSender: OutboxSending {
         do {
             try await TransactionRepository.createTransfer(
                 client: client, fromAccountId: payload.fromAccountId, toAccountId: payload.toAccountId,
-                fromAmount: payload.fromAmount, toAmount: payload.toAmount, occurredAt: payload.occurredAt,
+                fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4, occurredAt: payload.occurredAt,
                 fromId: payload.fromId, toId: payload.toId
             )
         } catch {
@@ -72,7 +72,7 @@ public struct LiveOutboxSender: OutboxSending {
     public func updateTransaction(_ payload: UpdateTransactionPayload) async throws -> Bool {
         let result = try await TransactionRepository.update(
             client: client, id: payload.id, expectedVersion: payload.expectedVersion, accountId: payload.accountId,
-            categoryId: payload.categoryId, amount: payload.amount, currency: payload.currency,
+            categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
             occurredAt: payload.occurredAt, merchantRaw: payload.merchantRaw
         )
         switch result {
@@ -85,7 +85,7 @@ public struct LiveOutboxSender: OutboxSending {
         let result = try await TransactionRepository.updateTransfer(
             client: client, transferGroupId: payload.transferGroupId,
             fromExpectedVersion: payload.fromExpectedVersion, toExpectedVersion: payload.toExpectedVersion,
-            fromAmount: payload.fromAmount, toAmount: payload.toAmount, occurredAt: payload.occurredAt
+            fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4, occurredAt: payload.occurredAt
         )
         switch result {
         case .saved: return true
@@ -109,7 +109,7 @@ public struct LiveOutboxSender: OutboxSending {
             return try await CaptureRepository.capture(
                 client: client, id: payload.id, cardIdentifier: payload.cardIdentifier,
                 merchantRaw: payload.merchantRaw, merchantNormalized: payload.merchantNormalized,
-                amount: payload.amount, occurredAt: payload.occurredAt, externalId: payload.externalId
+                amountE4: payload.amountE4, occurredAt: payload.occurredAt, externalId: payload.externalId
             )
         } catch {
             // A retried capture already landed under this id — we don't know

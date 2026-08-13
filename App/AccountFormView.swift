@@ -217,7 +217,7 @@ struct AccountFormView: View {
         guard
             let (data, _) = session.payloadCache.load(key: "accounts_with_balances"),
             let rows = try? JSONDecoder().decode([PublicSchema.AccountsWithBalancesSelect].self, from: data),
-            let cachedBalance = rows.first(where: { $0.accountId == accountId })?.balance
+            let cachedBalance = rows.first(where: { $0.accountId == accountId })?.balanceE4
         else {
             currentBalanceText = openingBalanceText
             return
@@ -241,14 +241,14 @@ struct AccountFormView: View {
         includeInTotal = account.includeInTotal
         countsTowardFi = account.countsTowardFi
         openingBalanceText = AmountFormatter.editableString(
-            account.openingBalance, minorUnit: selectedCurrencyMinorUnit
+            account.openingBalanceE4, minorUnit: selectedCurrencyMinorUnit
         )
     }
 }
 
 extension AccountFormView {
     fileprivate func save() async {
-        guard let openingBalance = AmountParser.parse(openingBalanceText) else {
+        guard let openingBalanceE4 = AmountParser.parse(openingBalanceText) else {
             errorMessage = "Enter a valid opening balance."
             return
         }
@@ -258,11 +258,11 @@ extension AccountFormView {
         do {
             switch mode {
             case .create:
-                try await createAccount(openingBalance: openingBalance)
+                try await createAccount(openingBalanceE4: openingBalanceE4)
                 onSaved()
                 dismiss()
             case .edit:
-                try await updateAccount(openingBalance: openingBalance)
+                try await updateAccount(openingBalanceE4: openingBalanceE4)
                 if !showConflictAlert {
                     onSaved()
                     dismiss()
@@ -277,24 +277,24 @@ extension AccountFormView {
     /// Goes through `session.outbox`, never `AccountRepository` directly —
     /// same reasoning as TransactionFormView's writes: an offline create
     /// queues instead of erroring.
-    fileprivate func createAccount(openingBalance: Decimal) async throws {
+    fileprivate func createAccount(openingBalanceE4: Int64) async throws {
         guard let userId = session.profile?.id else { return }
         let kind: PublicSchema.AccountKind = subtype == .investment ? .valuation : .ledger
         let payload = CreateAccountPayload(
             id: UUID(), ownerId: userId, kind: kind, subtype: subtype,
-            name: name, currency: currency, openingBalance: openingBalance
+            name: name, currency: currency, openingBalanceE4: openingBalanceE4
         )
         await session.outbox.submitCreateAccount(payload)
     }
 
-    fileprivate func updateAccount(openingBalance: Decimal) async throws {
+    fileprivate func updateAccount(openingBalanceE4: Int64) async throws {
         guard let id = editingId, let expectedVersion = editingVersion else {
             errorMessage = "Missing account details."
             return
         }
         let payload = UpdateAccountPayload(
             id: id, expectedVersion: expectedVersion, name: name, subtype: subtype,
-            openingBalance: openingBalance, includeInTotal: includeInTotal, countsTowardFi: countsTowardFi
+            openingBalanceE4: openingBalanceE4, includeInTotal: includeInTotal, countsTowardFi: countsTowardFi
         )
         let result = await session.outbox.submitUpdateAccount(payload)
         if result == .conflict {
@@ -311,13 +311,18 @@ extension AccountFormView {
     /// fresh whenever it finally runs, so a queued edit is never stale by
     /// the time it lands.
     fileprivate func updateBalance() async {
-        guard let id = editingId, let newBalance = AmountParser.parse(currentBalanceText) else {
+        guard
+            let id = editingId, let expectedVersion = editingVersion,
+            let newBalanceE4 = AmountParser.parse(currentBalanceText)
+        else {
             balanceUpdateMessage = "Enter a valid balance."
             return
         }
         isUpdatingBalance = true
         balanceUpdateMessage = nil
-        let payload = SetAccountBalancePayload(id: UUID(), accountId: id, newBalance: newBalance)
+        let payload = SetAccountBalancePayload(
+            id: UUID(), accountId: id, newBalanceE4: newBalanceE4, expectedVersion: expectedVersion
+        )
         let result = await session.outbox.submitSetAccountBalance(payload)
         switch result {
         case .applied:

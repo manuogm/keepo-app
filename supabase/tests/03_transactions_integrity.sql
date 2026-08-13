@@ -9,9 +9,9 @@ select plan(7);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 100);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a0000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Savings', 'EUR', 100);
 insert into categories (id, owner_id, kind, name)
 values ('c0000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Test Expense');
@@ -20,7 +20,7 @@ values ('c0000000-0000-0000-0000-000000000002', auth.uid(), 'income', 'Test Inco
 
 -- amount_not_zero
 select throws_ok(
-  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
      values (
        '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
        'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 0, 'EUR', now()
@@ -31,7 +31,7 @@ select throws_ok(
 
 -- transfer_xor_category: neither set
 select throws_ok(
-  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
      values (
        '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
        'a0000000-0000-0000-0000-000000000001', null, -10, 'EUR', now()
@@ -42,7 +42,7 @@ select throws_ok(
 
 -- sign_matches_category_kind: expense with a positive amount
 select throws_ok(
-  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
      values (
        '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
        'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 10, 'EUR', now()
@@ -52,7 +52,7 @@ select throws_ok(
 );
 
 select throws_ok(
-  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
      values (
        '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
        'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', -10, 'EUR', now()
@@ -61,7 +61,7 @@ select throws_ok(
   'sign_matches_category_kind rejects a negative-amount income'
 );
 
-insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
 values (
   '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
   'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -10, 'EUR', now()
@@ -106,7 +106,7 @@ savepoint h12_check;
 -- Run as postgres (bypasses RLS on categories/accounts so the FK itself,
 -- not a visibility gap, is what's being exercised) — the FK must reject
 -- this regardless of who's asking.
-insert into transactions (owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
 values (
   '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
   'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000099', -10, 'EUR', now()
@@ -127,7 +127,7 @@ rollback to savepoint h12_check;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into transactions (owner_id, created_by, account_id, amount, currency, occurred_at, transfer_group_id)
+insert into transactions (owner_id, created_by, account_id, amount_e4, currency, occurred_at, transfer_group_id)
 values (
   auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', -25, 'EUR', now(),
   '99999999-9999-9999-9999-999999999999'

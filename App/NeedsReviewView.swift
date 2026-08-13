@@ -298,7 +298,7 @@ struct NeedsReviewRow: View {
                 }
             }
             Spacer()
-            if let amount = item.amount, let currencyCode = item.currency {
+            if let amount = item.amountE4, let currencyCode = item.currency {
                 Text(MoneyFormatter.format(amount, currency: CurrencyInfo(code: currencyCode, minorUnit: minorUnit)))
                     .monospacedDigit()
                     .foregroundStyle(Color.primary)

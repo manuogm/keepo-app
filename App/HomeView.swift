@@ -9,8 +9,8 @@ import SwiftUI
 struct HomeView: View {
     let session: SessionStore
 
-    @State private var netWorth: Decimal?
-    @State private var seriesPoints: [(date: Date, value: Decimal)] = []
+    @State private var netWorth: Int64?
+    @State private var seriesPoints: [(date: Date, value: Int64)] = []
     @State private var baseCurrencyInfo: CurrencyInfo?
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -26,7 +26,7 @@ struct HomeView: View {
     /// base currency are guaranteed exact here; a cross-currency account
     /// needs `fxRates` to have that currency cached, same "—" fallback
     /// money rule 5 already governs everywhere else in this overlay.
-    private var overlaidNetWorth: Decimal? {
+    private var overlaidNetWorth: Int64? {
         guard let netWorth, let baseCurrencyInfo,
               let (data, _) = session.payloadCache.load(key: "accounts_with_balances"),
               let cachedAccounts = try? JSONDecoder().decode(
@@ -42,17 +42,17 @@ struct HomeView: View {
             }
         }
         let cachedBalances = Dictionary(uniqueKeysWithValues: inScope.compactMap { account in
-            account.accountId.flatMap { id in account.balance.map { (id, $0) } }
+            account.accountId.flatMap { id in account.balanceE4.map { (id, $0) } }
         })
         let cachedTransactions = PendingOverlayAdapter.cachedTransactionLookup(session: session)
         let overlay = PendingOverlayAdapter.overlaidBalances(
             cached: cachedBalances, outbox: session.outbox, cachedTransactions: cachedTransactions
         )
 
-        var total: Decimal = 0
+        var total: Int64 = 0
         for account in inScope {
             guard let id = account.accountId, let currency = account.currency else { return netWorth }
-            let balance = overlay[id] ?? account.balance
+            let balance = overlay[id] ?? account.balanceE4
             guard let balance else { return netWorth }
             guard let converted = LocalFxConvert.convert(
                 balance, from: currency, to: baseCurrencyInfo.code, rates: fxRates
@@ -84,7 +84,13 @@ struct HomeView: View {
                                 .foregroundStyle(Color.secondary)
                         } else {
                             Chart(seriesPoints, id: \.date) { point in
-                                LineMark(x: .value("Date", point.date), y: .value("Net worth", point.value))
+                                // Charting is display-only — converting to
+                                // Double here never feeds back into stored
+                                // or compared money, so it doesn't touch
+                                // money rule 3.
+                                LineMark(
+                                    x: .value("Date", point.date), y: .value("Net worth", Double(point.value) / 10_000)
+                                )
                             }
                             .foregroundStyle(Color.primary)
                             .chartYAxis {
@@ -158,8 +164,8 @@ struct HomeView: View {
             netWorth = try await netWorthResult
             let points = try await seriesResult
 
-            let parsed: [(date: Date, value: Decimal)] = points.compactMap { point in
-                guard let date = PostgresDate.dateOnly(from: point.asOf), let total = point.total else { return nil }
+            let parsed: [(date: Date, value: Int64)] = points.compactMap { point in
+                guard let date = PostgresDate.dateOnly(from: point.asOf), let total = point.totalE4 else { return nil }
                 return (date: date, value: total)
             }
             let granularity = DateBucketing.granularity(from: from, through: today)
@@ -213,14 +219,14 @@ struct HomeView: View {
 /// base currency needed to render them, for exactly one scope (part of the
 /// cache key, not this struct — Total/Me/Household are cached separately).
 private struct HomeSummaryCache: Codable {
-    let netWorth: Decimal?
+    let netWorth: Int64?
     let seriesPoints: [Point]
     let baseCurrencyCode: String?
     let baseCurrencyMinorUnit: Int?
 
     struct Point: Codable {
         let date: Date
-        let value: Decimal
+        let value: Int64
     }
 }
 

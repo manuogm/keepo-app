@@ -34,13 +34,13 @@ public enum CaptureRepository {
         cardIdentifier: String,
         merchantRaw: String,
         merchantNormalized: String,
-        amount: Decimal,
+        amountE4: Int64,
         occurredAt: Date,
         externalId: String
     ) async throws -> CaptureResult {
         let params = CaptureTransactionParams(
             id: id, cardIdentifier: cardIdentifier, merchantRaw: merchantRaw,
-            merchantNormalized: merchantNormalized, amount: amount,
+            merchantNormalized: merchantNormalized, amountE4: amountE4,
             occurredAt: PostgresDate.timestampString(occurredAt), externalId: externalId
         )
         let rows: [CaptureResult] = try await client.rpc("capture_transaction", params: params).execute().value
@@ -73,7 +73,7 @@ private struct CaptureTransactionParams: Encodable {
     let cardIdentifier: String
     let merchantRaw: String
     let merchantNormalized: String
-    let amount: Decimal
+    let amountE4: Int64
     let occurredAt: String
     let externalId: String
     enum CodingKeys: String, CodingKey {
@@ -81,7 +81,7 @@ private struct CaptureTransactionParams: Encodable {
         case cardIdentifier = "p_card_identifier"
         case merchantRaw = "p_merchant_raw"
         case merchantNormalized = "p_merchant_normalized"
-        case amount = "p_amount"
+        case amountE4 = "p_amount_e4"
         case occurredAt = "p_occurred_at"
         case externalId = "p_external_id"
     }

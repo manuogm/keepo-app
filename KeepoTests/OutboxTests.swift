@@ -26,7 +26,7 @@ struct OutboxTests {
         let outbox = try makeOutbox(sender: sender)
         let payload = CreateTransactionPayload(
             id: UUID(), ownerId: UUID(), accountId: UUID(), categoryId: UUID(),
-            amount: -10, currency: "EUR", occurredAt: Date()
+            amountE4: -100000, currency: "EUR", occurredAt: Date()
         )
 
         let submitResult = await outbox.submitCreateTransaction(payload)
@@ -45,7 +45,7 @@ struct OutboxTests {
         let outbox = try makeOutbox(sender: sender)
         let payload = UpdateTransactionPayload(
             id: UUID(), expectedVersion: 1, accountId: UUID(), categoryId: UUID(),
-            amount: -20, currency: "EUR", occurredAt: Date(), merchantRaw: nil
+            amountE4: -200000, currency: "EUR", occurredAt: Date(), merchantRaw: nil
         )
 
         let submitResult = await outbox.submitUpdateTransaction(payload)
@@ -60,7 +60,7 @@ struct OutboxTests {
         let outbox = try makeOutbox(sender: sender)
         let payload = UpdateTransactionPayload(
             id: UUID(), expectedVersion: 1, accountId: UUID(), categoryId: UUID(),
-            amount: -20, currency: "EUR", occurredAt: Date(), merchantRaw: nil
+            amountE4: -200000, currency: "EUR", occurredAt: Date(), merchantRaw: nil
         )
 
         _ = await outbox.submitUpdateTransaction(payload)
@@ -82,11 +82,11 @@ struct OutboxTests {
         let id = UUID()
         let firstEdit = UpdateTransactionPayload(
             id: id, expectedVersion: 1, accountId: UUID(), categoryId: UUID(),
-            amount: -20, currency: "EUR", occurredAt: Date(), merchantRaw: nil
+            amountE4: -200000, currency: "EUR", occurredAt: Date(), merchantRaw: nil
         )
         let secondEdit = UpdateTransactionPayload(
             id: id, expectedVersion: 1, accountId: UUID(), categoryId: UUID(),
-            amount: -30, currency: "EUR", occurredAt: Date(), merchantRaw: nil
+            amountE4: -300000, currency: "EUR", occurredAt: Date(), merchantRaw: nil
         )
 
         _ = await outbox.submitUpdateTransaction(firstEdit)
@@ -98,7 +98,7 @@ struct OutboxTests {
         #expect(outbox.pendingCount == 0)
         // The whole-row payload that actually reached the sender is the
         // LATEST desired state, never a merge of the two edits.
-        #expect(sender.lastUpdateTransactionPayload?.amount == -30)
+        #expect(sender.lastUpdateTransactionPayload?.amountE4 == -300000)
     }
 
     @Test("a capture that fails to send is queued; draining replays it")
@@ -108,7 +108,7 @@ struct OutboxTests {
         let outbox = try makeOutbox(sender: sender)
         let payload = CaptureTransactionPayload(
             id: UUID(), cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
-            amount: -4.50, occurredAt: Date(), externalId: "ext-1"
+            amountE4: -45000, occurredAt: Date(), externalId: "ext-1"
         )
 
         let submitResult = await outbox.submitCaptureTransaction(payload)
@@ -127,7 +127,7 @@ struct OutboxTests {
         let outbox = try makeOutbox(sender: sender)
         let payload = CaptureTransactionPayload(
             id: UUID(), cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
-            amount: -4.50, occurredAt: Date(), externalId: "ext-1"
+            amountE4: -45000, occurredAt: Date(), externalId: "ext-1"
         )
 
         let submitResult = await outbox.submitCaptureTransaction(payload)
@@ -142,7 +142,7 @@ struct OutboxTests {
         let outbox = try makeOutbox(sender: sender)
         let payload = CreateTransactionPayload(
             id: UUID(), ownerId: UUID(), accountId: UUID(), categoryId: UUID(),
-            amount: -10, currency: "EUR", occurredAt: Date()
+            amountE4: -100000, currency: "EUR", occurredAt: Date()
         )
 
         #expect(outbox.hasStalePending(threshold: 0) == false)
@@ -198,7 +198,7 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
 
     var createAccountResult: Result<Void, Error> = .success(())
     var updateAccountResult: Result<Bool, Error> = .success(true)
-    var setAccountBalanceResult: Result<Void, Error> = .success(())
+    var setAccountBalanceResult: Result<Bool, Error> = .success(true)
     var createCategoryResult: Result<Void, Error> = .success(())
     var updateCategoryResult: Result<Void, Error> = .success(())
 
@@ -210,7 +210,7 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
         try updateAccountResult.get()
     }
 
-    func setAccountBalance(_ payload: SetAccountBalancePayload) async throws {
+    func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool {
         try setAccountBalanceResult.get()
     }
 

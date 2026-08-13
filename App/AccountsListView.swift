@@ -22,7 +22,7 @@ struct AccountsListView: View {
     /// adds deltas the server will apply too, never approximates).
     private var overlaidAccounts: [OverlaidAccount] {
         let cachedBalances = Dictionary(uniqueKeysWithValues: accounts.compactMap { account in
-            account.accountId.flatMap { id in account.balance.map { (id, $0) } }
+            account.accountId.flatMap { id in account.balanceE4.map { (id, $0) } }
         })
         let cachedTransactions = PendingOverlayAdapter.cachedTransactionLookup(session: session)
         let overlay = PendingOverlayAdapter.overlaidBalances(
@@ -30,19 +30,20 @@ struct AccountsListView: View {
         )
         return accounts.map { account in
             guard
-                let id = account.accountId, let overlaidBalance = overlay[id], overlaidBalance != account.balance
+                let id = account.accountId, let overlaidBalance = overlay[id], overlaidBalance != account.balanceE4
             else {
                 return OverlaidAccount(
-                    account: account, balance: account.balance, balanceBase: account.balanceBase, isPending: false
+                    account: account, balanceE4: account.balanceE4, balanceBaseE4: account.balanceBaseE4,
+                    isPending: false
                 )
             }
-            let balanceBase: Decimal? = account.currency.flatMap { currency in
+            let balanceBaseE4: Int64? = account.currency.flatMap { currency in
                 account.baseCurrency.flatMap { base in
                     LocalFxConvert.convert(overlaidBalance, from: currency, to: base, rates: fxRates)
                 }
             }
             return OverlaidAccount(
-                account: account, balance: overlaidBalance, balanceBase: balanceBase, isPending: true
+                account: account, balanceE4: overlaidBalance, balanceBaseE4: balanceBaseE4, isPending: true
             )
         }
     }
@@ -185,9 +186,9 @@ struct AccountsListView: View {
         else { return "—" }
 
         let hasMissingRate = overlaidAccounts.contains {
-            ($0.account.hasMissingRate ?? false) || $0.balanceBase == nil
+            ($0.account.hasMissingRate ?? false) || $0.balanceBaseE4 == nil
         }
-        let total: Decimal? = hasMissingRate ? nil : overlaidAccounts.reduce(Decimal(0)) { $0 + ($1.balanceBase ?? 0) }
+        let total: Int64? = hasMissingRate ? nil : overlaidAccounts.reduce(Int64(0)) { $0 + ($1.balanceBaseE4 ?? 0) }
         return MoneyFormatter.format(total, currency: CurrencyInfo(code: baseCurrency, minorUnit: Int(baseMinorUnit)))
     }
 
@@ -237,8 +238,8 @@ private extension Binding where Value == UUID? {
 /// is queued elsewhere.
 private struct OverlaidAccount: Identifiable {
     let account: PublicSchema.AccountsWithBalancesSelect
-    let balance: Decimal?
-    let balanceBase: Decimal?
+    let balanceE4: Int64?
+    let balanceBaseE4: Int64?
     let isPending: Bool
     var id: UUID { account.accountId ?? UUID() }
 }
@@ -278,11 +279,11 @@ private struct AccountRow: View {
                 if !isPrivacyMode {
                     CurrencyConversionLabel(
                         nativeCurrency: account.currency,
-                        amountBase: overlaid.balanceBase,
+                        amountBase: overlaid.balanceBaseE4,
                         baseCurrency: account.baseCurrency,
                         baseMinorUnit: account.baseMinorUnit,
                         hasMissingRate: (account.hasMissingRate ?? false)
-                            || (overlaid.isPending && overlaid.balanceBase == nil)
+                            || (overlaid.isPending && overlaid.balanceBaseE4 == nil)
                     )
                 }
             }
@@ -292,6 +293,6 @@ private struct AccountRow: View {
     private var formattedBalance: String {
         guard let currencyCode = account.currency, let minorUnit = account.minorUnit else { return "—" }
         let currency = CurrencyInfo(code: currencyCode, minorUnit: Int(minorUnit))
-        return MoneyFormatter.format(overlaid.balance, currency: currency)
+        return MoneyFormatter.format(overlaid.balanceE4, currency: currency)
     }
 }

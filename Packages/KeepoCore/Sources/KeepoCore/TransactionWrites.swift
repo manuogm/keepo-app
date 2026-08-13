@@ -16,8 +16,8 @@ public extension TransactionRepository {
         client: SupabaseClient,
         fromAccountId: UUID,
         toAccountId: UUID,
-        fromAmount: Decimal,
-        toAmount: Decimal? = nil,
+        fromAmountE4: Int64,
+        toAmountE4: Int64? = nil,
         occurredAt: Date = Date(),
         fromId: UUID? = nil,
         toId: UUID? = nil
@@ -25,8 +25,8 @@ public extension TransactionRepository {
         let params = CreateTransferParams(
             fromAccountId: fromAccountId,
             toAccountId: toAccountId,
-            fromAmount: fromAmount,
-            toAmount: toAmount,
+            fromAmountE4: fromAmountE4,
+            toAmountE4: toAmountE4,
             occurredAt: PostgresDate.timestampString(occurredAt),
             fromId: fromId,
             toId: toId
@@ -44,15 +44,15 @@ public extension TransactionRepository {
         client: SupabaseClient,
         fromCurrency: String,
         toCurrency: String,
-        fromAmount: Decimal,
-        toAmount: Decimal,
+        fromAmountE4: Int64,
+        toAmountE4: Int64,
         occurredAt: Date = Date()
     ) async throws -> RateDivergence? {
         let params = CheckTransferRateDivergenceParams(
             fromCurrency: fromCurrency,
             toCurrency: toCurrency,
-            fromAmount: fromAmount,
-            toAmount: toAmount,
+            fromAmountE4: fromAmountE4,
+            toAmountE4: toAmountE4,
             occurredAt: PostgresDate.timestampString(occurredAt)
         )
         let rows: [RateDivergence] = try await client.rpc("check_transfer_rate_divergence", params: params)
@@ -78,14 +78,14 @@ public struct RateDivergence: Decodable, Sendable {
 private struct CheckTransferRateDivergenceParams: Encodable {
     let fromCurrency: String
     let toCurrency: String
-    let fromAmount: Decimal
-    let toAmount: Decimal
+    let fromAmountE4: Int64
+    let toAmountE4: Int64
     let occurredAt: String
     enum CodingKeys: String, CodingKey {
         case fromCurrency = "p_from_currency"
         case toCurrency = "p_to_currency"
-        case fromAmount = "p_from_amount"
-        case toAmount = "p_to_amount"
+        case fromAmountE4 = "p_from_amount_e4"
+        case toAmountE4 = "p_to_amount_e4"
         case occurredAt = "p_occurred_at"
     }
 }
@@ -123,7 +123,7 @@ struct UpdateTransactionParams: Encodable {
     let expectedVersion: Int
     let accountId: UUID
     let categoryId: UUID
-    let amount: Decimal
+    let amountE4: Int64
     let currency: String
     let occurredAt: String
     let merchantRaw: String?
@@ -132,7 +132,7 @@ struct UpdateTransactionParams: Encodable {
         case expectedVersion = "p_expected_version"
         case accountId = "p_account_id"
         case categoryId = "p_category_id"
-        case amount = "p_amount"
+        case amountE4 = "p_amount_e4"
         case currency = "p_currency"
         case occurredAt = "p_occurred_at"
         case merchantRaw = "p_merchant_raw"
@@ -143,15 +143,15 @@ struct UpdateTransferParams: Encodable {
     let transferGroupId: UUID
     let fromExpectedVersion: Int
     let toExpectedVersion: Int
-    let fromAmount: Decimal
-    let toAmount: Decimal
+    let fromAmountE4: Int64
+    let toAmountE4: Int64
     let occurredAt: String
     enum CodingKeys: String, CodingKey {
         case transferGroupId = "p_transfer_group_id"
         case fromExpectedVersion = "p_from_expected_version"
         case toExpectedVersion = "p_to_expected_version"
-        case fromAmount = "p_from_amount"
-        case toAmount = "p_to_amount"
+        case fromAmountE4 = "p_from_amount_e4"
+        case toAmountE4 = "p_to_amount_e4"
         case occurredAt = "p_occurred_at"
     }
 }
@@ -179,16 +179,16 @@ struct DeleteTransferParams: Encodable {
 private struct CreateTransferParams: Encodable {
     let fromAccountId: UUID
     let toAccountId: UUID
-    let fromAmount: Decimal
-    let toAmount: Decimal?
+    let fromAmountE4: Int64
+    let toAmountE4: Int64?
     let occurredAt: String
     let fromId: UUID?
     let toId: UUID?
     enum CodingKeys: String, CodingKey {
         case fromAccountId = "p_from_account_id"
         case toAccountId = "p_to_account_id"
-        case fromAmount = "p_from_amount"
-        case toAmount = "p_to_amount"
+        case fromAmountE4 = "p_from_amount_e4"
+        case toAmountE4 = "p_to_amount_e4"
         case occurredAt = "p_occurred_at"
         case fromId = "p_from_id"
         case toId = "p_to_id"

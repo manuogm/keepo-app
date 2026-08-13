@@ -81,7 +81,7 @@ select is(
 
 savepoint fx_staleness_check;
 delete from fx_rates;
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values (
   'a3000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
   '11111111-1111-1111-1111-111111111111', 'ledger', 'checking', 'Needs USD Rates', 'USD', 0
@@ -137,7 +137,7 @@ select is(
 
 select lives_ok(
   $$
-    insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+    insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
     values (
       'a3000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
       '11111111-1111-1111-1111-111111111111', 'ledger', 'checking', 'New Currency Account', 'GBP', 0

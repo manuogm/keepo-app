@@ -17,20 +17,20 @@ public enum BudgetRepository {
     @discardableResult
     // swiftlint:disable:next function_parameter_count
     public static func create(
-        client: SupabaseClient, ownerId: UUID, categoryId: UUID?, periodMonth: Date, amount: Decimal, currency: String
+        client: SupabaseClient, ownerId: UUID, categoryId: UUID?, periodMonth: Date, amountE4: Int64, currency: String
     ) async throws -> UUID {
         let id = UUID()
         let row = PublicSchema.BudgetsInsert(
-            amount: amount, categoryId: categoryId, createdAt: nil, currency: currency, id: id, ownerId: ownerId,
+            amountE4: amountE4, categoryId: categoryId, createdAt: nil, currency: currency, id: id, ownerId: ownerId,
             periodMonth: PostgresDate.dateOnlyString(periodMonth), updatedAt: nil, version: nil
         )
         try await client.from("budgets").insert(row).execute()
         return id
     }
 
-    public static func update(client: SupabaseClient, id: UUID, amount: Decimal, currency: String) async throws {
+    public static func update(client: SupabaseClient, id: UUID, amountE4: Int64, currency: String) async throws {
         let patch = PublicSchema.BudgetsUpdate(
-            amount: amount, categoryId: nil, createdAt: nil, currency: currency, id: nil, ownerId: nil,
+            amountE4: amountE4, categoryId: nil, createdAt: nil, currency: currency, id: nil, ownerId: nil,
             periodMonth: nil, updatedAt: nil, version: nil
         )
         try await client.from("budgets").update(patch).eq("id", value: id).execute()
@@ -41,15 +41,15 @@ public struct BudgetProgress: Decodable, Sendable {
     public let budgetId: UUID
     public let categoryId: UUID?
     public let categoryName: String?
-    public let budgeted: Decimal?
-    public let spent: Decimal?
+    public let budgetedE4: Int64?
+    public let spentE4: Int64?
     public let currency: String
     enum CodingKeys: String, CodingKey {
         case budgetId = "budget_id"
         case categoryId = "category_id"
         case categoryName = "category_name"
-        case budgeted
-        case spent
+        case budgetedE4 = "budgeted_e4"
+        case spentE4 = "spent_e4"
         case currency
     }
 }

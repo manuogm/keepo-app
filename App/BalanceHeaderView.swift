@@ -6,7 +6,7 @@ import SwiftUI
 /// table whenever either screen wants a single aggregate figure of its
 /// own; not retrofitted onto them yet since neither has asked for one.
 struct BalanceHeaderView: View {
-    let amount: Decimal?
+    let amount: Int64?
     let currency: CurrencyInfo?
 
     @Environment(\.isPrivacyMode) private var isPrivacyMode

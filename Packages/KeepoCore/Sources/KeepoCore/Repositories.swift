@@ -92,7 +92,7 @@ public enum AccountRepository {
         subtype: PublicSchema.AccountSubtype,
         name: String,
         currency: String,
-        openingBalance: Decimal
+        openingBalanceE4: Int64
     ) async throws -> UUID {
         let accountId = id
         let row = NewAccountRow(
@@ -103,7 +103,7 @@ public enum AccountRepository {
             subtype: subtype,
             name: name,
             currency: currency,
-            openingBalance: openingBalance
+            openingBalanceE4: openingBalanceE4
         )
         try await client.from("accounts").insert(row).execute()
 
@@ -112,7 +112,7 @@ public enum AccountRepository {
                 client: client,
                 accountId: accountId,
                 currency: currency,
-                value: openingBalance,
+                valueE4: openingBalanceE4,
                 ownerId: ownerId
             )
         }
@@ -124,14 +124,14 @@ public enum AccountRepository {
         client: SupabaseClient,
         accountId: UUID,
         currency: String,
-        value: Decimal,
+        valueE4: Int64,
         ownerId: UUID
     ) async throws {
         let snapshot = NewSnapshotRow(
             accountId: accountId,
             currency: currency,
             asOf: PostgresDate.dateOnlyString(Date()),
-            value: value,
+            valueE4: valueE4,
             createdBy: ownerId
         )
         try await client.from("balance_snapshots").insert(snapshot).execute()
@@ -146,12 +146,12 @@ private struct NewAccountRow: Encodable {
     let subtype: PublicSchema.AccountSubtype
     let name: String
     let currency: String
-    let openingBalance: Decimal
+    let openingBalanceE4: Int64
     enum CodingKeys: String, CodingKey {
         case id, kind, subtype, name, currency
         case ownerId = "owner_id"
         case createdBy = "created_by"
-        case openingBalance = "opening_balance"
+        case openingBalanceE4 = "opening_balance_e4"
     }
 }
 
@@ -159,11 +159,12 @@ private struct NewSnapshotRow: Encodable {
     let accountId: UUID
     let currency: String
     let asOf: String
-    let value: Decimal
+    let valueE4: Int64
     let createdBy: UUID
     enum CodingKeys: String, CodingKey {
         case accountId = "account_id"
-        case currency, value
+        case currency
+        case valueE4 = "value_e4"
         case asOf = "as_of"
         case createdBy = "created_by"
     }
@@ -213,7 +214,7 @@ public enum TransactionRepository {
         ownerId: UUID,
         accountId: UUID,
         categoryId: UUID,
-        amount: Decimal,
+        amountE4: Int64,
         currency: String,
         occurredAt: Date = Date()
     ) async throws -> UUID {
@@ -223,7 +224,7 @@ public enum TransactionRepository {
             createdBy: ownerId,
             accountId: accountId,
             categoryId: categoryId,
-            amount: amount,
+            amountE4: amountE4,
             currency: currency,
             occurredAt: PostgresDate.timestampString(occurredAt)
         )
@@ -248,7 +249,7 @@ public enum TransactionRepository {
         expectedVersion: Int,
         accountId: UUID,
         categoryId: UUID,
-        amount: Decimal,
+        amountE4: Int64,
         currency: String,
         occurredAt: Date = Date(),
         merchantRaw: String?
@@ -258,7 +259,7 @@ public enum TransactionRepository {
             expectedVersion: expectedVersion,
             accountId: accountId,
             categoryId: categoryId,
-            amount: amount,
+            amountE4: amountE4,
             currency: currency,
             occurredAt: PostgresDate.timestampString(occurredAt),
             merchantRaw: merchantRaw
@@ -276,16 +277,16 @@ public enum TransactionRepository {
         transferGroupId: UUID,
         fromExpectedVersion: Int,
         toExpectedVersion: Int,
-        fromAmount: Decimal,
-        toAmount: Decimal,
+        fromAmountE4: Int64,
+        toAmountE4: Int64,
         occurredAt: Date = Date()
     ) async throws -> WriteResult {
         let params = UpdateTransferParams(
             transferGroupId: transferGroupId,
             fromExpectedVersion: fromExpectedVersion,
             toExpectedVersion: toExpectedVersion,
-            fromAmount: fromAmount,
-            toAmount: toAmount,
+            fromAmountE4: fromAmountE4,
+            toAmountE4: toAmountE4,
             occurredAt: PostgresDate.timestampString(occurredAt)
         )
         let rows: [ConflictRow] = try await client.rpc("update_transfer", params: params).execute().value
@@ -320,11 +321,12 @@ private struct NewTransactionRow: Encodable {
     let createdBy: UUID
     let accountId: UUID
     let categoryId: UUID
-    let amount: Decimal
+    let amountE4: Int64
     let currency: String
     let occurredAt: String
     enum CodingKeys: String, CodingKey {
-        case id, amount, currency
+        case id, currency
+        case amountE4 = "amount_e4"
         case ownerId = "owner_id"
         case createdBy = "created_by"
         case accountId = "account_id"

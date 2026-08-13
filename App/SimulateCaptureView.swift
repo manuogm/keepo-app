@@ -68,7 +68,7 @@ struct SimulateCaptureView: View {
         )
         let payload = CaptureTransactionPayload(
             id: UUID(), cardIdentifier: card, merchantRaw: merchant, merchantNormalized: merchantNormalized,
-            amount: parsedAmount, occurredAt: occurredAt, externalId: externalId
+            amountE4: parsedAmount, occurredAt: occurredAt, externalId: externalId
         )
 
         switch await session.outbox.submitCaptureTransaction(payload) {

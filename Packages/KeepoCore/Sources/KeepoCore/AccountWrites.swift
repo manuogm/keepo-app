@@ -32,7 +32,7 @@ struct UpdateAccountParams: Encodable {
     let expectedVersion: Int
     let name: String
     let subtype: PublicSchema.AccountSubtype
-    let openingBalance: Decimal
+    let openingBalanceE4: Int64
     let includeInTotal: Bool
     let countsTowardFi: Bool
     enum CodingKeys: String, CodingKey {
@@ -40,7 +40,7 @@ struct UpdateAccountParams: Encodable {
         case expectedVersion = "p_expected_version"
         case name = "p_name"
         case subtype = "p_subtype"
-        case openingBalance = "p_opening_balance"
+        case openingBalanceE4 = "p_opening_balance_e4"
         case includeInTotal = "p_include_in_total"
         case countsTowardFi = "p_counts_toward_fi"
     }
@@ -68,28 +68,38 @@ struct DeleteAccountParams: Encodable {
 
 struct SetAccountBalanceParams: Encodable {
     let accountId: UUID
-    let newBalance: Decimal
+    let newBalanceE4: Int64
+    let expectedVersion: Int
     let id: UUID
     enum CodingKeys: String, CodingKey {
         case accountId = "p_account_id"
-        case newBalance = "p_new_balance"
+        case newBalanceE4 = "p_new_balance_e4"
+        case expectedVersion = "p_expected_version"
         case id = "p_id"
     }
 }
 
-/// Exactly one of the two is non-nil — which one depends on the account's
-/// kind, decided server-side (see the migration's own header comment).
+/// Exactly one of `transactionId`/`snapshotId` is non-nil on a successful
+/// (non-conflicting) write — which one depends on the account's kind,
+/// decided server-side (see the migration's own header comment).
+/// `conflict` mirrors every other versioned write RPC: a version mismatch
+/// on a *new* edit is reported as data, not an exception — a replay of an
+/// already-applied `id` is never a conflict, no matter how stale
+/// `expectedVersion` has since become (checked before the version check
+/// server-side, so idempotent outbox retries always succeed).
 public struct SetAccountBalanceResult: Decodable, Sendable {
     public let transactionId: UUID?
     public let snapshotId: UUID?
+    public let conflict: Bool
     enum CodingKeys: String, CodingKey {
         case transactionId = "transaction_id"
         case snapshotId = "snapshot_id"
+        case conflict
     }
 }
 
 public extension AccountRepository {
-    /// Editable: name, subtype, opening_balance, include_in_total,
+    /// Editable: name, subtype, opening_balance_e4, include_in_total,
     /// counts_toward_fi. Not editable, by omission from this call's
     /// parameters, not a client-side check: currency and kind (see
     /// migration 20260805180000's header comment for why).
@@ -104,7 +114,7 @@ public extension AccountRepository {
         expectedVersion: Int,
         name: String,
         subtype: PublicSchema.AccountSubtype,
-        openingBalance: Decimal,
+        openingBalanceE4: Int64,
         includeInTotal: Bool,
         countsTowardFi: Bool
     ) async throws -> AccountWriteResult {
@@ -113,7 +123,7 @@ public extension AccountRepository {
             expectedVersion: expectedVersion,
             name: name,
             subtype: subtype,
-            openingBalance: openingBalance,
+            openingBalanceE4: openingBalanceE4,
             includeInTotal: includeInTotal,
             countsTowardFi: countsTowardFi
         )
@@ -148,14 +158,17 @@ public extension AccountRepository {
     /// account's kind, not by the caller. `id` is the same client-
     /// generated idempotency key every outbox write uses — replaying it
     /// twice (e.g. a queued write synced, then retried) has no double
-    /// effect (see the migration's `on conflict (id) do nothing`).
+    /// effect and never conflicts, even against a stale `expectedVersion`
+    /// (the migration's idempotency-before-version-check ordering).
     @discardableResult
     static func setBalance(
-        client: SupabaseClient, accountId: UUID, newBalance: Decimal, id: UUID
+        client: SupabaseClient, accountId: UUID, newBalanceE4: Int64, expectedVersion: Int, id: UUID
     ) async throws -> SetAccountBalanceResult {
-        let params = SetAccountBalanceParams(accountId: accountId, newBalance: newBalance, id: id)
+        let params = SetAccountBalanceParams(
+            accountId: accountId, newBalanceE4: newBalanceE4, expectedVersion: expectedVersion, id: id
+        )
         let rows: [SetAccountBalanceResult] = try await client.rpc("set_account_balance", params: params)
             .execute().value
-        return rows.first ?? SetAccountBalanceResult(transactionId: nil, snapshotId: nil)
+        return rows.first ?? SetAccountBalanceResult(transactionId: nil, snapshotId: nil, conflict: false)
     }
 }

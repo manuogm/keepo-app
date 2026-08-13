@@ -12,9 +12,9 @@ select plan(9);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a0000000-0000-0000-0000-000000000010', auth.uid(), auth.uid(), 'ledger', 'checking', 'Checking', 'EUR', 100);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a0000000-0000-0000-0000-000000000011', auth.uid(), auth.uid(), 'ledger', 'cash', 'Cash', 'EUR', 0);
 insert into categories (id, owner_id, kind, name)
 values ('c0000000-0000-0000-0000-000000000010', auth.uid(), 'expense', 'Test Expense');
@@ -30,13 +30,13 @@ select throws_ok(
 -- 2. A correct-version edit succeeds, applies every editable column, and
 -- bumps version to 2.
 select results_eq(
-  $$ select conflict, (account).name, (account).subtype, (account).opening_balance,
+  $$ select conflict, (account).name, (account).subtype, (account).opening_balance_e4,
             (account).include_in_total, (account).counts_toward_fi, (account).version
      from update_account(
        'a0000000-0000-0000-0000-000000000010', 1,
-       'Main Checking', 'checking', 250, false, false
+       'Main Checking', 'checking', 2500000, false, false
      ) $$,
-  $$ values (false, 'Main Checking', 'checking'::account_subtype, 250.0000::numeric, false, false, 2) $$,
+  $$ values (false, 'Main Checking', 'checking'::account_subtype, 2500000::bigint, false, false, 2) $$,
   'a correct-version edit applies every editable column and bumps version to 2'
 );
 
@@ -44,7 +44,7 @@ select results_eq(
 -- and leaves exactly one sync_conflicts row.
 select is(
   (select conflict from update_account(
-    'a0000000-0000-0000-0000-000000000010', 1, 'Renamed', 'checking', 999, true, true
+    'a0000000-0000-0000-0000-000000000010', 1, 'Renamed', 'checking', 9990000, true, true
   )),
   true,
   'a stale-version edit reports conflict = true, not an exception'
@@ -82,10 +82,10 @@ select is(
 
 -- 5. delete_account refuses (raises, nothing to audit) while non-deleted
 -- transactions still reference the account.
-insert into transactions (id, owner_id, created_by, account_id, category_id, amount, currency, occurred_at)
+insert into transactions (id, owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
 values (
   'd0000000-0000-0000-0000-000000000010', auth.uid(), auth.uid(),
-  'a0000000-0000-0000-0000-000000000010', 'c0000000-0000-0000-0000-000000000010', -10, 'EUR', now()
+  'a0000000-0000-0000-0000-000000000010', 'c0000000-0000-0000-0000-000000000010', -100000, 'EUR', now()
 );
 
 select throws_like(

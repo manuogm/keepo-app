@@ -38,7 +38,7 @@ public enum InsightsRepository {
 
     /// `nil` before any `balance_snapshots` row exists for the account —
     /// money rule 5, never a `0` standing in for "not yet knowable."
-    public static func unrealizedGain(client: SupabaseClient, accountId: UUID) async throws -> Decimal? {
+    public static func unrealizedGain(client: SupabaseClient, accountId: UUID) async throws -> Int64? {
         try await client.rpc("unrealized_gain", params: AccountIdParam(accountId: accountId)).execute().value
     }
 }
@@ -46,24 +46,24 @@ public enum InsightsRepository {
 public struct CategorySpending: Decodable, Sendable {
     public let categoryId: UUID
     public let categoryName: String
-    public let total: Decimal?
+    public let totalE4: Int64?
     public let currency: String
     enum CodingKeys: String, CodingKey {
         case categoryId = "category_id"
         case categoryName = "category_name"
-        case total
+        case totalE4 = "total_e4"
         case currency
     }
 }
 
 public struct IncomeExpensePoint: Decodable, Sendable {
     public let bucketStart: String
-    public let income: Decimal?
-    public let expense: Decimal?
+    public let incomeE4: Int64?
+    public let expenseE4: Int64?
     enum CodingKeys: String, CodingKey {
         case bucketStart = "bucket_start"
-        case income
-        case expense
+        case incomeE4 = "income_e4"
+        case expenseE4 = "expense_e4"
     }
 }
 

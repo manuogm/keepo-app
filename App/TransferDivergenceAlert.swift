@@ -15,13 +15,13 @@ enum TransferDivergenceCheck {
         client: SupabaseClient,
         sourceCurrency: String,
         destinationCurrency: String,
-        fromAmount: Decimal,
-        toAmount: Decimal,
+        fromAmountE4: Int64,
+        toAmountE4: Int64,
         occurredAt: Date
     ) async -> RateDivergence? {
         let divergence = try? await TransactionRepository.checkTransferRateDivergence(
             client: client, fromCurrency: sourceCurrency, toCurrency: destinationCurrency,
-            fromAmount: fromAmount, toAmount: toAmount, occurredAt: occurredAt
+            fromAmountE4: fromAmountE4, toAmountE4: toAmountE4, occurredAt: occurredAt
         )
         guard let divergence, divergence.diverges else { return nil }
         return divergence

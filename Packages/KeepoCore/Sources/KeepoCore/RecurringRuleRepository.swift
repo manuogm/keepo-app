@@ -36,14 +36,14 @@ public enum RecurringRuleRepository {
         ownerId: UUID,
         accountId: UUID,
         categoryId: UUID,
-        amount: Decimal,
+        amountE4: Int64,
         currency: String,
         frequency: PublicSchema.RecurringFrequency,
         nextDueAt: Date
     ) async throws -> UUID {
         let id = UUID()
         let row = PublicSchema.RecurringRulesInsert(
-            accountId: accountId, active: true, amount: amount, categoryId: categoryId, createdAt: nil,
+            accountId: accountId, active: true, amountE4: amountE4, categoryId: categoryId, createdAt: nil,
             createdBy: ownerId, currency: currency, frequency: frequency, id: id, lastMaterializedAt: nil,
             nextDueAt: PostgresDate.dateOnlyString(nextDueAt), ownerId: ownerId, updatedAt: nil, version: nil
         )
@@ -62,14 +62,14 @@ public enum RecurringRuleRepository {
         id: UUID,
         accountId: UUID,
         categoryId: UUID,
-        amount: Decimal,
+        amountE4: Int64,
         currency: String,
         frequency: PublicSchema.RecurringFrequency,
         nextDueAt: Date,
         active: Bool
     ) async throws {
         let patch = PublicSchema.RecurringRulesUpdate(
-            accountId: accountId, active: active, amount: amount, categoryId: categoryId, createdAt: nil,
+            accountId: accountId, active: active, amountE4: amountE4, categoryId: categoryId, createdAt: nil,
             createdBy: nil, currency: currency, frequency: frequency, id: nil, lastMaterializedAt: nil,
             nextDueAt: PostgresDate.dateOnlyString(nextDueAt), ownerId: nil, updatedAt: nil, version: nil
         )
@@ -78,7 +78,7 @@ public enum RecurringRuleRepository {
 
     public static func setActive(client: SupabaseClient, id: UUID, active: Bool) async throws {
         let patch = PublicSchema.RecurringRulesUpdate(
-            accountId: nil, active: active, amount: nil, categoryId: nil, createdAt: nil, createdBy: nil,
+            accountId: nil, active: active, amountE4: nil, categoryId: nil, createdAt: nil, createdBy: nil,
             currency: nil, frequency: nil, id: nil, lastMaterializedAt: nil, nextDueAt: nil, ownerId: nil,
             updatedAt: nil, version: nil
         )

@@ -1,5 +1,9 @@
 -- fx_rate_on / fx_convert / upsert_fx_rate / account_balances_base.
 -- Fixture A (base EUR) = 11111111-..., fixture B (base USD) = 22222222-...
+--
+-- fx_rates.rate_to_eur is NOT part of the L1 integer migration (it's a
+-- conversion factor, not an amount) and stays numeric(20,4). fx_convert's
+-- own bigint amount is where L1's one rounding step happens.
 
 \ir _helpers.psql
 
@@ -51,16 +55,18 @@ select is(
   'fx_rate_on returns null, not 0 or an error, when no rate exists at or before the date'
 );
 
--- fx_convert: round-trip within rounding, and null propagation.
+-- fx_convert: matches the rounding contract exactly (half away from zero, at
+-- the final bigint step only — the one inexact operation in the whole money
+-- layer, per keepo-local-first-plan.md), and null propagation.
 select is(
-  round(fx_convert(100, 'EUR', 'USD', current_date) , 4),
-  round(100 / fx_rate_on('EUR', current_date) * fx_rate_on('USD', current_date), 4),
-  'fx_convert matches amount / rate_from * rate_to exactly'
+  fx_convert(1000000, 'EUR', 'USD', current_date),
+  round(1000000::numeric / fx_rate_on('EUR', current_date) * fx_rate_on('USD', current_date))::bigint,
+  'fx_convert matches round(amount_e4 / rate_from * rate_to) exactly'
 );
 
 select is(
-  fx_convert(100, 'EUR', 'USD', current_date - 20),
-  null::numeric,
+  fx_convert(1000000, 'EUR', 'USD', current_date - 20),
+  null::bigint,
   'fx_convert returns null, never 0, when the target rate is missing'
 );
 
@@ -88,18 +94,17 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
-values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'USD Checking', 'USD', 200);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance)
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'USD Checking', 'USD', 2000000);
+insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
 values ('a0000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'valuation', 'investment', 'Brokerage', 'EUR', 0);
 
--- Compared against fx_convert directly, unrounded — money rule 2 rounds
--- only for display, never for storage or intermediate computation, and
--- account_balances_base's balance_base is exactly fx_convert's raw output
--- with no rounding applied anywhere in the view.
+-- Compared against fx_convert directly — account_balances_base's
+-- balance_base_e4 is exactly fx_convert's output, including its one
+-- rounding step, with no further rounding applied anywhere in the view.
 select is(
-  (select balance_base from account_balances_base where account_id = 'a0000000-0000-0000-0000-000000000001'),
-  fx_convert(200, 'USD', 'EUR', current_date),
+  (select balance_base_e4 from account_balances_base where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  fx_convert(2000000, 'USD', 'EUR', current_date),
   'account_balances_base converts a USD account into fixture A''s EUR base currency'
 );
 
@@ -119,9 +124,9 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
 select is(
-  (select balance_base from account_balances_base where account_id = 'a0000000-0000-0000-0000-000000000001'),
-  null::numeric,
-  'a not-yet-onboarded null base_currency renders balance_base as null, not a missing row'
+  (select balance_base_e4 from account_balances_base where account_id = 'a0000000-0000-0000-0000-000000000001'),
+  null::bigint,
+  'a not-yet-onboarded null base_currency renders balance_base_e4 as null, not a missing row'
 );
 
 select ok(
