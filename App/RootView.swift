@@ -63,7 +63,7 @@ struct RootView: View {
                 .onPreferenceChange(TabBarHeightKey.self) { tabBarHeight = $0 }
                 .overlay(alignment: .bottom) {
                     if network.isOffline {
-                        OfflineStatusBar(lastSyncedAt: session.payloadCache.latestFetchedAt())
+                        OfflineStatusBar(lastSyncedAt: session.syncEngine?.lastSyncedAt)
                             .padding(.bottom, tabBarHeight + 2)
                             .ignoresSafeArea(edges: .bottom)
                             .allowsHitTesting(false)

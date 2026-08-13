@@ -176,7 +176,7 @@ Client-only, server-side behavior unchanged — the app is still online-first; t
 - **GRDB (`App/LocalStore.swift`)**, a SPM dependency on the `Keepo` app target only, same reasoning as `OfflineStore`'s own header comment on why it lives in the app target and not `KeepoCore`: this is client-storage plumbing, not portable money logic. A single `DatabaseQueue` at `Local.sqlite` in the app container's Application Support directory (no App Group — same reasoning as `OfflineStore.swift`), memoized per-process behind a lock so `SessionStore` and `CaptureIntent` never open two coordinators against the same file. File protection (`.completeUnlessOpen`) applied to the main file and its `-wal`/`-shm` siblings, identical pattern to `OfflineStore.protectStoreFiles` — including its confirmed Simulator limitation (no data-protection subsystem to read the attribute back from; real enforcement is device-only, Phase 20's checklist).
 - **Schema mirrors the server 1:1** — all 16 syncable tables (`LocalSchemaV1`), `snake_case` columns, `sync_seq`/`deleted_at`/`version` present wherever the server has them, money as `INTEGER` (`_e4` bigint, matching L1). Dates/timestamps stay `TEXT`, the exact string PostgREST already produced — no reparsing here, no local FX arithmetic either (`fx_rates.rate_to_eur` stays an opaque `TEXT` decimal string; the referee comparing SQLite output against Postgres is L4's job). **Schema only, today** — nothing writes into these 16 tables until L5's pull loop lands; the table shapes are locked in now so the sync design and the schema can't drift apart.
 - **The offline outbox is fully ported off SwiftData onto GRDB** (`outbox_items`, `OutboxItemRecord` in `LocalStore.swift`). `Outbox`'s public surface (`submit*`/`drainAll`/`queuedKindsAndPayloads`/`pendingCount`) is unchanged — only its storage internals moved, so every call site from Phase 11 onward needed no changes beyond how `Outbox` itself is constructed. `created_at` on this table alone is `.double` (a `timeIntervalSince1970`), not `.text` like every synced table's date columns — this column is pure local bookkeeping, never compared against a server timestamp, and a `TEXT`-affinity round trip through a 15-significant-digit cast was found (via a flaking unit test) to occasionally round a just-inserted row's timestamp forward past `Date()` read a moment later.
-- **`OutboxMigration`** — a one-time, idempotent move of any rows still queued in the pre-L3 SwiftData `OutboxItem` store into `outbox_items`, run at `SessionStore` construction (and defensively again in `CaptureIntent`, since an App Intent launch may not go through the same init path). `OfflineStore`'s `VersionedSchema` still declares the `OutboxItem` SwiftData model purely so this migration can open and read the legacy store; nothing else writes to it anymore. `PayloadCache`/`CachedPayload` are unaffected and stay on SwiftData — L3's scope is the syncable-table mirror and the outbox, not the read-through payload cache.
+- **`OutboxMigration`** — a one-time, idempotent move of any rows still queued in the pre-L3 SwiftData `OutboxItem` store into `outbox_items`, run at `SessionStore` construction (and defensively again in `CaptureIntent`, since an App Intent launch may not go through the same init path). `OfflineStore`'s `VersionedSchema` still declares the `OutboxItem` SwiftData model purely so this migration can open and read the legacy store; nothing else writes to it anymore. (`PayloadCache`/`CachedPayload` were unaffected at the time and stayed on SwiftData through L3–L5 — L6 deleted `PayloadCache` outright once the local mirror replaced it as the read path; see that section below. `CachedPayload` itself stays declared in `OfflineSchemaV1` — dropping a SwiftData model from a versioned schema without a migration stage is its own hazard, not worth taking for a model nothing writes to anymore.)
 - **No `ValueObservation` wiring yet** — `Outbox` is currently the sole writer to its own table and already refreshes its `@Observable` properties synchronously after every write; there is no second writer for a SwiftUI view to observe until L5's pull loop starts writing into the syncable-table mirror. Wiring `ValueObservation` now would be speculative.
 
 ### The money layer, ported to SQLite (L4, `keepo-local-first-plan.md`) — "the make-or-break phase"
@@ -199,6 +199,65 @@ The pull side of local-first — `Outbox` (Phase 11/L3) remains, unchanged, the 
 - **`App/SyncApply.swift`** — one generic upsert, driven by the JSON row's own keys against a per-table column whitelist matching `LocalSchemaV1` exactly (never a blind pass-through of arbitrary JSON keys into SQL identifiers). A "tombstone" needs no special DELETE path: a soft-deleted server row still has a payload (`deleted_at` simply non-null), and every local money query already filters `deleted_at IS NULL` itself — upserting it normally is already correct.
 - **`App/SyncEngine.swift`** — one `pull()` call round-trips `pull_changes` once (the RPC has no pagination; a single call already returns the full backlog) and applies the result inside one GRDB transaction. An **epoch mismatch** (this device's stored `sync_epoch` differs from the fresh one — a share/unshare/leave changed what this device can see since its last pull) wipes every server-derived table (never `outbox_items`), resets the stored cursors, and re-pulls from 0. `SyncCursorStore` persists `(cursor, global_cursor, epoch)` in `UserDefaults`, namespaced by user id — pure local bookkeeping, same category as `Outbox`'s own `created_at` column, never synced.
 - **Trigger sites**: `RootView`'s existing scenePhase-active handler (alongside `Outbox.drainAll()`), `NetworkMonitor` regaining connectivity, and every sign-in path in `SessionStore`. **A Realtime nudge ("the ticket moved, go pull") is deferred, not built** — investigated first: Phase 19's household-events mechanism turned out to be polling (`HouseholdViewLoader`/`HouseholdRepository.fetchEvents`, called each time that screen loads), not an existing Realtime subscription, so there was nothing to reuse, and adding this app's first-ever `RealtimeChannel`/`postgresChange` usage is a genuinely separate, untested feature surface. The three lifecycle triggers already cover correctness (a shared account's changes are seen at the next foreground/reconnect/sign-in); only instant cross-device staleness is deferred.
+
+### Read path on-device (L6, `keepo-local-first-plan.md`)
+
+Every screen now reads from the local GRDB mirror — `PostgREST`/`PayloadCache`/`FxRateCache`/
+`CurrencyCache`/`DataStore` are gone from the read path entirely, deleted rather than left dormant
+alongside the local queries (two answers to "what's my balance" is the exact divergence this whole
+rebuild exists to remove).
+
+- **`App/LocalAccountRow.swift`/`App/LocalTransactionRow.swift`** are the two non-trivial result
+  types. Straight 1:1 table types (`categories`, `budgets`, `recurring_rules`, `currencies`, a single
+  `accounts`/`transactions` row, `households`/`household_members`/`household_accounts`) reuse the
+  *generated* `PublicSchema.*Select` structs directly via `FetchableRecord` (GRDB's default
+  `Decodable`-based row decoder) — `App/LocalTableQueries.swift`. But `accounts_with_balances` and
+  `transactions_with_details` are Postgres *views* with computed columns (`balance_e4`, `is_shared`,
+  `amount_base_e4`, `kind`, `has_missing_rate`) that don't exist as raw table columns, and FX
+  conversion has to happen in Swift (L4), not SQL — so those two get purpose-built result types
+  instead. `LocalTransactionRow` specifically builds `PublicSchema.TransactionsWithDetailsSelect`
+  instances (the exact type every consumer — `TransactionRow`, `TransactionFormView`, `MapCardSheet`
+  — already renders) via an `AnyJSON` → `JSONEncoder` → `JSONDecoder` round-trip, because that
+  generated type has no public initializer reachable from the App target (a plain `Codable` struct
+  with no custom `init`, so only its synthesized `public init(from decoder:)` crosses the module
+  boundary) — this keeps every downstream view unchanged, at the cost of one indirection most other
+  local-read call sites don't need.
+- **`Outbox` write-through (`App/OutboxLocalWrite.swift`)** — the load-bearing piece that makes
+  deleting the old cache/overlay machinery safe. Before L6, `Outbox` sent a write straight to
+  Postgres and only *queued* it locally on failure; the local mirror otherwise only advanced via
+  `SyncEngine.pull()`. Once every screen reads local-only, that gap would have meant an offline (or
+  even a fast, just-submitted online) write staying invisible until the next pull — precisely what
+  `PendingOverlay` used to paper over on the old cache-based read path. Every `Outbox.submitX` now
+  applies the same payload as an optimistic upsert into the local mirror immediately, via
+  `SyncApply.upsertRow` — the identical whitelist-guarded upsert the real sync pull already uses, so
+  the eventual authoritative row overwrites the optimistic one at the same primary key; never a
+  second, competing source of truth. `sync_seq` is written as a `0` placeholder (no money query reads
+  it) purely to satisfy the `NOT NULL` constraint until the real value lands. Transfer legs are
+  matched by their current sign (money rule 1) since an update/delete-transfer payload carries a
+  `transfer_group_id` but not each leg's own id. `set_account_balance` mirrors the server RPC's own
+  branch — an adjustment transaction for a ledger account, a new snapshot for a valuation account,
+  never a stored balance either way. `captureTransaction` is the one write kind NOT covered: its
+  payload has no `accountId`/`categoryId` (resolved server-side from `card_mappings`), and every
+  local balance query already filters `status = 'confirmed'`, excluding the pending row it would
+  write anyway.
+- **A version conflict needs a real sync pull before the local re-read, not just a local re-read.**
+  `Outbox`'s write-through already applied the user's (rejected) edit to the local mirror
+  optimistically before the conflict was known — `AccountFormView`/`TransactionFormView`'s
+  post-conflict reload calls `session.syncEngine?.pull()` first, then re-reads locally; skipping the
+  pull would just echo the same wrong guess back.
+- **`HouseholdView` stays partially online-first, deliberately.** `household_events` has no local
+  table — it's a notification feed, not money-bearing data, and mirroring it was never in scope —
+  so `HouseholdViewLoader` reads `household`/`members`/`myAccounts`/`sharedAccountIds` locally and
+  fetches `events` best-effort over the network, never blocking the rest of the screen if that call
+  fails.
+- **`needs_review`'s `csv_import_candidate` branch never appears via the local read** —
+  `LocalMoneyQueries.needsReview` only derives the three locally-computable branches; CSV import
+  stays server-side entirely (a decision already on record — see the plan's open questions), so those
+  review items are only reachable from `CSVImportView` itself while online.
+- **`OfflineStatusBar`'s "Last synced …" moved from `PayloadCache.latestFetchedAt()` to
+  `SyncCursorStore.lastSyncedAt(for:)`**, persisted in `UserDefaults` alongside the cursor/epoch on
+  every successful pull — the same namespaced-by-user-id pattern that store already used, so this
+  needed no new persistence mechanism, just one more field on an existing one.
 
 ### Indexes
 

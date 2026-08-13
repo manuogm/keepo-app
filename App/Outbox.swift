@@ -159,11 +159,6 @@ enum OutboxKind: String {
 public final class Outbox {
     public private(set) var pendingCount = 0
     public private(set) var oldestPendingAt: Date?
-    /// Pending *creates* only — the display-friendly seam a list screen
-    /// reads to show an unsynced row inline. Updates/deletes stay invisible
-    /// until drained; overlaying those onto an existing row is a separate,
-    /// not-yet-built piece of UI (see version-logs/phase-11-log.md).
-    public private(set) var pendingCreateTransactions: [CreateTransactionPayload] = []
 
     private let dbQueue: DatabaseQueue
     let sender: OutboxSending
@@ -366,23 +361,9 @@ public final class Outbox {
         }) ?? []
     }
 
-    /// Every currently-queued write's kind + raw payload, in FIFO order —
-    /// the seam the pending-delta overlay (`PendingOverlayAdapter`) reads
-    /// to know what hasn't synced yet. Exposed narrowly rather than the
-    /// `OutboxItemRecord` itself, so nothing outside this file can mutate
-    /// a queued item directly.
-    func queuedKindsAndPayloads() -> [(kind: OutboxKind, payloadJSON: Data)] {
-        pendingItems().compactMap { item in
-            OutboxKind(rawValue: item.kind).map { ($0, item.payloadJSON) }
-        }
-    }
-
     private func refreshCounts() {
         let items = pendingItems()
         pendingCount = items.count
         oldestPendingAt = items.first?.createdAt
-        pendingCreateTransactions = items
-            .filter { $0.kind == OutboxKind.createTransaction.rawValue }
-            .compactMap { try? decoder.decode(CreateTransactionPayload.self, from: $0.payloadJSON) }
     }
 }

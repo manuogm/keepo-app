@@ -324,11 +324,55 @@ trigger, both detailed in `version-logs/phase-L5-log.md`:**
 ## Phase L6 — Read-path rewrite
 
 - Every screen moves from PostgREST view types to local queries (~20 screens across 66 App files).
-- Delete: `PendingOverlay`, `PendingOverlayAdapter`, `LocalFxConvert`, `PayloadCache`,
-  `FxRateCache`, `CurrencyCache`, and `DataStore`'s network path. Two answers to "what is my balance
-  offline" would recreate the exact divergence problem this plan exists to remove.
+- Delete: `PendingOverlay`, `PendingOverlayAdapter`, `PayloadCache`, `FxRateCache`, `CurrencyCache`,
+  and `DataStore`. Two answers to "what is my balance offline" would recreate the exact divergence
+  problem this plan exists to remove.
 - `CaptureIntent` writes locally and resolves its card mapping locally — offline Apple Pay capture
   finally works end to end, which the current architecture cannot do.
+
+**Shipped 2026-08-13.** Sub-phased L6a–L6f, the same way Phase 7 was flagged as the largest phase in
+the master plan — 20 screens/66 files was too large for one reviewable unit, so each sub-phase landed
+as its own commit with its own build/lint/test pass. Findings:
+
+1. **This list's own `LocalFxConvert` entry was wrong** — it's the shared, unit-tested FX-conversion
+   function `LocalMoneyConversion`/`LocalMoneyQueries` (L4) call at the display boundary, not
+   cache/overlay machinery. Corrected here rather than silently deleted; it's the one piece of the
+   old read path that stays, by design, exactly as L4 built it.
+2. **A gap the plan's own text glossed over: `Outbox` sent writes straight to Postgres and only
+   *queued* on failure — it never touched the local mirror either way.** Cutting screens to
+   local-only reads without fixing this would have been a real regression (an offline, or even a
+   fast just-submitted online, write would be invisible until the next sync pull), exactly the kind
+   of divergence this phase exists to remove. Fixed with `Outbox` optimistic write-through
+   (`App/OutboxLocalWrite.swift`): every submit applies the same payload into the local mirror
+   immediately, reusing `SyncApply.upsertRow` — the identical upsert the real pull already uses, so
+   the eventual authoritative row always overwrites the optimistic guess at the same primary key,
+   never a second source of truth. Covers the 10 balance-relevant payload kinds; `captureTransaction`
+   is deliberately excluded (its payload has no `accountId`/`categoryId` — resolved server-side — and
+   every local balance query already filters `status = 'confirmed'`, excluding the pending row it
+   would write anyway).
+3. **A conflict means the write-through already applied OUR rejected edit locally before the
+   rejection was known.** `AccountFormView`/`TransactionFormView`'s post-conflict reload now calls
+   `session.syncEngine?.pull()` before re-reading — a plain local re-read after a conflict would just
+   echo the same wrong guess back; only a real pull corrects it.
+4. **`needs_review`'s `csv_import_candidate` branch never appears via the local read** —
+   `LocalMoneyQueries.needsReview` only derives the three locally-computable branches
+   (`sync_conflict`/`pending_capture`/`ambiguous_card`); CSV import stays server-side entirely (open
+   question #3, confirmed still true), so its Needs Review entries are only visible from
+   `CSVImportView` itself while online. Accept/reject UI branches stay in the shared row renderer,
+   simply unreachable offline — not worth a special case for one dead branch.
+5. **`HouseholdView`/`HouseholdViewLoader` is the one screen left partially online-first, on
+   purpose.** `household_events` has no local table (a notification feed, not money-bearing data;
+   the plan never called for mirroring it) — every other field on that screen (`household`,
+   `members`, `myAccounts`, `sharedAccountIds`) is a local read, `events` alone stays a best-effort
+   network call that never blocks the rest of the screen.
+6. **`NeedsReviewView` (the standalone tab, distinct from `TransactionsListView`'s inline Needs
+   Review section) was missed by the original file inventory** — found only by grepping for the
+   machinery being deleted and seeing it was still a live consumer. Cut over in the same pass.
+7. **Deleted the SwiftData `CachedPayload` model's only remaining external consumer
+   (`OfflineStatusBar`'s "Last synced …")** by giving `SyncCursorStore` a persisted `lastSyncedAt`
+   (set alongside cursor/epoch on every successful pull) instead — `OfflineSchemaV1`/`OfflineStore`
+   themselves are unchanged and still needed for `OutboxItem`'s one-time SwiftData→GRDB migration
+   path (L3), just no longer for `CachedPayload`.
 
 ## Phase L7 — Verification and cutover
 

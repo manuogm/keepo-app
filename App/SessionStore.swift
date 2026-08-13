@@ -45,7 +45,6 @@ public final class SessionStore {
     /// the same point the Supabase client is — both are session-lifetime,
     /// not per-screen.
     public let outbox: Outbox
-    public let payloadCache: PayloadCache
     /// The pull side of Phase L5's sync engine — `nil` until `userId` is
     /// known (a cursor is meaningless without knowing whose domain it
     /// belongs to), rebuilt on every sign-in rather than constructed once
@@ -53,7 +52,7 @@ public final class SessionStore {
     public private(set) var syncEngine: SyncEngine?
     /// The same GRDB queue `syncEngine` pulls into — Phase L6's read path
     /// queries this directly instead of PostgREST, so it needs to be as
-    /// reachable from any screen as `outbox`/`payloadCache` already are.
+    /// reachable from any screen as `outbox` already is.
     public let dbQueue: DatabaseQueue
     private let authProvider: AuthProvider
     private var userId: UUID?
@@ -95,7 +94,6 @@ public final class SessionStore {
         }
         self.dbQueue = dbQueue
         let context = ModelContext(container)
-        self.payloadCache = PayloadCache(context: context)
         OutboxMigration.migrateIfNeeded(swiftDataContext: context, to: dbQueue)
         self.outbox = Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
     }

@@ -9,7 +9,8 @@ import SwiftUI
 struct NeedsReviewView: View {
     let session: SessionStore
 
-    @State private var store = DataStore<PublicSchema.NeedsReviewSelect>()
+    @State private var items: [PublicSchema.NeedsReviewSelect] = []
+    @State private var isLoading = true
     @State private var currencyMinorUnits: [String: Int] = [:]
     @State private var actionErrorMessage: String?
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
@@ -21,7 +22,7 @@ struct NeedsReviewView: View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if store.isLoading {
+            if isLoading {
                 ProgressView()
             } else if displayItems.isEmpty {
                 Text("Nothing needs review")
@@ -36,7 +37,7 @@ struct NeedsReviewView: View {
                 .refreshable { await load() }
             }
 
-            if let errorMessage = store.errorMessage ?? actionErrorMessage {
+            if let errorMessage = actionErrorMessage {
                 VStack {
                     Spacer()
                     Text(errorMessage)
@@ -66,7 +67,7 @@ struct NeedsReviewView: View {
     }
 
     private var displayItems: [PublicSchema.NeedsReviewSelect] {
-        store.items.filter { $0.kind != "reconciliation_gap" }
+        items.filter { $0.kind != "reconciliation_gap" }
     }
 
     @ViewBuilder
@@ -130,11 +131,20 @@ struct NeedsReviewView: View {
     }
 
     private func load() async {
-        if currencyMinorUnits.isEmpty {
-            let currencies = await CurrencyCache.fetchAll(session: session)
-            currencyMinorUnits = Dictionary(uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) })
+        actionErrorMessage = nil
+        do {
+            let loaded = try await session.dbQueue.read { database in
+                (
+                    try LocalMoneyQueries.needsReview(database),
+                    try LocalTableQueries.currencies(database)
+                )
+            }
+            items = try loaded.0.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
+            currencyMinorUnits = Dictionary(uniqueKeysWithValues: loaded.1.map { ($0.code, Int($0.minorUnit)) })
+        } catch {
+            actionErrorMessage = UserFacingError.describe(error)
         }
-        await store.load { try await NeedsReviewRepository.fetchAll(client: session.client) }
+        isLoading = false
     }
 
     private func resolve(_ item: PublicSchema.NeedsReviewSelect) async {
@@ -152,12 +162,12 @@ struct NeedsReviewView: View {
     /// bespoke capture-review screen (app-architecture.md) — this only
     /// fetches the one row `needs_review` doesn't carry in full.
     private func openForReview(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId else { return }
+        guard let id = item.itemId, let baseCurrency = session.profile?.baseCurrency else { return }
         actionErrorMessage = nil
         do {
-            guard let transaction = try await TransactionRepository.fetchOne(client: session.client, id: id) else {
-                return
-            }
+            guard let transaction = try await session.dbQueue.read({ database in
+                try LocalTransactionRow.fetchOne(database, id: id.uuidString, baseCurrency: baseCurrency)
+            }) else { return }
             editingTransaction = transaction
             showEditingTransaction = true
         } catch {
@@ -170,11 +180,12 @@ struct NeedsReviewView: View {
     /// row's current version, which `needs_review` doesn't carry, hence
     /// the extra fetch.
     private func confirmCapture(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId else { return }
+        guard let id = item.itemId, let baseCurrency = session.profile?.baseCurrency else { return }
         actionErrorMessage = nil
         do {
-            guard let transaction = try await TransactionRepository.fetchOne(client: session.client, id: id),
-                  let version = transaction.version else { return }
+            guard let transaction = try await session.dbQueue.read({ database in
+                try LocalTransactionRow.fetchOne(database, id: id.uuidString, baseCurrency: baseCurrency)
+            }), let version = transaction.version else { return }
             _ = try await CaptureRepository.confirmCapture(
                 client: session.client, id: id, expectedVersion: Int(version)
             )
@@ -217,7 +228,7 @@ struct MapCardSheet: View {
     let onMapped: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var accounts: [PublicSchema.AccountsWithBalancesSelect] = []
+    @State private var accounts: [LocalAccountRow] = []
     @State private var selectedAccountId: UUID?
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -233,8 +244,8 @@ struct MapCardSheet: View {
                 Section("Route charges to") {
                     Picker("Account", selection: $selectedAccountId) {
                         Text("Choose an account").tag(UUID?.none)
-                        ForEach(ledgerAccounts, id: \.accountId) { account in
-                            Text(account.name ?? "—").tag(account.accountId)
+                        ForEach(ledgerAccounts) { account in
+                            Text(account.name).tag(UUID?.some(account.id))
                         }
                     }
                 }
@@ -254,12 +265,17 @@ struct MapCardSheet: View {
                 }
             }
             .task {
-                accounts = (try? await AccountRepository.fetchAllWithBalances(client: session.client)) ?? []
+                guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
+                    return
+                }
+                accounts = (try? await session.dbQueue.read { database in
+                    try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency)
+                }) ?? []
             }
         }
     }
 
-    private var ledgerAccounts: [PublicSchema.AccountsWithBalancesSelect] {
+    private var ledgerAccounts: [LocalAccountRow] {
         accounts.filter { $0.kind == .ledger && $0.archivedAt == nil }
     }
 

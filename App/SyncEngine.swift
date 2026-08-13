@@ -21,6 +21,11 @@ public final class SyncEngine {
     private let userId: String
     public private(set) var isSyncing = false
     public private(set) var lastErrorMessage: String?
+    /// Backs `OfflineStatusBar`'s "Last synced …" — persisted in
+    /// `SyncCursorStore` (not just in-memory) so a relaunch shows a real
+    /// timestamp from before this session started, not nothing until the
+    /// next pull completes.
+    public var lastSyncedAt: Date? { SyncCursorStore.lastSyncedAt(for: userId) }
 
     public init(dbQueue: DatabaseQueue, puller: SyncPulling, userId: String) {
         self.dbQueue = dbQueue

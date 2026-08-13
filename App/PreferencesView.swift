@@ -65,7 +65,7 @@ struct PreferencesView: View {
     }
 
     private func load() async {
-        currencies = await CurrencyCache.fetchAll(session: session)
+        currencies = (try? await session.dbQueue.read { database in try LocalTableQueries.currencies(database) }) ?? []
         selectedCurrency = session.profile?.baseCurrency ?? currencies.first?.code ?? "USD"
     }
 

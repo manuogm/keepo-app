@@ -32,6 +32,15 @@ enum SyncCursorStore {
         defaults.set(Int(cursor), forKey: key(.cursor, userId))
         defaults.set(Int(globalCursor), forKey: key(.globalCursor, userId))
         defaults.set(Int(epoch), forKey: key(.epoch, userId))
+        defaults.set(Date(), forKey: key(.lastSyncedAt, userId))
+    }
+
+    /// The `OfflineStatusBar`'s "Last synced …" — persisted (unlike
+    /// `SyncEngine.isSyncing`/`lastErrorMessage`, which are session-only)
+    /// so a relaunch right after a successful pull still shows a real
+    /// timestamp instead of nothing until the next pull completes.
+    static func lastSyncedAt(for userId: String) -> Date? {
+        UserDefaults.standard.object(forKey: key(.lastSyncedAt, userId)) as? Date
     }
 
     /// Called on an epoch mismatch, before the forced re-pull from 0 — the
@@ -44,7 +53,7 @@ enum SyncCursorStore {
     }
 
     private enum Field: String {
-        case cursor, globalCursor, epoch
+        case cursor, globalCursor, epoch, lastSyncedAt
     }
 
     private static func key(_ field: Field, _ userId: String) -> String {
