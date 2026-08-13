@@ -116,7 +116,10 @@ extension LocalMoneyConversion {
         )
     }
 
-    private static func fiSettings(_ database: Database, ownerId: String) throws -> FISettingsLocal {
+    /// Not `private` — `FISettingsView` (L6) reads the raw settings directly
+    /// (target spend / withdrawal rate / real return rate) to prefill its
+    /// edit form, the same row `fiMetrics` above only consumes internally.
+    static func fiSettings(_ database: Database, ownerId: String) throws -> FISettingsLocal {
         let row = try Row.fetchOne(
             database,
             sql: """

@@ -51,7 +51,10 @@ public final class SessionStore {
     /// belongs to), rebuilt on every sign-in rather than constructed once
     /// in `init()` alongside `outbox`, which needs no identity to be usable.
     public private(set) var syncEngine: SyncEngine?
-    private let dbQueue: DatabaseQueue
+    /// The same GRDB queue `syncEngine` pulls into — Phase L6's read path
+    /// queries this directly instead of PostgREST, so it needs to be as
+    /// reachable from any screen as `outbox`/`payloadCache` already are.
+    public let dbQueue: DatabaseQueue
     private let authProvider: AuthProvider
     private var userId: UUID?
     /// True when pointed at the local dev stack — controls whether startup
