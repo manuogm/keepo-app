@@ -46,6 +46,12 @@ public final class SessionStore {
     /// not per-screen.
     public let outbox: Outbox
     public let payloadCache: PayloadCache
+    /// The pull side of Phase L5's sync engine — `nil` until `userId` is
+    /// known (a cursor is meaningless without knowing whose domain it
+    /// belongs to), rebuilt on every sign-in rather than constructed once
+    /// in `init()` alongside `outbox`, which needs no identity to be usable.
+    public private(set) var syncEngine: SyncEngine?
+    private let dbQueue: DatabaseQueue
     private let authProvider: AuthProvider
     private var userId: UUID?
     /// True when pointed at the local dev stack — controls whether startup
@@ -84,10 +90,19 @@ public final class SessionStore {
         } catch {
             fatalError("Failed to create the offline store: \(error)")
         }
+        self.dbQueue = dbQueue
         let context = ModelContext(container)
         self.payloadCache = PayloadCache(context: context)
         OutboxMigration.migrateIfNeeded(swiftDataContext: context, to: dbQueue)
         self.outbox = Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
+    }
+
+    /// Rebuilds `syncEngine` for the now-known `userId` — called from every
+    /// place `userId` itself gets set, immediately before that same call
+    /// site's existing `outbox.drainAll()`, so push and pull start from the
+    /// same trigger.
+    private func makeSyncEngine(userId: UUID) -> SyncEngine {
+        SyncEngine(dbQueue: dbQueue, puller: LiveSyncPuller(client: client), userId: userId.uuidString)
     }
 
     public func start() async {
@@ -95,16 +110,20 @@ public final class SessionStore {
             if let restored = try await authProvider.restoreSession() {
                 userId = restored.user.id
                 userEmail = restored.user.email
+                syncEngine = makeSyncEngine(userId: restored.user.id)
                 try await refreshProfile()
                 await outbox.drainAll()
+                await syncEngine?.pull()
             } else if isLocal {
                 // Local dev stack: auto-sign in via StubAuthProvider's fixed
                 // credentials — no UI needed, no email confirmation required.
                 let session = try await authProvider.signIn()
                 userId = session.user.id
                 userEmail = session.user.email
+                syncEngine = makeSyncEngine(userId: session.user.id)
                 try await refreshProfile()
                 await outbox.drainAll()
+                await syncEngine?.pull()
             } else {
                 // Hosted: no cached session — present the OTP sign-in UI.
                 // The signIn() path on PasswordAuthProvider fails against
@@ -136,8 +155,10 @@ public final class SessionStore {
             linkError = nil
             userId = session.user.id
             userEmail = session.user.email
+            syncEngine = makeSyncEngine(userId: session.user.id)
             try await refreshProfile()
             await outbox.drainAll()
+            await syncEngine?.pull()
         } catch {
             linkError = UserFacingError.describe(error)
         }
@@ -148,6 +169,7 @@ public final class SessionStore {
         userId = nil
         userEmail = nil
         profile = nil
+        syncEngine = nil
         phase = .needsSignIn
     }
 

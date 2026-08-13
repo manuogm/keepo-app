@@ -23,7 +23,7 @@
 
 begin;
 
-select plan(21);
+select plan(23);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -314,6 +314,44 @@ select ok(
   (select next_ticket - 1 from sync_tickets where domain_id = sync_global_domain())
     >= (select sync_seq from currencies where code = 'ZZZ'),
   'the global domain''s own ticket counter has advanced past the row it just stamped'
+);
+
+-- ----------------------------------------------------------------------------
+-- L5 fix: pull_changes must not let to_jsonb(row) turn a `numeric` column
+-- into a JSON number — the client would decode it through a binary
+-- floating-point type before re-encoding it as the local TEXT decimal
+-- string, silently reintroducing the imprecision L1 eliminated.
+-- rate_to_eur/withdrawal_rate/real_return_rate are the only three numeric
+-- columns left in the syncable set.
+-- ----------------------------------------------------------------------------
+
+insert into fx_rates (currency, rate_date, rate_to_eur, source)
+values ('ZZZ', current_date, 0.9000, 'ecb')
+on conflict (currency, rate_date) do update set rate_to_eur = excluded.rate_to_eur;
+
+select is(
+  (
+    select jsonb_typeof(row -> 'rate_to_eur') from jsonb_array_elements(
+      (select payload -> 'fx_rates' from pull_changes(0, 0))
+    ) row where row ->> 'currency' = 'ZZZ'
+  ),
+  'string',
+  'pull_changes renders fx_rates.rate_to_eur as a JSON string, never a JSON number'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+update fi_settings set withdrawal_rate = 0.0425 where owner_id = auth.uid();
+
+select is(
+  (
+    select row -> 'withdrawal_rate' from jsonb_array_elements(
+      (select payload -> 'fi_settings' from pull_changes(0, 0))
+    ) row where row ->> 'owner_id' = '11111111-1111-1111-1111-111111111111'
+  ),
+  to_jsonb('0.0425'::text),
+  'pull_changes renders fi_settings.withdrawal_rate as the exact decimal string, not a rounded/re-encoded JSON number'
 );
 
 select * from finish();

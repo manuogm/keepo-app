@@ -295,6 +295,32 @@ The make-or-break phase.
   "the ticket moved, go pull" — exactly how Phase 19 already uses Realtime).
 - Conflicts unchanged: version rejected → `sync_conflicts` → Needs Review.
 
+**Shipped 2026-08-13 — the referee-adjacent precision bug caught before it shipped, and one deferred
+trigger, both detailed in `version-logs/phase-L5-log.md`:**
+1. **`pull_changes` had a real precision bug, fixed before any client code shipped against it.**
+   `to_jsonb(row)` renders a Postgres `numeric` column as a JSON *number* — `fx_rates.rate_to_eur` and
+   `fi_settings.withdrawal_rate`/`real_return_rate` (the only three `numeric` columns left in the
+   syncable set) would have round-tripped through a Swift binary float before landing back in the
+   local `TEXT` decimal column, silently reintroducing the exact imprecision L1 eliminated and L4's
+   referee verified was gone. Fixed with a follow-up migration
+   (`20260817100000_pull_changes_numeric_precision.sql`) overriding just those three keys with an
+   explicit `::text` cast, plus two new pgTAP assertions.
+2. **The Realtime nudge is deferred, not built — the plan's own claim that Phase 19 "already uses
+   Realtime" turned out to be wrong.** Investigated before assuming there was something to reuse: a
+   repo-wide grep for `RealtimeChannel`/`postgresChange` found zero hits outside the SDK itself.
+   Phase 19's household-events mechanism is plain polling
+   (`HouseholdViewLoader`/`HouseholdRepository.fetchEvents`, called each time that screen loads), not
+   a subscription. Building this app's first-ever Realtime channel usage is a genuinely separate,
+   untested feature surface, not a two-line reuse — deferred rather than built speculatively under
+   this phase's already-large scope. The three lifecycle triggers that *were* built (app active,
+   network regained, every sign-in path) already cover pull correctness; only instant cross-device
+   staleness (seeing a household partner's edit before the next foreground/reconnect) is what's
+   missing. Revisit if that latency becomes a real product complaint.
+3. **`needs_review` was intentionally not re-ported here** — L4 already covers why (the local schema
+   has no `csv_import_candidates` table); L5 only had to make sure the sync engine doesn't need one
+   either, which it doesn't (`sync_conflicts`/pending captures/`card_mappings` all pull and apply like
+   every other table).
+
 ## Phase L6 — Read-path rewrite
 
 - Every screen moves from PostgREST view types to local queries (~20 screens across 66 App files).

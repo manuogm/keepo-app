@@ -92,7 +92,18 @@ struct RootView: View {
         // waiting for the next cold start (Phase 11).
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
-                Task { await session.outbox.drainAll() }
+                Task {
+                    await session.outbox.drainAll()
+                    await session.syncEngine?.pull()
+                }
+            }
+        }
+        // L5: connectivity regained is exactly the other "went offline,
+        // came back" moment `Outbox.drainAll()` already needed on
+        // foreground — the sync engine's pull needs the identical trigger.
+        .onChange(of: network.isOffline) { wasOffline, isOffline in
+            if wasOffline && !isOffline {
+                Task { await session.syncEngine?.pull() }
             }
         }
     }
