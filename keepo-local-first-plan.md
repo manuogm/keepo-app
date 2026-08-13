@@ -196,6 +196,26 @@ on its own, before any sync work starts** — two large changes serialized rathe
 - **Verify:** pgTAP for pull/epoch/re-stamp/fork-on-unshare · plus a **two-session shell test** for
   the ticket ordering guarantee, which pgTAP cannot express from inside one transaction · hosted push.
 
+**Shipped 2026-08-16 — three corrections found while building/testing, all detailed in
+`version-logs/phase-L2-log.md`:**
+
+1. **`pull_changes` needs TWO cursors, not one.** `currencies`/`fx_rates` share one global domain
+   (no owner of their own) whose ticket counter accumulates across every user and grows far faster
+   than any single household's. A single scalar `next_cursor` taking the max across every table
+   (global + per-domain) starves the slow-growing domain: a freshly re-stamped row there can sit at
+   a low ticket while the cursor is already past a much higher global-domain value, so
+   `sync_seq > cursor` is false forever. `pull_changes(p_cursor, p_global_cursor)` — domain-scoped
+   tables compare against the first, `currencies`/`fx_rates` against the second.
+2. **`set_account_balance`'s `p_expected_version` (LH6) was already added during L1**, not L2 — no
+   further migration work needed here beyond confirming it via pgTAP.
+3. **`household_members`/`household_accounts` needed converting from hard `DELETE` to soft-delete**
+   (not called out explicitly in the original L2 bullets above, but required by "re-stamp on gain /
+   epoch-bump on loss" to actually work): a hard delete gives the remaining household member's next
+   pull nothing to learn a departure from. `deleted_at` added to both; `my_household_id()`/
+   `can_read_account()`/the `accounts` H3-exception policies/`enforce_household_member_cap()` all
+   updated to filter it; `accept_invite` reactivates a tombstoned row on rejoin instead of colliding
+   on the PK.
+
 ## Phase L3 — On-device store: GRDB
 
 - GRDB dependency; SQLite schema mirroring the syncable set, integers throughout.

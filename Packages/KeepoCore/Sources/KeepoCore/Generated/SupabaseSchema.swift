@@ -79,6 +79,7 @@ public enum PublicSchema {
     public let openingBalanceE4: Int64
     public let ownerId: UUID
     public let subtype: AccountSubtype
+    public let syncSeq: Int64
     public let updatedAt: String
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
@@ -96,6 +97,7 @@ public enum PublicSchema {
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
       case subtype = "subtype"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -115,6 +117,7 @@ public enum PublicSchema {
     public let openingBalanceE4: Int64?
     public let ownerId: UUID
     public let subtype: AccountSubtype
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -132,6 +135,7 @@ public enum PublicSchema {
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
       case subtype = "subtype"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -151,6 +155,7 @@ public enum PublicSchema {
     public let openingBalanceE4: Int64?
     public let ownerId: UUID?
     public let subtype: AccountSubtype?
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -168,6 +173,7 @@ public enum PublicSchema {
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
       case subtype = "subtype"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -178,7 +184,9 @@ public enum PublicSchema {
     public let createdAt: String
     public let createdBy: UUID
     public let currency: String
+    public let deletedAt: String?
     public let id: UUID
+    public let syncSeq: Int64
     public let valueE4: Int64
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
@@ -186,7 +194,9 @@ public enum PublicSchema {
       case createdAt = "created_at"
       case createdBy = "created_by"
       case currency = "currency"
+      case deletedAt = "deleted_at"
       case id = "id"
+      case syncSeq = "sync_seq"
       case valueE4 = "value_e4"
     }
   }
@@ -196,7 +206,9 @@ public enum PublicSchema {
     public let createdAt: String?
     public let createdBy: UUID
     public let currency: String
+    public let deletedAt: String?
     public let id: UUID?
+    public let syncSeq: Int64?
     public let valueE4: Int64
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
@@ -204,7 +216,9 @@ public enum PublicSchema {
       case createdAt = "created_at"
       case createdBy = "created_by"
       case currency = "currency"
+      case deletedAt = "deleted_at"
       case id = "id"
+      case syncSeq = "sync_seq"
       case valueE4 = "value_e4"
     }
   }
@@ -214,7 +228,9 @@ public enum PublicSchema {
     public let createdAt: String?
     public let createdBy: UUID?
     public let currency: String?
+    public let deletedAt: String?
     public let id: UUID?
+    public let syncSeq: Int64?
     public let valueE4: Int64?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
@@ -222,7 +238,9 @@ public enum PublicSchema {
       case createdAt = "created_at"
       case createdBy = "created_by"
       case currency = "currency"
+      case deletedAt = "deleted_at"
       case id = "id"
+      case syncSeq = "sync_seq"
       case valueE4 = "value_e4"
     }
   }
@@ -231,9 +249,11 @@ public enum PublicSchema {
     public let categoryId: UUID?
     public let createdAt: String
     public let currency: String
+    public let deletedAt: String?
     public let id: UUID
     public let ownerId: UUID
     public let periodMonth: String
+    public let syncSeq: Int64
     public let updatedAt: String
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
@@ -241,9 +261,11 @@ public enum PublicSchema {
       case categoryId = "category_id"
       case createdAt = "created_at"
       case currency = "currency"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
       case periodMonth = "period_month"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -253,9 +275,11 @@ public enum PublicSchema {
     public let categoryId: UUID?
     public let createdAt: String?
     public let currency: String
+    public let deletedAt: String?
     public let id: UUID?
     public let ownerId: UUID
     public let periodMonth: String
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -263,9 +287,11 @@ public enum PublicSchema {
       case categoryId = "category_id"
       case createdAt = "created_at"
       case currency = "currency"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
       case periodMonth = "period_month"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -275,9 +301,11 @@ public enum PublicSchema {
     public let categoryId: UUID?
     public let createdAt: String?
     public let currency: String?
+    public let deletedAt: String?
     public let id: UUID?
     public let ownerId: UUID?
     public let periodMonth: String?
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -285,9 +313,11 @@ public enum PublicSchema {
       case categoryId = "category_id"
       case createdAt = "created_at"
       case currency = "currency"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
       case periodMonth = "period_month"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -296,15 +326,19 @@ public enum PublicSchema {
     public let accountId: UUID?
     public let cardIdentifier: String
     public let createdAt: String
+    public let deletedAt: String?
     public let id: UUID
     public let ownerId: UUID
+    public let syncSeq: Int64
     public let updatedAt: String
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case cardIdentifier = "card_identifier"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
@@ -312,15 +346,19 @@ public enum PublicSchema {
     public let accountId: UUID?
     public let cardIdentifier: String
     public let createdAt: String?
+    public let deletedAt: String?
     public let id: UUID?
     public let ownerId: UUID
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case cardIdentifier = "card_identifier"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
@@ -328,15 +366,19 @@ public enum PublicSchema {
     public let accountId: UUID?
     public let cardIdentifier: String?
     public let createdAt: String?
+    public let deletedAt: String?
     public let id: UUID?
     public let ownerId: UUID?
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
       case cardIdentifier = "card_identifier"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
@@ -350,6 +392,7 @@ public enum PublicSchema {
     public let kind: CategoryKind
     public let name: String
     public let ownerId: UUID
+    public let syncSeq: Int64
     public let updatedAt: String
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
@@ -362,6 +405,7 @@ public enum PublicSchema {
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -376,6 +420,7 @@ public enum PublicSchema {
     public let kind: CategoryKind
     public let name: String
     public let ownerId: UUID
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -388,6 +433,7 @@ public enum PublicSchema {
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -402,6 +448,7 @@ public enum PublicSchema {
     public let kind: CategoryKind?
     public let name: String?
     public let ownerId: UUID?
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -414,6 +461,7 @@ public enum PublicSchema {
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -553,25 +601,31 @@ public enum PublicSchema {
   public struct CurrenciesSelect: Codable, Hashable, Sendable {
     public let code: String
     public let minorUnit: Int16
+    public let syncSeq: Int64
     public enum CodingKeys: String, CodingKey {
       case code = "code"
       case minorUnit = "minor_unit"
+      case syncSeq = "sync_seq"
     }
   }
   public struct CurrenciesInsert: Codable, Hashable, Sendable {
     public let code: String
     public let minorUnit: Int16
+    public let syncSeq: Int64?
     public enum CodingKeys: String, CodingKey {
       case code = "code"
       case minorUnit = "minor_unit"
+      case syncSeq = "sync_seq"
     }
   }
   public struct CurrenciesUpdate: Codable, Hashable, Sendable {
     public let code: String?
     public let minorUnit: Int16?
+    public let syncSeq: Int64?
     public enum CodingKeys: String, CodingKey {
       case code = "code"
       case minorUnit = "minor_unit"
+      case syncSeq = "sync_seq"
     }
   }
   public struct ExportAuditLogSelect: Codable, Hashable, Sendable {
@@ -617,42 +671,54 @@ public enum PublicSchema {
     }
   }
   public struct FiSettingsSelect: Codable, Hashable, Sendable {
+    public let deletedAt: String?
     public let ownerId: UUID
     public let realReturnRate: Decimal
+    public let syncSeq: Int64
     public let targetAnnualSpendE4: Int64?
     public let updatedAt: String
     public let withdrawalRate: Decimal
     public enum CodingKeys: String, CodingKey {
+      case deletedAt = "deleted_at"
       case ownerId = "owner_id"
       case realReturnRate = "real_return_rate"
+      case syncSeq = "sync_seq"
       case targetAnnualSpendE4 = "target_annual_spend_e4"
       case updatedAt = "updated_at"
       case withdrawalRate = "withdrawal_rate"
     }
   }
   public struct FiSettingsInsert: Codable, Hashable, Sendable {
+    public let deletedAt: String?
     public let ownerId: UUID
     public let realReturnRate: Decimal?
+    public let syncSeq: Int64?
     public let targetAnnualSpendE4: Int64?
     public let updatedAt: String?
     public let withdrawalRate: Decimal?
     public enum CodingKeys: String, CodingKey {
+      case deletedAt = "deleted_at"
       case ownerId = "owner_id"
       case realReturnRate = "real_return_rate"
+      case syncSeq = "sync_seq"
       case targetAnnualSpendE4 = "target_annual_spend_e4"
       case updatedAt = "updated_at"
       case withdrawalRate = "withdrawal_rate"
     }
   }
   public struct FiSettingsUpdate: Codable, Hashable, Sendable {
+    public let deletedAt: String?
     public let ownerId: UUID?
     public let realReturnRate: Decimal?
+    public let syncSeq: Int64?
     public let targetAnnualSpendE4: Int64?
     public let updatedAt: String?
     public let withdrawalRate: Decimal?
     public enum CodingKeys: String, CodingKey {
+      case deletedAt = "deleted_at"
       case ownerId = "owner_id"
       case realReturnRate = "real_return_rate"
+      case syncSeq = "sync_seq"
       case targetAnnualSpendE4 = "target_annual_spend_e4"
       case updatedAt = "updated_at"
       case withdrawalRate = "withdrawal_rate"
@@ -688,12 +754,14 @@ public enum PublicSchema {
     public let rateDate: String
     public let rateToEur: Decimal
     public let source: FxSource
+    public let syncSeq: Int64
     public enum CodingKeys: String, CodingKey {
       case currency = "currency"
       case fetchedAt = "fetched_at"
       case rateDate = "rate_date"
       case rateToEur = "rate_to_eur"
       case source = "source"
+      case syncSeq = "sync_seq"
     }
   }
   public struct FxRatesInsert: Codable, Hashable, Sendable {
@@ -702,12 +770,14 @@ public enum PublicSchema {
     public let rateDate: String
     public let rateToEur: Decimal
     public let source: FxSource
+    public let syncSeq: Int64?
     public enum CodingKeys: String, CodingKey {
       case currency = "currency"
       case fetchedAt = "fetched_at"
       case rateDate = "rate_date"
       case rateToEur = "rate_to_eur"
       case source = "source"
+      case syncSeq = "sync_seq"
     }
   }
   public struct FxRatesUpdate: Codable, Hashable, Sendable {
@@ -716,42 +786,56 @@ public enum PublicSchema {
     public let rateDate: String?
     public let rateToEur: Decimal?
     public let source: FxSource?
+    public let syncSeq: Int64?
     public enum CodingKeys: String, CodingKey {
       case currency = "currency"
       case fetchedAt = "fetched_at"
       case rateDate = "rate_date"
       case rateToEur = "rate_to_eur"
       case source = "source"
+      case syncSeq = "sync_seq"
     }
   }
   public struct HouseholdAccountsSelect: Codable, Hashable, Sendable {
     public let accountId: UUID
+    public let deletedAt: String?
     public let householdId: UUID
     public let sharedAt: String
+    public let syncSeq: Int64
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
+      case deletedAt = "deleted_at"
       case householdId = "household_id"
       case sharedAt = "shared_at"
+      case syncSeq = "sync_seq"
     }
   }
   public struct HouseholdAccountsInsert: Codable, Hashable, Sendable {
     public let accountId: UUID
+    public let deletedAt: String?
     public let householdId: UUID
     public let sharedAt: String?
+    public let syncSeq: Int64?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
+      case deletedAt = "deleted_at"
       case householdId = "household_id"
       case sharedAt = "shared_at"
+      case syncSeq = "sync_seq"
     }
   }
   public struct HouseholdAccountsUpdate: Codable, Hashable, Sendable {
     public let accountId: UUID?
+    public let deletedAt: String?
     public let householdId: UUID?
     public let sharedAt: String?
+    public let syncSeq: Int64?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
+      case deletedAt = "deleted_at"
       case householdId = "household_id"
       case sharedAt = "shared_at"
+      case syncSeq = "sync_seq"
     }
   }
   public struct HouseholdEventsSelect: Codable, Hashable, Sendable {
@@ -851,92 +935,128 @@ public enum PublicSchema {
     }
   }
   public struct HouseholdMembersSelect: Codable, Hashable, Sendable {
+    public let deletedAt: String?
     public let householdId: UUID
     public let joinedAt: String
+    public let syncSeq: Int64
     public let userId: UUID
     public enum CodingKeys: String, CodingKey {
+      case deletedAt = "deleted_at"
       case householdId = "household_id"
       case joinedAt = "joined_at"
+      case syncSeq = "sync_seq"
       case userId = "user_id"
     }
   }
   public struct HouseholdMembersInsert: Codable, Hashable, Sendable {
+    public let deletedAt: String?
     public let householdId: UUID
     public let joinedAt: String?
+    public let syncSeq: Int64?
     public let userId: UUID
     public enum CodingKeys: String, CodingKey {
+      case deletedAt = "deleted_at"
       case householdId = "household_id"
       case joinedAt = "joined_at"
+      case syncSeq = "sync_seq"
       case userId = "user_id"
     }
   }
   public struct HouseholdMembersUpdate: Codable, Hashable, Sendable {
+    public let deletedAt: String?
     public let householdId: UUID?
     public let joinedAt: String?
+    public let syncSeq: Int64?
     public let userId: UUID?
     public enum CodingKeys: String, CodingKey {
+      case deletedAt = "deleted_at"
       case householdId = "household_id"
       case joinedAt = "joined_at"
+      case syncSeq = "sync_seq"
       case userId = "user_id"
     }
   }
   public struct HouseholdsSelect: Codable, Hashable, Sendable {
     public let createdAt: String
+    public let deletedAt: String?
     public let id: UUID
+    public let syncSeq: Int64
     public enum CodingKeys: String, CodingKey {
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
+      case syncSeq = "sync_seq"
     }
   }
   public struct HouseholdsInsert: Codable, Hashable, Sendable {
     public let createdAt: String?
+    public let deletedAt: String?
     public let id: UUID?
+    public let syncSeq: Int64?
     public enum CodingKeys: String, CodingKey {
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
+      case syncSeq = "sync_seq"
     }
   }
   public struct HouseholdsUpdate: Codable, Hashable, Sendable {
     public let createdAt: String?
+    public let deletedAt: String?
     public let id: UUID?
+    public let syncSeq: Int64?
     public enum CodingKeys: String, CodingKey {
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
+      case syncSeq = "sync_seq"
     }
   }
   public struct MerchantCategoryMapSelect: Codable, Hashable, Sendable {
     public let categoryId: UUID
+    public let deletedAt: String?
     public let merchantPattern: String
     public let ownerId: UUID
+    public let syncSeq: Int64
     public let updatedAt: String
     public enum CodingKeys: String, CodingKey {
       case categoryId = "category_id"
+      case deletedAt = "deleted_at"
       case merchantPattern = "merchant_pattern"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
   public struct MerchantCategoryMapInsert: Codable, Hashable, Sendable {
     public let categoryId: UUID
+    public let deletedAt: String?
     public let merchantPattern: String
     public let ownerId: UUID
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case categoryId = "category_id"
+      case deletedAt = "deleted_at"
       case merchantPattern = "merchant_pattern"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
   public struct MerchantCategoryMapUpdate: Codable, Hashable, Sendable {
     public let categoryId: UUID?
+    public let deletedAt: String?
     public let merchantPattern: String?
     public let ownerId: UUID?
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case categoryId = "category_id"
+      case deletedAt = "deleted_at"
       case merchantPattern = "merchant_pattern"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
@@ -1069,42 +1189,60 @@ public enum PublicSchema {
   public struct ProfilesSelect: Codable, Hashable, Sendable {
     public let baseCurrency: String?
     public let createdAt: String
+    public let deletedAt: String?
     public let id: UUID
     public let onboardedAt: String?
+    public let syncEpoch: Int64
+    public let syncSeq: Int64
     public let updatedAt: String
     public enum CodingKeys: String, CodingKey {
       case baseCurrency = "base_currency"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case onboardedAt = "onboarded_at"
+      case syncEpoch = "sync_epoch"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
   public struct ProfilesInsert: Codable, Hashable, Sendable {
     public let baseCurrency: String?
     public let createdAt: String?
+    public let deletedAt: String?
     public let id: UUID
     public let onboardedAt: String?
+    public let syncEpoch: Int64?
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case baseCurrency = "base_currency"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case onboardedAt = "onboarded_at"
+      case syncEpoch = "sync_epoch"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
   public struct ProfilesUpdate: Codable, Hashable, Sendable {
     public let baseCurrency: String?
     public let createdAt: String?
+    public let deletedAt: String?
     public let id: UUID?
     public let onboardedAt: String?
+    public let syncEpoch: Int64?
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case baseCurrency = "base_currency"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case onboardedAt = "onboarded_at"
+      case syncEpoch = "sync_epoch"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
   }
@@ -1121,6 +1259,7 @@ public enum PublicSchema {
     public let lastMaterializedAt: String?
     public let nextDueAt: String
     public let ownerId: UUID
+    public let syncSeq: Int64
     public let updatedAt: String
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
@@ -1136,6 +1275,7 @@ public enum PublicSchema {
       case lastMaterializedAt = "last_materialized_at"
       case nextDueAt = "next_due_at"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -1153,6 +1293,7 @@ public enum PublicSchema {
     public let lastMaterializedAt: String?
     public let nextDueAt: String
     public let ownerId: UUID
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -1168,6 +1309,7 @@ public enum PublicSchema {
       case lastMaterializedAt = "last_materialized_at"
       case nextDueAt = "next_due_at"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -1185,6 +1327,7 @@ public enum PublicSchema {
     public let lastMaterializedAt: String?
     public let nextDueAt: String?
     public let ownerId: UUID?
+    public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -1200,6 +1343,7 @@ public enum PublicSchema {
       case lastMaterializedAt = "last_materialized_at"
       case nextDueAt = "next_due_at"
       case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -1207,61 +1351,97 @@ public enum PublicSchema {
   public struct SyncConflictsSelect: Codable, Hashable, Sendable {
     public let clientVersion: Int32
     public let createdAt: String
+    public let deletedAt: String?
     public let id: UUID
     public let ownerId: UUID
     public let resolvedAt: String?
     public let rowId: UUID
     public let serverVersion: Int32
+    public let syncSeq: Int64
     public let tableName: String
     public enum CodingKeys: String, CodingKey {
       case clientVersion = "client_version"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
       case resolvedAt = "resolved_at"
       case rowId = "row_id"
       case serverVersion = "server_version"
+      case syncSeq = "sync_seq"
       case tableName = "table_name"
     }
   }
   public struct SyncConflictsInsert: Codable, Hashable, Sendable {
     public let clientVersion: Int32
     public let createdAt: String?
+    public let deletedAt: String?
     public let id: UUID?
     public let ownerId: UUID
     public let resolvedAt: String?
     public let rowId: UUID
     public let serverVersion: Int32
+    public let syncSeq: Int64?
     public let tableName: String
     public enum CodingKeys: String, CodingKey {
       case clientVersion = "client_version"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
       case resolvedAt = "resolved_at"
       case rowId = "row_id"
       case serverVersion = "server_version"
+      case syncSeq = "sync_seq"
       case tableName = "table_name"
     }
   }
   public struct SyncConflictsUpdate: Codable, Hashable, Sendable {
     public let clientVersion: Int32?
     public let createdAt: String?
+    public let deletedAt: String?
     public let id: UUID?
     public let ownerId: UUID?
     public let resolvedAt: String?
     public let rowId: UUID?
     public let serverVersion: Int32?
+    public let syncSeq: Int64?
     public let tableName: String?
     public enum CodingKeys: String, CodingKey {
       case clientVersion = "client_version"
       case createdAt = "created_at"
+      case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
       case resolvedAt = "resolved_at"
       case rowId = "row_id"
       case serverVersion = "server_version"
+      case syncSeq = "sync_seq"
       case tableName = "table_name"
+    }
+  }
+  public struct SyncTicketsSelect: Codable, Hashable, Sendable {
+    public let domainId: UUID
+    public let nextTicket: Int64
+    public enum CodingKeys: String, CodingKey {
+      case domainId = "domain_id"
+      case nextTicket = "next_ticket"
+    }
+  }
+  public struct SyncTicketsInsert: Codable, Hashable, Sendable {
+    public let domainId: UUID
+    public let nextTicket: Int64?
+    public enum CodingKeys: String, CodingKey {
+      case domainId = "domain_id"
+      case nextTicket = "next_ticket"
+    }
+  }
+  public struct SyncTicketsUpdate: Codable, Hashable, Sendable {
+    public let domainId: UUID?
+    public let nextTicket: Int64?
+    public enum CodingKeys: String, CodingKey {
+      case domainId = "domain_id"
+      case nextTicket = "next_ticket"
     }
   }
   public struct TransactionsSelect: Codable, Hashable, Sendable {
@@ -1283,6 +1463,7 @@ public enum PublicSchema {
     public let recurringRuleId: UUID?
     public let source: TransactionSource
     public let status: TransactionStatus
+    public let syncSeq: Int64
     public let transferGroupId: UUID?
     public let updatedAt: String
     public let version: Int32
@@ -1305,6 +1486,7 @@ public enum PublicSchema {
       case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"
+      case syncSeq = "sync_seq"
       case transferGroupId = "transfer_group_id"
       case updatedAt = "updated_at"
       case version = "version"
@@ -1329,6 +1511,7 @@ public enum PublicSchema {
     public let recurringRuleId: UUID?
     public let source: TransactionSource?
     public let status: TransactionStatus?
+    public let syncSeq: Int64?
     public let transferGroupId: UUID?
     public let updatedAt: String?
     public let version: Int32?
@@ -1351,6 +1534,7 @@ public enum PublicSchema {
       case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"
+      case syncSeq = "sync_seq"
       case transferGroupId = "transfer_group_id"
       case updatedAt = "updated_at"
       case version = "version"
@@ -1375,6 +1559,7 @@ public enum PublicSchema {
     public let recurringRuleId: UUID?
     public let source: TransactionSource?
     public let status: TransactionStatus?
+    public let syncSeq: Int64?
     public let transferGroupId: UUID?
     public let updatedAt: String?
     public let version: Int32?
@@ -1397,6 +1582,7 @@ public enum PublicSchema {
       case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"
+      case syncSeq = "sync_seq"
       case transferGroupId = "transfer_group_id"
       case updatedAt = "updated_at"
       case version = "version"

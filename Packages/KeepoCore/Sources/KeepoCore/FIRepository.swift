@@ -14,8 +14,8 @@ public enum FIRepository {
         client: SupabaseClient, targetAnnualSpendE4: Int64?, withdrawalRate: Decimal, realReturnRate: Decimal
     ) async throws {
         let patch = PublicSchema.FiSettingsUpdate(
-            ownerId: nil, realReturnRate: realReturnRate, targetAnnualSpendE4: targetAnnualSpendE4, updatedAt: nil,
-            withdrawalRate: withdrawalRate
+            deletedAt: nil, ownerId: nil, realReturnRate: realReturnRate, syncSeq: nil,
+            targetAnnualSpendE4: targetAnnualSpendE4, updatedAt: nil, withdrawalRate: withdrawalRate
         )
         try await client.from("fi_settings").update(patch).execute()
     }

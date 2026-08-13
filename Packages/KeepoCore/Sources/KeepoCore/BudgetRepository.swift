@@ -21,8 +21,9 @@ public enum BudgetRepository {
     ) async throws -> UUID {
         let id = UUID()
         let row = PublicSchema.BudgetsInsert(
-            amountE4: amountE4, categoryId: categoryId, createdAt: nil, currency: currency, id: id, ownerId: ownerId,
-            periodMonth: PostgresDate.dateOnlyString(periodMonth), updatedAt: nil, version: nil
+            amountE4: amountE4, categoryId: categoryId, createdAt: nil, currency: currency, deletedAt: nil, id: id,
+            ownerId: ownerId, periodMonth: PostgresDate.dateOnlyString(periodMonth), syncSeq: nil, updatedAt: nil,
+            version: nil
         )
         try await client.from("budgets").insert(row).execute()
         return id
@@ -30,8 +31,8 @@ public enum BudgetRepository {
 
     public static func update(client: SupabaseClient, id: UUID, amountE4: Int64, currency: String) async throws {
         let patch = PublicSchema.BudgetsUpdate(
-            amountE4: amountE4, categoryId: nil, createdAt: nil, currency: currency, id: nil, ownerId: nil,
-            periodMonth: nil, updatedAt: nil, version: nil
+            amountE4: amountE4, categoryId: nil, createdAt: nil, currency: currency, deletedAt: nil, id: nil,
+            ownerId: nil, periodMonth: nil, syncSeq: nil, updatedAt: nil, version: nil
         )
         try await client.from("budgets").update(patch).eq("id", value: id).execute()
     }

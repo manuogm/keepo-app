@@ -194,9 +194,11 @@ select is(
   'A also got her own fresh forked copy of the shared transaction'
 );
 
--- 15. household_accounts no longer shares the (now-archived) account.
+-- 15. household_accounts no longer shares the (now-archived) account — the
+-- row is soft-deleted (a tombstone the other member's pull still needs to
+-- see), not hard-deleted, so this filters deleted_at explicitly.
 select is(
-  (select count(*) from household_accounts where account_id = 'a4000000-0000-0000-0000-00000000a001'),
+  (select count(*) from household_accounts where account_id = 'a4000000-0000-0000-0000-00000000a001' and deleted_at is null),
   0::bigint,
   'the original account is fully unshared after the fork'
 );

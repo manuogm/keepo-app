@@ -45,7 +45,8 @@ public enum RecurringRuleRepository {
         let row = PublicSchema.RecurringRulesInsert(
             accountId: accountId, active: true, amountE4: amountE4, categoryId: categoryId, createdAt: nil,
             createdBy: ownerId, currency: currency, frequency: frequency, id: id, lastMaterializedAt: nil,
-            nextDueAt: PostgresDate.dateOnlyString(nextDueAt), ownerId: ownerId, updatedAt: nil, version: nil
+            nextDueAt: PostgresDate.dateOnlyString(nextDueAt), ownerId: ownerId, syncSeq: nil, updatedAt: nil,
+            version: nil
         )
         try await client.from("recurring_rules").insert(row).execute()
         return id
@@ -71,7 +72,8 @@ public enum RecurringRuleRepository {
         let patch = PublicSchema.RecurringRulesUpdate(
             accountId: accountId, active: active, amountE4: amountE4, categoryId: categoryId, createdAt: nil,
             createdBy: nil, currency: currency, frequency: frequency, id: nil, lastMaterializedAt: nil,
-            nextDueAt: PostgresDate.dateOnlyString(nextDueAt), ownerId: nil, updatedAt: nil, version: nil
+            nextDueAt: PostgresDate.dateOnlyString(nextDueAt), ownerId: nil, syncSeq: nil, updatedAt: nil,
+            version: nil
         )
         try await client.from("recurring_rules").update(patch).eq("id", value: id).execute()
     }
@@ -80,7 +82,7 @@ public enum RecurringRuleRepository {
         let patch = PublicSchema.RecurringRulesUpdate(
             accountId: nil, active: active, amountE4: nil, categoryId: nil, createdAt: nil, createdBy: nil,
             currency: nil, frequency: nil, id: nil, lastMaterializedAt: nil, nextDueAt: nil, ownerId: nil,
-            updatedAt: nil, version: nil
+            syncSeq: nil, updatedAt: nil, version: nil
         )
         try await client.from("recurring_rules").update(patch).eq("id", value: id).execute()
     }
