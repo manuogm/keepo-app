@@ -65,7 +65,9 @@
 		A90857943ADABEFB25B44996 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EB6980116C8080A7ADF85D /* SyncEngine.swift */; };
 		B2972500ABD0C917D1224199 /* TransactionsListView+NeedsReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449EE6DD8C7A3D022AB8219E /* TransactionsListView+NeedsReview.swift */; };
 		B54F02C80D3D973B33154960 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5BCEA514344BDBF220342E /* HouseholdView.swift */; };
+		B627DB442B79800AE401940B /* LocalAccountRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7AC3C81304BFE67EEFD8611 /* LocalAccountRow.swift */; };
 		B7A28835CF97300D93A8A733 /* LocalMoneyTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEDC16F840D1D52F4F06892 /* LocalMoneyTypes.swift */; };
+		BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */; };
 		C2B619C3EC87A5847A00EAE4 /* SyncCursorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FD9B0EBCF053E1B3E86E65C /* SyncCursorStore.swift */; };
 		C886AE5DBD13E41BFE14BA54 /* CSVImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */; };
 		C8E7A3DF42CF721E8ACD0703 /* PendingOverlayAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C5123A29ED598F17E55385 /* PendingOverlayAdapter.swift */; };
@@ -143,6 +145,7 @@
 		333AEF1387D80D7D4ECFD033 /* RefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinator.swift; sourceTree = "<group>"; };
 		362334366778871A75100AB1 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		3680339542A1E05C2216A883 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
+		38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRowTests.swift; sourceTree = "<group>"; };
 		449EE6DD8C7A3D022AB8219E /* TransactionsListView+NeedsReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionsListView+NeedsReview.swift"; sourceTree = "<group>"; };
 		472675CD5ADE433AA4B8E336 /* LocalMoneyRefereeFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyRefereeFixture.swift; sourceTree = "<group>"; };
 		47C5123A29ED598F17E55385 /* PendingOverlayAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingOverlayAdapter.swift; sourceTree = "<group>"; };
@@ -203,6 +206,7 @@
 		D635D3C66205FA4089E40FF3 /* SyncApply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncApply.swift; sourceTree = "<group>"; };
 		E430CAB6976F8BB2B64C7D1A /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		E6A741E7644D1745889C5114 /* RecurringRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRulesView.swift; sourceTree = "<group>"; };
+		E7AC3C81304BFE67EEFD8611 /* LocalAccountRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRow.swift; sourceTree = "<group>"; };
 		E9EFFACF34C66AE4CCA5245E /* CurrencyConversionLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyConversionLabel.swift; sourceTree = "<group>"; };
 		EDED98D97ACE3A89820BBD09 /* CaptureIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureIntent.swift; sourceTree = "<group>"; };
 		EE77801FEDF30EF5EC63D7C9 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
@@ -303,6 +307,7 @@
 				93D38049FAF0C58BCD88AD02 /* InsightsView.swift */,
 				C91440E871E1BD48AB796B63 /* Keepo.entitlements */,
 				884043304F66BADDBBBE1E13 /* KeepoApp.swift */,
+				E7AC3C81304BFE67EEFD8611 /* LocalAccountRow.swift */,
 				A9BE688265BE8E6EB9C7C6BF /* LocalMoneyConversion.swift */,
 				BEF1B7C56A8116B4DEC59DA8 /* LocalMoneyConversionFI.swift */,
 				B3600B8733D14B431A8E3067 /* LocalMoneyQueries.swift */,
@@ -368,6 +373,7 @@
 			isa = PBXGroup;
 			children = (
 				8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */,
+				38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */,
 				472675CD5ADE433AA4B8E336 /* LocalMoneyRefereeFixture.swift */,
 				2022ED7EAFC392568FE06C52 /* LocalMoneyRefereeTests.swift */,
 				C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */,
@@ -507,6 +513,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4C27DB33415AF4D03D91EEE8 /* KeepoTests.swift in Sources */,
+				BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */,
 				E66057E7D6C97B7B9301BB1E /* LocalMoneyRefereeFixture.swift in Sources */,
 				D89DE5A5161CEB8D44029020 /* LocalMoneyRefereeTests.swift in Sources */,
 				CDEAFC8D83E97D3B04E20CFD /* LocalStoreTests.swift in Sources */,
@@ -558,6 +565,7 @@
 				A6774885935170E1206B4D19 /* HouseholdViewLoader.swift in Sources */,
 				F10227EA22BFB76AB57DF555 /* InsightsView.swift in Sources */,
 				04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */,
+				B627DB442B79800AE401940B /* LocalAccountRow.swift in Sources */,
 				203E3DE0C583D51FFA3CC973 /* LocalMoneyConversion.swift in Sources */,
 				4AB6686801726DAB9101FF2B /* LocalMoneyConversionFI.swift in Sources */,
 				D2249999B755B75AF3BA291E /* LocalMoneyQueries.swift in Sources */,
