@@ -29,6 +29,46 @@ struct LocalStoreTests {
         #expect(Set(existing) == Set(expectedTables))
     }
 
+    /// Postgres always renders `uuid` columns lowercase (`to_jsonb`), but
+    /// Swift's `UUID.uuidString` is uppercase — every screen binds a
+    /// `session.profile?.id.uuidString` (uppercase) against `owner_id`
+    /// values that arrived from a sync pull (lowercase). SQLite's default
+    /// `TEXT` equality is byte-for-byte case-sensitive, so without
+    /// `.collate(.nocase)` on every id-shaped column, that comparison
+    /// silently matches nothing — confirmed against a real device: accounts
+    /// and transactions synced correctly (net worth, which doesn't do this
+    /// comparison, computed the right total) yet both list screens stayed
+    /// empty forever.
+    @Test("owner_id comparisons match regardless of UUID case")
+    func idColumnsAreCaseInsensitive() throws {
+        let dbQueue = try DatabaseQueue()
+        var migrator = DatabaseMigrator()
+        migrator.registerMigration("v1") { database in try LocalSchemaV1.migrate(database) }
+        try migrator.migrate(dbQueue)
+
+        let lowercaseOwnerId = UUID().uuidString.lowercased()
+        try dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO accounts (id, owner_id, created_by, kind, subtype, name, currency,
+                    opening_balance_e4, opening_balance_at, include_in_total, counts_toward_fi, version,
+                    created_at, updated_at, sync_seq)
+                VALUES (?, ?, ?, 'ledger', 'checking', 'Checking', 'EUR', 0, '2026-01-01', 1, 1, 1,
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [UUID().uuidString.lowercased(), lowercaseOwnerId, lowercaseOwnerId]
+            )
+        }
+
+        let uppercaseOwnerId = lowercaseOwnerId.uppercased()
+        let count = try dbQueue.read { database in
+            try Int.fetchOne(
+                database, sql: "SELECT COUNT(*) FROM accounts WHERE owner_id = ?", arguments: [uppercaseOwnerId]
+            )
+        }
+        #expect(count == 1)
+    }
+
     @Test("makeQueue's file-protection call completes without throwing")
     func fileProtectionCallSucceeds() throws {
         _ = try LocalStore.makeQueue()

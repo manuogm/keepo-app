@@ -35,9 +35,9 @@ public enum LocalSchemaV1 {
 
     private static func createAccountAndTransactionTables(_ database: Database) throws {
         try database.create(table: "accounts") { table in
-            table.column("id", .text).primaryKey()
-            table.column("owner_id", .text).notNull()
-            table.column("created_by", .text).notNull()
+            table.column("id", .text).primaryKey().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
+            table.column("created_by", .text).notNull().collate(.nocase)
             table.column("kind", .text).notNull()
             table.column("subtype", .text).notNull()
             table.column("name", .text).notNull()
@@ -55,23 +55,23 @@ public enum LocalSchemaV1 {
         }
 
         try database.create(table: "transactions") { table in
-            table.column("id", .text).primaryKey()
-            table.column("owner_id", .text).notNull()
-            table.column("created_by", .text).notNull()
-            table.column("account_id", .text).notNull()
+            table.column("id", .text).primaryKey().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
+            table.column("created_by", .text).notNull().collate(.nocase)
+            table.column("account_id", .text).notNull().collate(.nocase)
             table.column("account_kind", .text)
-            table.column("category_id", .text)
+            table.column("category_id", .text).collate(.nocase)
             table.column("category_kind", .text)
             table.column("amount_e4", .integer).notNull()
             table.column("currency", .text).notNull()
             table.column("occurred_at", .text).notNull()
             table.column("merchant_raw", .text)
             table.column("merchant_normalized", .text)
-            table.column("transfer_group_id", .text)
+            table.column("transfer_group_id", .text).collate(.nocase)
             table.column("source", .text).notNull()
             table.column("status", .text).notNull()
             table.column("external_id", .text)
-            table.column("recurring_rule_id", .text)
+            table.column("recurring_rule_id", .text).collate(.nocase)
             table.column("version", .integer).notNull()
             table.column("deleted_at", .text)
             table.column("created_at", .text).notNull()
@@ -84,12 +84,12 @@ public enum LocalSchemaV1 {
 
     private static func createBalanceAndCategoryTables(_ database: Database) throws {
         try database.create(table: "balance_snapshots") { table in
-            table.column("id", .text).primaryKey()
-            table.column("account_id", .text).notNull()
+            table.column("id", .text).primaryKey().collate(.nocase)
+            table.column("account_id", .text).notNull().collate(.nocase)
             table.column("currency", .text).notNull()
             table.column("as_of", .text).notNull()
             table.column("value_e4", .integer).notNull()
-            table.column("created_by", .text).notNull()
+            table.column("created_by", .text).notNull().collate(.nocase)
             table.column("created_at", .text).notNull()
             table.column("deleted_at", .text)
             table.column("sync_seq", .integer).notNull()
@@ -99,8 +99,8 @@ public enum LocalSchemaV1 {
         )
 
         try database.create(table: "categories") { table in
-            table.column("id", .text).primaryKey()
-            table.column("owner_id", .text).notNull()
+            table.column("id", .text).primaryKey().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("kind", .text).notNull()
             table.column("name", .text).notNull()
             table.column("is_default", .boolean).notNull()
@@ -116,11 +116,11 @@ public enum LocalSchemaV1 {
 
     private static func createPlanningTables(_ database: Database) throws {
         try database.create(table: "recurring_rules") { table in
-            table.column("id", .text).primaryKey()
-            table.column("owner_id", .text).notNull()
-            table.column("created_by", .text).notNull()
-            table.column("account_id", .text).notNull()
-            table.column("category_id", .text).notNull()
+            table.column("id", .text).primaryKey().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
+            table.column("created_by", .text).notNull().collate(.nocase)
+            table.column("account_id", .text).notNull().collate(.nocase)
+            table.column("category_id", .text).notNull().collate(.nocase)
             table.column("amount_e4", .integer).notNull()
             table.column("currency", .text).notNull()
             table.column("frequency", .text).notNull()
@@ -134,9 +134,9 @@ public enum LocalSchemaV1 {
         }
 
         try database.create(table: "budgets") { table in
-            table.column("id", .text).primaryKey()
-            table.column("owner_id", .text).notNull()
-            table.column("category_id", .text)
+            table.column("id", .text).primaryKey().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
+            table.column("category_id", .text).collate(.nocase)
             table.column("period_month", .text).notNull()
             table.column("amount_e4", .integer).notNull()
             table.column("currency", .text).notNull()
@@ -148,7 +148,7 @@ public enum LocalSchemaV1 {
         }
 
         try database.create(table: "fi_settings") { table in
-            table.column("owner_id", .text).primaryKey()
+            table.column("owner_id", .text).primaryKey().collate(.nocase)
             table.column("target_annual_spend_e4", .integer)
             table.column("withdrawal_rate", .text).notNull()
             table.column("real_return_rate", .text).notNull()
@@ -176,10 +176,10 @@ public enum LocalSchemaV1 {
         }
 
         try database.create(table: "card_mappings") { table in
-            table.column("id", .text).primaryKey()
-            table.column("owner_id", .text).notNull()
+            table.column("id", .text).primaryKey().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("card_identifier", .text).notNull()
-            table.column("account_id", .text)
+            table.column("account_id", .text).collate(.nocase)
             table.column("created_at", .text).notNull()
             table.column("updated_at", .text).notNull()
             table.column("deleted_at", .text)
@@ -187,9 +187,9 @@ public enum LocalSchemaV1 {
         }
 
         try database.create(table: "merchant_category_map") { table in
-            table.column("owner_id", .text).notNull()
+            table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("merchant_pattern", .text).notNull()
-            table.column("category_id", .text).notNull()
+            table.column("category_id", .text).notNull().collate(.nocase)
             table.column("updated_at", .text).notNull()
             table.column("deleted_at", .text)
             table.column("sync_seq", .integer).notNull()
@@ -197,10 +197,10 @@ public enum LocalSchemaV1 {
         }
 
         try database.create(table: "sync_conflicts") { table in
-            table.column("id", .text).primaryKey()
+            table.column("id", .text).primaryKey().collate(.nocase)
             table.column("table_name", .text).notNull()
-            table.column("row_id", .text).notNull()
-            table.column("owner_id", .text).notNull()
+            table.column("row_id", .text).notNull().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("client_version", .integer).notNull()
             table.column("server_version", .integer).notNull()
             table.column("created_at", .text).notNull()
@@ -212,15 +212,15 @@ public enum LocalSchemaV1 {
 
     private static func createHouseholdTables(_ database: Database) throws {
         try database.create(table: "households") { table in
-            table.column("id", .text).primaryKey()
+            table.column("id", .text).primaryKey().collate(.nocase)
             table.column("created_at", .text).notNull()
             table.column("deleted_at", .text)
             table.column("sync_seq", .integer).notNull()
         }
 
         try database.create(table: "household_members") { table in
-            table.column("household_id", .text).notNull()
-            table.column("user_id", .text).notNull()
+            table.column("household_id", .text).notNull().collate(.nocase)
+            table.column("user_id", .text).notNull().collate(.nocase)
             table.column("joined_at", .text).notNull()
             table.column("deleted_at", .text)
             table.column("sync_seq", .integer).notNull()
@@ -228,8 +228,8 @@ public enum LocalSchemaV1 {
         }
 
         try database.create(table: "household_accounts") { table in
-            table.column("household_id", .text).notNull()
-            table.column("account_id", .text).notNull()
+            table.column("household_id", .text).notNull().collate(.nocase)
+            table.column("account_id", .text).notNull().collate(.nocase)
             table.column("shared_at", .text).notNull()
             table.column("deleted_at", .text)
             table.column("sync_seq", .integer).notNull()
@@ -237,7 +237,7 @@ public enum LocalSchemaV1 {
         }
 
         try database.create(table: "profiles") { table in
-            table.column("id", .text).primaryKey()
+            table.column("id", .text).primaryKey().collate(.nocase)
             table.column("base_currency", .text)
             table.column("onboarded_at", .text)
             table.column("created_at", .text).notNull()
