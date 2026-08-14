@@ -60,11 +60,17 @@ struct RootView: View {
                 .tint(Color.primary)
                 .environment(\.isPrivacyMode, session.isPrivacyMode)
                 .task(id: session.refresh.token) { await loadNeedsReviewCount() }
-                .safeAreaInset(edge: .bottom) {
+                // `.overlay`, not `.safeAreaInset` — iOS 26's floating pill tab
+                // bar renders above the safe area it reports, so a view
+                // placed relative to that reported inset still lands behind
+                // the pill's own visual bounds. Floating our own banner a
+                // fixed distance off the true screen bottom sidesteps that
+                // mismatch entirely.
+                .overlay(alignment: .bottom) {
                     if network.isOffline {
                         OfflineStatusBar(lastSyncedAt: session.syncEngine?.lastSyncedAt)
                             .padding(.horizontal)
-                            .padding(.bottom, 14)
+                            .padding(.bottom, 100)
                     }
                 }
             case .failed(let message):
