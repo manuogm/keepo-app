@@ -159,6 +159,11 @@ public final class SessionStore {
                     profile = refreshed
                     phase = refreshed.onboardedAt == nil ? .needsOnboarding : .ready
                 }
+                // The pull can bring in accounts/transactions/balances that
+                // existed on the server before this device's first local
+                // row, even when the profile row itself is unchanged — every
+                // screen keys its load off this token, not off `profile`.
+                refresh.bump()
             }
         } else {
             // First-ever login on this device: nothing local to render yet,

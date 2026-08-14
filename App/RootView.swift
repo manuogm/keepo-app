@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import UIKit
 
 /// Routes on SessionStore.phase: loading while signing in, OnboardingView
 /// until a base currency + first account exist, main TabView after.
@@ -15,6 +16,18 @@ struct RootView: View {
     /// sees on its own, since the tab bar's space is consumed only for the
     /// content *inside* each tab.
     @State private var tabBarHeight: CGFloat = 0
+    /// Backs the privacy curtain instead of `@Environment(\.scenePhase)` —
+    /// SwiftUI's `scenePhase` is documented (and reproduces on real devices,
+    /// never in the simulator) to flicker to `.inactive` for reasons that
+    /// have nothing to do with backgrounding — app-launch settling, sheet/
+    /// alert presentation transitions — and the curtain has no debounce or
+    /// `allowsHitTesting(false)` guard (it can't: it must block real
+    /// backgrounding instantly, before the app-switcher snapshot). Every
+    /// false-positive flicker silently ate the next tap. `UIApplication`'s
+    /// own `willResignActive`/`didBecomeActive` notifications are the
+    /// authoritative signal for "about to stop being the active app" (the
+    /// same instant the OS takes the switcher snapshot) without that quirk.
+    @State private var isSceneActive = true
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
 
@@ -83,9 +96,15 @@ struct RootView: View {
         // instant the scene stops being .active, so the curtain has to cover
         // both .inactive (switcher gesture starting) and .background.
         .overlay {
-            if scenePhase != .active {
+            if !isSceneActive {
                 privacyCurtain
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            isSceneActive = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            isSceneActive = true
         }
         // Drain on foreground, not just at launch — a write made offline
         // should sync the moment connectivity is plausible again, without
@@ -95,6 +114,7 @@ struct RootView: View {
                 Task {
                     await session.outbox.drainAll()
                     await session.syncEngine?.pull()
+                    session.refresh.bump()
                 }
             }
         }
@@ -103,7 +123,10 @@ struct RootView: View {
         // foreground — the sync engine's pull needs the identical trigger.
         .onChange(of: network.isOffline) { wasOffline, isOffline in
             if wasOffline && !isOffline {
-                Task { await session.syncEngine?.pull() }
+                Task {
+                    await session.syncEngine?.pull()
+                    session.refresh.bump()
+                }
             }
         }
     }
