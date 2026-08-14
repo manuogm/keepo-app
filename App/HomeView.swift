@@ -54,20 +54,26 @@ struct HomeView: View {
             // Both top-bar buttons present via `.popover` rather than a
             // system `.sheet`, so neither gets the automatic background dim
             // a sheet would apply — this overlay adds that dimming back
-            // manually. Purely visual: the popovers already dismiss on an
-            // outside tap on their own, so hit testing stays off here.
+            // manually.
             //
-            // No implicit `.animation(value:)` here — that still visibly
-            // trailed the popover's own dismiss animation no matter how
-            // short its duration, because it's a second, independently
-            // timed animation layered on top of the popover's. Snapping the
-            // opacity instantly ties the curtain to the exact same instant
-            // `isPresented` flips, so it now disappears together with the
-            // popover instead of after it.
+            // Hit-testable (only while shown) and wired to close both
+            // popovers itself: an outside tap dismisses a `.popover` via a
+            // system animation whose completion — not its start — is what
+            // flips `isPresented`, so a curtain merely watching that binding
+            // sits fully opaque for the whole dismiss animation and then
+            // disappears abruptly right at the end. Setting the state here,
+            // at the moment of the tap, puts the curtain back in the same
+            // fast path as the "pick an option" dismiss, which already set
+            // state directly and always looked instant.
             Color.black.opacity(isOverlayPresented ? 0.25 : 0)
                 .ignoresSafeArea()
-                .allowsHitTesting(false)
+                .allowsHitTesting(isOverlayPresented)
+                .onTapGesture {
+                    showScopeMenu = false
+                    showNotifications = false
+                }
         }
+        .animation(.easeInOut(duration: 0.15), value: isOverlayPresented)
         .navigationTitle("Home")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
