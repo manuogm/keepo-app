@@ -6,15 +6,30 @@ import SwiftUI
 /// row whose category isn't in the cached list yet) renders a neutral
 /// placeholder rather than nothing, so row heights never jump.
 struct CategoryIconView: View {
-    let category: PublicSchema.CategoriesSelect?
+    private let icon: String
+    private let color: Color
     var diameter: CGFloat = 32
 
+    init(category: PublicSchema.CategoriesSelect?, diameter: CGFloat = 32) {
+        self.icon = category?.icon ?? "questionmark"
+        self.color = category.map { Color(hex: $0.color) } ?? Color.gray
+        self.diameter = diameter
+    }
+
+    /// Renders an explicit icon+color directly, bypassing the `nil`-category
+    /// placeholder — for badges that aren't backed by a category, like transfers.
+    init(icon: String, color: Color, diameter: CGFloat = 32) {
+        self.icon = icon
+        self.color = color
+        self.diameter = diameter
+    }
+
     var body: some View {
-        Image(systemName: category?.icon ?? "questionmark")
+        Image(systemName: icon)
             .font(.system(size: diameter * 0.45))
             .foregroundStyle(.white)
             .frame(width: diameter, height: diameter)
-            .background(category.map { Color(hex: $0.color) } ?? Color.gray)
+            .background(color)
             .clipShape(Circle())
     }
 }

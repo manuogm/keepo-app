@@ -79,7 +79,7 @@ public enum AccountRepository {
     /// inserting a duplicate row — same convention as
     /// `TransactionRepository.create`.
     ///
-    /// Otherwise seven named, self-explanatory parameters describing one new
+    /// Otherwise nine named, self-explanatory parameters describing one new
     /// account — splitting into a params struct here would be an
     /// indirection layer with no reader benefit, not a simplification.
     @discardableResult
@@ -92,7 +92,9 @@ public enum AccountRepository {
         subtype: PublicSchema.AccountSubtype,
         name: String,
         currency: String,
-        openingBalanceE4: Int64
+        openingBalanceE4: Int64,
+        icon: String,
+        color: String
     ) async throws -> UUID {
         let accountId = id
         let row = NewAccountRow(
@@ -103,7 +105,9 @@ public enum AccountRepository {
             subtype: subtype,
             name: name,
             currency: currency,
-            openingBalanceE4: openingBalanceE4
+            openingBalanceE4: openingBalanceE4,
+            icon: icon,
+            color: color
         )
         try await client.from("accounts").insert(row).execute()
 
@@ -147,8 +151,10 @@ private struct NewAccountRow: Encodable {
     let name: String
     let currency: String
     let openingBalanceE4: Int64
+    let icon: String
+    let color: String
     enum CodingKeys: String, CodingKey {
-        case id, kind, subtype, name, currency
+        case id, kind, subtype, name, currency, icon, color
         case ownerId = "owner_id"
         case createdBy = "created_by"
         case openingBalanceE4 = "opening_balance_e4"

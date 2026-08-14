@@ -23,7 +23,7 @@
 
 begin;
 
-select plan(23);
+select plan(22);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -337,21 +337,6 @@ select is(
   ),
   'string',
   'pull_changes renders fx_rates.rate_to_eur as a JSON string, never a JSON number'
-);
-
-set local role authenticated;
-select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
-
-update fi_settings set withdrawal_rate = 0.0425 where owner_id = auth.uid();
-
-select is(
-  (
-    select row -> 'withdrawal_rate' from jsonb_array_elements(
-      (select payload -> 'fi_settings' from pull_changes(0, 0))
-    ) row where row ->> 'owner_id' = '11111111-1111-1111-1111-111111111111'
-  ),
-  to_jsonb('0.0425'::text),
-  'pull_changes renders fi_settings.withdrawal_rate as the exact decimal string, not a rounded/re-encoded JSON number'
 );
 
 select * from finish();

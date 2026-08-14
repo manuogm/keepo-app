@@ -34,7 +34,8 @@ struct UpdateAccountParams: Encodable {
     let subtype: PublicSchema.AccountSubtype
     let openingBalanceE4: Int64
     let includeInTotal: Bool
-    let countsTowardFi: Bool
+    let icon: String
+    let color: String
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case expectedVersion = "p_expected_version"
@@ -42,7 +43,8 @@ struct UpdateAccountParams: Encodable {
         case subtype = "p_subtype"
         case openingBalanceE4 = "p_opening_balance_e4"
         case includeInTotal = "p_include_in_total"
-        case countsTowardFi = "p_counts_toward_fi"
+        case icon = "p_icon"
+        case color = "p_color"
     }
 }
 
@@ -99,10 +101,10 @@ public struct SetAccountBalanceResult: Decodable, Sendable {
 }
 
 public extension AccountRepository {
-    /// Editable: name, subtype, opening_balance_e4, include_in_total,
-    /// counts_toward_fi. Not editable, by omission from this call's
-    /// parameters, not a client-side check: currency and kind (see
-    /// migration 20260805180000's header comment for why).
+    /// Editable: name, subtype, opening_balance_e4, include_in_total, icon,
+    /// color. Not editable, by omission from this call's parameters, not a
+    /// client-side check: currency and kind (see migration 20260805180000's
+    /// header comment for why).
     ///
     /// Seven named, self-explanatory parameters — same reasoning as
     /// AccountRepository.create.
@@ -116,7 +118,8 @@ public extension AccountRepository {
         subtype: PublicSchema.AccountSubtype,
         openingBalanceE4: Int64,
         includeInTotal: Bool,
-        countsTowardFi: Bool
+        icon: String,
+        color: String
     ) async throws -> AccountWriteResult {
         let params = UpdateAccountParams(
             id: id,
@@ -125,7 +128,8 @@ public extension AccountRepository {
             subtype: subtype,
             openingBalanceE4: openingBalanceE4,
             includeInTotal: includeInTotal,
-            countsTowardFi: countsTowardFi
+            icon: icon,
+            color: color
         )
         let rows: [AccountConflictRow] = try await client.rpc("update_account", params: params).execute().value
         return rows.first.map(AccountWriteResult.init) ?? .conflict

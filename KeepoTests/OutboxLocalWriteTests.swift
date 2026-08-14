@@ -30,9 +30,9 @@ struct OutboxLocalWriteTests {
             try database.execute(
                 sql: """
                 INSERT INTO accounts (id, owner_id, created_by, kind, subtype, name, currency,
-                    opening_balance_e4, opening_balance_at, include_in_total, counts_toward_fi, version,
+                    opening_balance_e4, opening_balance_at, include_in_total, icon, color, version,
                     created_at, updated_at, sync_seq)
-                VALUES (?, ?, ?, ?, 'checking', 'Test', ?, ?, '2026-01-01', 1, 1, 1,
+                VALUES (?, ?, ?, ?, 'checking', 'Test', ?, ?, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
                     '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
                 """,
                 arguments: [id.uuidString, ownerId.uuidString, ownerId.uuidString, kind, currency, openingBalanceE4]
@@ -186,7 +186,7 @@ struct OutboxLocalWriteTests {
         _ = await outbox.submitCreateAccount(
             CreateAccountPayload(
                 id: accountId, ownerId: ownerId, kind: .ledger, subtype: .checking, name: "New Account",
-                currency: "USD", openingBalanceE4: 10000
+                currency: "USD", openingBalanceE4: 10000, icon: "banknote", color: "#8E8E93"
             )
         )
 

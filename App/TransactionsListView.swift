@@ -1,20 +1,35 @@
 import KeepoCore
 import SwiftUI
 
-/// Reads straight off the local GRDB mirror (Phase L6) — no server round
-/// trip, no payload cache. `Outbox`'s optimistic write-through means a
-/// queued-but-unsynced create/edit/delete is already reflected in the same
-/// `transactions` rows this screen queries, so there is no separate
-/// "pending" row/marker to overlay anymore — a transaction created offline
-/// simply appears in Recent like any other, the moment it's submitted.
+/// The single transactions screen — day-grouped history for a day/week/
+/// month/year/custom period, with account/category/kind as a complementary
+/// filter on top. Reads straight off the local GRDB mirror (Phase L6) — no
+/// server round trip, no payload cache. `Outbox`'s optimistic write-through
+/// means a queued-but-unsynced create/edit/delete is already reflected in
+/// the same `transactions` rows this screen queries.
 struct TransactionsListView: View {
     let session: SessionStore
 
-    // MARK: - Transactions state
+    enum Period: String, CaseIterable {
+        case day = "Day"
+        case week = "Week"
+        case month = "Month"
+        case year = "Year"
+        case custom = "Custom"
+
+        var component: Calendar.Component? {
+            switch self {
+            case .day: return .day
+            case .week: return .weekOfYear
+            case .month: return .month
+            case .year: return .year
+            case .custom: return nil
+            }
+        }
+    }
 
     // Not `private` — read/written from TransactionsListView+Loading.swift,
-    // an extension in a different file (kept there purely for file-length,
-    // same reasoning as the Needs-review state below).
+    // an extension in a different file (kept there purely for file-length).
     @State var transactions: [PublicSchema.TransactionsWithDetailsSelect] = []
     @State var isLoading = true
     @State var loadErrorMessage: String?
@@ -26,30 +41,33 @@ struct TransactionsListView: View {
     @State private var editingRecurringRule: PublicSchema.RecurringRulesSelect?
     @State var filter = TransactionFilter()
     @State private var isFilterSheetPresented = false
+    @State private var isSearching = false
 
-    // MARK: - Needs-review inbox state
+    // Not `private` — read/written from TransactionsListView+Period.swift.
+    @State var period: Period = .month
+    @State var anchor = Date()
+    @State var customFrom = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    @State var customThrough = Date()
+    @State var isCustomRangePresented = false
 
-    // Not `private` — read/written from TransactionsListView+NeedsReview.swift,
-    // an extension in a different file (kept there purely for file-length).
-    @State var reviewItems: [PublicSchema.NeedsReviewSelect] = []
-    @State var reviewCurrencies: [String: Int] = [:]
-    @State var reviewActionError: String?
-    @State var reviewEditingTransaction: PublicSchema.TransactionsWithDetailsSelect?
-    @State var showReviewEditing = false
-    @State var reviewMappingCard: PublicSchema.NeedsReviewSelect?
-    @State var showReviewCardMapping = false
-    @State var conflictId: UUID?
+    // Not `private` — read from TransactionsListView+Period.swift.
+    let calendar = Calendar.current
 
-    // MARK: - Computed
+    var range: DateInterval {
+        guard let component = period.component else {
+            return DateInterval(start: calendar.startOfDay(for: customFrom), end: customThrough)
+        }
+        return calendar.dateInterval(of: component, for: anchor) ?? DateInterval(start: anchor, duration: 0)
+    }
 
-    /// The default page is already ordered newest-first (Phase 6's keyset
-    /// index) — this is just the head of it. The full history lives one
-    /// tap away in `TransactionRegisterView`, grouped by day with its own
-    /// period navigator.
-    private let recentLimit = 10
-
-    private var recentTransactions: [PublicSchema.TransactionsWithDetailsSelect] {
-        Array(transactions.prefix(recentLimit))
+    private var groupedByDay: [(day: Date, items: [PublicSchema.TransactionsWithDetailsSelect])] {
+        let groups = Dictionary(grouping: transactions) { transaction -> Date in
+            guard
+                let occurredAt = transaction.occurredAt, let date = PostgresDate.date(fromTimestamp: occurredAt)
+            else { return .distantPast }
+            return calendar.startOfDay(for: date)
+        }
+        return groups.keys.sorted(by: >).map { day in (day: day, items: groups[day] ?? []) }
     }
 
     private func category(
@@ -58,69 +76,54 @@ struct TransactionsListView: View {
         filterCategories.first { $0.id == transaction.categoryId }
     }
 
-    private var reviewDisplayItems: [PublicSchema.NeedsReviewSelect] {
-        reviewItems.filter { $0.kind != "reconciliation_gap" }
-    }
-
     // MARK: - Body
 
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if isLoading {
-                ProgressView()
-            } else if transactions.isEmpty && reviewDisplayItems.isEmpty {
-                Text("No transactions yet")
-                    .foregroundStyle(Color.secondary)
-            } else {
-                List {
-                    // Needs-review inbox — most actionable items first
-                    if !reviewDisplayItems.isEmpty {
-                        Section("Needs Review") {
-                            ForEach(reviewDisplayItems, id: \.itemId) { item in
-                                reviewRow(item)
-                            }
-                        }
-                    }
+            VStack(spacing: 0) {
+                periodNavigator
 
-                    Section {
-                        ForEach(recentTransactions, id: \.transactionId) { transaction in
-                            TransactionRow(transaction: transaction, category: category(for: transaction))
-                            .contentShape(Rectangle())
-                            .onTapGesture { handleTap(on: transaction) }
-                        }
-                        .onDelete { offsets in
-                            Task { await delete(at: offsets, in: recentTransactions) }
-                        }
-                    } header: {
-                        HStack {
-                            Text("Recent")
-                            Spacer()
-                            NavigationLink {
-                                TransactionRegisterView(session: session)
-                            } label: {
-                                Text("See All")
-                            }
-                            .textCase(nil)
-                        }
-                    }
-                }
-                .scrollContentBackground(.hidden)
-                .refreshable { await load() }
-            }
-
-            if let errorMessage = loadErrorMessage ?? reviewActionError {
-                VStack {
+                if isLoading {
                     Spacer()
-                    Text(errorMessage)
+                    ProgressView()
+                    Spacer()
+                } else if transactions.isEmpty {
+                    Spacer()
+                    Text("No transactions in this period")
+                        .foregroundStyle(Color.secondary)
+                    Spacer()
+                } else {
+                    List {
+                        ForEach(groupedByDay, id: \.day) { group in
+                            Section {
+                                ForEach(group.items, id: \.transactionId) { transaction in
+                                    TransactionRow(transaction: transaction, category: category(for: transaction))
+                                        .contentShape(Rectangle())
+                                        .onTapGesture { handleTap(on: transaction) }
+                                }
+                                .onDelete { offsets in
+                                    Task { await delete(at: offsets, in: group.items) }
+                                }
+                            } header: {
+                                Text(group.day.formatted(date: .abbreviated, time: .omitted))
+                            }
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                    .refreshable { await load() }
+                }
+
+                if let loadErrorMessage {
+                    Text(loadErrorMessage)
                         .font(.footnote)
                         .foregroundStyle(.red)
                         .padding()
                 }
             }
         }
-        .searchable(text: searchBinding, prompt: "Merchant, category, or account")
+        .searchable(text: searchBinding, isPresented: $isSearching, prompt: "Merchant, category, or account")
         .navigationTitle("Transactions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -135,6 +138,13 @@ struct TransactionsListView: View {
                     isAddingTransaction = true
                 } label: {
                     Image(systemName: "plus")
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isSearching = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
                 }
             }
             ToolbarItem(placement: .secondaryAction) {
@@ -172,29 +182,10 @@ struct TransactionsListView: View {
         .sheet(isPresented: $isFilterSheetPresented) {
             TransactionFilterView(filter: $filter, accounts: filterAccounts, categories: filterCategories)
         }
-        .navigationDestination(isPresented: $showReviewEditing) {
-            if let reviewEditingTransaction {
-                TransactionFormView(
-                    session: session,
-                    mode: .edit(reviewEditingTransaction, sibling: nil)
-                ) {
-                    session.refresh.bump()
-                }
-            }
+        .sheet(isPresented: $isCustomRangePresented) {
+            customRangeSheet
         }
-        .sheet(isPresented: $showReviewCardMapping) {
-            if let reviewMappingCard {
-                MapCardSheet(session: session, item: reviewMappingCard) {
-                    session.refresh.bump()
-                }
-            }
-        }
-        .sheet(item: $conflictId) { id in
-            ConflictDetailSheet(session: session, conflictId: id) {
-                session.refresh.bump()
-            }
-        }
-        .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter)) { await load() }
+        .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter, range: range)) { await load() }
     }
 
     // MARK: - Transaction helpers
@@ -243,4 +234,5 @@ extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
 private struct TransactionsLoadKey: Equatable {
     let token: Int
     let filter: TransactionFilter
+    let range: DateInterval
 }

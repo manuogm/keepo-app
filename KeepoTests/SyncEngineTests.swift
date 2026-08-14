@@ -145,7 +145,7 @@ struct SyncEngineTests {
             "kind": .string("ledger"), "subtype": .string("checking"), "name": .string("Checking"),
             "currency": .string("EUR"), "opening_balance_e4": .integer(0),
             "opening_balance_at": .string("2026-01-01"), "include_in_total": .bool(true),
-            "counts_toward_fi": .bool(true), "version": .integer(1),
+            "icon": .string("banknote"), "color": .string("#8E8E93"), "version": .integer(1),
             "deleted_at": deletedAt.map(AnyJSON.string) ?? .null,
             "created_at": .string("2026-01-01T00:00:00.000000+00:00"),
             "updated_at": .string("2026-01-01T00:00:00.000000+00:00"), "sync_seq": .integer(1)

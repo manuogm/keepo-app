@@ -29,6 +29,9 @@ struct DataPrivacyView: View {
                     NavigationLink("Export") {
                         ExportView(session: session)
                     }
+                    NavigationLink("Archived") {
+                        ArchiveAccountsView(session: session)
+                    }
                 } header: {
                     Text("Data")
                 } footer: {

@@ -52,15 +52,6 @@ struct LocalMoneyRefereeTests {
         }
     }
 
-    @Test("unrealized_gain matches Postgres — snapshot minus every transfer ever, no date bound")
-    func unrealizedGainMatchesPostgres() throws {
-        let dbQueue = try makeDatabase()
-        let gain = try dbQueue.read { database in
-            try LocalMoneyQueries.unrealizedGain(database, accountId: RefereeFixture.eurBrokerage)
-        }
-        #expect(gain == 40_000_000)
-    }
-
     // MARK: - net_worth(scope) — the money-rule-5 propagation case
 
     @Test("net_worth propagates a missing GBP rate to nil for 'me'/'total'; 'household' is a clean 0")
@@ -83,72 +74,6 @@ struct LocalMoneyRefereeTests {
         }
     }
 
-    // MARK: - spending_by_category
-
-    @Test("spending_by_category: one GBP row poisons the whole Groceries total to nil")
-    func spendingByCategoryMatchesPostgres() throws {
-        let dbQueue = try makeDatabase()
-        let moneyScope = LocalMoneyScope(scope: .total, baseCurrency: "EUR")
-        let results = try dbQueue.read { database in
-            try LocalMoneyConversion.spendingByCategory(database, moneyScope, from: "2026-07-01", through: "2026-08-13")
-        }
-        #expect(results.count == 1)
-        #expect(results.first?.categoryId == RefereeFixture.groceries)
-        #expect(results.first?.totalE4 == nil)
-    }
-
-    // MARK: - income_expense_series
-
-    @Test("income_expense_series weekly matches Postgres's 4 buckets exactly, including the GBP-poisoned week")
-    func incomeExpenseSeriesWeeklyMatchesPostgres() throws {
-        let dbQueue = try makeDatabase()
-        let moneyScope = LocalMoneyScope(scope: .total, baseCurrency: "EUR")
-        let points = try dbQueue.read { database in
-            try LocalMoneyConversion.incomeExpenseSeries(
-                database, moneyScope, from: "2026-07-01", through: "2026-08-13", granularity: "weekly"
-            )
-        }
-        let byBucket = Dictionary(uniqueKeysWithValues: points.map { ($0.bucketStart, $0) })
-        #expect(points.count == 4)
-        #expect(byBucket["2026-06-29"]?.incomeE4 == 0)
-        #expect(byBucket["2026-06-29"]?.expenseE4 == 500_000)
-        #expect(byBucket["2026-07-06"]?.incomeE4 == 20_000_000)
-        #expect(byBucket["2026-07-06"]?.expenseE4 == nil)
-        #expect(byBucket["2026-07-27"]?.incomeE4 == 0)
-        #expect(byBucket["2026-07-27"]?.expenseE4 == 120_000)
-        #expect(byBucket["2026-08-03"]?.incomeE4 == 21_000_000)
-        #expect(byBucket["2026-08-03"]?.expenseE4 == 0)
-    }
-
-    @Test("income_expense_series monthly matches Postgres's 2 buckets exactly")
-    func incomeExpenseSeriesMonthlyMatchesPostgres() throws {
-        let dbQueue = try makeDatabase()
-        let moneyScope = LocalMoneyScope(scope: .total, baseCurrency: "EUR")
-        let points = try dbQueue.read { database in
-            try LocalMoneyConversion.incomeExpenseSeries(
-                database, moneyScope, from: "2026-07-01", through: "2026-08-13", granularity: "monthly"
-            )
-        }
-        let byBucket = Dictionary(uniqueKeysWithValues: points.map { ($0.bucketStart, $0) })
-        #expect(points.count == 2)
-        #expect(byBucket["2026-07-01"]?.incomeE4 == 20_000_000)
-        #expect(byBucket["2026-07-01"]?.expenseE4 == nil)
-        #expect(byBucket["2026-08-01"]?.incomeE4 == 21_000_000)
-        #expect(byBucket["2026-08-01"]?.expenseE4 == 120_000)
-    }
-
-    // MARK: - savings_rate
-
-    @Test("savings_rate is nil — the same GBP-poisoned expense side")
-    func savingsRateMatchesPostgres() throws {
-        let dbQueue = try makeDatabase()
-        let moneyScope = LocalMoneyScope(scope: .total, baseCurrency: "EUR")
-        let rate = try dbQueue.read { database in
-            try LocalMoneyConversion.savingsRate(database, moneyScope, from: "2026-07-01", through: "2026-08-13")
-        }
-        #expect(rate == nil)
-    }
-
     // MARK: - budget_progress
 
     @Test("budget_progress: budgeted converts cleanly (EUR-to-EUR), spent is nil (GBP in period)")
@@ -163,23 +88,5 @@ struct LocalMoneyRefereeTests {
         #expect(rows.count == 1)
         #expect(rows.first?.budgetedE4 == 1_000_000)
         #expect(rows.first?.spentE4 == nil)
-    }
-
-    // MARK: - fi_metrics
-
-    @Test("fi_metrics: every field nil once the trailing-365-day window includes the GBP transaction")
-    func fiMetricsMatchesPostgres() throws {
-        let dbQueue = try makeDatabase()
-        let moneyScope = LocalMoneyScope(scope: .total, baseCurrency: "EUR")
-        let metrics = try dbQueue.read { database in
-            try LocalMoneyConversion.fiMetrics(database, ownerId: RefereeFixture.ownerId, moneyScope, today: Self.today)
-        }
-        #expect(metrics.annualSpendE4 == nil)
-        #expect(metrics.fiNumberE4 == nil)
-        #expect(metrics.currentNetWorthE4 == nil)
-        #expect(metrics.percentProgress == nil)
-        #expect(metrics.annualSavingsE4 == nil)
-        #expect(metrics.yearsToFi == nil)
-        #expect(metrics.coastFiNumberE4 == nil)
     }
 }

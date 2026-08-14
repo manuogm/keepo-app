@@ -2,27 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Merged with the auto-generated Info.plist (GENERATE_INFOPLIST_FILE=YES
-	     stays on for CFBundleDisplayName/UILaunchScreen/etc via INFOPLIST_KEY_*
-	     in project.yml). $(VAR) here is substituted from build settings during
-	     the Process Info.plist phase — the standard mechanism for surfacing
-	     xcconfig values to Swift via Bundle.main, since INFOPLIST_KEY_* only
-	     recognizes well-known Apple plist keys, not arbitrary custom ones. -->
-	<key>SupabaseURL</key>
-	<string>$(SUPABASE_URL)</string>
-	<key>SupabaseAnonKey</key>
-	<string>$(SUPABASE_ANON_KEY)</string>
-	<!-- Required the moment any Keychain item uses a biometric SecAccessControl
-	     (KeychainSessionStorage, Phase 17) — iOS hard-crashes on the first
-	     Face ID-gated Keychain access without this key, rather than
-	     returning an error. Never surfaced until the first real-device run
-	     (the simulator/StubAuthProvider path never touches this code). -->
-	<key>NSFaceIDUsageDescription</key>
-	<string>Keepo uses Face ID to confirm it's you before showing or exporting your financial data.</string>
-	<!-- Custom URL scheme so Supabase magic-link emails can re-open the app
-	     after the user taps the confirmation link. Must match the redirectTo
-	     URL passed to signInWithOTP and the Allowed Redirect URL in the
-	     Supabase dashboard (Authentication → URL Configuration). -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -34,5 +13,9 @@
 			</array>
 		</dict>
 	</array>
+	<key>SupabaseAnonKey</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
+	<key>SupabaseURL</key>
+	<string>$(SUPABASE_URL)</string>
 </dict>
 </plist>

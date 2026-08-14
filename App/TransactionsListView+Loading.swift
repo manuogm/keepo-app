@@ -2,8 +2,7 @@ import Foundation
 import KeepoCore
 
 /// Data loading and mutation for `TransactionsListView` — split out purely
-/// for file-length (SwiftLint's `type_body_length`), same reasoning as
-/// `TransactionsListView+NeedsReview.swift`.
+/// for file-length (SwiftLint's `type_body_length`).
 extension TransactionsListView {
     func load() async {
         loadErrorMessage = nil
@@ -12,26 +11,27 @@ extension TransactionsListView {
             return
         }
         let dbQueue = session.dbQueue
-        let currentFilter = filter
+        let effectiveFilter: TransactionFilter = {
+            var effective = filter
+            effective.from = range.start
+            effective.through = range.end
+            return effective
+        }()
         do {
             let loaded: LoadedTransactionsState = try await dbQueue.read { database in
                 LoadedTransactionsState(
                     transactions: try LocalTransactionRow.fetchFiltered(
-                        database, filter: currentFilter, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
+                        database, filter: effectiveFilter, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
                     ),
                     accounts: try LocalAccountRow.fetchAll(
                         database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
                     ),
-                    categories: try LocalTableQueries.categories(database),
-                    reviewRows: try LocalMoneyQueries.needsReview(database),
-                    currencies: try LocalTableQueries.currencies(database)
+                    categories: try LocalTableQueries.categories(database)
                 )
             }
             transactions = loaded.transactions
             filterAccounts = loaded.accounts
             filterCategories = loaded.categories
-            reviewItems = try loaded.reviewRows.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
-            reviewCurrencies = Dictionary(uniqueKeysWithValues: loaded.currencies.map { ($0.code, Int($0.minorUnit)) })
         } catch {
             loadErrorMessage = UserFacingError.describe(error)
         }
@@ -69,6 +69,4 @@ private struct LoadedTransactionsState {
     let transactions: [PublicSchema.TransactionsWithDetailsSelect]
     let accounts: [LocalAccountRow]
     let categories: [PublicSchema.CategoriesSelect]
-    let reviewRows: [NeedsReviewLocalRow]
-    let currencies: [PublicSchema.CurrenciesSelect]
 }

@@ -140,7 +140,9 @@ struct OnboardingView: View {
                 subtype: accountSubtype,
                 name: accountName,
                 currency: selectedCurrency,
-                openingBalanceE4: openingBalanceE4
+                openingBalanceE4: openingBalanceE4,
+                icon: AccountAppearance.defaultIcon(forSubtype: accountSubtype),
+                color: CategoryAppearance.randomColor()
             )
             try await session.completeOnboarding(baseCurrency: selectedCurrency)
             step = .captureWalkthrough

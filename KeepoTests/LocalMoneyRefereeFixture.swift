@@ -41,7 +41,7 @@ enum RefereeFixture {
         try seedFxRates(database)
         try seedValuationLeg(database)
         try seedTransactions(database)
-        try seedBudgetAndFISettings(database)
+        try seedBudget(database)
     }
 
     private static func seedCurrencies(_ database: Database) throws {
@@ -92,8 +92,8 @@ enum RefereeFixture {
                 sql: """
                 INSERT INTO accounts (
                     id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4, opening_balance_at,
-                    include_in_total, counts_toward_fi, version, created_at, updated_at, sync_seq
-                ) VALUES (?, ?, ?, ?, 'checking', ?, ?, ?, '2026-01-01', 1, 1, 1,
+                    include_in_total, icon, color, version, created_at, updated_at, sync_seq
+                ) VALUES (?, ?, ?, ?, 'checking', ?, ?, ?, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
                           '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
                 """,
                 arguments: [
@@ -184,7 +184,7 @@ enum RefereeFixture {
         )
     }
 
-    private static func seedBudgetAndFISettings(_ database: Database) throws {
+    private static func seedBudget(_ database: Database) throws {
         try database.execute(
             sql: """
             INSERT INTO budgets (
@@ -194,16 +194,6 @@ enum RefereeFixture {
                     '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
             """,
             arguments: [ownerId, groceries]
-        )
-
-        try database.execute(
-            sql: """
-            INSERT INTO fi_settings (
-                owner_id, target_annual_spend_e4, withdrawal_rate, real_return_rate, updated_at, sync_seq
-            )
-            VALUES (?, NULL, '0.04', '0.05', '2026-01-01T00:00:00.000000+00:00', 1)
-            """,
-            arguments: [ownerId]
         )
     }
 }

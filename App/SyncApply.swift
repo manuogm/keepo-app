@@ -23,7 +23,7 @@ enum SyncApply {
     private static let tableColumns: [String: Set<String>] = [
         "accounts": [
             "id", "owner_id", "created_by", "kind", "subtype", "name", "currency", "opening_balance_e4",
-            "opening_balance_at", "include_in_total", "counts_toward_fi", "archived_at", "version", "deleted_at",
+            "opening_balance_at", "include_in_total", "icon", "color", "archived_at", "version", "deleted_at",
             "created_at", "updated_at", "sync_seq"
         ],
         "transactions": [
@@ -47,10 +47,6 @@ enum SyncApply {
             "id", "owner_id", "category_id", "period_month", "amount_e4", "currency", "version", "deleted_at",
             "created_at", "updated_at", "sync_seq"
         ],
-        "fi_settings": [
-            "owner_id", "target_annual_spend_e4", "withdrawal_rate", "real_return_rate", "deleted_at", "updated_at",
-            "sync_seq"
-        ],
         "currencies": ["code", "minor_unit", "sync_seq"],
         "fx_rates": ["currency", "rate_date", "rate_to_eur", "source", "fetched_at", "sync_seq"],
         "card_mappings": [
@@ -73,7 +69,7 @@ enum SyncApply {
 
     private static let primaryKeys: [String: [String]] = [
         "accounts": ["id"], "transactions": ["id"], "balance_snapshots": ["id"], "categories": ["id"],
-        "recurring_rules": ["id"], "budgets": ["id"], "fi_settings": ["owner_id"], "currencies": ["code"],
+        "recurring_rules": ["id"], "budgets": ["id"], "currencies": ["code"],
         "fx_rates": ["currency", "rate_date"], "card_mappings": ["id"],
         "merchant_category_map": ["owner_id", "merchant_pattern"], "sync_conflicts": ["id"], "households": ["id"],
         "household_members": ["household_id", "user_id"], "household_accounts": ["household_id", "account_id"],

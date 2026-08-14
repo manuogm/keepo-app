@@ -8,14 +8,6 @@ struct RootView: View {
     @State private var session = SessionStore()
     @State private var network = NetworkMonitor()
     @State private var needsReviewCount = 0
-    /// The exact distance from the screen's bottom edge to the top of the
-    /// tab bar — measured, not guessed, via `TabBarHeightKey` below. A tab
-    /// view's own content reports this as its `safeAreaInsets.bottom` (the
-    /// bar's rendered height including whatever slice of the home-indicator
-    /// zone it occupies), which a sibling `.overlay` on the `TabView` never
-    /// sees on its own, since the tab bar's space is consumed only for the
-    /// content *inside* each tab.
-    @State private var tabBarHeight: CGFloat = 0
     /// Backs the privacy curtain instead of `@Environment(\.scenePhase)` —
     /// SwiftUI's `scenePhase` is documented (and reproduces on real devices,
     /// never in the simulator) to flicker to `.inactive` for reasons that
@@ -47,12 +39,8 @@ struct RootView: View {
                     NavigationStack {
                         HomeView(session: session)
                     }
-                    .tabItem { Label("Dashboard", systemImage: "house") }
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear.preference(key: TabBarHeightKey.self, value: proxy.safeAreaInsets.bottom)
-                        }
-                    )
+                    .tabItem { Label("Dashboard", systemImage: "chart.line.uptrend.xyaxis") }
+                    .badge(needsReviewCount > 0 ? needsReviewCount : 0)
 
                     NavigationStack {
                         AccountsListView(session: session)
@@ -63,7 +51,6 @@ struct RootView: View {
                         TransactionsListView(session: session)
                     }
                     .tabItem { Label("Transactions", systemImage: "list.bullet") }
-                    .badge(needsReviewCount > 0 ? needsReviewCount : 0)
 
                     NavigationStack {
                         ProfileView(session: session)
@@ -73,13 +60,11 @@ struct RootView: View {
                 .tint(Color.primary)
                 .environment(\.isPrivacyMode, session.isPrivacyMode)
                 .task(id: session.refresh.token) { await loadNeedsReviewCount() }
-                .onPreferenceChange(TabBarHeightKey.self) { tabBarHeight = $0 }
-                .overlay(alignment: .bottom) {
+                .safeAreaInset(edge: .bottom) {
                     if network.isOffline {
                         OfflineStatusBar(lastSyncedAt: session.syncEngine?.lastSyncedAt)
-                            .padding(.bottom, tabBarHeight + 2)
-                            .ignoresSafeArea(edges: .bottom)
-                            .allowsHitTesting(false)
+                            .padding(.horizontal)
+                            .padding(.bottom, 4)
                     }
                 }
             case .failed(let message):
@@ -171,18 +156,6 @@ struct RootView: View {
                     .padding(.horizontal)
             }
         }
-    }
-}
-
-/// Propagates a tab's own `safeAreaInsets.bottom` (which, measured from
-/// *inside* a tab, equals the tab bar's full rendered height) up to
-/// `RootView`. `reduce` takes the max since every tab could in principle
-/// report it, though only one needs to for the value to be right.
-private struct TabBarHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
     }
 }
 

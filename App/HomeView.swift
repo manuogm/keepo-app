@@ -1,11 +1,11 @@
-import Charts
 import KeepoCore
 import SwiftUI
 
-/// Dashboard — hero net-worth balance + 90-day trajectory for the scope the
-/// user selected via `ScopeSwitcherButton`. Scope lives in SessionStore so
-/// it persists across tab switches and drives every financial screen from
-/// the same source of truth.
+/// Dashboard — hero net-worth card for the scope the user selected via
+/// `ScopeSwitcherButton`, plus a bell that opens the Needs Review inbox as a
+/// floating notifications panel. Scope lives in SessionStore so it persists
+/// across tab switches and drives every financial screen from the same
+/// source of truth.
 ///
 /// Reads straight off the local GRDB mirror (Phase L6) — no server round
 /// trip, no payload cache, no pending-write overlay. `Outbox`'s optimistic
@@ -20,6 +20,8 @@ struct HomeView: View {
     @State private var baseCurrencyInfo: CurrencyInfo?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var needsReviewCount = 0
+    @State private var showNotifications = false
 
     private let rangeDays = 90
 
@@ -32,33 +34,7 @@ struct HomeView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        BalanceHeaderView(amount: netWorth, currency: baseCurrencyInfo)
-
-                        // A gap in the line (a day this scope has no rows
-                        // for, or an unresolvable rate) is left as a gap,
-                        // never filled with zero — money rule 5 governs
-                        // this chart, not the bar-chart "fill gaps with
-                        // real zeroes" rule from app-architecture.md §5.
-                        if seriesPoints.isEmpty {
-                            Text("No trajectory yet for this scope.")
-                                .font(.callout)
-                                .foregroundStyle(Color.secondary)
-                        } else {
-                            Chart(seriesPoints, id: \.date) { point in
-                                // Charting is display-only — converting to
-                                // Double here never feeds back into stored
-                                // or compared money, so it doesn't touch
-                                // money rule 3.
-                                LineMark(
-                                    x: .value("Date", point.date), y: .value("Net worth", Double(point.value) / 10_000)
-                                )
-                            }
-                            .foregroundStyle(Color.primary)
-                            .chartYAxis {
-                                AxisMarks(position: .leading)
-                            }
-                            .frame(height: 220)
-                        }
+                        netWorthCard
 
                         if let errorMessage {
                             Text(errorMessage)
@@ -81,14 +57,46 @@ struct HomeView: View {
                 ScreenTitleBar(title: "Dashboard", session: session)
             }
             ToolbarItem(placement: .primaryAction) {
-                NavigationLink {
-                    InsightsView(session: session)
+                Button {
+                    showNotifications = true
                 } label: {
-                    Image(systemName: "chart.bar")
+                    Image(systemName: "bell")
+                }
+                .overlay(alignment: .topTrailing) {
+                    if needsReviewCount > 0 {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 2, y: -2)
+                    }
                 }
             }
         }
+        .sheet(isPresented: $showNotifications) {
+            NavigationStack {
+                NeedsReviewView(session: session)
+            }
+            .presentationDetents([.medium, .large])
+        }
         .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
+    }
+
+    private var netWorthCard: some View {
+        NavigationLink {
+            NetWorthDetailView(session: session)
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Net Worth")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondary)
+                BalanceHeaderView(amount: netWorth, currency: baseCurrencyInfo)
+                NetWorthChartView(seriesPoints: seriesPoints, showAxes: false, height: 120)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
     }
 
     private func load() async {
@@ -106,19 +114,21 @@ struct HomeView: View {
         let dbQueue = session.dbQueue
 
         do {
-            let (netWorthValue, seriesResult, currencies) = try await dbQueue.read { database in
+            let (netWorthValue, seriesResult, currencies, reviewRows) = try await dbQueue.read { database in
                 (
                     try LocalMoneyConversion.netWorth(database, moneyScope, asOf: todayString, now: today),
                     try LocalMoneyConversion.netWorthSeries(
                         database, moneyScope, from: fromString, through: todayString, now: today
                     ),
-                    try LocalTableQueries.currencies(database)
+                    try LocalTableQueries.currencies(database),
+                    try LocalMoneyQueries.needsReview(database)
                 )
             }
             netWorth = netWorthValue
             if let row = currencies.first(where: { $0.code == baseCurrency }) {
                 baseCurrencyInfo = CurrencyInfo(code: row.code, minorUnit: Int(row.minorUnit))
             }
+            needsReviewCount = reviewRows.filter { $0.kind != "reconciliation_gap" }.count
 
             let parsed: [(date: Date, value: Int64)] = seriesResult.compactMap { point in
                 guard

@@ -16,6 +16,7 @@ struct AccountsListView: View {
     @State private var isAddingAccount = false
     @State private var editingAccountId: UUID?
     @State private var actionErrorMessage: String?
+    @State private var archiveCandidate: LocalAccountRow?
 
     private var everyday: [LocalAccountRow] {
         accounts.filter { $0.kind == .ledger && $0.archivedAt == nil }
@@ -52,8 +53,10 @@ struct AccountsListView: View {
                         }
                     }
                     if !archived.isEmpty {
-                        Section("Archived") {
-                            ForEach(archived) { accountRow($0) }
+                        Section {
+                            NavigationLink("Archived (\(archived.count))") {
+                                ArchiveAccountsView(session: session)
+                            }
                         }
                     }
                 }
@@ -99,6 +102,24 @@ struct AccountsListView: View {
             }
         }
         .task(id: session.refresh.token) { await load() }
+        .alert(
+            "Archive \"\(archiveCandidate?.name ?? "")\"?",
+            isPresented: archiveConfirmationBinding
+        ) {
+            Button("Archive", role: .destructive) {
+                if let archiveCandidate { Task { await setArchived(archiveCandidate, archived: true) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Archiving an account will remove it from your total balance but will not delete "
+                    + "the account or the transactions associated."
+            )
+        }
+    }
+
+    private var archiveConfirmationBinding: Binding<Bool> {
+        Binding(get: { archiveCandidate != nil }, set: { if !$0 { archiveCandidate = nil } })
     }
 
     @ViewBuilder
@@ -108,7 +129,11 @@ struct AccountsListView: View {
             .onTapGesture { editingAccountId = row.id }
             .swipeActions(edge: .trailing) {
                 Button(role: .destructive) {
-                    Task { await setArchived(row, archived: row.archivedAt == nil) }
+                    if row.archivedAt == nil {
+                        archiveCandidate = row
+                    } else {
+                        Task { await setArchived(row, archived: false) }
+                    }
                 } label: {
                     if row.archivedAt == nil {
                         Label("Archive", systemImage: "archivebox")
@@ -178,6 +203,7 @@ private struct AccountRow: View {
 
     var body: some View {
         HStack {
+            CategoryIconView(icon: row.icon, color: Color(hex: row.color), diameter: 32)
             HStack(spacing: 4) {
                 Text(row.name)
                     .foregroundStyle(row.archivedAt == nil ? Color.primary : Color.secondary)

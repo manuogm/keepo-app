@@ -45,7 +45,8 @@ public enum LocalSchemaV1 {
             table.column("opening_balance_e4", .integer).notNull()
             table.column("opening_balance_at", .text).notNull()
             table.column("include_in_total", .boolean).notNull()
-            table.column("counts_toward_fi", .boolean).notNull()
+            table.column("icon", .text).notNull()
+            table.column("color", .text).notNull()
             table.column("archived_at", .text)
             table.column("version", .integer).notNull()
             table.column("deleted_at", .text)
@@ -143,16 +144,6 @@ public enum LocalSchemaV1 {
             table.column("version", .integer).notNull()
             table.column("deleted_at", .text)
             table.column("created_at", .text).notNull()
-            table.column("updated_at", .text).notNull()
-            table.column("sync_seq", .integer).notNull()
-        }
-
-        try database.create(table: "fi_settings") { table in
-            table.column("owner_id", .text).primaryKey().collate(.nocase)
-            table.column("target_annual_spend_e4", .integer)
-            table.column("withdrawal_rate", .text).notNull()
-            table.column("real_return_rate", .text).notNull()
-            table.column("deleted_at", .text)
             table.column("updated_at", .text).notNull()
             table.column("sync_seq", .integer).notNull()
         }

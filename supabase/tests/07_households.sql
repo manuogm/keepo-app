@@ -154,7 +154,8 @@ select is(
 -- owns it (Phase 6's update_account/archive_account addendum to H2).
 select is(
   (select conflict from update_account(
-    'a0000000-0000-0000-0000-00000000a001', 1, 'A Shared (renamed by B)', 'checking', 10000000, true, true
+    'a0000000-0000-0000-0000-00000000a001', 1, 'A Shared (renamed by B)', 'checking', 10000000, true,
+    'banknote', '#8E8E93'
   )),
   false,
   'a household member can call update_account on a shared account she does not own'

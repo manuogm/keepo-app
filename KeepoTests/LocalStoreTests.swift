@@ -19,7 +19,7 @@ struct LocalStoreTests {
 
         let expectedTables = [
             "accounts", "transactions", "balance_snapshots", "categories", "currencies", "fx_rates",
-            "budgets", "fi_settings", "recurring_rules", "card_mappings", "merchant_category_map",
+            "budgets", "recurring_rules", "card_mappings", "merchant_category_map",
             "sync_conflicts", "households", "household_members", "household_accounts", "profiles",
             "outbox_items"
         ]
@@ -51,9 +51,9 @@ struct LocalStoreTests {
             try database.execute(
                 sql: """
                 INSERT INTO accounts (id, owner_id, created_by, kind, subtype, name, currency,
-                    opening_balance_e4, opening_balance_at, include_in_total, counts_toward_fi, version,
+                    opening_balance_e4, opening_balance_at, include_in_total, icon, color, version,
                     created_at, updated_at, sync_seq)
-                VALUES (?, ?, ?, 'ledger', 'checking', 'Checking', 'EUR', 0, '2026-01-01', 1, 1, 1,
+                VALUES (?, ?, ?, 'ledger', 'checking', 'Checking', 'EUR', 0, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
                     '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
                 """,
                 arguments: [UUID().uuidString.lowercased(), lowercaseOwnerId, lowercaseOwnerId]

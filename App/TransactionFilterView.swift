@@ -4,15 +4,14 @@ import SwiftUI
 /// Split out of TransactionsListView.swift purely to keep that file under
 /// the project's file-length lint threshold — no dependency on
 /// TransactionsListView's own state beyond the filter binding it's handed.
+/// Date range is no longer this sheet's job — the period picker atop
+/// TransactionsListView owns that now; this is account/category/kind only.
 struct TransactionFilterView: View {
     @Binding var filter: TransactionFilter
     let accounts: [LocalAccountRow]
     let categories: [PublicSchema.CategoriesSelect]
 
     @Environment(\.dismiss) private var dismiss
-    @State private var hasDateRange = false
-    @State private var from = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
-    @State private var through = Date()
 
     var body: some View {
         NavigationStack {
@@ -42,13 +41,6 @@ struct TransactionFilterView: View {
                     }
                     .pickerStyle(.segmented)
                 }
-                Section("Date range") {
-                    Toggle("Limit to a date range", isOn: $hasDateRange)
-                    if hasDateRange {
-                        DatePicker("From", selection: $from, displayedComponents: .date)
-                        DatePicker("Through", selection: $through, displayedComponents: .date)
-                    }
-                }
             }
             .navigationTitle("Filter")
             .navigationBarTitleDisplayMode(.inline)
@@ -56,23 +48,15 @@ struct TransactionFilterView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Clear") {
                         filter = TransactionFilter(search: filter.search)
-                        hasDateRange = false
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        filter.from = hasDateRange ? from : nil
-                        filter.through = hasDateRange ? through : nil
                         dismiss()
                     }
                 }
             }
-        }
-        .task {
-            hasDateRange = filter.from != nil || filter.through != nil
-            from = filter.from ?? from
-            through = filter.through ?? through
         }
     }
 }

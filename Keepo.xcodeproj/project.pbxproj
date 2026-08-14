@@ -13,10 +13,10 @@
 		01CC7E812F03C9F7D9E6E79F /* BalanceReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56BD1170276112E0659274B6 /* BalanceReminderScheduler.swift */; };
 		04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 884043304F66BADDBBBE1E13 /* KeepoApp.swift */; };
 		07757F6F5323860A58AB2EF0 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06737C4FC884994C69283C0A /* HomeView.swift */; };
-		0A2E011E2D6FAEDA3B077CBE /* TransactionRegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701EBD4C3630ED53D0C78911 /* TransactionRegisterView.swift */; };
 		1258AEE2BE84DBE4A3238432 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4ADFA49D22C598E055F5FB9 /* AppSettings.swift */; };
 		1AC5044D2005A53BA40B40DD /* RecurringRuleFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010F6BE2EDE4A87D2634D6FE /* RecurringRuleFormView.swift */; };
 		203E3DE0C583D51FFA3CC973 /* LocalMoneyConversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9BE688265BE8E6EB9C7C6BF /* LocalMoneyConversion.swift */; };
+		21D7B4F8764655E5F17DFD75 /* OfflineInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE615004EB22E1F564BAEEC8 /* OfflineInfoSheet.swift */; };
 		23E7D1393EAD719BE66438BF /* AccountFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6234223F609F295F8F13BDED /* AccountFormView.swift */; };
 		2BEA2658AA22E03CB9ACAE5A /* LocalTransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4164124106D1FC427294CD27 /* LocalTransactionRow.swift */; };
 		303F4C318CFC27290CD85D25 /* PrivacyToggleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD74535C9BAD0B3D22700F1 /* PrivacyToggleButton.swift */; };
@@ -31,8 +31,8 @@
 		4396DE29BCBD5EA251338E5E /* CategoryLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9921C3A12ACEF10F463E95 /* CategoryLocalWrite.swift */; };
 		45123E973A54142DB5AD78C9 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEF4B309BD81A9566743401 /* ExportView.swift */; };
 		475B1C8ADEBEC90129CDBB89 /* CategoryFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 735529C00019B4CABBA21C30 /* CategoryFormView.swift */; };
+		4917BE825C6565670031AF5F /* LocalMoneyConversionBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3EF5DAED2EACFF58805C874 /* LocalMoneyConversionBudget.swift */; };
 		4A9BA5608EA3BB156B3E71AE /* OfflineStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0DC0C876E0AE5447A36475 /* OfflineStatusBar.swift */; };
-		4AB6686801726DAB9101FF2B /* LocalMoneyConversionFI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF1B7C56A8116B4DEC59DA8 /* LocalMoneyConversionFI.swift */; };
 		4C27DB33415AF4D03D91EEE8 /* KeepoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */; };
 		4D9150EB4ECF8A74B015DCD5 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0D525863FB5ABAE4C22CDAE5 /* GRDB */; };
 		503974F3E8B7F0D828A0C6CA /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 333AEF1387D80D7D4ECFD033 /* RefreshCoordinator.swift */; };
@@ -44,13 +44,17 @@
 		720AA92A68E578F823FA5F4D /* NeedsReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A0AEC925B7A3FF79E7F977 /* NeedsReviewView.swift */; };
 		7B5828DB0F36A3D6B2ED4DEB /* ConflictResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D55AC5A489A7549317ADB19 /* ConflictResolution.swift */; };
 		7C5F40F75BBB39A3364D07AD /* DataPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27663EBB8FB0BA605B81BDE /* DataPrivacyView.swift */; };
+		7D30C1E73CAD87BAF1224099 /* AccountLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898182E4776D77AF168F541B /* AccountLocalWrite.swift */; };
 		7DCDB64122A2891105C7C10F /* OTPSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 864D74AE697E673562039C23 /* OTPSignInView.swift */; };
 		7DD08FCA4FF3B91194F3AFB3 /* BudgetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4437A523DE24A64B83A5D54 /* BudgetsView.swift */; };
 		81727031FB03BFD0EC3CC42D /* OfflineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D05E8A22B7751E78E33EBC02 /* OfflineStore.swift */; };
+		81C18CDDD1C078398AC45EE8 /* TransactionsListView+Period.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00320C6876E1B14C807E478 /* TransactionsListView+Period.swift */; };
 		826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */; };
+		8418D67FD7BAB31C6629EE5B /* TransactionFormView+Delete.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7302E5237413BF6107E4CE /* TransactionFormView+Delete.swift */; };
 		85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A520844CB1127366801CB8 /* KeepoCore */; };
 		8BF5404657D72CE37547C10A /* TransactionFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F669D17F23A1AEDB491BF1F /* TransactionFilterView.swift */; };
 		8C19ADA540858E61760E4FE7 /* BudgetFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EF478F9C03D81B6E0CCFB1 /* BudgetFormView.swift */; };
+		910929EACA4D7E2B7840D626 /* ArchiveAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26D5FDEC899FFE8FBF9699D /* ArchiveAccountsView.swift */; };
 		916606BE115D52894CF13E4A /* Outbox+AccountsCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF23EF5C13D50D95393B5ABF /* Outbox+AccountsCategories.swift */; };
 		9330F41C8C3EC71EEC94610F /* AutomationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68C5239FB8E94D256E60F0EF /* AutomationsView.swift */; };
 		94E300A07A178B1A2876CF5A /* SimulateCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D105BF3ECCEFDC84E629D824 /* SimulateCaptureView.swift */; };
@@ -62,13 +66,14 @@
 		A84A63EA9F34755A0DFB9067 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E416B10D5153DF1638B0ED9 /* ColorHex.swift */; };
 		A90857943ADABEFB25B44996 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EB6980116C8080A7ADF85D /* SyncEngine.swift */; };
 		AD9ECBCDD919F4BB10E4245D /* ConflictDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBAFFDD646D531BB369E684A /* ConflictDetailSheet.swift */; };
-		B2972500ABD0C917D1224199 /* TransactionsListView+NeedsReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449EE6DD8C7A3D022AB8219E /* TransactionsListView+NeedsReview.swift */; };
 		B3D55B77F4EB1B1F699789EB /* UUID+Identifiable.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EFC21F0C8C59B19FFD185A /* UUID+Identifiable.swift */; };
 		B54F02C80D3D973B33154960 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5BCEA514344BDBF220342E /* HouseholdView.swift */; };
 		B627DB442B79800AE401940B /* LocalAccountRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7AC3C81304BFE67EEFD8611 /* LocalAccountRow.swift */; };
 		B7A28835CF97300D93A8A733 /* LocalMoneyTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEDC16F840D1D52F4F06892 /* LocalMoneyTypes.swift */; };
+		B95EF6554B1C4939A18561C3 /* NetWorthDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA049CBC27DE13AAA36A637E /* NetWorthDetailView.swift */; };
 		BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */; };
 		C2B619C3EC87A5847A00EAE4 /* SyncCursorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FD9B0EBCF053E1B3E86E65C /* SyncCursorStore.swift */; };
+		C31584818223B578BF4B42FD /* NetWorthChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F2FC3C71C9E5CC965BC8F3F /* NetWorthChartView.swift */; };
 		C886AE5DBD13E41BFE14BA54 /* CSVImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */; };
 		C95EADE3438BF04F99EBE006 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE6F0FB1B3DF6715A2BF817 /* PreferencesView.swift */; };
 		CA271C456719F30FF84B8FF5 /* CaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDED98D97ACE3A89820BBD09 /* CaptureIntent.swift */; };
@@ -87,13 +92,11 @@
 		E4AE632568A815AAFE48026F /* TransactionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192A9246EB85747C42D7E97D /* TransactionsListView.swift */; };
 		E66057E7D6C97B7B9301BB1E /* LocalMoneyRefereeFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 472675CD5ADE433AA4B8E336 /* LocalMoneyRefereeFixture.swift */; };
 		E6D1468DE51E2DA7DD7B71CA /* TransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C335B228DAD2B9C1F3DD183 /* TransactionRow.swift */; };
-		E8F2B176E85370E38B4283F9 /* FISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0DB9A7C7E367E6428310ABB /* FISettingsView.swift */; };
 		E923E0F08CF810D2921A687A /* OutboxMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8E38E1BEBD69551349E9D4E /* OutboxMigrationTests.swift */; };
 		E9B90B45B2064ED05EA757BE /* CurrencyConversionLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EFFACF34C66AE4CCA5245E /* CurrencyConversionLabel.swift */; };
 		E9C9D4B3DF078A1CC161900E /* LocalTableQueriesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D1996C00A3B200872FFDA8 /* LocalTableQueriesTests.swift */; };
 		EA430EC5D2F03C8C3197B7D0 /* OfflineStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B74F9A6C1456B3EC4ED7C6C1 /* OfflineStoreTests.swift */; };
 		ED0C39EA3E52A60BC689B4EA /* OutboxPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ABA32C5D1B5DFF5297CA7CC /* OutboxPayloads.swift */; };
-		F10227EA22BFB76AB57DF555 /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D38049FAF0C58BCD88AD02 /* InsightsView.swift */; };
 		F3CCB559F93565682DBAE498 /* TransactionFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223C215A93C8B4A390E17F34 /* TransactionFormView.swift */; };
 		F4D8709FFC8E2B106B600182 /* RecurringRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A741E7644D1745889C5114 /* RecurringRulesView.swift */; };
 		F621BD7F9360149A762CDA34 /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */; };
@@ -147,8 +150,8 @@
 		3680339542A1E05C2216A883 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
 		36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryLocalWriteTests.swift; sourceTree = "<group>"; };
 		38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRowTests.swift; sourceTree = "<group>"; };
+		3F7302E5237413BF6107E4CE /* TransactionFormView+Delete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionFormView+Delete.swift"; sourceTree = "<group>"; };
 		4164124106D1FC427294CD27 /* LocalTransactionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTransactionRow.swift; sourceTree = "<group>"; };
-		449EE6DD8C7A3D022AB8219E /* TransactionsListView+NeedsReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionsListView+NeedsReview.swift"; sourceTree = "<group>"; };
 		472675CD5ADE433AA4B8E336 /* LocalMoneyRefereeFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyRefereeFixture.swift; sourceTree = "<group>"; };
 		4BB58A8214ECD93F7BA2BFA3 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		4DC8348A94F64846D6389F14 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -161,7 +164,6 @@
 		66A0AEC925B7A3FF79E7F977 /* NeedsReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsReviewView.swift; sourceTree = "<group>"; };
 		68C5239FB8E94D256E60F0EF /* AutomationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationsView.swift; sourceTree = "<group>"; };
 		6E416B10D5153DF1638B0ED9 /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
-		701EBD4C3630ED53D0C78911 /* TransactionRegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionRegisterView.swift; sourceTree = "<group>"; };
 		735529C00019B4CABBA21C30 /* CategoryFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryFormView.swift; sourceTree = "<group>"; };
 		768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7742491A185D240463F3F936 /* KeepoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -169,13 +171,14 @@
 		864D74AE697E673562039C23 /* OTPSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPSignInView.swift; sourceTree = "<group>"; };
 		884043304F66BADDBBBE1E13 /* KeepoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoApp.swift; sourceTree = "<group>"; };
 		8871465199EB566D42ACEC52 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		898182E4776D77AF168F541B /* AccountLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLocalWrite.swift; sourceTree = "<group>"; };
 		8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoTests.swift; sourceTree = "<group>"; };
 		8C335B228DAD2B9C1F3DD183 /* TransactionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionRow.swift; sourceTree = "<group>"; };
 		8D5BCEA514344BDBF220342E /* HouseholdView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdView.swift; sourceTree = "<group>"; };
 		8E0C66C1771B2C113D912E35 /* TransactionsListView+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionsListView+Loading.swift"; sourceTree = "<group>"; };
 		8EEF4B309BD81A9566743401 /* ExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportView.swift; sourceTree = "<group>"; };
+		8F2FC3C71C9E5CC965BC8F3F /* NetWorthChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthChartView.swift; sourceTree = "<group>"; };
 		8F54724997986A0ED81DEF3B /* LocalTableQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTableQueries.swift; sourceTree = "<group>"; };
-		93D38049FAF0C58BCD88AD02 /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
 		99345A8328BECF736129DE7F /* OutboxMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxMigration.swift; sourceTree = "<group>"; };
 		9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
 		9FD9B0EBCF053E1B3E86E65C /* SyncCursorStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCursorStore.swift; sourceTree = "<group>"; };
@@ -190,7 +193,7 @@
 		B88C7E86C0F680D0F63F4135 /* TransferDivergenceAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferDivergenceAlert.swift; sourceTree = "<group>"; };
 		B8E38E1BEBD69551349E9D4E /* OutboxMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxMigrationTests.swift; sourceTree = "<group>"; };
 		BBAFFDD646D531BB369E684A /* ConflictDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictDetailSheet.swift; sourceTree = "<group>"; };
-		BEF1B7C56A8116B4DEC59DA8 /* LocalMoneyConversionFI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversionFI.swift; sourceTree = "<group>"; };
+		C00320C6876E1B14C807E478 /* TransactionsListView+Period.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionsListView+Period.swift"; sourceTree = "<group>"; };
 		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4437A523DE24A64B83A5D54 /* BudgetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetsView.swift; sourceTree = "<group>"; };
 		C4ADFA49D22C598E055F5FB9 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
@@ -201,18 +204,21 @@
 		CF23EF5C13D50D95393B5ABF /* Outbox+AccountsCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+AccountsCategories.swift"; sourceTree = "<group>"; };
 		D05E8A22B7751E78E33EBC02 /* OfflineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStore.swift; sourceTree = "<group>"; };
 		D105BF3ECCEFDC84E629D824 /* SimulateCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulateCaptureView.swift; sourceTree = "<group>"; };
+		D26D5FDEC899FFE8FBF9699D /* ArchiveAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveAccountsView.swift; sourceTree = "<group>"; };
 		D2EFC21F0C8C59B19FFD185A /* UUID+Identifiable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UUID+Identifiable.swift"; sourceTree = "<group>"; };
 		D3CD02450207FB6B2E822D2F /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		D635D3C66205FA4089E40FF3 /* SyncApply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncApply.swift; sourceTree = "<group>"; };
+		DE615004EB22E1F564BAEEC8 /* OfflineInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineInfoSheet.swift; sourceTree = "<group>"; };
+		E3EF5DAED2EACFF58805C874 /* LocalMoneyConversionBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversionBudget.swift; sourceTree = "<group>"; };
 		E430CAB6976F8BB2B64C7D1A /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		E6A741E7644D1745889C5114 /* RecurringRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRulesView.swift; sourceTree = "<group>"; };
 		E7AC3C81304BFE67EEFD8611 /* LocalAccountRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRow.swift; sourceTree = "<group>"; };
 		E9EFFACF34C66AE4CCA5245E /* CurrencyConversionLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyConversionLabel.swift; sourceTree = "<group>"; };
+		EA049CBC27DE13AAA36A637E /* NetWorthDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthDetailView.swift; sourceTree = "<group>"; };
 		EB21306F71BA4693E4676718 /* ConflictDetailSheet+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConflictDetailSheet+Loading.swift"; sourceTree = "<group>"; };
 		ED9921C3A12ACEF10F463E95 /* CategoryLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryLocalWrite.swift; sourceTree = "<group>"; };
 		EDED98D97ACE3A89820BBD09 /* CaptureIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureIntent.swift; sourceTree = "<group>"; };
 		EE77801FEDF30EF5EC63D7C9 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
-		F0DB9A7C7E367E6428310ABB /* FISettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FISettingsView.swift; sourceTree = "<group>"; };
 		F3D1996C00A3B200872FFDA8 /* LocalTableQueriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTableQueriesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -279,8 +285,10 @@
 			isa = PBXGroup;
 			children = (
 				6234223F609F295F8F13BDED /* AccountFormView.swift */,
+				898182E4776D77AF168F541B /* AccountLocalWrite.swift */,
 				02A0D5880530458F27A93E14 /* AccountsListView.swift */,
 				C4ADFA49D22C598E055F5FB9 /* AppSettings.swift */,
+				D26D5FDEC899FFE8FBF9699D /* ArchiveAccountsView.swift */,
 				68C5239FB8E94D256E60F0EF /* AutomationsView.swift */,
 				3680339542A1E05C2216A883 /* BalanceHeaderView.swift */,
 				56BD1170276112E0659274B6 /* BalanceReminderScheduler.swift */,
@@ -299,17 +307,15 @@
 				E9EFFACF34C66AE4CCA5245E /* CurrencyConversionLabel.swift */,
 				A27663EBB8FB0BA605B81BDE /* DataPrivacyView.swift */,
 				8EEF4B309BD81A9566743401 /* ExportView.swift */,
-				F0DB9A7C7E367E6428310ABB /* FISettingsView.swift */,
 				06737C4FC884994C69283C0A /* HomeView.swift */,
 				8D5BCEA514344BDBF220342E /* HouseholdView.swift */,
 				136D79B8A96DF200ACDE60BA /* HouseholdViewLoader.swift */,
 				07039596342F80EA227C6AFD /* Info.plist */,
-				93D38049FAF0C58BCD88AD02 /* InsightsView.swift */,
 				C91440E871E1BD48AB796B63 /* Keepo.entitlements */,
 				884043304F66BADDBBBE1E13 /* KeepoApp.swift */,
 				E7AC3C81304BFE67EEFD8611 /* LocalAccountRow.swift */,
 				A9BE688265BE8E6EB9C7C6BF /* LocalMoneyConversion.swift */,
-				BEF1B7C56A8116B4DEC59DA8 /* LocalMoneyConversionFI.swift */,
+				E3EF5DAED2EACFF58805C874 /* LocalMoneyConversionBudget.swift */,
 				B3600B8733D14B431A8E3067 /* LocalMoneyQueries.swift */,
 				2EEDC16F840D1D52F4F06892 /* LocalMoneyTypes.swift */,
 				1F7E462D55BFB72F55965EFE /* LocalStore.swift */,
@@ -318,7 +324,10 @@
 				0A3FA3E05923A1E586BEE2BA /* MetricKitSubscriber.swift */,
 				66A0AEC925B7A3FF79E7F977 /* NeedsReviewView.swift */,
 				362334366778871A75100AB1 /* NetworkMonitor.swift */,
+				8F2FC3C71C9E5CC965BC8F3F /* NetWorthChartView.swift */,
+				EA049CBC27DE13AAA36A637E /* NetWorthDetailView.swift */,
 				E430CAB6976F8BB2B64C7D1A /* NotificationSettingsView.swift */,
+				DE615004EB22E1F564BAEEC8 /* OfflineInfoSheet.swift */,
 				2D0DC0C876E0AE5447A36475 /* OfflineStatusBar.swift */,
 				D05E8A22B7751E78E33EBC02 /* OfflineStore.swift */,
 				768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */,
@@ -345,11 +354,11 @@
 				A9EB6980116C8080A7ADF85D /* SyncEngine.swift */,
 				4F669D17F23A1AEDB491BF1F /* TransactionFilterView.swift */,
 				223C215A93C8B4A390E17F34 /* TransactionFormView.swift */,
-				701EBD4C3630ED53D0C78911 /* TransactionRegisterView.swift */,
+				3F7302E5237413BF6107E4CE /* TransactionFormView+Delete.swift */,
 				8C335B228DAD2B9C1F3DD183 /* TransactionRow.swift */,
 				192A9246EB85747C42D7E97D /* TransactionsListView.swift */,
 				8E0C66C1771B2C113D912E35 /* TransactionsListView+Loading.swift */,
-				449EE6DD8C7A3D022AB8219E /* TransactionsListView+NeedsReview.swift */,
+				C00320C6876E1B14C807E478 /* TransactionsListView+Period.swift */,
 				B88C7E86C0F680D0F63F4135 /* TransferDivergenceAlert.swift */,
 				D2EFC21F0C8C59B19FFD185A /* UUID+Identifiable.swift */,
 				CDA9FDB15C2C5D6B5B18466D /* WalletAutomationGuideView.swift */,
@@ -541,8 +550,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				23E7D1393EAD719BE66438BF /* AccountFormView.swift in Sources */,
+				7D30C1E73CAD87BAF1224099 /* AccountLocalWrite.swift in Sources */,
 				A5FFBD48BD9FE9D8281754EE /* AccountsListView.swift in Sources */,
 				1258AEE2BE84DBE4A3238432 /* AppSettings.swift in Sources */,
+				910929EACA4D7E2B7840D626 /* ArchiveAccountsView.swift in Sources */,
 				9330F41C8C3EC71EEC94610F /* AutomationsView.swift in Sources */,
 				6A667687CB7EC9234BAAE2E6 /* BalanceHeaderView.swift in Sources */,
 				01CC7E812F03C9F7D9E6E79F /* BalanceReminderScheduler.swift in Sources */,
@@ -561,15 +572,13 @@
 				E9B90B45B2064ED05EA757BE /* CurrencyConversionLabel.swift in Sources */,
 				7C5F40F75BBB39A3364D07AD /* DataPrivacyView.swift in Sources */,
 				45123E973A54142DB5AD78C9 /* ExportView.swift in Sources */,
-				E8F2B176E85370E38B4283F9 /* FISettingsView.swift in Sources */,
 				07757F6F5323860A58AB2EF0 /* HomeView.swift in Sources */,
 				B54F02C80D3D973B33154960 /* HouseholdView.swift in Sources */,
 				A6774885935170E1206B4D19 /* HouseholdViewLoader.swift in Sources */,
-				F10227EA22BFB76AB57DF555 /* InsightsView.swift in Sources */,
 				04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */,
 				B627DB442B79800AE401940B /* LocalAccountRow.swift in Sources */,
 				203E3DE0C583D51FFA3CC973 /* LocalMoneyConversion.swift in Sources */,
-				4AB6686801726DAB9101FF2B /* LocalMoneyConversionFI.swift in Sources */,
+				4917BE825C6565670031AF5F /* LocalMoneyConversionBudget.swift in Sources */,
 				D2249999B755B75AF3BA291E /* LocalMoneyQueries.swift in Sources */,
 				B7A28835CF97300D93A8A733 /* LocalMoneyTypes.swift in Sources */,
 				D5BF43435891F0747B331635 /* LocalStore.swift in Sources */,
@@ -577,9 +586,12 @@
 				2BEA2658AA22E03CB9ACAE5A /* LocalTransactionRow.swift in Sources */,
 				3233B01CD185C2B402C691F8 /* MetricKitSubscriber.swift in Sources */,
 				720AA92A68E578F823FA5F4D /* NeedsReviewView.swift in Sources */,
+				C31584818223B578BF4B42FD /* NetWorthChartView.swift in Sources */,
+				B95EF6554B1C4939A18561C3 /* NetWorthDetailView.swift in Sources */,
 				989AC18F0909238D156D83B1 /* NetworkMonitor.swift in Sources */,
 				E08BF0F46CB847CE79E85D6E /* NotificationSettingsView.swift in Sources */,
 				7DCDB64122A2891105C7C10F /* OTPSignInView.swift in Sources */,
+				21D7B4F8764655E5F17DFD75 /* OfflineInfoSheet.swift in Sources */,
 				4A9BA5608EA3BB156B3E71AE /* OfflineStatusBar.swift in Sources */,
 				81727031FB03BFD0EC3CC42D /* OfflineStore.swift in Sources */,
 				D870CF193CABA5CA3A2B649C /* OnboardingView.swift in Sources */,
@@ -604,11 +616,11 @@
 				C2B619C3EC87A5847A00EAE4 /* SyncCursorStore.swift in Sources */,
 				A90857943ADABEFB25B44996 /* SyncEngine.swift in Sources */,
 				8BF5404657D72CE37547C10A /* TransactionFilterView.swift in Sources */,
+				8418D67FD7BAB31C6629EE5B /* TransactionFormView+Delete.swift in Sources */,
 				F3CCB559F93565682DBAE498 /* TransactionFormView.swift in Sources */,
-				0A2E011E2D6FAEDA3B077CBE /* TransactionRegisterView.swift in Sources */,
 				E6D1468DE51E2DA7DD7B71CA /* TransactionRow.swift in Sources */,
 				35FBFA6ED12189BE76D60F92 /* TransactionsListView+Loading.swift in Sources */,
-				B2972500ABD0C917D1224199 /* TransactionsListView+NeedsReview.swift in Sources */,
+				81C18CDDD1C078398AC45EE8 /* TransactionsListView+Period.swift in Sources */,
 				E4AE632568A815AAFE48026F /* TransactionsListView.swift in Sources */,
 				CA42FD39D7ED2C1AA7DDD329 /* TransferDivergenceAlert.swift in Sources */,
 				B3D55B77F4EB1B1F699789EB /* UUID+Identifiable.swift in Sources */,

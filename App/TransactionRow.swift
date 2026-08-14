@@ -1,10 +1,9 @@
 import KeepoCore
 import SwiftUI
 
-/// Shared by `TransactionsListView`'s Recent section and
-/// `TransactionRegisterView`'s full history — the same row rendering
-/// (category icon, currency conversion label, privacy mode) in one place
-/// rather than two copies.
+/// Shared by every transaction row in `TransactionsListView` — the same row
+/// rendering (category icon, currency conversion label, privacy mode) in
+/// one place.
 struct TransactionRow: View {
     let transaction: PublicSchema.TransactionsWithDetailsSelect
     var category: PublicSchema.CategoriesSelect?
@@ -17,11 +16,7 @@ struct TransactionRow: View {
     var body: some View {
         HStack {
             if isTransfer {
-                CategoryIconView(category: nil).overlay {
-                    Image(systemName: "arrow.left.arrow.right")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white)
-                }
+                CategoryIconView(icon: "arrow.left.arrow.right", color: Color.gray)
             } else {
                 CategoryIconView(category: category)
             }

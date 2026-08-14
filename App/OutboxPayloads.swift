@@ -158,10 +158,12 @@ public struct CreateAccountPayload: Codable, Sendable {
     public let name: String
     public let currency: String
     public let openingBalanceE4: Int64
+    public let icon: String
+    public let color: String
 
     public init(
         id: UUID, ownerId: UUID, kind: PublicSchema.AccountKind, subtype: PublicSchema.AccountSubtype,
-        name: String, currency: String, openingBalanceE4: Int64
+        name: String, currency: String, openingBalanceE4: Int64, icon: String, color: String
     ) {
         self.id = id
         self.ownerId = ownerId
@@ -170,6 +172,8 @@ public struct CreateAccountPayload: Codable, Sendable {
         self.name = name
         self.currency = currency
         self.openingBalanceE4 = openingBalanceE4
+        self.icon = icon
+        self.color = color
     }
 }
 
@@ -180,11 +184,12 @@ public struct UpdateAccountPayload: Codable, Sendable {
     public let subtype: PublicSchema.AccountSubtype
     public let openingBalanceE4: Int64
     public let includeInTotal: Bool
-    public let countsTowardFi: Bool
+    public let icon: String
+    public let color: String
 
     public init(
         id: UUID, expectedVersion: Int, name: String, subtype: PublicSchema.AccountSubtype,
-        openingBalanceE4: Int64, includeInTotal: Bool, countsTowardFi: Bool
+        openingBalanceE4: Int64, includeInTotal: Bool, icon: String, color: String
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
@@ -192,7 +197,8 @@ public struct UpdateAccountPayload: Codable, Sendable {
         self.subtype = subtype
         self.openingBalanceE4 = openingBalanceE4
         self.includeInTotal = includeInTotal
-        self.countsTowardFi = countsTowardFi
+        self.icon = icon
+        self.color = color
     }
 }
 

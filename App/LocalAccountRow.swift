@@ -16,6 +16,8 @@ struct LocalAccountRow: Identifiable {
     let currency: String
     let currencyInfo: CurrencyInfo
     let kind: PublicSchema.AccountKind
+    let icon: String
+    let color: String
     let archivedAt: String?
     let version: Int
     let isShared: Bool
@@ -27,7 +29,7 @@ struct LocalAccountRow: Identifiable {
         let accounts = try Row.fetchAll(
             database,
             sql: """
-            SELECT id, name, currency, kind, archived_at, version FROM accounts
+            SELECT id, name, currency, kind, icon, color, archived_at, version FROM accounts
             WHERE deleted_at IS NULL AND (
                 owner_id = ? OR id IN (
                     SELECT ha.account_id FROM household_accounts ha
@@ -60,7 +62,8 @@ struct LocalAccountRow: Identifiable {
             return LocalAccountRow(
                 id: UUID(uuidString: accountId) ?? UUID(), name: row["name"], currency: currency,
                 currencyInfo: CurrencyInfo(code: currency, minorUnit: currencies[currency] ?? 2),
-                kind: PublicSchema.AccountKind(rawValue: kindRaw) ?? .ledger, archivedAt: row["archived_at"],
+                kind: PublicSchema.AccountKind(rawValue: kindRaw) ?? .ledger,
+                icon: row["icon"], color: row["color"], archivedAt: row["archived_at"],
                 version: row["version"], isShared: sharedIds.contains(accountId), balanceE4: balance,
                 balanceBaseE4: balanceBase,
                 baseCurrencyInfo: baseMinorUnit.map { CurrencyInfo(code: baseCurrency, minorUnit: $0) }

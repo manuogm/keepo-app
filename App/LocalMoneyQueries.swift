@@ -129,7 +129,7 @@ enum LocalMoneyQueries {
         return PostgresDate.sqliteTimestampBoundaryString(min(nextDay, now))
     }
 
-    // MARK: - scope filtering (net worth / insights / FI share this predicate)
+    // MARK: - scope filtering
 
     /// Mirrors the `(p_scope = 'me' and not exists (...)) or (p_scope =
     /// 'household' and exists (...)) or p_scope = 'total'` clause repeated
@@ -148,68 +148,9 @@ enum LocalMoneyQueries {
         }
     }
 
-    // MARK: - insights: native transaction rows
-
-    /// Every confirmed, non-deleted, categorized transaction in `[from,
-    /// through]` (inclusive, by calendar day), native currency, scoped —
-    /// the shared row source for `spendingByCategory`/`incomeExpenseSeries`/
-    /// `savingsRate`/`fiMetrics`' income+expense component, each of which
-    /// groups and converts it differently in `LocalMoneyConversion`.
-    static func categorizedNativeTransactions(
-        _ database: Database, scope: PublicSchema.AccountScope, from: String, through: String,
-        categoryKind: String? = nil
-    ) throws -> [NativeCategorizedTransaction] {
-        var sql = """
-        SELECT amount_e4, currency, substr(occurred_at, 1, 10) AS occurred_date, category_id, category_kind
-        FROM transactions
-        WHERE deleted_at IS NULL AND status = 'confirmed' AND category_id IS NOT NULL
-          AND substr(occurred_at, 1, 10) BETWEEN ? AND ?
-          AND (\(scopeFilterSQL(scope, accountIdColumn: "account_id")))
-        """
-        var arguments: [DatabaseValueConvertible] = [from, through]
-        if let categoryKind {
-            sql += " AND category_kind = ?"
-            arguments.append(categoryKind)
-        }
-        return try Row.fetchAll(database, sql: sql, arguments: StatementArguments(arguments)).map {
-            NativeCategorizedTransaction(
-                amountE4: $0["amount_e4"], currency: $0["currency"], occurredDate: $0["occurred_date"],
-                categoryId: $0["category_id"], categoryKind: $0["category_kind"]
-            )
-        }
-    }
-
     static func categoryNames(_ database: Database) throws -> [String: String] {
         let rows = try Row.fetchAll(database, sql: "SELECT id, name FROM categories")
         return Dictionary(uniqueKeysWithValues: rows.map { ($0["id"] as String, $0["name"] as String) })
-    }
-
-    // MARK: - unrealized_gain (single account, single currency — exact in SQL)
-
-    /// Port of `unrealized_gain(p_account_id)` — `nil` when the account has
-    /// no snapshot yet (money rule 5), exact bigint subtraction, no FX
-    /// involved (a valuation account's snapshot and its transfers always
-    /// share one currency).
-    static func unrealizedGain(_ database: Database, accountId: String) throws -> Int64? {
-        guard let latest = try Row.fetchOne(
-            database,
-            sql: """
-            SELECT value_e4 FROM balance_snapshots WHERE account_id = ?
-            ORDER BY as_of DESC, created_at DESC LIMIT 1
-            """,
-            arguments: [accountId]
-        ) else { return nil }
-
-        let transferred: Int64 = try Int64.fetchOne(
-            database,
-            sql: """
-            SELECT COALESCE(SUM(amount_e4), 0) FROM transactions
-            WHERE account_id = ? AND deleted_at IS NULL AND status = 'confirmed'
-            """,
-            arguments: [accountId]
-        ) ?? 0
-        let snapshotValue: Int64 = latest["value_e4"]
-        return snapshotValue - transferred
     }
 
     // MARK: - needs_review (no money conversion at all — a straight port)
@@ -280,15 +221,6 @@ struct NativeAccountBalance {
     /// `nil` propagates money rule 5 — a valuation account with no snapshot
     /// yet has no computable balance, never a `0`.
     let balanceE4: Int64?
-}
-
-struct NativeCategorizedTransaction {
-    let amountE4: Int64
-    let currency: String
-    /// `YYYY-MM-DD`, the exact key `fx_rate_on`/Postgres's `occurred_at::date` uses.
-    let occurredDate: String
-    let categoryId: String?
-    let categoryKind: String?
 }
 
 struct NeedsReviewLocalRow {

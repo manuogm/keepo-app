@@ -17,29 +17,11 @@ let utcCalendar: Calendar = {
     return calendar
 }()
 
-/// Postgres's `date_trunc('week', ts)` truncates to Monday, ISO 8601
-/// style — `Calendar(identifier: .iso8601)` is exactly that convention
-/// (Monday first day of week), unlike the default Gregorian calendar's
-/// locale-dependent first weekday.
-let isoCalendar: Calendar = {
-    var calendar = Calendar(identifier: .iso8601)
-    calendar.timeZone = utcTimeZone
-    return calendar
-}()
-
 /// `TimeZone(identifier:)` is technically failable, but "UTC" is a
 /// guaranteed-valid IANA identifier on every platform this app ships to —
 /// the fallback chain avoids a force-unwrap without pretending the
 /// fallback path can actually be exercised.
 private let utcTimeZone = TimeZone(identifier: "UTC") ?? TimeZone(secondsFromGMT: 0) ?? .current
-
-func monthStart(_ date: Date) -> Date {
-    utcCalendar.dateInterval(of: .month, for: date)?.start ?? date
-}
-
-func weekStart(_ date: Date) -> Date {
-    isoCalendar.dateInterval(of: .weekOfYear, for: date)?.start ?? date
-}
 
 // MARK: - accumulator
 
@@ -69,19 +51,6 @@ struct RunningTotal {
 
 // MARK: - result types
 
-struct CategorySpendingLocal {
-    let categoryId: String
-    let categoryName: String
-    let totalE4: Int64?
-    let currency: String
-}
-
-struct IncomeExpensePointLocal {
-    let bucketStart: String
-    let incomeE4: Int64?
-    let expenseE4: Int64?
-}
-
 struct BudgetProgressLocal {
     let budgetId: String
     let categoryId: String?
@@ -89,20 +58,4 @@ struct BudgetProgressLocal {
     let budgetedE4: Int64?
     let spentE4: Int64?
     let currency: String
-}
-
-struct FIMetricsLocal {
-    let annualSpendE4: Int64?
-    let fiNumberE4: Int64?
-    let currentNetWorthE4: Int64?
-    let percentProgress: Decimal?
-    let annualSavingsE4: Int64?
-    let yearsToFi: Double?
-    let coastFiNumberE4: Int64?
-}
-
-struct FISettingsLocal {
-    let targetSpendE4: Int64?
-    let withdrawalRateDecimal: Decimal?
-    let realReturnRate: Double
 }

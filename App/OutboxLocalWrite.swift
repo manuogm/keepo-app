@@ -162,7 +162,8 @@ enum OutboxLocalWrite {
                 "subtype": .string(payload.subtype.rawValue), "name": .string(payload.name),
                 "currency": .string(payload.currency), "opening_balance_e4": .integer(Int(payload.openingBalanceE4)),
                 "opening_balance_at": .string(today), "include_in_total": .bool(true),
-                "counts_toward_fi": .bool(true), "version": .integer(1), "created_at": .string(now),
+                "icon": .string(payload.icon), "color": .string(payload.color),
+                "version": .integer(1), "created_at": .string(now),
                 "updated_at": .string(now), "sync_seq": .integer(0)
             ],
             table: "accounts", in: database
@@ -186,7 +187,8 @@ enum OutboxLocalWrite {
                 "id": .string(payload.id.uuidString), "name": .string(payload.name),
                 "subtype": .string(payload.subtype.rawValue),
                 "opening_balance_e4": .integer(Int(payload.openingBalanceE4)),
-                "include_in_total": .bool(payload.includeInTotal), "counts_toward_fi": .bool(payload.countsTowardFi),
+                "include_in_total": .bool(payload.includeInTotal),
+                "icon": .string(payload.icon), "color": .string(payload.color),
                 "version": .integer(payload.expectedVersion + 1), "updated_at": .string(now)
             ],
             table: "accounts", in: database

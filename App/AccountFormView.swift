@@ -25,11 +25,14 @@ struct AccountFormView: View {
     @State private var currency = ""
     @State private var openingBalanceText = ""
     @State private var includeInTotal = true
-    @State private var countsTowardFi = true
+    @State private var icon = AccountAppearance.pickerIcons[0]
+    @State private var color = Color(hex: CategoryAppearance.randomColor())
 
     @State private var editingId: UUID?
     @State private var editingVersion: Int?
     @State private var editingKind: PublicSchema.AccountKind?
+    @State private var editingArchivedAt: String?
+    @State private var showArchiveConfirm = false
 
     @State private var isLoading = true
     @State private var isSaving = false
@@ -126,9 +129,30 @@ struct AccountFormView: View {
                         }
                     }
 
+                    Section("Icon") {
+                        iconGrid
+                    }
+
+                    Section("Color") {
+                        ColorPicker("Account Color", selection: $color, supportsOpacity: false)
+                    }
+
                     Section {
                         Toggle("Include in totals", isOn: $includeInTotal)
-                        Toggle("Counts toward FI", isOn: $countsTowardFi)
+                    }
+
+                    if isEditing {
+                        Section {
+                            Button(role: .destructive) {
+                                if editingArchivedAt == nil {
+                                    showArchiveConfirm = true
+                                } else {
+                                    Task { await setArchived(false) }
+                                }
+                            } label: {
+                                Text(editingArchivedAt == nil ? "Archive Account" : "Unarchive Account")
+                            }
+                        }
                     }
 
                     if let errorMessage {
@@ -153,8 +177,39 @@ struct AccountFormView: View {
                     .disabled(isSaveDisabled)
                 }
             }
+            .alert("Archive \"\(name)\"?", isPresented: $showArchiveConfirm) {
+                Button("Archive", role: .destructive) {
+                    Task { await setArchived(true) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "Archiving an account will remove it from your total balance but will not delete "
+                        + "the account or the transactions associated."
+                )
+            }
         }
         .task { await load() }
+    }
+
+    @ViewBuilder
+    private var iconGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+            ForEach(AccountAppearance.pickerIcons, id: \.self) { candidate in
+                Button {
+                    icon = candidate
+                } label: {
+                    Image(systemName: candidate)
+                        .font(.title3)
+                        .frame(width: 36, height: 36)
+                        .foregroundStyle(icon == candidate ? Color.white : Color.primary)
+                        .background(icon == candidate ? color : Color(.systemGray5))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     private func label(for subtype: PublicSchema.AccountSubtype) -> String {
@@ -217,11 +272,13 @@ struct AccountFormView: View {
         editingId = account.id
         editingVersion = Int(account.version)
         editingKind = account.kind
+        editingArchivedAt = account.archivedAt
         name = account.name
         subtype = account.subtype
         currency = account.currency
         includeInTotal = account.includeInTotal
-        countsTowardFi = account.countsTowardFi
+        icon = account.icon
+        color = Color(hex: account.color)
         openingBalanceText = AmountFormatter.editableString(
             account.openingBalanceE4, minorUnit: selectedCurrencyMinorUnit
         )
@@ -265,7 +322,8 @@ extension AccountFormView {
         let kind: PublicSchema.AccountKind = subtype == .investment ? .valuation : .ledger
         let payload = CreateAccountPayload(
             id: UUID(), ownerId: userId, kind: kind, subtype: subtype,
-            name: name, currency: currency, openingBalanceE4: openingBalanceE4
+            name: name, currency: currency, openingBalanceE4: openingBalanceE4,
+            icon: icon, color: color.hexString ?? CategoryAppearance.randomColor()
         )
         await session.outbox.submitCreateAccount(payload)
     }
@@ -277,9 +335,22 @@ extension AccountFormView {
         }
         let payload = UpdateAccountPayload(
             id: id, expectedVersion: expectedVersion, name: name, subtype: subtype,
-            openingBalanceE4: openingBalanceE4, includeInTotal: includeInTotal, countsTowardFi: countsTowardFi
+            openingBalanceE4: openingBalanceE4, includeInTotal: includeInTotal,
+            icon: icon, color: color.hexString ?? CategoryAppearance.randomColor()
         )
         await session.outbox.submitUpdateAccount(payload)
+    }
+
+    /// The "twin button" archive/unarchive inside the edit sheet, alongside
+    /// the existing swipe action on `AccountsListView` — same
+    /// `archive_account` RPC either way, just a second entry point for
+    /// users who don't discover swipe gestures.
+    fileprivate func setArchived(_ archived: Bool) async {
+        guard let id = editingId, let expectedVersion = editingVersion else { return }
+        let payload = ArchiveAccountPayload(id: id, expectedVersion: expectedVersion, archived: archived)
+        await session.outbox.submitArchiveAccount(payload)
+        onSaved()
+        dismiss()
     }
 
     /// A separate action from Save, on purpose — "this account is worth X

@@ -25,7 +25,9 @@ struct TransactionFormView: View {
         case transfer = "Transfer"
     }
 
-    @Environment(\.dismiss) private var dismiss
+    // Not `private` — read from TransactionFormView+Delete.swift, an
+    // extension in a different file (kept there purely for file-length).
+    @Environment(\.dismiss) var dismiss
 
     @State private var kind: Kind = .expense
     @State private var accounts: [LocalAccountRow] = []
@@ -41,15 +43,15 @@ struct TransactionFormView: View {
     @State private var receivedAmountText = ""
 
     // Edit-mode versions the save call sends back for lost-update detection.
-    @State private var editingId: UUID?
-    @State private var editingFromVersion: Int?
-    @State private var editingToVersion: Int?
-    @State private var editingTransferGroupId: UUID?
+    @State var editingId: UUID?
+    @State var editingFromVersion: Int?
+    @State var editingToVersion: Int?
+    @State var editingTransferGroupId: UUID?
     // created_by (who entered it) differs from the viewer on a shared account.
     @State private var addedByHouseholdMember = false
 
-    @State private var isSaving = false
-    @State private var errorMessage: String?
+    @State var isSaving = false
+    @State var errorMessage: String?
     @State private var divergenceWarning: RateDivergence?
     @State private var transferDivergenceConfirmed = false
 
@@ -129,6 +131,18 @@ struct TransactionFormView: View {
                     Text(errorMessage)
                         .font(.footnote)
                         .foregroundStyle(.red)
+                }
+
+                // Standard practice whenever a swipe-action exists elsewhere
+                // for the same object (the list's swipe-to-delete) — not
+                // every user discovers the gesture.
+                if isEditing {
+                    Section {
+                        Button("Delete Transaction", role: .destructive) {
+                            Task { await deleteTransaction() }
+                        }
+                        .disabled(isSaving)
+                    }
                 }
             }
             .navigationTitle(isEditing ? "Edit \(kind.rawValue)" : "New \(kind.rawValue)")
@@ -367,5 +381,4 @@ extension TransactionFormView {
         )
         await session.outbox.submitUpdateTransfer(payload)
     }
-
 }

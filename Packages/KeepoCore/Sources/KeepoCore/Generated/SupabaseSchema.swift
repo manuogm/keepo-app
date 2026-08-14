@@ -66,11 +66,12 @@ public enum PublicSchema {
   }
   public struct AccountsSelect: Codable, Hashable, Sendable {
     public let archivedAt: String?
-    public let countsTowardFi: Bool
+    public let color: String
     public let createdAt: String
     public let createdBy: UUID
     public let currency: String
     public let deletedAt: String?
+    public let icon: String
     public let id: UUID
     public let includeInTotal: Bool
     public let kind: AccountKind
@@ -84,11 +85,12 @@ public enum PublicSchema {
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
       case archivedAt = "archived_at"
-      case countsTowardFi = "counts_toward_fi"
+      case color = "color"
       case createdAt = "created_at"
       case createdBy = "created_by"
       case currency = "currency"
       case deletedAt = "deleted_at"
+      case icon = "icon"
       case id = "id"
       case includeInTotal = "include_in_total"
       case kind = "kind"
@@ -104,11 +106,12 @@ public enum PublicSchema {
   }
   public struct AccountsInsert: Codable, Hashable, Sendable {
     public let archivedAt: String?
-    public let countsTowardFi: Bool?
+    public let color: String?
     public let createdAt: String?
     public let createdBy: UUID
     public let currency: String
     public let deletedAt: String?
+    public let icon: String?
     public let id: UUID?
     public let includeInTotal: Bool?
     public let kind: AccountKind
@@ -122,11 +125,12 @@ public enum PublicSchema {
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case archivedAt = "archived_at"
-      case countsTowardFi = "counts_toward_fi"
+      case color = "color"
       case createdAt = "created_at"
       case createdBy = "created_by"
       case currency = "currency"
       case deletedAt = "deleted_at"
+      case icon = "icon"
       case id = "id"
       case includeInTotal = "include_in_total"
       case kind = "kind"
@@ -142,11 +146,12 @@ public enum PublicSchema {
   }
   public struct AccountsUpdate: Codable, Hashable, Sendable {
     public let archivedAt: String?
-    public let countsTowardFi: Bool?
+    public let color: String?
     public let createdAt: String?
     public let createdBy: UUID?
     public let currency: String?
     public let deletedAt: String?
+    public let icon: String?
     public let id: UUID?
     public let includeInTotal: Bool?
     public let kind: AccountKind?
@@ -160,11 +165,12 @@ public enum PublicSchema {
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case archivedAt = "archived_at"
-      case countsTowardFi = "counts_toward_fi"
+      case color = "color"
       case createdAt = "created_at"
       case createdBy = "created_by"
       case currency = "currency"
       case deletedAt = "deleted_at"
+      case icon = "icon"
       case id = "id"
       case includeInTotal = "include_in_total"
       case kind = "kind"
@@ -668,60 +674,6 @@ public enum PublicSchema {
       case id = "id"
       case ownerId = "owner_id"
       case rowCount = "row_count"
-    }
-  }
-  public struct FiSettingsSelect: Codable, Hashable, Sendable {
-    public let deletedAt: String?
-    public let ownerId: UUID
-    public let realReturnRate: Decimal
-    public let syncSeq: Int64
-    public let targetAnnualSpendE4: Int64?
-    public let updatedAt: String
-    public let withdrawalRate: Decimal
-    public enum CodingKeys: String, CodingKey {
-      case deletedAt = "deleted_at"
-      case ownerId = "owner_id"
-      case realReturnRate = "real_return_rate"
-      case syncSeq = "sync_seq"
-      case targetAnnualSpendE4 = "target_annual_spend_e4"
-      case updatedAt = "updated_at"
-      case withdrawalRate = "withdrawal_rate"
-    }
-  }
-  public struct FiSettingsInsert: Codable, Hashable, Sendable {
-    public let deletedAt: String?
-    public let ownerId: UUID
-    public let realReturnRate: Decimal?
-    public let syncSeq: Int64?
-    public let targetAnnualSpendE4: Int64?
-    public let updatedAt: String?
-    public let withdrawalRate: Decimal?
-    public enum CodingKeys: String, CodingKey {
-      case deletedAt = "deleted_at"
-      case ownerId = "owner_id"
-      case realReturnRate = "real_return_rate"
-      case syncSeq = "sync_seq"
-      case targetAnnualSpendE4 = "target_annual_spend_e4"
-      case updatedAt = "updated_at"
-      case withdrawalRate = "withdrawal_rate"
-    }
-  }
-  public struct FiSettingsUpdate: Codable, Hashable, Sendable {
-    public let deletedAt: String?
-    public let ownerId: UUID?
-    public let realReturnRate: Decimal?
-    public let syncSeq: Int64?
-    public let targetAnnualSpendE4: Int64?
-    public let updatedAt: String?
-    public let withdrawalRate: Decimal?
-    public enum CodingKeys: String, CodingKey {
-      case deletedAt = "deleted_at"
-      case ownerId = "owner_id"
-      case realReturnRate = "real_return_rate"
-      case syncSeq = "sync_seq"
-      case targetAnnualSpendE4 = "target_annual_spend_e4"
-      case updatedAt = "updated_at"
-      case withdrawalRate = "withdrawal_rate"
     }
   }
   public struct ForkHandledTablesSelect: Codable, Hashable, Sendable {
@@ -1623,9 +1575,10 @@ public enum PublicSchema {
     public let balanceE4: Int64?
     public let baseCurrency: String?
     public let baseMinorUnit: Int16?
-    public let countsTowardFi: Bool?
+    public let color: String?
     public let currency: String?
     public let hasMissingRate: Bool?
+    public let icon: String?
     public let includeInTotal: Bool?
     public let isShared: Bool?
     public let kind: AccountKind?
@@ -1640,9 +1593,10 @@ public enum PublicSchema {
       case balanceE4 = "balance_e4"
       case baseCurrency = "base_currency"
       case baseMinorUnit = "base_minor_unit"
-      case countsTowardFi = "counts_toward_fi"
+      case color = "color"
       case currency = "currency"
       case hasMissingRate = "has_missing_rate"
+      case icon = "icon"
       case includeInTotal = "include_in_total"
       case isShared = "is_shared"
       case kind = "kind"

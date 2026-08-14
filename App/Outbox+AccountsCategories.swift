@@ -14,7 +14,7 @@ extension LiveOutboxSender {
             try await AccountRepository.create(
                 client: client, id: payload.id, ownerId: payload.ownerId, kind: payload.kind,
                 subtype: payload.subtype, name: payload.name, currency: payload.currency,
-                openingBalanceE4: payload.openingBalanceE4
+                openingBalanceE4: payload.openingBalanceE4, icon: payload.icon, color: payload.color
             )
         } catch {
             // A retried create that already landed hits `accounts`' primary
@@ -34,7 +34,7 @@ extension LiveOutboxSender {
         let result = try await AccountRepository.update(
             client: client, id: payload.id, expectedVersion: payload.expectedVersion, name: payload.name,
             subtype: payload.subtype, openingBalanceE4: payload.openingBalanceE4,
-            includeInTotal: payload.includeInTotal, countsTowardFi: payload.countsTowardFi
+            includeInTotal: payload.includeInTotal, icon: payload.icon, color: payload.color
         )
         switch result {
         case .saved: return true
