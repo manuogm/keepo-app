@@ -167,10 +167,18 @@ public final class SessionStore {
             }
         } else {
             // First-ever login on this device: nothing local to render yet,
-            // so this is the one case genuinely worth waiting on.
+            // so this is the one case genuinely worth waiting on. But
+            // `refreshProfile()` alone already flips `phase` to `.ready`
+            // (a returning user's profile is already onboarded) — the
+            // TabView mounts and every screen's `.task` fires *before* the
+            // pull below has put anything into the still-empty local
+            // mirror, same gap as the branch above. Bump once the pull
+            // actually lands data, or every screen shows "—" until a
+            // manual tab switch happens to re-trigger its load.
             try await refreshProfile()
             await outbox.drainAll()
             await syncEngine?.pull()
+            refresh.bump()
         }
     }
 

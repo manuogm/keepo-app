@@ -163,12 +163,7 @@ struct ConflictDetailSheet: View {
             Button {
                 Task { await keepServer() }
             } label: {
-                VStack(spacing: 2) {
-                    Text("Keep What's Saved").frame(maxWidth: .infinity)
-                    Text("Discard your change on this device")
-                        .font(.caption2)
-                        .opacity(0.8)
-                }
+                Text("Keep What's Saved").frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .disabled(isWorking)
@@ -177,21 +172,11 @@ struct ConflictDetailSheet: View {
                 Button {
                     Task { await keepMine() }
                 } label: {
-                    VStack(spacing: 2) {
-                        Text("Keep My Change").frame(maxWidth: .infinity)
-                        Text("Overwrite what's saved with this device's version")
-                            .font(.caption2)
-                            .opacity(0.8)
-                    }
+                    Text("Keep My Change").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(isWorking)
             }
-
-            Text("Closing without choosing leaves this in Needs Review — it won't resolve itself.")
-                .font(.caption2)
-                .foregroundStyle(Color.secondary)
-                .multilineTextAlignment(.center)
         }
         .padding()
     }

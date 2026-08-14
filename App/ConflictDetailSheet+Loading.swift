@@ -11,9 +11,22 @@ extension ConflictDetailSheet {
     /// fetches the server's row straight over the network (not the local
     /// mirror, which by definition hasn't caught up yet) to build the diff.
     func load() async {
-        guard let loaded = try? await session.dbQueue.read({ database in
+        var loaded = try? await session.dbQueue.read({ database in
             try ConflictLocalQueries.detail(database, id: conflictId.uuidString)
-        }) else {
+        })
+        // A conflict tile is only ever shown once it exists in the local
+        // mirror, but a pull that's still in flight at the exact moment the
+        // sheet opens (e.g. right after a fresh install) can leave a brief
+        // window where the row genuinely isn't there yet — indistinguishable
+        // locally from "already resolved." One retry after a pull rules
+        // that out before falling back to the empty state.
+        if loaded == nil {
+            await session.syncEngine?.pull()
+            loaded = try? await session.dbQueue.read({ database in
+                try ConflictLocalQueries.detail(database, id: conflictId.uuidString)
+            })
+        }
+        guard let loaded else {
             isLoading = false
             return
         }
