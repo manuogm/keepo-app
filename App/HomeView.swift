@@ -1,11 +1,11 @@
 import KeepoCore
 import SwiftUI
 
-/// Dashboard — hero net-worth card for the scope the user selected via
-/// `ScopeSwitcherButton`, plus a bell that opens the Needs Review inbox as a
-/// floating notifications panel. Scope lives in SessionStore so it persists
-/// across tab switches and drives every financial screen from the same
-/// source of truth.
+/// Home — hero net-worth card for the scope the user selected via the
+/// top-left "more options" button, plus a bell that opens the Needs Review
+/// inbox as a floating notifications panel. Scope lives in SessionStore so
+/// it persists across tab switches and drives every financial screen from
+/// the same source of truth.
 ///
 /// Reads straight off the local GRDB mirror (Phase L6) — no server round
 /// trip, no payload cache, no pending-write overlay. `Outbox`'s optimistic
@@ -23,8 +23,11 @@ struct HomeView: View {
     @State private var errorMessage: String?
     @State private var needsReviewCount = 0
     @State private var showNotifications = false
+    @State private var showScopeMenu = false
 
     private let rangeDays = 90
+
+    private var isOverlayPresented: Bool { showNotifications || showScopeMenu }
 
     var body: some View {
         ZStack {
@@ -47,15 +50,39 @@ struct HomeView: View {
                 }
                 .refreshable { await load() }
             }
+
+            // Both top-bar buttons present via `.popover` rather than a
+            // system `.sheet`, so neither gets the automatic background dim
+            // a sheet would apply — this overlay adds that dimming back
+            // manually. Purely visual: the popovers already dismiss on an
+            // outside tap on their own, so hit testing stays off here.
+            if isOverlayPresented {
+                Color.black.opacity(0.25)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
         }
-        .navigationTitle("Dashboard")
+        .animation(.easeInOut(duration: 0.2), value: isOverlayPresented)
+        .navigationTitle("Home")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                ScopeSwitcherButton(session: session)
+                Button {
+                    showScopeMenu = true
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                // Same anchored-popover pattern as the bell button below —
+                // grows from the button itself instead of rising as a sheet.
+                .popover(isPresented: $showScopeMenu) {
+                    scopeMenuContent
+                        .frame(width: 220)
+                        .presentationCompactAdaptation(.popover)
+                }
             }
             ToolbarItem(placement: .principal) {
-                ScreenTitleBar(title: "Dashboard", session: session)
+                ScreenTitleBar(title: "Home", session: session)
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -86,6 +113,43 @@ struct HomeView: View {
             }
         }
         .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
+    }
+
+    /// Rows keep their identity icon (globe/person/person.2) even when
+    /// selected — the checkmark is appended at the trailing edge instead of
+    /// replacing it, so which option is which stays visible at a glance.
+    private var scopeMenuContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            scopeRow(.total, label: "Total Net Worth", icon: "globe")
+            Divider()
+            scopeRow(.me, label: "Personal", icon: "person.fill")
+            Divider()
+            scopeRow(.household, label: "Household", icon: "person.2.fill")
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func scopeRow(_ scope: PublicSchema.AccountScope, label: String, icon: String) -> some View {
+        Button {
+            session.scope = scope
+            showScopeMenu = false
+        } label: {
+            HStack {
+                Image(systemName: icon)
+                    .frame(width: 20)
+                Text(label)
+                Spacer()
+                if session.scope == scope {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.primary)
     }
 
     private var netWorthCard: some View {

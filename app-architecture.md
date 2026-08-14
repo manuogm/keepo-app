@@ -35,7 +35,7 @@ Every write reaches Postgres through PostgREST/RPC, never a direct table write f
 | Household & Sharing | `households`, `household_members`, `household_accounts`, `household_invites` |
 | Sync Ritual | `reconciliations`, adjustment transactions, valuation snapshots |
 | Needs Review | `needs_review` view (§3) |
-| Dashboard | `net_worth()`, `account_balances`, `net_worth_daily`, Needs Review notifications panel |
+| Home | `net_worth()`, `account_balances`, `net_worth_daily`, Needs Review notifications panel |
 | Operations & Monitoring | `ops_events`, health-check functions, alerting Edge Function |
 
 ---
@@ -47,13 +47,13 @@ Every write reaches Postgres through PostgREST/RPC, never a direct table write f
 | Screen | Notes |
 |---|---|
 | Onboarding | Base currency → first account → opening balance → optional Wallet automation walkthrough |
-| Home (Dashboard) | Net-worth card (title, balance, month-over-month trend badge, axis-free chart colored/gradient-filled by trend) pushing to a full-chart detail screen; Total / Me / Household picker; bell icon opens the Needs Review inbox as a `.popover` anchored to the button (grows from it, not a rising sheet) |
+| Home | Tab labeled "Home" with the globe icon. Net-worth card (title, balance, month-over-month trend badge, axis-free chart colored/gradient-filled by trend) pushing to a full-chart detail screen. Top-left "more options" (•••) button and top-right bell both present as a `.popover` anchored to their button (grows from it, not a rising sheet) with a shared slight dark-curtain overlay behind whichever is open; the ••• popover is the Total/Personal/Household scope picker — each row keeps its identity icon (globe/person/person.2) and adds a trailing checkmark when selected, rather than swapping the icon out |
 | Accounts | List, add/edit, icon + color picker, archive (with confirmation). "Everyday" (`ledger`) and "Investments" (`valuation`) sections; archived accounts collapse to an "Archived (N)" link into a separate screen (My Profile → Data & Privacy → Data) with unarchive and non-reversible delete; archived accounts (and their transactions) never count toward net worth |
 | Transaction entry | One view, three kinds via segmented control — used for capture review, manual add, and edit; edit mode has an explicit "Delete Transaction" button alongside the list's swipe-to-delete |
 | Transactions | Single day-grouped list with a day/week/month/year/custom period picker up top; toolbar has a search button (on-demand full-width search bar) and a "+" |
 | Categories | Expense/income sections; the two default "Other" rows have no delete affordance |
 | Sync Ritual | Per-account freshness, enter-balance flow, unlogged adjustment |
-| Needs Review | One inbox, one row type per §3's `needs_review` view — surfaced from the Dashboard's bell, not its own tab |
+| Needs Review | One inbox, one row type per §3's `needs_review` view — surfaced from Home's bell, not its own tab |
 | Household | Members, invite, leave (with the fork confirmation) |
 | Import | CSV upload → match-and-review |
 | Settings | Base currency, appearance, security (export, delete), household |

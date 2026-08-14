@@ -39,7 +39,7 @@ struct RootView: View {
                     NavigationStack {
                         HomeView(session: session)
                     }
-                    .tabItem { Label("Dashboard", systemImage: "chart.line.uptrend.xyaxis") }
+                    .tabItem { Label("Home", systemImage: "globe") }
                     .badge(needsReviewCount > 0 ? needsReviewCount : 0)
 
                     NavigationStack {
