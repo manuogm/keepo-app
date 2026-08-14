@@ -68,8 +68,8 @@ struct CategoriesView: View {
                 session.refresh.bump()
             }
         }
-        .sheet(item: $editingCategoryId.map(EditingCategoryId.init)) { wrapped in
-            if let category = categories.first(where: { $0.id == wrapped.id }) {
+        .sheet(item: $editingCategoryId) { id in
+            if let category = categories.first(where: { $0.id == id }) {
                 CategoryFormView(session: session, mode: .edit(category)) {
                     session.refresh.bump()
                 }
@@ -107,22 +107,6 @@ struct CategoriesView: View {
             errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
-    }
-}
-
-/// `.sheet(item:)` needs an `Identifiable`; a bare `UUID?` binding isn't
-/// one — same wrapper AccountsListView already uses for the identical
-/// reason.
-private struct EditingCategoryId: Identifiable {
-    let id: UUID
-}
-
-private extension Binding where Value == UUID? {
-    func map(_ transform: @escaping (UUID) -> EditingCategoryId) -> Binding<EditingCategoryId?> {
-        Binding<EditingCategoryId?>(
-            get: { wrappedValue.map(transform) },
-            set: { wrappedValue = $0?.id }
-        )
     }
 }
 

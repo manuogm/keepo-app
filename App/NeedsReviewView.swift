@@ -18,7 +18,6 @@ struct NeedsReviewView: View {
     @State private var mappingCard: PublicSchema.NeedsReviewSelect?
     @State private var showCardMapping = false
     @State private var conflictId: UUID?
-    @State private var showConflictDetail = false
 
     var body: some View {
         ZStack {
@@ -66,11 +65,9 @@ struct NeedsReviewView: View {
                 }
             }
         }
-        .sheet(isPresented: $showConflictDetail) {
-            if let conflictId {
-                ConflictDetailSheet(session: session, conflictId: conflictId) {
-                    session.refresh.bump()
-                }
+        .sheet(item: $conflictId) { id in
+            ConflictDetailSheet(session: session, conflictId: id) {
+                session.refresh.bump()
             }
         }
     }
@@ -100,7 +97,6 @@ struct NeedsReviewView: View {
             } else if item.kind == "sync_conflict" {
                 Button {
                     conflictId = item.itemId
-                    showConflictDetail = true
                 } label: {
                     NeedsReviewRow(item: item, minorUnit: minorUnit(for: item.currency))
                 }

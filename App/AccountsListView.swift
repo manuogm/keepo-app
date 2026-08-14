@@ -93,8 +93,8 @@ struct AccountsListView: View {
                 session.refresh.bump()
             }
         }
-        .sheet(item: $editingAccountId.map(EditingAccountId.init)) { wrapped in
-            AccountFormView(session: session, mode: .edit(wrapped.id)) {
+        .sheet(item: $editingAccountId) { id in
+            AccountFormView(session: session, mode: .edit(id)) {
                 session.refresh.bump()
             }
         }
@@ -168,22 +168,6 @@ struct AccountsListView: View {
         let payload = ArchiveAccountPayload(id: row.id, expectedVersion: row.version, archived: archived)
         await session.outbox.submitArchiveAccount(payload)
         session.refresh.bump()
-    }
-}
-
-/// `.sheet(item:)` needs an `Identifiable`; a bare `UUID?` binding isn't
-/// one, and wrapping it locally is simpler than making `UUID` itself
-/// Identifiable app-wide for one call site.
-private struct EditingAccountId: Identifiable {
-    let id: UUID
-}
-
-private extension Binding where Value == UUID? {
-    func map(_ transform: @escaping (UUID) -> EditingAccountId) -> Binding<EditingAccountId?> {
-        Binding<EditingAccountId?>(
-            get: { wrappedValue.map(transform) },
-            set: { wrappedValue = $0?.id }
-        )
     }
 }
 

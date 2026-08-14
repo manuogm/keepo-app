@@ -39,7 +39,6 @@ struct TransactionsListView: View {
     @State var reviewMappingCard: PublicSchema.NeedsReviewSelect?
     @State var showReviewCardMapping = false
     @State var conflictId: UUID?
-    @State var showConflictDetail = false
 
     // MARK: - Computed
 
@@ -190,11 +189,9 @@ struct TransactionsListView: View {
                 }
             }
         }
-        .sheet(isPresented: $showConflictDetail) {
-            if let conflictId {
-                ConflictDetailSheet(session: session, conflictId: conflictId) {
-                    session.refresh.bump()
-                }
+        .sheet(item: $conflictId) { id in
+            ConflictDetailSheet(session: session, conflictId: id) {
+                session.refresh.bump()
             }
         }
         .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter)) { await load() }
