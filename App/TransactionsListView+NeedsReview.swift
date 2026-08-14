@@ -29,6 +29,14 @@ extension TransactionsListView {
                     NeedsReviewRow(item: item, minorUnit: reviewMinorUnit(for: item.currency))
                 }
                 .buttonStyle(.plain)
+            } else if item.kind == "sync_conflict" {
+                Button {
+                    conflictId = item.itemId
+                    showConflictDetail = true
+                } label: {
+                    NeedsReviewRow(item: item, minorUnit: reviewMinorUnit(for: item.currency))
+                }
+                .buttonStyle(.plain)
             } else {
                 NeedsReviewRow(item: item, minorUnit: reviewMinorUnit(for: item.currency))
             }

@@ -144,9 +144,12 @@ public struct DeleteTransferPayload: Codable, Sendable {
     }
 }
 
-/// Delete/archive are deliberately absent — both need a live server check
-/// (does this account still have transactions?) that a queued write can't
-/// answer truthfully offline, so they stay online-only (see AccountsListView).
+/// Delete is deliberately absent — it needs a live server check (does this
+/// account still have transactions?) that a queued write can't answer
+/// truthfully offline, so it stays online-only (see AccountsListView).
+/// Archive carries no such check (`archive_account` is a plain
+/// version-checked flag flip, confirmed against its own migration) — see
+/// `ArchiveAccountPayload` below, which does go through the outbox.
 public struct CreateAccountPayload: Codable, Sendable {
     public let id: UUID
     public let ownerId: UUID
@@ -250,5 +253,22 @@ public struct SetAccountBalancePayload: Codable, Sendable {
         self.accountId = accountId
         self.newBalanceE4 = newBalanceE4
         self.expectedVersion = expectedVersion
+    }
+}
+
+/// B: `archive_account` is a plain version-checked flag flip (no live
+/// "does this still have transactions" check — that requirement belongs to
+/// `delete_account` alone), so unlike delete it has nothing that needs a
+/// live server round-trip and goes through the outbox exactly like any
+/// other versioned account edit.
+public struct ArchiveAccountPayload: Codable, Sendable {
+    public let id: UUID
+    public let expectedVersion: Int
+    public let archived: Bool
+
+    public init(id: UUID, expectedVersion: Int, archived: Bool) {
+        self.id = id
+        self.expectedVersion = expectedVersion
+        self.archived = archived
     }
 }

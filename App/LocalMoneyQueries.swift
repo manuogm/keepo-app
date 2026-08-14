@@ -68,13 +68,26 @@ enum LocalMoneyQueries {
             return openingBalance + delta
         }
 
+        // Prefer the latest snapshot at-or-before asOf; if none exists, fall
+        // back to the account's earliest snapshot overall rather than
+        // returning nil for the account's entire pre-history — mirrors
+        // account_balance_on's own fallback (20260818100000), which keeps a
+        // ledger account computable via opening_balance_e4 in the same
+        // situation. Still nil if the account has no snapshot at all.
         guard let snapshot = try Row.fetchOne(
             database,
             sql: """
             SELECT id, value_e4, created_at FROM balance_snapshots
-            WHERE account_id = ? AND as_of <= ? ORDER BY as_of DESC, created_at DESC LIMIT 1
+            WHERE account_id = ?
+            ORDER BY
+                CASE WHEN as_of <= ? THEN 0 ELSE 1 END,
+                CASE WHEN as_of <= ? THEN as_of END DESC,
+                CASE WHEN as_of <= ? THEN created_at END DESC,
+                CASE WHEN as_of > ? THEN as_of END ASC,
+                CASE WHEN as_of > ? THEN created_at END ASC
+            LIMIT 1
             """,
-            arguments: [accountId, asOf]
+            arguments: [accountId, asOf, asOf, asOf, asOf, asOf]
         ) else { return nil }
 
         let snapshotValue: Int64 = snapshot["value_e4"]

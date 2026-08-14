@@ -20,7 +20,6 @@ struct TransactionsListView: View {
     @State var loadErrorMessage: String?
     @State var filterAccounts: [LocalAccountRow] = []
     @State var filterCategories: [PublicSchema.CategoriesSelect] = []
-    @State var showConflictAlert = false
     @State private var isAddingTransaction = false
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
     @State private var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
@@ -39,6 +38,8 @@ struct TransactionsListView: View {
     @State var showReviewEditing = false
     @State var reviewMappingCard: PublicSchema.NeedsReviewSelect?
     @State var showReviewCardMapping = false
+    @State var conflictId: UUID?
+    @State var showConflictDetail = false
 
     // MARK: - Computed
 
@@ -172,11 +173,6 @@ struct TransactionsListView: View {
         .sheet(isPresented: $isFilterSheetPresented) {
             TransactionFilterView(filter: $filter, accounts: filterAccounts, categories: filterCategories)
         }
-        .alert("This transaction changed elsewhere", isPresented: $showConflictAlert) {
-            Button("OK") {}
-        } message: {
-            Text("The list has been refreshed with the latest version.")
-        }
         .navigationDestination(isPresented: $showReviewEditing) {
             if let reviewEditingTransaction {
                 TransactionFormView(
@@ -190,6 +186,13 @@ struct TransactionsListView: View {
         .sheet(isPresented: $showReviewCardMapping) {
             if let reviewMappingCard {
                 MapCardSheet(session: session, item: reviewMappingCard) {
+                    session.refresh.bump()
+                }
+            }
+        }
+        .sheet(isPresented: $showConflictDetail) {
+            if let conflictId {
+                ConflictDetailSheet(session: session, conflictId: conflictId) {
                     session.refresh.bump()
                 }
             }

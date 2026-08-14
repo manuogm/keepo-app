@@ -50,6 +50,16 @@ extension LiveOutboxSender {
         return !result.conflict
     }
 
+    public func archiveAccount(_ payload: ArchiveAccountPayload) async throws -> Bool {
+        let result = try await AccountRepository.setArchived(
+            client: client, id: payload.id, expectedVersion: payload.expectedVersion, archived: payload.archived
+        )
+        switch result {
+        case .saved: return true
+        case .conflict: return false
+        }
+    }
+
     public func createCategory(_ payload: CreateCategoryPayload) async throws {
         do {
             try await CategoryRepository.create(
@@ -72,22 +82,29 @@ extension LiveOutboxSender {
 // MARK: - Outbox
 
 extension Outbox {
+    /// See the identical header comment on `Outbox.submitCreateTransaction`
+    /// (A) — every submit* here returns as soon as the local write-through
+    /// lands; the network attempt runs in the returned, un-awaited `Task`.
     @discardableResult
-    public func submitCreateAccount(_ payload: CreateAccountPayload) async -> OutboxSubmitResult {
+    public func submitCreateAccount(_ payload: CreateAccountPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.createAccount(payload, in: $0) }
-        return await attempt(id: payload.id, kind: .createAccount, payload: payload) {
-            try await self.sender.createAccount(payload)
-            return true
+        return Task {
+            await self.attempt(id: payload.id, kind: .createAccount, payload: payload) {
+                try await self.sender.createAccount(payload)
+                return true
+            }
         }
     }
 
     @discardableResult
-    public func submitUpdateAccount(_ payload: UpdateAccountPayload) async -> OutboxSubmitResult {
+    public func submitUpdateAccount(_ payload: UpdateAccountPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.updateAccount(payload, in: $0) }
-        return await attempt(
-            id: payload.id, kind: .updateAccount, payload: payload, expectedVersion: payload.expectedVersion
-        ) {
-            try await self.sender.updateAccount(payload)
+        return Task {
+            await self.attempt(
+                id: payload.id, kind: .updateAccount, payload: payload, expectedVersion: payload.expectedVersion
+            ) {
+                try await self.sender.updateAccount(payload)
+            }
         }
     }
 
@@ -99,28 +116,46 @@ extension Outbox {
     /// runs, in order; the net result still lands on the last-entered
     /// value, just via two adjustment transactions instead of one.
     @discardableResult
-    public func submitSetAccountBalance(_ payload: SetAccountBalancePayload) async -> OutboxSubmitResult {
+    public func submitSetAccountBalance(_ payload: SetAccountBalancePayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.setAccountBalance(payload, in: $0) }
-        return await attempt(id: payload.id, kind: .setAccountBalance, payload: payload) {
-            try await self.sender.setAccountBalance(payload)
+        return Task {
+            await self.attempt(id: payload.id, kind: .setAccountBalance, payload: payload) {
+                try await self.sender.setAccountBalance(payload)
+            }
         }
     }
 
     @discardableResult
-    public func submitCreateCategory(_ payload: CreateCategoryPayload) async -> OutboxSubmitResult {
+    public func submitArchiveAccount(_ payload: ArchiveAccountPayload) async -> Task<OutboxSubmitResult, Never> {
+        await applyLocally { try OutboxLocalWrite.archiveAccount(payload, in: $0) }
+        return Task {
+            await self.attempt(
+                id: payload.id, kind: .archiveAccount, payload: payload, expectedVersion: payload.expectedVersion
+            ) {
+                try await self.sender.archiveAccount(payload)
+            }
+        }
+    }
+
+    @discardableResult
+    public func submitCreateCategory(_ payload: CreateCategoryPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.createCategory(payload, in: $0) }
-        return await attempt(id: payload.id, kind: .createCategory, payload: payload) {
-            try await self.sender.createCategory(payload)
-            return true
+        return Task {
+            await self.attempt(id: payload.id, kind: .createCategory, payload: payload) {
+                try await self.sender.createCategory(payload)
+                return true
+            }
         }
     }
 
     @discardableResult
-    public func submitUpdateCategory(_ payload: UpdateCategoryPayload) async -> OutboxSubmitResult {
+    public func submitUpdateCategory(_ payload: UpdateCategoryPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.updateCategory(payload, in: $0) }
-        return await attempt(id: payload.id, kind: .updateCategory, payload: payload) {
-            try await self.sender.updateCategory(payload)
-            return true
+        return Task {
+            await self.attempt(id: payload.id, kind: .updateCategory, payload: payload) {
+                try await self.sender.updateCategory(payload)
+                return true
+            }
         }
     }
 
@@ -136,6 +171,8 @@ extension Outbox {
             return try await sender.updateAccount(decoder.decode(UpdateAccountPayload.self, from: data))
         case .setAccountBalance:
             return try await sender.setAccountBalance(decoder.decode(SetAccountBalancePayload.self, from: data))
+        case .archiveAccount:
+            return try await sender.archiveAccount(decoder.decode(ArchiveAccountPayload.self, from: data))
         case .createCategory:
             try await sender.createCategory(decoder.decode(CreateCategoryPayload.self, from: data))
             return true

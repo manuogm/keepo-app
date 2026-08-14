@@ -28,7 +28,7 @@ struct OutboxTests {
             amountE4: -100000, currency: "EUR", occurredAt: Date()
         )
 
-        let submitResult = await outbox.submitCreateTransaction(payload)
+        let submitResult = await outbox.submitCreateTransaction(payload).value
         #expect(submitResult == .queued)
         #expect(outbox.pendingCount == 1)
 
@@ -47,7 +47,7 @@ struct OutboxTests {
             amountE4: -200000, currency: "EUR", occurredAt: Date(), merchantRaw: nil
         )
 
-        let submitResult = await outbox.submitUpdateTransaction(payload)
+        let submitResult = await outbox.submitUpdateTransaction(payload).value
         #expect(submitResult == .conflict)
         #expect(outbox.pendingCount == 0)
     }
@@ -62,7 +62,7 @@ struct OutboxTests {
             amountE4: -200000, currency: "EUR", occurredAt: Date(), merchantRaw: nil
         )
 
-        _ = await outbox.submitUpdateTransaction(payload)
+        _ = await outbox.submitUpdateTransaction(payload).value
         #expect(outbox.pendingCount == 1)
 
         // The retry during drain succeeds at the network level but resolves
@@ -88,8 +88,8 @@ struct OutboxTests {
             amountE4: -300000, currency: "EUR", occurredAt: Date(), merchantRaw: nil
         )
 
-        _ = await outbox.submitUpdateTransaction(firstEdit)
-        _ = await outbox.submitUpdateTransaction(secondEdit)
+        _ = await outbox.submitUpdateTransaction(firstEdit).value
+        _ = await outbox.submitUpdateTransaction(secondEdit).value
         #expect(outbox.pendingCount == 1)
 
         sender.updateTransactionResult = .success(true)
@@ -98,6 +98,22 @@ struct OutboxTests {
         // The whole-row payload that actually reached the sender is the
         // LATEST desired state, never a merge of the two edits.
         #expect(sender.lastUpdateTransactionPayload?.amountE4 == -300000)
+    }
+
+    @Test("B: archiving an account queues on failure and drains on recovery, same as any other edit")
+    func archiveAccountQueuesThenDrains() async throws {
+        let sender = StubTransactionSender()
+        sender.archiveAccountResult = .failure(StubSenderError.network)
+        let outbox = try makeOutbox(sender: sender)
+        let payload = ArchiveAccountPayload(id: UUID(), expectedVersion: 1, archived: true)
+
+        let submitResult = await outbox.submitArchiveAccount(payload).value
+        #expect(submitResult == .queued)
+        #expect(outbox.pendingCount == 1)
+
+        sender.archiveAccountResult = .success(true)
+        await outbox.drainAll()
+        #expect(outbox.pendingCount == 0)
     }
 
     @Test("a capture that fails to send is queued; draining replays it")
@@ -145,7 +161,7 @@ struct OutboxTests {
         )
 
         #expect(outbox.hasStalePending(threshold: 0) == false)
-        _ = await outbox.submitCreateTransaction(payload)
+        _ = await outbox.submitCreateTransaction(payload).value
         // A real clock tick between `enqueue`'s `Date()` and this one — on a
         // fast in-memory GRDB write, both can otherwise land in the same
         // clock tick and make a `threshold: 0` comparison flake at the
@@ -203,6 +219,7 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
     var createAccountResult: Result<Void, Error> = .success(())
     var updateAccountResult: Result<Bool, Error> = .success(true)
     var setAccountBalanceResult: Result<Bool, Error> = .success(true)
+    var archiveAccountResult: Result<Bool, Error> = .success(true)
     var createCategoryResult: Result<Void, Error> = .success(())
     var updateCategoryResult: Result<Void, Error> = .success(())
 
@@ -216,6 +233,10 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
 
     func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool {
         try setAccountBalanceResult.get()
+    }
+
+    func archiveAccount(_ payload: ArchiveAccountPayload) async throws -> Bool {
+        try archiveAccountResult.get()
     }
 
     func createCategory(_ payload: CreateCategoryPayload) async throws {

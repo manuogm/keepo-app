@@ -215,12 +215,27 @@ struct CategoryFormView: View {
         isCheckingDelete = false
     }
 
+    /// B: the RPC itself stays online-only (see `deleteWithReassign`'s own
+    /// header comment — the live count this confirms against is only
+    /// honest live), but a successful call still needs to be echoed into
+    /// the local mirror immediately, exactly like every outbox write
+    /// already is — otherwise this screen's `onSaved()`/`dismiss()` fires
+    /// before the next sync pull, and the category stays visible locally
+    /// until one happens. Mirrors the server's own two-statement effect:
+    /// reassign local transactions off this category, then soft-delete it.
     private func performDelete() async {
         guard case .edit(let category) = mode else { return }
         isDeleting = true
         errorMessage = nil
         do {
             try await CategoryRepository.deleteWithReassign(client: session.client, categoryId: category.id)
+            if let ownerId = session.profile?.id {
+                try? await session.dbQueue.write { database in
+                    try CategoryLocalWrite.deleteAndReassignToOther(
+                        categoryId: category.id, kind: category.kind, ownerId: ownerId, in: database
+                    )
+                }
+            }
             onSaved()
             dismiss()
         } catch {

@@ -84,6 +84,31 @@ struct LocalTableQueriesTests {
         #expect(account?.includeInTotal == true)
     }
 
+    @Test("a local profile fetch decodes ProfilesSelect, and is nil for an unknown or deleted id")
+    func profileDecodes() async throws {
+        let dbQueue = try makeDatabase()
+        let userId = UUID().uuidString
+        try await dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO profiles (id, base_currency, onboarded_at, created_at, updated_at, sync_epoch, sync_seq)
+                VALUES (?, 'EUR', '2026-01-01T00:00:00.000000+00:00',
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1, 1)
+                """,
+                arguments: [userId]
+            )
+        }
+
+        let profile = try await dbQueue.read { database in try LocalTableQueries.profile(database, id: userId) }
+        let missing = try await dbQueue.read { database in
+            try LocalTableQueries.profile(database, id: UUID().uuidString)
+        }
+
+        #expect(profile?.baseCurrency == "EUR")
+        #expect(profile?.onboardedAt != nil)
+        #expect(missing == nil)
+    }
+
     @Test("no household row when the user isn't a member of any household")
     func myHouseholdNilWhenUnaffiliated() async throws {
         let dbQueue = try makeDatabase()

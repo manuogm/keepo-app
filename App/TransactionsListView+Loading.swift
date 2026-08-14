@@ -38,29 +38,30 @@ extension TransactionsListView {
         isLoading = false
     }
 
+    /// A: the local write-through already removes each row from the list
+    /// the moment this loop reaches it — the network delivery for each
+    /// delete keeps running in the background after this function returns.
+    /// A version conflict, if one happens, surfaces later via Needs Review,
+    /// not as a reason to make the swipe-to-delete gesture wait.
     func delete(
         at offsets: IndexSet, in list: [PublicSchema.TransactionsWithDetailsSelect]
     ) async {
-        var hadConflict = false
         for index in offsets {
             let transaction = list[index]
             guard let id = transaction.transactionId, let version = transaction.version else { continue }
-            let result: OutboxSubmitResult
             if let groupId = transaction.transferGroupId, let siblingVersion = sibling(of: transaction)?.version {
                 let payload = DeleteTransferPayload(
                     transferGroupId: groupId,
                     fromExpectedVersion: (transaction.amountE4 ?? 0) < 0 ? Int(version) : Int(siblingVersion),
                     toExpectedVersion: (transaction.amountE4 ?? 0) < 0 ? Int(siblingVersion) : Int(version)
                 )
-                result = await session.outbox.submitDeleteTransfer(payload)
+                await session.outbox.submitDeleteTransfer(payload)
             } else {
                 let payload = DeleteTransactionPayload(id: id, expectedVersion: Int(version))
-                result = await session.outbox.submitDeleteTransaction(payload)
+                await session.outbox.submitDeleteTransaction(payload)
             }
-            if result == .conflict { hadConflict = true }
         }
         session.refresh.bump()
-        if hadConflict { showConflictAlert = true }
     }
 }
 

@@ -41,18 +41,15 @@ struct TransactionFormView: View {
     @State private var receivedAmountText = ""
 
     // Edit-mode versions the save call sends back for lost-update detection.
-    // Not `private` — read by the conflict-reload path in
-    // TransactionFormView+Conflict.swift.
-    @State var editingId: UUID?
-    @State var editingFromVersion: Int?
-    @State var editingToVersion: Int?
-    @State var editingTransferGroupId: UUID?
+    @State private var editingId: UUID?
+    @State private var editingFromVersion: Int?
+    @State private var editingToVersion: Int?
+    @State private var editingTransferGroupId: UUID?
     // created_by (who entered it) differs from the viewer on a shared account.
     @State private var addedByHouseholdMember = false
 
     @State private var isSaving = false
     @State private var errorMessage: String?
-    @State var showConflictAlert = false
     @State private var divergenceWarning: RateDivergence?
     @State private var transferDivergenceConfirmed = false
 
@@ -145,11 +142,6 @@ struct TransactionFormView: View {
                         .disabled(isSaveDisabled)
                 }
             }
-            .alert("This transaction changed elsewhere", isPresented: $showConflictAlert) {
-                Button("OK") {}
-            } message: {
-                Text("Showing the latest version — review it and save again.")
-            }
             .transferDivergenceAlert($divergenceWarning) {
                 transferDivergenceConfirmed = true
                 Task { await save() }
@@ -198,11 +190,8 @@ struct TransactionFormView: View {
         }
     }
 
-    /// Shared by the initial edit-mode prefill and by a post-conflict
-    /// reload (`TransactionFormView+Conflict.swift`) — both are "populate
-    /// the form from a server row." Not `private`: the conflict-reload path
-    /// calls it cross-file.
-    func apply(
+    /// Populates the form from a server row — the initial edit-mode prefill.
+    private func apply(
         transaction: PublicSchema.TransactionsWithDetailsSelect,
         sibling: PublicSchema.TransactionsWithDetailsSelect?
     ) {
@@ -276,7 +265,12 @@ extension TransactionFormView {
             case (true, .transfer):
                 try await updateTransfer(magnitude: magnitude)
             }
-            if !showConflictAlert && divergenceWarning == nil {
+            // A: the local write already landed by the time submitX
+            // returns — the network delivery keeps running in the
+            // background. A version conflict, if one happens, surfaces
+            // later via Needs Review, not as a reason to keep this sheet
+            // open; `divergenceWarning` is the one remaining pre-write gate.
+            if divergenceWarning == nil {
                 onSaved()
                 dismiss()
             }
@@ -350,10 +344,7 @@ extension TransactionFormView {
             amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
             merchantRaw: merchantRaw
         )
-        let result = await session.outbox.submitUpdateTransaction(payload)
-        if result == .conflict {
-            await reloadAfterConflict()
-        }
+        await session.outbox.submitUpdateTransaction(payload)
     }
 
     fileprivate func updateTransfer(magnitude: Int64) async throws {
@@ -374,10 +365,7 @@ extension TransactionFormView {
             transferGroupId: transferGroupId, fromExpectedVersion: fromExpectedVersion,
             toExpectedVersion: toExpectedVersion, fromAmountE4: magnitude, toAmountE4: toAmount, occurredAt: occurredAt
         )
-        let result = await session.outbox.submitUpdateTransfer(payload)
-        if result == .conflict {
-            await reloadAfterConflict()
-        }
+        await session.outbox.submitUpdateTransfer(payload)
     }
 
 }

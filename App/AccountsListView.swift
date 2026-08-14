@@ -15,7 +15,6 @@ struct AccountsListView: View {
     @State private var isLoading = true
     @State private var isAddingAccount = false
     @State private var editingAccountId: UUID?
-    @State private var showConflictAlert = false
     @State private var actionErrorMessage: String?
 
     private var everyday: [LocalAccountRow] {
@@ -99,11 +98,6 @@ struct AccountsListView: View {
                 session.refresh.bump()
             }
         }
-        .alert("This account changed elsewhere", isPresented: $showConflictAlert) {
-            Button("OK") {}
-        } message: {
-            Text("The list has been refreshed with the latest version.")
-        }
         .task(id: session.refresh.token) { await load() }
     }
 
@@ -165,17 +159,15 @@ struct AccountsListView: View {
         isLoading = false
     }
 
+    /// B: goes through `session.outbox`, never `AccountRepository` directly —
+    /// the local write-through lands (and this screen's list re-renders)
+    /// before the network attempt even starts, and it works offline. A
+    /// version conflict, if one happens, surfaces later via Needs Review.
     private func setArchived(_ row: LocalAccountRow, archived: Bool) async {
         actionErrorMessage = nil
-        do {
-            let result = try await AccountRepository.setArchived(
-                client: session.client, id: row.id, expectedVersion: row.version, archived: archived
-            )
-            session.refresh.bump()
-            if case .conflict = result { showConflictAlert = true }
-        } catch {
-            actionErrorMessage = UserFacingError.describe(error)
-        }
+        let payload = ArchiveAccountPayload(id: row.id, expectedVersion: row.version, archived: archived)
+        await session.outbox.submitArchiveAccount(payload)
+        session.refresh.bump()
     }
 }
 

@@ -80,7 +80,7 @@ struct OutboxLocalWriteTests {
             )
         )
 
-        #expect(result == .queued)
+        #expect(await result.value == .queued)
         #expect(try await balance(dbQueue, accountId: accountId) == -50000)
     }
 
@@ -159,6 +159,24 @@ struct OutboxLocalWriteTests {
         #expect(transactionCount == 0)
     }
 
+    @Test("B: archiving an account sets archived_at locally before any sync pull")
+    func archiveAccountAppliesLocally() async throws {
+        let (outbox, dbQueue) = try makeOutboxAndDatabase()
+        let ownerId = UUID()
+        let accountId = UUID()
+        try await seedAccount(dbQueue, id: accountId, ownerId: ownerId)
+
+        _ = await outbox.submitArchiveAccount(
+            ArchiveAccountPayload(id: accountId, expectedVersion: 1, archived: true)
+        )
+
+        let archivedAt = try await dbQueue.read { database in
+            try String.fetchOne(database, sql: "SELECT archived_at FROM accounts WHERE id = ?",
+                                 arguments: [accountId.uuidString])
+        }
+        #expect(archivedAt != nil)
+    }
+
     @Test("a created account is queryable locally before any sync pull")
     func createAccountAppliesLocally() async throws {
         let (outbox, dbQueue) = try makeOutboxAndDatabase()
@@ -194,6 +212,7 @@ private final class AlwaysFailingSender: OutboxSending, @unchecked Sendable {
     }
     func createAccount(_ payload: CreateAccountPayload) async throws { throw StubError.alwaysFails }
     func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool { throw StubError.alwaysFails }
+    func archiveAccount(_ payload: ArchiveAccountPayload) async throws -> Bool { throw StubError.alwaysFails }
     func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool { throw StubError.alwaysFails }
     func createCategory(_ payload: CreateCategoryPayload) async throws { throw StubError.alwaysFails }
     func updateCategory(_ payload: UpdateCategoryPayload) async throws { throw StubError.alwaysFails }

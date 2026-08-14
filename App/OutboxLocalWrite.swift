@@ -5,17 +5,19 @@ import Supabase
 
 /// Optimistic local write-through (Phase L6, `keepo-local-first-plan.md`).
 ///
-/// `Outbox` always sends a write straight to Postgres first and only queues
-/// it locally on failure — the local GRDB mirror otherwise only advances via
-/// `SyncEngine.pull()` (sign-in/foreground/reconnect), not immediately after
-/// a write. Once every screen reads balances from that local mirror instead
-/// of a server-fetched cache (L6), a write that hasn't been pulled back down
-/// yet would be invisible — offline, or even briefly online before the next
-/// pull — which is exactly the gap `PendingOverlay` used to paper over on
+/// Every `Outbox.submitX` applies its write here, into the SAME table
+/// `LocalMoneyQueries` reads, before the network attempt even starts (L7's
+/// non-blocking-writes pass — see `Outbox.attempt`'s own header) — the local
+/// GRDB mirror otherwise only advances via `SyncEngine.pull()` (sign-in/
+/// foreground/reconnect), not immediately after a write. Once every screen
+/// reads balances from that local mirror instead of a server-fetched cache
+/// (L6), a write that hasn't been pulled back down yet would be invisible —
+/// offline, or for the entire (now backgrounded) network round-trip while
+/// online — which is exactly the gap `PendingOverlay` used to paper over on
 /// top of the *old* cache-based read path. Deleting `PendingOverlay` only
-/// stays correct if this file exists: every write applies here, into the
-/// SAME table `LocalMoneyQueries` reads, at the moment it's submitted —
-/// success or queued, doesn't matter, it's optimistic either way.
+/// stays correct if this file exists: applied here whether the network
+/// attempt that follows ultimately succeeds or queues, doesn't matter, it's
+/// optimistic either way.
 ///
 /// The eventual real sync pull is what actually corrects this: it upserts
 /// the authoritative server row over the same primary key, via
@@ -185,6 +187,18 @@ enum OutboxLocalWrite {
                 "subtype": .string(payload.subtype.rawValue),
                 "opening_balance_e4": .integer(Int(payload.openingBalanceE4)),
                 "include_in_total": .bool(payload.includeInTotal), "counts_toward_fi": .bool(payload.countsTowardFi),
+                "version": .integer(payload.expectedVersion + 1), "updated_at": .string(now)
+            ],
+            table: "accounts", in: database
+        )
+    }
+
+    static func archiveAccount(_ payload: ArchiveAccountPayload, in database: Database) throws {
+        let now = PostgresDate.sqliteTimestampBoundaryString(Date())
+        try SyncApply.upsertRow(
+            [
+                "id": .string(payload.id.uuidString),
+                "archived_at": payload.archived ? .string(now) : .null,
                 "version": .integer(payload.expectedVersion + 1), "updated_at": .string(now)
             ],
             table: "accounts", in: database

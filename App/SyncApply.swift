@@ -110,6 +110,19 @@ enum SyncApply {
         try upsert(row, table: table, allowedColumns: columns, database)
     }
 
+    /// UPDATE-then-INSERT, never a single `INSERT ... ON CONFLICT DO UPDATE`
+    /// (B, found chasing a real bug: `archiveAccount`'s local echo silently
+    /// no-op'd every time). SQLite validates NOT NULL on the INSERT's
+    /// candidate row before it even checks for a conflict — so a partial
+    /// payload (an update/archive echo naming only its own changed columns)
+    /// throws a NOT NULL violation on every OTHER not-null column the
+    /// candidate row doesn't mention, even though the row was always going
+    /// to take the DO UPDATE branch and never actually insert those missing
+    /// values. A plain UPDATE has no such pre-check — it only touches the
+    /// columns named — so it's correct for the (overwhelmingly common) case
+    /// where the row already exists; INSERT only runs when UPDATE touched
+    /// nothing, which requires the caller to have supplied every column (a
+    /// full pull-changes row, or a local `createX` write always does).
     private static func upsert(
         _ row: JSONObject, table: String, allowedColumns: Set<String>, _ database: Database
     ) throws {
@@ -118,15 +131,25 @@ enum SyncApply {
         guard !columns.isEmpty, primaryKey.allSatisfy(columns.contains) else { return }
 
         let updateColumns = columns.filter { !primaryKey.contains($0) }
-        let setClause = updateColumns.map { "\($0) = excluded.\($0)" }.joined(separator: ", ")
-        let action = setClause.isEmpty ? "DO NOTHING" : "DO UPDATE SET \(setClause)"
-        let sql = """
+        if !updateColumns.isEmpty {
+            let setClause = updateColumns.map { "\($0) = ?" }.joined(separator: ", ")
+            let whereClause = primaryKey.map { "\($0) = ?" }.joined(separator: " AND ")
+            let updateArguments = updateColumns.map { databaseValue(row[$0] ?? .null) }
+                + primaryKey.map { databaseValue(row[$0] ?? .null) }
+            try database.execute(
+                sql: "UPDATE \(table) SET \(setClause) WHERE \(whereClause)",
+                arguments: StatementArguments(updateArguments)
+            )
+            if database.changesCount > 0 { return }
+        }
+
+        let insertSQL = """
         INSERT INTO \(table) (\(columns.joined(separator: ", ")))
         VALUES (\(columns.map { _ in "?" }.joined(separator: ", ")))
-        ON CONFLICT(\(primaryKey.joined(separator: ", "))) \(action)
+        ON CONFLICT(\(primaryKey.joined(separator: ", "))) DO NOTHING
         """
-        let arguments = columns.map { databaseValue(row[$0] ?? .null) }
-        try database.execute(sql: sql, arguments: StatementArguments(arguments))
+        let insertArguments = columns.map { databaseValue(row[$0] ?? .null) }
+        try database.execute(sql: insertSQL, arguments: StatementArguments(insertArguments))
     }
 
     private static func databaseValue(_ json: AnyJSON) -> DatabaseValueConvertible? {

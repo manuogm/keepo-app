@@ -24,6 +24,7 @@ public protocol OutboxSending: Sendable {
     func createAccount(_ payload: CreateAccountPayload) async throws
     func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool
     func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool
+    func archiveAccount(_ payload: ArchiveAccountPayload) async throws -> Bool
     func createCategory(_ payload: CreateCategoryPayload) async throws
     /// No applied/conflict distinction — see `UpdateCategoryPayload`'s own
     /// header comment on why a rename has nothing to conflict against.
@@ -129,7 +130,7 @@ public struct LiveOutboxSender: OutboxSending {
 
 // MARK: - Outbox
 
-public enum OutboxSubmitResult: Equatable {
+public enum OutboxSubmitResult: Equatable, Sendable {
     case applied
     case conflict
     case queued
@@ -143,7 +144,7 @@ public enum OutboxCaptureResult: Equatable, Sendable {
 enum OutboxKind: String {
     case createTransaction, createTransfer, updateTransaction, updateTransfer, deleteTransaction, deleteTransfer
     case captureTransaction
-    case createAccount, updateAccount, setAccountBalance, createCategory, updateCategory
+    case createAccount, updateAccount, setAccountBalance, archiveAccount, createCategory, updateCategory
 }
 
 /// Every write attempts to send immediately; only a thrown error (offline,
@@ -176,63 +177,87 @@ public final class Outbox {
         return Date().timeIntervalSince(oldestPendingAt) > threshold
     }
 
+    /// A: every submit* here awaits only the local write-through before
+    /// returning — a caller that just wants the UI to be correct immediately
+    /// (every screen today) never waits on the network. The delivery attempt
+    /// itself (`attempt`, unchanged) still runs to completion and still
+    /// drives `pendingCount`/conflict bookkeeping exactly as before; it just
+    /// runs in a detached-from-the-caller `Task` instead of being awaited
+    /// inline. Callers that genuinely need the outcome (tests, mainly) can
+    /// `await` the returned `Task`'s `.value`; every UI call site simply
+    /// discards it. A version conflict is no longer knowable synchronously
+    /// by the caller — it always surfaces later via `sync_conflicts` / Needs
+    /// Review (see NeedsReviewView's conflict-resolution modal), whether the
+    /// background attempt resolves it immediately or a later drain does.
     @discardableResult
-    public func submitCreateTransaction(_ payload: CreateTransactionPayload) async -> OutboxSubmitResult {
+    public func submitCreateTransaction(_ payload: CreateTransactionPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.createTransaction(payload, in: $0) }
-        return await attempt(id: payload.id, kind: .createTransaction, payload: payload) {
-            try await self.sender.createTransaction(payload)
-            return true
+        return Task {
+            await self.attempt(id: payload.id, kind: .createTransaction, payload: payload) {
+                try await self.sender.createTransaction(payload)
+                return true
+            }
         }
     }
 
     @discardableResult
-    public func submitCreateTransfer(_ payload: CreateTransferPayload) async -> OutboxSubmitResult {
+    public func submitCreateTransfer(_ payload: CreateTransferPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.createTransfer(payload, in: $0) }
-        return await attempt(id: payload.fromId, kind: .createTransfer, payload: payload) {
-            try await self.sender.createTransfer(payload)
-            return true
+        return Task {
+            await self.attempt(id: payload.fromId, kind: .createTransfer, payload: payload) {
+                try await self.sender.createTransfer(payload)
+                return true
+            }
         }
     }
 
     @discardableResult
-    public func submitUpdateTransaction(_ payload: UpdateTransactionPayload) async -> OutboxSubmitResult {
+    public func submitUpdateTransaction(_ payload: UpdateTransactionPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.updateTransaction(payload, in: $0) }
-        return await attempt(
-            id: payload.id, kind: .updateTransaction, payload: payload, expectedVersion: payload.expectedVersion
-        ) {
-            try await self.sender.updateTransaction(payload)
+        return Task {
+            await self.attempt(
+                id: payload.id, kind: .updateTransaction, payload: payload, expectedVersion: payload.expectedVersion
+            ) {
+                try await self.sender.updateTransaction(payload)
+            }
         }
     }
 
     @discardableResult
-    public func submitUpdateTransfer(_ payload: UpdateTransferPayload) async -> OutboxSubmitResult {
+    public func submitUpdateTransfer(_ payload: UpdateTransferPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.updateTransfer(payload, in: $0) }
-        return await attempt(
-            id: payload.transferGroupId, kind: .updateTransfer, payload: payload,
-            expectedVersion: payload.fromExpectedVersion
-        ) {
-            try await self.sender.updateTransfer(payload)
+        return Task {
+            await self.attempt(
+                id: payload.transferGroupId, kind: .updateTransfer, payload: payload,
+                expectedVersion: payload.fromExpectedVersion
+            ) {
+                try await self.sender.updateTransfer(payload)
+            }
         }
     }
 
     @discardableResult
-    public func submitDeleteTransaction(_ payload: DeleteTransactionPayload) async -> OutboxSubmitResult {
+    public func submitDeleteTransaction(_ payload: DeleteTransactionPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.deleteTransaction(payload, in: $0) }
-        return await attempt(
-            id: payload.id, kind: .deleteTransaction, payload: payload, expectedVersion: payload.expectedVersion
-        ) {
-            try await self.sender.deleteTransaction(payload)
+        return Task {
+            await self.attempt(
+                id: payload.id, kind: .deleteTransaction, payload: payload, expectedVersion: payload.expectedVersion
+            ) {
+                try await self.sender.deleteTransaction(payload)
+            }
         }
     }
 
     @discardableResult
-    public func submitDeleteTransfer(_ payload: DeleteTransferPayload) async -> OutboxSubmitResult {
+    public func submitDeleteTransfer(_ payload: DeleteTransferPayload) async -> Task<OutboxSubmitResult, Never> {
         await applyLocally { try OutboxLocalWrite.deleteTransfer(payload, in: $0) }
-        return await attempt(
-            id: payload.transferGroupId, kind: .deleteTransfer, payload: payload,
-            expectedVersion: payload.fromExpectedVersion
-        ) {
-            try await self.sender.deleteTransfer(payload)
+        return Task {
+            await self.attempt(
+                id: payload.transferGroupId, kind: .deleteTransfer, payload: payload,
+                expectedVersion: payload.fromExpectedVersion
+            ) {
+                try await self.sender.deleteTransfer(payload)
+            }
         }
     }
 
@@ -350,7 +375,7 @@ public final class Outbox {
             let payload = try decoder.decode(CaptureTransactionPayload.self, from: item.payloadJSON)
             _ = try await sender.captureTransaction(payload)
             return true
-        case .createAccount, .updateAccount, .setAccountBalance, .createCategory, .updateCategory:
+        case .createAccount, .updateAccount, .setAccountBalance, .archiveAccount, .createCategory, .updateCategory:
             return try await replayAccountOrCategory(kind, data: item.payloadJSON)
         }
     }

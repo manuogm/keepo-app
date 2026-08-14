@@ -27,6 +27,7 @@ extension PublicSchema.TransactionsSelect: @retroactive FetchableRecord {}
 extension PublicSchema.HouseholdsSelect: @retroactive FetchableRecord {}
 extension PublicSchema.HouseholdMembersSelect: @retroactive FetchableRecord {}
 extension PublicSchema.HouseholdAccountsSelect: @retroactive FetchableRecord {}
+extension PublicSchema.ProfilesSelect: @retroactive FetchableRecord {}
 
 enum LocalTableQueries {
     static func categories(_ database: Database) throws -> [PublicSchema.CategoriesSelect] {
@@ -72,6 +73,17 @@ enum LocalTableQueries {
             database,
             sql: "SELECT * FROM accounts WHERE owner_id = ? AND deleted_at IS NULL ORDER BY name",
             arguments: [ownerId]
+        )
+    }
+
+    /// The instant-cold-start read (D): `SessionStore.start()` used to gate
+    /// `.ready` on a network `refreshProfile()` call even though `profiles`
+    /// is already in the local mirror — this is what lets it render
+    /// immediately instead, with the network refresh happening in the
+    /// background afterward.
+    static func profile(_ database: Database, id: String) throws -> PublicSchema.ProfilesSelect? {
+        try PublicSchema.ProfilesSelect.fetchOne(
+            database, sql: "SELECT * FROM profiles WHERE id = ? AND deleted_at IS NULL", arguments: [id]
         )
     }
 

@@ -34,7 +34,6 @@ struct AccountFormView: View {
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var errorMessage: String?
-    @State private var showConflictAlert = false
 
     @State private var currentBalanceText = ""
     @State private var isUpdatingBalance = false
@@ -154,11 +153,6 @@ struct AccountFormView: View {
                     .disabled(isSaveDisabled)
                 }
             }
-            .alert("This account changed elsewhere", isPresented: $showConflictAlert) {
-                Button("OK") {}
-            } message: {
-                Text("Showing the latest version — review it and save again.")
-            }
         }
         .task { await load() }
     }
@@ -247,15 +241,16 @@ extension AccountFormView {
             switch mode {
             case .create:
                 try await createAccount(openingBalanceE4: openingBalanceE4)
-                onSaved()
-                dismiss()
             case .edit:
                 try await updateAccount(openingBalanceE4: openingBalanceE4)
-                if !showConflictAlert {
-                    onSaved()
-                    dismiss()
-                }
             }
+            // A: the local write already landed by the time submitX
+            // returns — the network delivery keeps running in the
+            // background, so there's nothing left worth waiting for here.
+            // A version conflict, if one happens, surfaces later via
+            // Needs Review, not as a reason to keep this sheet open.
+            onSaved()
+            dismiss()
         } catch {
             errorMessage = UserFacingError.describe(error)
         }
@@ -284,10 +279,7 @@ extension AccountFormView {
             id: id, expectedVersion: expectedVersion, name: name, subtype: subtype,
             openingBalanceE4: openingBalanceE4, includeInTotal: includeInTotal, countsTowardFi: countsTowardFi
         )
-        let result = await session.outbox.submitUpdateAccount(payload)
-        if result == .conflict {
-            await reloadAfterConflict(id: id)
-        }
+        await session.outbox.submitUpdateAccount(payload)
     }
 
     /// A separate action from Save, on purpose — "this account is worth X
@@ -311,33 +303,13 @@ extension AccountFormView {
         let payload = SetAccountBalancePayload(
             id: UUID(), accountId: id, newBalanceE4: newBalanceE4, expectedVersion: expectedVersion
         )
-        let result = await session.outbox.submitSetAccountBalance(payload)
-        switch result {
-        case .applied:
-            balanceUpdateMessage = "Balance updated."
-            session.refresh.bump()
-        case .queued:
-            balanceUpdateMessage = "Saved — will sync once you're back online."
-            session.refresh.bump()
-        case .conflict:
-            balanceUpdateMessage = "Couldn't update the balance — try again."
-        }
+        // A: the local write is already in by the time this returns — the
+        // network delivery keeps going in the background, so there's
+        // nothing left to distinguish (applied vs. queued) synchronously.
+        // A version conflict, if one happens, surfaces later via Needs Review.
+        await session.outbox.submitSetAccountBalance(payload)
+        balanceUpdateMessage = "Balance updated."
+        session.refresh.bump()
         isUpdatingBalance = false
-    }
-
-    /// A stale version means someone else changed this account since it
-    /// loaded. `Outbox`'s write-through already applied OUR attempted edit
-    /// to the local mirror optimistically (before the conflict was known),
-    /// so a plain local re-read would just show that same wrong guess back
-    /// — a sync pull is what actually corrects the local row to the real
-    /// server state; only then is a local re-read meaningful.
-    fileprivate func reloadAfterConflict(id: UUID) async {
-        await session.syncEngine?.pull()
-        if let account = try? await session.dbQueue.read({ database in
-            try LocalTableQueries.account(database, id: id.uuidString)
-        }) {
-            apply(account)
-        }
-        showConflictAlert = true
     }
 }

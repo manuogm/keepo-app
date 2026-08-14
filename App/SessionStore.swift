@@ -112,9 +112,7 @@ public final class SessionStore {
                 userId = restored.user.id
                 userEmail = restored.user.email
                 syncEngine = makeSyncEngine(userId: restored.user.id)
-                try await refreshProfile()
-                await outbox.drainAll()
-                await syncEngine?.pull()
+                try await startWithLocalFirstProfile()
             } else if isLocal {
                 // Local dev stack: auto-sign in via StubAuthProvider's fixed
                 // credentials — no UI needed, no email confirmation required.
@@ -122,9 +120,7 @@ public final class SessionStore {
                 userId = session.user.id
                 userEmail = session.user.email
                 syncEngine = makeSyncEngine(userId: session.user.id)
-                try await refreshProfile()
-                await outbox.drainAll()
-                await syncEngine?.pull()
+                try await startWithLocalFirstProfile()
             } else {
                 // Hosted: no cached session — present the OTP sign-in UI.
                 // The signIn() path on PasswordAuthProvider fails against
@@ -133,6 +129,43 @@ public final class SessionStore {
             }
         } catch {
             phase = .failed(UserFacingError.describe(error))
+        }
+    }
+
+    /// D: a returning user's cold start used to gate `.ready` on a network
+    /// `refreshProfile()` call, even though `profiles` is already in the
+    /// local mirror from the previous session — every launch paid a full
+    /// round-trip just to show the same landing screen it showed last time.
+    /// If a local profile row already exists, render from it immediately and
+    /// let the outbox drain + sync pull run in the background, re-syncing
+    /// `profile`/`phase` only if the pull actually changed something (e.g.
+    /// onboarding completed on another device). A genuinely first-ever
+    /// login — no local row yet, nothing to render — falls back to the old
+    /// synchronous path; `.loading`'s spinner is exactly the right UI for
+    /// that one real wait, so no separate first-sync screen is needed.
+    private func startWithLocalFirstProfile() async throws {
+        guard let userId else { return }
+        if let localProfile = try? await dbQueue.read({ database in
+            try LocalTableQueries.profile(database, id: userId.uuidString)
+        }) {
+            profile = localProfile
+            phase = localProfile.onboardedAt == nil ? .needsOnboarding : .ready
+            Task {
+                await outbox.drainAll()
+                await syncEngine?.pull()
+                if let refreshed = try? await dbQueue.read({ database in
+                    try LocalTableQueries.profile(database, id: userId.uuidString)
+                }), refreshed != profile {
+                    profile = refreshed
+                    phase = refreshed.onboardedAt == nil ? .needsOnboarding : .ready
+                }
+            }
+        } else {
+            // First-ever login on this device: nothing local to render yet,
+            // so this is the one case genuinely worth waiting on.
+            try await refreshProfile()
+            await outbox.drainAll()
+            await syncEngine?.pull()
         }
     }
 
