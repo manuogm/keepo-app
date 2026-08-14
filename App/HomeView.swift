@@ -89,6 +89,14 @@ struct HomeView: View {
                     scopeMenuContent
                         .frame(width: 220)
                         .presentationCompactAdaptation(.popover)
+                        // The system's own outside-tap-to-dismiss sits above
+                        // our content and wins the touch outright, so the
+                        // curtain's own tap gesture below never actually
+                        // fired for that path — only the system's delayed
+                        // isPresented flip did. Disabling it here makes our
+                        // curtain the sole handler for an outside tap, so
+                        // both dismiss paths now go through the same code.
+                        .interactiveDismissDisabled()
                 }
             }
             ToolbarItem(placement: .principal) {
@@ -119,6 +127,7 @@ struct HomeView: View {
                     }
                     .frame(width: 340, height: 480)
                     .presentationCompactAdaptation(.popover)
+                    .interactiveDismissDisabled()
                 }
             }
         }
