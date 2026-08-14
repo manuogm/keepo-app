@@ -56,14 +56,16 @@ struct HomeView: View {
             // a sheet would apply — this overlay adds that dimming back
             // manually. Purely visual: the popovers already dismiss on an
             // outside tap on their own, so hit testing stays off here.
-            if isOverlayPresented {
-                Color.black.opacity(0.25)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-            }
+            //
+            // Opacity is driven directly (not `.transition` + `if`) so only
+            // one animation curve applies — stacking a transition's own
+            // insert/remove animation on top of `.animation(value:)` is what
+            // made the curtain visibly lag behind the popover on dismiss.
+            Color.black.opacity(isOverlayPresented ? 0.25 : 0)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
         }
-        .animation(.easeInOut(duration: 0.2), value: isOverlayPresented)
+        .animation(.easeInOut(duration: 0.12), value: isOverlayPresented)
         .navigationTitle("Home")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
