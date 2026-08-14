@@ -77,6 +77,78 @@ struct TransactionsListView: View {
     // MARK: - Body
 
     var body: some View {
+        mainContent
+            .navigationTitle("Transactions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ScopeSwitcherButton(session: session)
+                }
+                ToolbarItem(placement: .principal) {
+                    ScreenTitleBar(title: "Transactions", session: session)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        isSearching = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        isAddingTransaction = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $isAddingTransaction) {
+                TransactionFormView(session: session) {
+                    session.refresh.bump()
+                }
+            }
+            .sheet(item: $editingTransaction) { transaction in
+                TransactionFormView(session: session, mode: .edit(transaction, sibling: sibling(of: transaction))) {
+                    session.refresh.bump()
+                }
+            }
+            .sheet(item: $editingRecurringRule) { rule in
+                RecurringRuleFormView(session: session, mode: .edit(rule)) {
+                    session.refresh.bump()
+                }
+            }
+            .confirmationDialog(
+                "This is a recurring transaction", isPresented: recurringChoiceBinding, presenting: recurringEditChoice
+            ) { transaction in
+                Button("Edit this transaction") { editingTransaction = transaction }
+                Button("Edit all future occurrences") {
+                    Task { await openRecurringRule(for: transaction) }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+            .sheet(isPresented: $isCustomRangePresented) {
+                customRangeSheet
+            }
+            .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter, range: range)) { await load() }
+    }
+
+    // MARK: - Content
+
+    /// `.searchable` is attached only while `isSearching` is true — attaching
+    /// it unconditionally makes SwiftUI render a persistent full-width search
+    /// row in the List regardless of the `isPresented` binding, which is
+    /// exactly the row the toolbar search icon was meant to replace.
+    @ViewBuilder
+    private var mainContent: some View {
+        if isSearching {
+            listContent
+                .searchable(text: searchBinding, isPresented: $isSearching, prompt: "Merchant, category, or account")
+        } else {
+            listContent
+        }
+    }
+
+    private var listContent: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
@@ -121,59 +193,6 @@ struct TransactionsListView: View {
                 }
             }
         }
-        .searchable(text: searchBinding, isPresented: $isSearching, prompt: "Merchant, category, or account")
-        .navigationTitle("Transactions")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                ScopeSwitcherButton(session: session)
-            }
-            ToolbarItem(placement: .principal) {
-                ScreenTitleBar(title: "Transactions", session: session)
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isSearching = true
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isAddingTransaction = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
-        }
-        .sheet(isPresented: $isAddingTransaction) {
-            TransactionFormView(session: session) {
-                session.refresh.bump()
-            }
-        }
-        .sheet(item: $editingTransaction) { transaction in
-            TransactionFormView(session: session, mode: .edit(transaction, sibling: sibling(of: transaction))) {
-                session.refresh.bump()
-            }
-        }
-        .sheet(item: $editingRecurringRule) { rule in
-            RecurringRuleFormView(session: session, mode: .edit(rule)) {
-                session.refresh.bump()
-            }
-        }
-        .confirmationDialog(
-            "This is a recurring transaction", isPresented: recurringChoiceBinding, presenting: recurringEditChoice
-        ) { transaction in
-            Button("Edit this transaction") { editingTransaction = transaction }
-            Button("Edit all future occurrences") {
-                Task { await openRecurringRule(for: transaction) }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .sheet(isPresented: $isCustomRangePresented) {
-            customRangeSheet
-        }
-        .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter, range: range)) { await load() }
     }
 
     // MARK: - Transaction helpers
