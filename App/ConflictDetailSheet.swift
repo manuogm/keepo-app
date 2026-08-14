@@ -6,6 +6,17 @@ import SwiftUI
 /// without telling the user what happened or letting them choose which
 /// side wins). This is the modal that replaces it.
 ///
+/// Showing raw `client_version`/`server_version` integers told the user
+/// nothing actionable — "3 vs 4" answers no question a person actually
+/// has. What they need is what changed, in their own words: fetches the
+/// server's current row (a network call, since that's the only place the
+/// authoritative "what's saved right now" answer lives before a pull
+/// overwrites the local copy) and diffs it field-by-field against what
+/// this device still has queued, showing only the fields that disagree.
+/// The loading/diffing logic lives in `ConflictDetailSheet+Loading.swift`
+/// purely to keep this file under the project's type-body-length lint
+/// threshold — same reasoning as `TransactionsListView`'s own split.
+///
 /// "Keep Mine" is intentionally scoped to what this app's conflicts
 /// actually are: a transaction re-submits its current local edit; an
 /// account re-submits its archived flag, the one account field a version
@@ -16,19 +27,26 @@ struct ConflictDetailSheet: View {
     let conflictId: UUID
     var onResolved: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
 
-    @State private var detail: SyncConflictDetail?
-    @State private var summary: String?
-    @State private var myAccount: PublicSchema.AccountsSelect?
-    @State private var myTransaction: PublicSchema.TransactionsWithDetailsSelect?
-    @State private var isLoading = true
-    @State private var isWorking = false
-    @State private var errorMessage: String?
+    // Not `private` — read/written from ConflictDetailSheet+Loading.swift,
+    // an extension in a different file (kept there purely for file-length).
+    @State var detail: SyncConflictDetail?
+    @State var fields: [ConflictField] = []
+    @State var myAccount: PublicSchema.AccountsSelect?
+    @State var myTransaction: PublicSchema.TransactionsWithDetailsSelect?
+    @State var couldNotReachServer = false
+    @State var isLoading = true
+    @State var isWorking = false
+    @State var errorMessage: String?
 
     private var canKeepMine: Bool {
         guard let detail else { return false }
         return detail.tableName == "accounts" ? myAccount != nil : myTransaction != nil
+    }
+
+    private var subjectName: String {
+        detail?.tableName == "accounts" ? "account" : "transaction"
     }
 
     var body: some View {
@@ -37,33 +55,47 @@ struct ConflictDetailSheet: View {
                 if isLoading {
                     ProgressView()
                 } else if let detail {
-                    Form {
-                        Section("What changed") {
-                            Text(detail.tableName == "accounts" ? "Account" : "Transaction")
-                            if let summary {
-                                Text(summary).foregroundStyle(.secondary)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            explanation
+                            if !fields.isEmpty {
+                                comparisonCard
+                            } else if couldNotReachServer {
+                                Label(
+                                    "Couldn't reach the server to show what changed. "
+                                        + "Check your connection and reopen this.",
+                                    systemImage: "wifi.slash"
+                                )
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                             } else {
-                                Text("No longer available locally — pull to see the server's version.")
-                                    .foregroundStyle(.secondary)
+                                Text(
+                                    "Nothing about this \(subjectName) looks different anymore "
+                                        + "— it may be safe to keep either version."
+                                )
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            }
+                            if let errorMessage {
+                                Text(errorMessage).font(.footnote).foregroundStyle(.red)
                             }
                         }
-                        Section("Versions") {
-                            LabeledContent("Your version", value: "\(detail.clientVersion)")
-                            LabeledContent("Server version", value: "\(detail.serverVersion)")
-                        }
-                        if let errorMessage {
-                            Text(errorMessage).foregroundStyle(.red)
-                        }
+                        .padding()
                     }
                 } else {
-                    Text("This conflict no longer applies.").foregroundStyle(.secondary)
+                    VStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.largeTitle)
+                            .foregroundStyle(Color.secondary)
+                        Text("This conflict no longer applies.").foregroundStyle(Color.secondary)
+                    }
                 }
             }
             .navigationTitle("Sync Conflict")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Dismiss") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -73,12 +105,66 @@ struct ConflictDetailSheet: View {
         .task { await load() }
     }
 
+    private var explanation: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Changed in two places", systemImage: "arrow.triangle.branch")
+                .font(.headline)
+            Text(
+                "You changed this \(subjectName) on this device, but it was also changed elsewhere "
+                    + "(another device, or directly on the server) before the two could sync up. "
+                    + "Pick which version should win — the other will be discarded."
+            )
+            .font(.subheadline)
+            .foregroundStyle(Color.secondary)
+        }
+    }
+
+    private var comparisonCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(fields) { field in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(field.label)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    HStack(spacing: 8) {
+                        fieldValue(icon: "iphone", caption: "This device", value: field.mine)
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.caption)
+                            .foregroundStyle(Color.secondary)
+                        fieldValue(icon: "icloud", caption: "Currently saved", value: field.server)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func fieldValue(icon: String, caption: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(caption, systemImage: icon)
+                .font(.caption)
+                .foregroundStyle(Color.secondary)
+            Text(value)
+                .font(.body)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.primary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var actionButtons: some View {
         VStack(spacing: 12) {
             Button {
                 Task { await keepServer() }
             } label: {
-                Text("Keep Server Version").frame(maxWidth: .infinity)
+                VStack(spacing: 2) {
+                    Text("Keep What's Saved").frame(maxWidth: .infinity)
+                    Text("Discard your change on this device")
+                        .font(.caption2)
+                        .opacity(0.8)
+                }
             }
             .buttonStyle(.borderedProminent)
             .disabled(isWorking)
@@ -87,105 +173,32 @@ struct ConflictDetailSheet: View {
                 Button {
                     Task { await keepMine() }
                 } label: {
-                    Text("Keep My Version").frame(maxWidth: .infinity)
+                    VStack(spacing: 2) {
+                        Text("Keep My Change").frame(maxWidth: .infinity)
+                        Text("Overwrite what's saved with this device's version")
+                            .font(.caption2)
+                            .opacity(0.8)
+                    }
                 }
                 .buttonStyle(.bordered)
                 .disabled(isWorking)
             }
+
+            Text("Closing without choosing leaves this in Needs Review — it won't resolve itself.")
+                .font(.caption2)
+                .foregroundStyle(Color.secondary)
+                .multilineTextAlignment(.center)
         }
         .padding()
     }
+}
 
-    /// Captures "my version" — the local mirror's current, still-optimistic
-    /// field values — before either action below ever pulls, since a pull
-    /// overwrites this same row with the server's authoritative one.
-    private func load() async {
-        guard let loaded = try? await session.dbQueue.read({ database in
-            try ConflictLocalQueries.detail(database, id: conflictId.uuidString)
-        }) else {
-            isLoading = false
-            return
-        }
-        detail = loaded
-
-        if loaded.tableName == "accounts" {
-            myAccount = try? await session.dbQueue.read { database in
-                try LocalTableQueries.account(database, id: loaded.rowId)
-            }
-            summary = myAccount.map { "\($0.name) — \($0.archivedAt == nil ? "active" : "archived")" }
-        } else if let baseCurrency = session.profile?.baseCurrency, let ownerId = session.profile?.id {
-            myTransaction = try? await session.dbQueue.read { database in
-                try LocalTransactionRow.fetchOne(
-                    database, id: loaded.rowId, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
-                )
-            }
-            if let transaction = myTransaction, let amount = transaction.amountE4, let currency = transaction.currency {
-                let info = CurrencyInfo(code: currency, minorUnit: Int(transaction.minorUnit ?? 2))
-                let formatted = MoneyFormatter.format(amount, currency: info)
-                summary = "\(transaction.merchantRaw ?? transaction.categoryName ?? "Transaction") — \(formatted)"
-            }
-        }
-        isLoading = false
-    }
-
-    /// The pull alone already corrects the local mirror to the server's
-    /// row — nothing left to do but mark the conflict resolved.
-    private func keepServer() async {
-        guard let detail else { return }
-        isWorking = true
-        errorMessage = nil
-        await session.syncEngine?.pull()
-        await resolve(detail)
-        isWorking = false
-    }
-
-    private func keepMine() async {
-        guard let detail else { return }
-        isWorking = true
-        errorMessage = nil
-        await session.syncEngine?.pull()
-        let freshVersion = await currentServerVersion(detail)
-        if detail.tableName == "accounts", let myAccount {
-            _ = await session.outbox.submitArchiveAccount(
-                ArchiveAccountPayload(
-                    id: myAccount.id, expectedVersion: freshVersion, archived: myAccount.archivedAt != nil
-                )
-            ).value
-        } else if let myTransaction, let id = myTransaction.transactionId, let categoryId = myTransaction.categoryId {
-            _ = await session.outbox.submitUpdateTransaction(
-                UpdateTransactionPayload(
-                    id: id, expectedVersion: freshVersion,
-                    accountId: myTransaction.accountId ?? UUID(), categoryId: categoryId,
-                    amountE4: myTransaction.amountE4 ?? 0, currency: myTransaction.currency ?? "USD",
-                    occurredAt: PostgresDate.date(fromTimestamp: myTransaction.occurredAt ?? "") ?? Date(),
-                    merchantRaw: myTransaction.merchantRaw
-                )
-            ).value
-        }
-        await resolve(detail)
-        isWorking = false
-    }
-
-    /// After the pull above, the local row's own `version` IS the server's
-    /// current one — no separate network round trip needed to learn it.
-    private func currentServerVersion(_ detail: SyncConflictDetail) async -> Int {
-        let fresh: Int? = try? await session.dbQueue.read { database in
-            if detail.tableName == "accounts" {
-                return try LocalTableQueries.account(database, id: detail.rowId).map { Int($0.version) }
-            }
-            return try LocalTableQueries.transaction(database, id: detail.rowId).map { Int($0.version) }
-        }
-        return fresh ?? detail.serverVersion
-    }
-
-    private func resolve(_ detail: SyncConflictDetail) async {
-        do {
-            try await NeedsReviewRepository.resolveSyncConflict(client: session.client, id: detail.id)
-            session.refresh.bump()
-            onResolved()
-            dismiss()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
-    }
+/// One field the local and server rows disagree on, in plain-English form
+/// — only fields that actually differ are shown, per `load()`'s field
+/// builders, so this never carries noise like unchanged timestamps.
+struct ConflictField: Identifiable {
+    let label: String
+    let mine: String
+    let server: String
+    var id: String { label }
 }

@@ -20,6 +20,7 @@
 		23E7D1393EAD719BE66438BF /* AccountFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6234223F609F295F8F13BDED /* AccountFormView.swift */; };
 		2BEA2658AA22E03CB9ACAE5A /* LocalTransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4164124106D1FC427294CD27 /* LocalTransactionRow.swift */; };
 		303F4C318CFC27290CD85D25 /* PrivacyToggleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD74535C9BAD0B3D22700F1 /* PrivacyToggleButton.swift */; };
+		313FC5BD846C0415D62084A2 /* ConflictDetailSheet+Loading.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB21306F71BA4693E4676718 /* ConflictDetailSheet+Loading.swift */; };
 		3233B01CD185C2B402C691F8 /* MetricKitSubscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A3FA3E05923A1E586BEE2BA /* MetricKitSubscriber.swift */; };
 		32384D1C333E36EFC326C01E /* WalletAutomationGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDA9FDB15C2C5D6B5B18466D /* WalletAutomationGuideView.swift */; };
 		35FBFA6ED12189BE76D60F92 /* TransactionsListView+Loading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E0C66C1771B2C113D912E35 /* TransactionsListView+Loading.swift */; };
@@ -205,6 +206,7 @@
 		E6A741E7644D1745889C5114 /* RecurringRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRulesView.swift; sourceTree = "<group>"; };
 		E7AC3C81304BFE67EEFD8611 /* LocalAccountRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRow.swift; sourceTree = "<group>"; };
 		E9EFFACF34C66AE4CCA5245E /* CurrencyConversionLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyConversionLabel.swift; sourceTree = "<group>"; };
+		EB21306F71BA4693E4676718 /* ConflictDetailSheet+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConflictDetailSheet+Loading.swift"; sourceTree = "<group>"; };
 		ED9921C3A12ACEF10F463E95 /* CategoryLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryLocalWrite.swift; sourceTree = "<group>"; };
 		EDED98D97ACE3A89820BBD09 /* CaptureIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureIntent.swift; sourceTree = "<group>"; };
 		EE77801FEDF30EF5EC63D7C9 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
@@ -289,6 +291,7 @@
 				ED9921C3A12ACEF10F463E95 /* CategoryLocalWrite.swift */,
 				6E416B10D5153DF1638B0ED9 /* ColorHex.swift */,
 				BBAFFDD646D531BB369E684A /* ConflictDetailSheet.swift */,
+				EB21306F71BA4693E4676718 /* ConflictDetailSheet+Loading.swift */,
 				1D55AC5A489A7549317ADB19 /* ConflictResolution.swift */,
 				5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */,
 				E9EFFACF34C66AE4CCA5245E /* CurrencyConversionLabel.swift */,
@@ -549,6 +552,7 @@
 				3F28EF46A43EE7AF81CD656B /* CategoryIconView.swift in Sources */,
 				4396DE29BCBD5EA251338E5E /* CategoryLocalWrite.swift in Sources */,
 				A84A63EA9F34755A0DFB9067 /* ColorHex.swift in Sources */,
+				313FC5BD846C0415D62084A2 /* ConflictDetailSheet+Loading.swift in Sources */,
 				AD9ECBCDD919F4BB10E4245D /* ConflictDetailSheet.swift in Sources */,
 				7B5828DB0F36A3D6B2ED4DEB /* ConflictResolution.swift in Sources */,
 				E9B90B45B2064ED05EA757BE /* CurrencyConversionLabel.swift in Sources */,
