@@ -34,6 +34,7 @@ struct TransactionsListView: View {
     @State var isLoading = true
     @State var loadErrorMessage: String?
     @State var filterCategories: [PublicSchema.CategoriesSelect] = []
+    @State var filterAccounts: [LocalAccountRow] = []
     @State private var isAddingTransaction = false
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
     @State private var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
@@ -153,6 +154,7 @@ struct TransactionsListView: View {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
             VStack(spacing: 0) {
+                accountFilterMenu
                 periodNavigator
 
                 if isLoading {
@@ -193,6 +195,51 @@ struct TransactionsListView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Account filter
+
+    private var accountFilterMenu: some View {
+        Menu {
+            Button {
+                filter.accountId = nil
+            } label: {
+                if filter.accountId == nil {
+                    Label("All Accounts", systemImage: "checkmark")
+                } else {
+                    Text("All Accounts")
+                }
+            }
+            ForEach(filterAccounts) { account in
+                Button {
+                    filter.accountId = account.id
+                } label: {
+                    if filter.accountId == account.id {
+                        Label(account.name, systemImage: "checkmark")
+                    } else {
+                        Text(account.name)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(selectedAccountName)
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+            }
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+        }
+        .padding(.horizontal)
+        .padding(.top, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var selectedAccountName: String {
+        guard let accountId = filter.accountId else { return "All Accounts" }
+        return filterAccounts.first { $0.id == accountId }?.name ?? "All Accounts"
     }
 
     // MARK: - Transaction helpers

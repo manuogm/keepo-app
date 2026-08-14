@@ -29,7 +29,31 @@ public enum MoneyFormatter {
         locale: Locale = .current
     ) -> String {
         guard let amountE4 else { return "—" }
+        let formatter = currencyFormatter(currency: currency, locale: locale)
+        return formatter.string(from: displayValue(amountE4, currency: currency) as NSDecimalNumber) ?? "—"
+    }
 
+    /// Same rendering as `format`, split at the locale's decimal separator so
+    /// a caller (e.g. a hero balance) can give the fractional part its own,
+    /// smaller styling. `fraction` includes the separator itself (e.g.
+    /// ".56") and is empty for a zero-decimal currency or a missing value —
+    /// callers render `whole` alone in that case.
+    public static func formatSplit(
+        _ amountE4: Int64?,
+        currency: CurrencyInfo,
+        locale: Locale = .current
+    ) -> (whole: String, fraction: String) {
+        guard let amountE4 else { return ("—", "") }
+        let formatter = currencyFormatter(currency: currency, locale: locale)
+        let full = formatter.string(from: displayValue(amountE4, currency: currency) as NSDecimalNumber) ?? "—"
+
+        guard currency.minorUnit > 0, let separator = formatter.decimalSeparator,
+            let range = full.range(of: separator, options: .backwards)
+        else { return (full, "") }
+        return (String(full[..<range.lowerBound]), String(full[range.lowerBound...]))
+    }
+
+    private static func displayValue(_ amountE4: Int64, currency: CurrencyInfo) -> Decimal {
         var displayValue = Decimal()
         var source = Decimal(amountE4) / Decimal(10_000)
         // Display rounding only, driven by the currency's minor unit — `.plain`
@@ -37,14 +61,16 @@ public enum MoneyFormatter {
         // server-side in `fx_convert`, not NumberFormatter's own default
         // half-even rounding.
         NSDecimalRound(&displayValue, &source, currency.minorUnit, .plain)
+        return displayValue
+    }
 
+    private static func currencyFormatter(currency: CurrencyInfo, locale: Locale) -> NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = currency.code
         formatter.locale = locale
         formatter.minimumFractionDigits = currency.minorUnit
         formatter.maximumFractionDigits = currency.minorUnit
-
-        return formatter.string(from: displayValue as NSDecimalNumber) ?? "—"
+        return formatter
     }
 }

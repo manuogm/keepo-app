@@ -71,6 +71,7 @@
 		B7A28835CF97300D93A8A733 /* LocalMoneyTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEDC16F840D1D52F4F06892 /* LocalMoneyTypes.swift */; };
 		B95EF6554B1C4939A18561C3 /* NetWorthDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA049CBC27DE13AAA36A637E /* NetWorthDetailView.swift */; };
 		BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */; };
+		C161DFD748D70B4AB3D02EEB /* AccountGroupDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E411123808C435E6B54C1F93 /* AccountGroupDetailView.swift */; };
 		C2B619C3EC87A5847A00EAE4 /* SyncCursorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FD9B0EBCF053E1B3E86E65C /* SyncCursorStore.swift */; };
 		C31584818223B578BF4B42FD /* NetWorthChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F2FC3C71C9E5CC965BC8F3F /* NetWorthChartView.swift */; };
 		C886AE5DBD13E41BFE14BA54 /* CSVImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */; };
@@ -210,6 +211,7 @@
 		D635D3C66205FA4089E40FF3 /* SyncApply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncApply.swift; sourceTree = "<group>"; };
 		DE615004EB22E1F564BAEEC8 /* OfflineInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineInfoSheet.swift; sourceTree = "<group>"; };
 		E3EF5DAED2EACFF58805C874 /* LocalMoneyConversionBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversionBudget.swift; sourceTree = "<group>"; };
+		E411123808C435E6B54C1F93 /* AccountGroupDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountGroupDetailView.swift; sourceTree = "<group>"; };
 		E430CAB6976F8BB2B64C7D1A /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		E6A741E7644D1745889C5114 /* RecurringRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRulesView.swift; sourceTree = "<group>"; };
 		E7AC3C81304BFE67EEFD8611 /* LocalAccountRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRow.swift; sourceTree = "<group>"; };
@@ -285,6 +287,7 @@
 			isa = PBXGroup;
 			children = (
 				6234223F609F295F8F13BDED /* AccountFormView.swift */,
+				E411123808C435E6B54C1F93 /* AccountGroupDetailView.swift */,
 				898182E4776D77AF168F541B /* AccountLocalWrite.swift */,
 				02A0D5880530458F27A93E14 /* AccountsListView.swift */,
 				C4ADFA49D22C598E055F5FB9 /* AppSettings.swift */,
@@ -551,6 +554,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				23E7D1393EAD719BE66438BF /* AccountFormView.swift in Sources */,
+				C161DFD748D70B4AB3D02EEB /* AccountGroupDetailView.swift in Sources */,
 				7D30C1E73CAD87BAF1224099 /* AccountLocalWrite.swift in Sources */,
 				A5FFBD48BD9FE9D8281754EE /* AccountsListView.swift in Sources */,
 				1258AEE2BE84DBE4A3238432 /* AppSettings.swift in Sources */,

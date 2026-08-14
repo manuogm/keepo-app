@@ -9,11 +9,17 @@ import SwiftUI
 struct CategoriesView: View {
     let session: SessionStore
 
+    private enum KindTab: String, CaseIterable {
+        case expense = "Expense"
+        case income = "Income"
+    }
+
     @State private var categories: [PublicSchema.CategoriesSelect] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAddingCategory = false
     @State private var editingCategoryId: UUID?
+    @State private var selectedTab: KindTab = .expense
 
     private var expenseCategories: [PublicSchema.CategoriesSelect] {
         categories.filter { $0.kind == .expense }
@@ -23,23 +29,43 @@ struct CategoriesView: View {
         categories.filter { $0.kind == .income }
     }
 
+    private var visibleCategories: [PublicSchema.CategoriesSelect] {
+        selectedTab == .expense ? expenseCategories : incomeCategories
+    }
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
 
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if isLoading {
-                ProgressView()
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        categorySection(title: "Expense", categories: expenseCategories)
-                        categorySection(title: "Income", categories: incomeCategories)
-                    }
-                    .padding()
+            VStack(spacing: 0) {
+                Picker("Kind", selection: $selectedTab) {
+                    ForEach(KindTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
-                .refreshable { await load() }
+                .pickerStyle(.segmented)
+                .padding()
+
+                if isLoading {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(visibleCategories, id: \.id) { category in
+                                Button {
+                                    editingCategoryId = category.id
+                                } label: {
+                                    CategoryTile(category: category)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .refreshable { await load() }
+                }
             }
 
             if let errorMessage {
@@ -78,27 +104,6 @@ struct CategoriesView: View {
         .task(id: session.refresh.token) { await load() }
     }
 
-    @ViewBuilder
-    private func categorySection(title: String, categories: [PublicSchema.CategoriesSelect]) -> some View {
-        if !categories.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(Color.secondary)
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(categories, id: \.id) { category in
-                        Button {
-                            editingCategoryId = category.id
-                        } label: {
-                            CategoryTile(category: category)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
     private func load() async {
         errorMessage = nil
         do {
@@ -120,7 +125,7 @@ private struct CategoryTile: View {
                 .foregroundStyle(.white)
                 .frame(width: 48, height: 48)
                 .background(Color(hex: category.color))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(Circle())
             Text(category.name)
                 .font(.footnote)
                 .foregroundStyle(Color.primary)
@@ -129,7 +134,5 @@ private struct CategoryTile: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }

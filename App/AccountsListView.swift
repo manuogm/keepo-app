@@ -40,26 +40,23 @@ struct AccountsListView: View {
                 List {
                     if !everyday.isEmpty {
                         Section {
+                            aggregateRow(title: "Everyday", accounts: everyday)
                             ForEach(everyday) { accountRow($0) }
-                        } header: {
-                            sectionHeader("Everyday", accounts: everyday)
                         }
                     }
                     if !investments.isEmpty {
                         Section {
+                            aggregateRow(title: "Investments", accounts: investments)
                             ForEach(investments) { accountRow($0) }
-                        } header: {
-                            sectionHeader("Investments", accounts: investments)
                         }
                     }
                     if !archived.isEmpty {
                         Section {
-                            NavigationLink("Archived (\(archived.count))") {
-                                ArchiveAccountsView(session: session)
-                            }
+                            archivedRow
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
                 .refreshable { await load() }
             }
@@ -146,12 +143,41 @@ struct AccountsListView: View {
 
     @Environment(\.isPrivacyMode) private var isPrivacyMode
 
-    private func sectionHeader(_ title: String, accounts: [LocalAccountRow]) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(isPrivacyMode ? "••••" : subtotalText(for: accounts))
+    /// Lives inside the card as the group's own first row (not a floating
+    /// `Section` header) so the aggregate reads as part of the group rather
+    /// than a label above it — a distinct shade sets it apart from the
+    /// account rows underneath, and it pushes to its own (currently blank)
+    /// detail screen.
+    private func aggregateRow(title: String, accounts: [LocalAccountRow]) -> some View {
+        NavigationLink {
+            AccountGroupDetailView(title: title)
+        } label: {
+            HStack {
+                Text(title).font(.headline)
+                Spacer()
+                Text(isPrivacyMode ? "••••" : subtotalText(for: accounts))
+                    .foregroundStyle(Color.secondary)
+            }
         }
+        .listRowBackground(Color(.tertiarySystemGroupedBackground))
+    }
+
+    /// A plain `NavigationLink` always appends its own trailing disclosure
+    /// chevron in a `List` regardless of the label's own content — routing
+    /// navigation through an invisible link and drawing the chevron inline
+    /// ourselves is the only way to place it next to the text instead.
+    private var archivedRow: some View {
+        ZStack {
+            NavigationLink("", destination: ArchiveAccountsView(session: session)).opacity(0)
+            HStack(spacing: 4) {
+                Text("Archived (\(archived.count))")
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
+                Spacer()
+            }
+        }
+        .listRowBackground(Color.clear)
     }
 
     /// A subtotal only means anything converted into one common currency —

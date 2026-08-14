@@ -26,6 +26,7 @@ struct OfflineStatusBar: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showInfo) {

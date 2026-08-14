@@ -64,7 +64,7 @@ struct RootView: View {
                     if network.isOffline {
                         OfflineStatusBar(lastSyncedAt: session.syncEngine?.lastSyncedAt)
                             .padding(.horizontal)
-                            .padding(.bottom, 4)
+                            .padding(.bottom, 14)
                     }
                 }
             case .failed(let message):

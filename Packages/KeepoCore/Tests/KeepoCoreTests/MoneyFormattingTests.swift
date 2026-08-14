@@ -48,4 +48,26 @@ struct MoneyFormatterTests {
         let result = MoneyFormatter.format(0, currency: usd, locale: usLocale)
         #expect(result != "—")
     }
+
+    @Test("formatSplit's two parts concatenate back to the plain format")
+    func formatSplitReassemblesToFullFormat() {
+        let full = MoneyFormatter.format(123_450, currency: usd, locale: usLocale)
+        let split = MoneyFormatter.formatSplit(123_450, currency: usd, locale: usLocale)
+        #expect(split.whole + split.fraction == full)
+        #expect(split.fraction.hasPrefix("."))
+    }
+
+    @Test("formatSplit has no fraction for a zero-decimal currency")
+    func formatSplitZeroDecimalCurrency() {
+        let split = MoneyFormatter.formatSplit(15_000_000, currency: jpy, locale: usLocale)
+        #expect(split.fraction.isEmpty)
+        #expect(split.whole == MoneyFormatter.format(15_000_000, currency: jpy, locale: usLocale))
+    }
+
+    @Test("formatSplit renders a missing value as a whole-only dash")
+    func formatSplitMissingValue() {
+        let split = MoneyFormatter.formatSplit(nil, currency: usd, locale: usLocale)
+        #expect(split.whole == "—")
+        #expect(split.fraction.isEmpty)
+    }
 }
