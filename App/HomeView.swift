@@ -51,20 +51,14 @@ struct HomeView: View {
                 .refreshable { await load() }
             }
 
-            // Both top-bar buttons present via `.popover` rather than a
-            // system `.sheet`, so neither gets the automatic background dim
-            // a sheet would apply — this overlay adds that dimming back
-            // manually.
-            //
-            // Hit-testable (only while shown) and wired to close both
-            // popovers itself: an outside tap dismisses a `.popover` via a
-            // system animation whose completion — not its start — is what
-            // flips `isPresented`, so a curtain merely watching that binding
-            // sits fully opaque for the whole dismiss animation and then
-            // disappears abruptly right at the end. Setting the state here,
-            // at the moment of the tap, puts the curtain back in the same
-            // fast path as the "pick an option" dismiss, which already set
-            // state directly and always looked instant.
+            // Both top-bar buttons present as a plain SwiftUI overlay here —
+            // not a system `.popover` — because a popover's own outside-tap
+            // dismissal happens above our content and gives us no reliable
+            // hook to keep a background curtain in sync with it (tested:
+            // both watching its delayed `isPresented` flip and trying to
+            // race it with our own tap gesture failed). Owning the whole
+            // presentation ourselves means one piece of state drives the
+            // trigger, the curtain, and the outside-tap dismiss together.
             Color.black.opacity(isOverlayPresented ? 0.25 : 0)
                 .ignoresSafeArea()
                 .allowsHitTesting(isOverlayPresented)
@@ -72,6 +66,22 @@ struct HomeView: View {
                     showScopeMenu = false
                     showNotifications = false
                 }
+
+            if showScopeMenu {
+                scopeMenuCard
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.top, 4)
+                    .padding(.leading, 8)
+                    .transition(.scale(scale: 0.85, anchor: .topLeading).combined(with: .opacity))
+            }
+
+            if showNotifications {
+                notificationsCard
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.top, 4)
+                    .padding(.trailing, 8)
+                    .transition(.scale(scale: 0.85, anchor: .topTrailing).combined(with: .opacity))
+            }
         }
         .animation(.easeInOut(duration: 0.15), value: isOverlayPresented)
         .navigationTitle("Home")
@@ -82,21 +92,6 @@ struct HomeView: View {
                     showScopeMenu = true
                 } label: {
                     Image(systemName: "ellipsis")
-                }
-                // Same anchored-popover pattern as the bell button below —
-                // grows from the button itself instead of rising as a sheet.
-                .popover(isPresented: $showScopeMenu) {
-                    scopeMenuContent
-                        .frame(width: 220)
-                        .presentationCompactAdaptation(.popover)
-                        // The system's own outside-tap-to-dismiss sits above
-                        // our content and wins the touch outright, so the
-                        // curtain's own tap gesture below never actually
-                        // fired for that path — only the system's delayed
-                        // isPresented flip did. Disabling it here makes our
-                        // curtain the sole handler for an outside tap, so
-                        // both dismiss paths now go through the same code.
-                        .interactiveDismissDisabled()
                 }
             }
             ToolbarItem(placement: .principal) {
@@ -116,19 +111,6 @@ struct HomeView: View {
                             .offset(x: 2, y: -2)
                     }
                 }
-                // A popover (rather than a sheet) grows from the bell button
-                // itself instead of rising from the bottom of the screen —
-                // presentationCompactAdaptation(.popover) keeps that anchored
-                // presentation on iPhone too, which would otherwise force it
-                // to a full-screen cover in a compact-width size class.
-                .popover(isPresented: $showNotifications) {
-                    NavigationStack {
-                        NeedsReviewView(session: session)
-                    }
-                    .frame(width: 340, height: 480)
-                    .presentationCompactAdaptation(.popover)
-                    .interactiveDismissDisabled()
-                }
             }
         }
         .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
@@ -137,7 +119,7 @@ struct HomeView: View {
     /// Rows keep their identity icon (globe/person/person.2) even when
     /// selected — the checkmark is appended at the trailing edge instead of
     /// replacing it, so which option is which stays visible at a glance.
-    private var scopeMenuContent: some View {
+    private var scopeMenuCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             scopeRow(.total, label: "Total Net Worth", icon: "globe")
             Divider()
@@ -146,6 +128,20 @@ struct HomeView: View {
             scopeRow(.household, label: "Household", icon: "person.2.fill")
         }
         .padding(.vertical, 4)
+        .frame(width: 220)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+    }
+
+    private var notificationsCard: some View {
+        NavigationStack {
+            NeedsReviewView(session: session)
+        }
+        .frame(width: 340, height: 480)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
     }
 
     private func scopeRow(_ scope: PublicSchema.AccountScope, label: String, icon: String) -> some View {
