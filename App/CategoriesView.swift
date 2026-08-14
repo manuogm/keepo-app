@@ -87,8 +87,12 @@ struct CategoriesView: View {
                     .foregroundStyle(Color.secondary)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(categories, id: \.id) { category in
-                        CategoryTile(category: category)
-                            .onTapGesture { editingCategoryId = category.id }
+                        Button {
+                            editingCategoryId = category.id
+                        } label: {
+                            CategoryTile(category: category)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
