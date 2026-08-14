@@ -32,4 +32,14 @@ enum ConflictLocalQueries {
             clientVersion: row["client_version"], serverVersion: row["server_version"]
         )
     }
+
+    /// `resolve_sync_conflict` is online-only and, like `delete_category_
+    /// and_reassign`, needs a local echo right after it succeeds — without
+    /// one, `needs_review`'s local query (`resolved_at IS NULL`) keeps
+    /// showing the row until the next sync pull happens to land, which can
+    /// be much later than the moment the user just resolved it.
+    static func markResolved(id: String, in database: Database) throws {
+        let now = PostgresDate.sqliteTimestampBoundaryString(Date())
+        try database.execute(sql: "UPDATE sync_conflicts SET resolved_at = ? WHERE id = ?", arguments: [now, id])
+    }
 }

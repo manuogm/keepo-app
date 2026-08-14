@@ -119,6 +119,9 @@ extension TransactionsListView {
         reviewActionError = nil
         do {
             try await NeedsReviewRepository.resolveSyncConflict(client: session.client, id: id)
+            try? await session.dbQueue.write { database in
+                try ConflictLocalQueries.markResolved(id: id.uuidString, in: database)
+            }
             session.refresh.bump()
         } catch {
             reviewActionError = UserFacingError.describe(error)

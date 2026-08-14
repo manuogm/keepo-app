@@ -157,6 +157,9 @@ extension ConflictDetailSheet {
     func resolve(_ detail: SyncConflictDetail) async {
         do {
             try await NeedsReviewRepository.resolveSyncConflict(client: session.client, id: detail.id)
+            try? await session.dbQueue.write { database in
+                try ConflictLocalQueries.markResolved(id: detail.id.uuidString, in: database)
+            }
             session.refresh.bump()
             onResolved()
             dismiss()
