@@ -16,6 +16,7 @@ struct HomeView: View {
     let session: SessionStore
 
     @State private var netWorth: Int64?
+    @State private var previousMonthNetWorth: Int64?
     @State private var seriesPoints: [(date: Date, value: Int64)] = []
     @State private var baseCurrencyInfo: CurrencyInfo?
     @State private var isLoading = true
@@ -70,13 +71,19 @@ struct HomeView: View {
                             .offset(x: 2, y: -2)
                     }
                 }
+                // A popover (rather than a sheet) grows from the bell button
+                // itself instead of rising from the bottom of the screen —
+                // presentationCompactAdaptation(.popover) keeps that anchored
+                // presentation on iPhone too, which would otherwise force it
+                // to a full-screen cover in a compact-width size class.
+                .popover(isPresented: $showNotifications) {
+                    NavigationStack {
+                        NeedsReviewView(session: session)
+                    }
+                    .frame(width: 340, height: 480)
+                    .presentationCompactAdaptation(.popover)
+                }
             }
-        }
-        .sheet(isPresented: $showNotifications) {
-            NavigationStack {
-                NeedsReviewView(session: session)
-            }
-            .presentationDetents([.medium, .large])
         }
         .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
     }
@@ -85,18 +92,32 @@ struct HomeView: View {
         NavigationLink {
             NetWorthDetailView(session: session)
         } label: {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Net Worth")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondary)
                 BalanceHeaderView(amount: netWorth, currency: baseCurrencyInfo)
-                NetWorthChartView(seriesPoints: seriesPoints, showAxes: false, height: 120)
+                TrendBadge(percentChange: monthOverMonthChange, color: trendColor)
+                NetWorthChartView(seriesPoints: seriesPoints, showAxes: false, height: 70, trendColor: trendColor)
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
+    }
+
+    /// nil when either side can't be computed (money rule 5 — a missing FX
+    /// rate propagates to "—", never a partial/misleading percentage), or
+    /// when there was nothing a month ago to compare against.
+    private var monthOverMonthChange: Double? {
+        guard let netWorth, let previousMonthNetWorth, previousMonthNetWorth != 0 else { return nil }
+        return Double(netWorth - previousMonthNetWorth) / Double(abs(previousMonthNetWorth)) * 100
+    }
+
+    private var trendColor: Color {
+        guard let monthOverMonthChange else { return .secondary }
+        return monthOverMonthChange >= 0 ? .green : .red
     }
 
     private func load() async {
@@ -110,13 +131,16 @@ struct HomeView: View {
         let todayString = PostgresDate.dateOnlyString(today, calendar: utcCalendar)
         let fromDate = utcCalendar.date(byAdding: .day, value: -(rangeDays - 1), to: today) ?? today
         let fromString = PostgresDate.dateOnlyString(fromDate, calendar: utcCalendar)
+        let oneMonthAgo = utcCalendar.date(byAdding: .month, value: -1, to: today) ?? today
+        let oneMonthAgoString = PostgresDate.dateOnlyString(oneMonthAgo, calendar: utcCalendar)
         let moneyScope = LocalMoneyScope(scope: session.scope, baseCurrency: baseCurrency)
         let dbQueue = session.dbQueue
 
         do {
-            let (netWorthValue, seriesResult, currencies, reviewRows) = try await dbQueue.read { database in
+            let loaded = try await dbQueue.read { database in
                 (
                     try LocalMoneyConversion.netWorth(database, moneyScope, asOf: todayString, now: today),
+                    try LocalMoneyConversion.netWorth(database, moneyScope, asOf: oneMonthAgoString, now: today),
                     try LocalMoneyConversion.netWorthSeries(
                         database, moneyScope, from: fromString, through: todayString, now: today
                     ),
@@ -124,7 +148,9 @@ struct HomeView: View {
                     try LocalMoneyQueries.needsReview(database)
                 )
             }
+            let (netWorthValue, previousMonthValue, seriesResult, currencies, reviewRows) = loaded
             netWorth = netWorthValue
+            previousMonthNetWorth = previousMonthValue
             if let row = currencies.first(where: { $0.code == baseCurrency }) {
                 baseCurrencyInfo = CurrencyInfo(code: row.code, minorUnit: Int(row.minorUnit))
             }

@@ -41,6 +41,12 @@ enum LocalTransactionRow {
     ))
     """
 
+    /// Archiving an account (`archived_at`) hides its transactions from
+    /// this list too — same "no physical flag on the row" approach the
+    /// exclusion has everywhere else: visibility is derived live from the
+    /// account's own archived state, not copied onto every transaction, so
+    /// unarchiving makes them reappear with no backfill needed. The FK
+    /// itself is untouched either way.
     static func fetchFiltered(
         _ database: Database, filter: TransactionFilter, baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
@@ -51,7 +57,8 @@ enum LocalTransactionRow {
                CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                     WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
         FROM transactions t
-        JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
+        JOIN accounts a ON a.id = t.account_id
+            AND a.deleted_at IS NULL AND a.archived_at IS NULL AND \(visibleAccountClause)
         LEFT JOIN categories c ON c.id = t.category_id
         JOIN currencies cur ON cur.code = t.currency
         WHERE t.deleted_at IS NULL

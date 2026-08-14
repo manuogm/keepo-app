@@ -52,7 +52,6 @@
 		826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */; };
 		8418D67FD7BAB31C6629EE5B /* TransactionFormView+Delete.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7302E5237413BF6107E4CE /* TransactionFormView+Delete.swift */; };
 		85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A520844CB1127366801CB8 /* KeepoCore */; };
-		8BF5404657D72CE37547C10A /* TransactionFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F669D17F23A1AEDB491BF1F /* TransactionFilterView.swift */; };
 		8C19ADA540858E61760E4FE7 /* BudgetFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EF478F9C03D81B6E0CCFB1 /* BudgetFormView.swift */; };
 		910929EACA4D7E2B7840D626 /* ArchiveAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26D5FDEC899FFE8FBF9699D /* ArchiveAccountsView.swift */; };
 		916606BE115D52894CF13E4A /* Outbox+AccountsCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF23EF5C13D50D95393B5ABF /* Outbox+AccountsCategories.swift */; };
@@ -78,6 +77,7 @@
 		C95EADE3438BF04F99EBE006 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE6F0FB1B3DF6715A2BF817 /* PreferencesView.swift */; };
 		CA271C456719F30FF84B8FF5 /* CaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDED98D97ACE3A89820BBD09 /* CaptureIntent.swift */; };
 		CA42FD39D7ED2C1AA7DDD329 /* TransferDivergenceAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88C7E86C0F680D0F63F4135 /* TransferDivergenceAlert.swift */; };
+		CBA1F8EB27B25B3AE8413965 /* LocalMoneyConversionArchivedAccountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D45833432D943398CC902D /* LocalMoneyConversionArchivedAccountTests.swift */; };
 		CBDD7CC0182214986F8DE756 /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A2FE5321B9AA09B7118722 /* SecuritySettingsView.swift */; };
 		CDEAFC8D83E97D3B04E20CFD /* LocalStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */; };
 		D2249999B755B75AF3BA291E /* LocalMoneyQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3600B8733D14B431A8E3067 /* LocalMoneyQueries.swift */; };
@@ -156,7 +156,6 @@
 		4BB58A8214ECD93F7BA2BFA3 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		4DC8348A94F64846D6389F14 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		4DD4484E755728FA2992E894 /* LocalTransactionRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTransactionRowTests.swift; sourceTree = "<group>"; };
-		4F669D17F23A1AEDB491BF1F /* TransactionFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFilterView.swift; sourceTree = "<group>"; };
 		56BD1170276112E0659274B6 /* BalanceReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceReminderScheduler.swift; sourceTree = "<group>"; };
 		5A43338D7EE342E9D02ACC23 /* OutboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxTests.swift; sourceTree = "<group>"; };
 		5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVImportView.swift; sourceTree = "<group>"; };
@@ -183,6 +182,7 @@
 		9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
 		9FD9B0EBCF053E1B3E86E65C /* SyncCursorStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCursorStore.swift; sourceTree = "<group>"; };
 		A27663EBB8FB0BA605B81BDE /* DataPrivacyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataPrivacyView.swift; sourceTree = "<group>"; };
+		A5D45833432D943398CC902D /* LocalMoneyConversionArchivedAccountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversionArchivedAccountTests.swift; sourceTree = "<group>"; };
 		A6EC2DB7E832362CEA7CCF77 /* KeepoCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = KeepoCore; path = Packages/KeepoCore; sourceTree = SOURCE_ROOT; };
 		A78A0F12025B9E97E5A5B859 /* CategoryIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryIconView.swift; sourceTree = "<group>"; };
 		A9BE688265BE8E6EB9C7C6BF /* LocalMoneyConversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversion.swift; sourceTree = "<group>"; };
@@ -352,7 +352,6 @@
 				D635D3C66205FA4089E40FF3 /* SyncApply.swift */,
 				9FD9B0EBCF053E1B3E86E65C /* SyncCursorStore.swift */,
 				A9EB6980116C8080A7ADF85D /* SyncEngine.swift */,
-				4F669D17F23A1AEDB491BF1F /* TransactionFilterView.swift */,
 				223C215A93C8B4A390E17F34 /* TransactionFormView.swift */,
 				3F7302E5237413BF6107E4CE /* TransactionFormView+Delete.swift */,
 				8C335B228DAD2B9C1F3DD183 /* TransactionRow.swift */,
@@ -382,6 +381,7 @@
 				36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */,
 				8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */,
 				38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */,
+				A5D45833432D943398CC902D /* LocalMoneyConversionArchivedAccountTests.swift */,
 				472675CD5ADE433AA4B8E336 /* LocalMoneyRefereeFixture.swift */,
 				2022ED7EAFC392568FE06C52 /* LocalMoneyRefereeTests.swift */,
 				C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */,
@@ -524,6 +524,7 @@
 				E43BEBD85BAD11CDD781A200 /* CategoryLocalWriteTests.swift in Sources */,
 				4C27DB33415AF4D03D91EEE8 /* KeepoTests.swift in Sources */,
 				BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */,
+				CBA1F8EB27B25B3AE8413965 /* LocalMoneyConversionArchivedAccountTests.swift in Sources */,
 				E66057E7D6C97B7B9301BB1E /* LocalMoneyRefereeFixture.swift in Sources */,
 				D89DE5A5161CEB8D44029020 /* LocalMoneyRefereeTests.swift in Sources */,
 				CDEAFC8D83E97D3B04E20CFD /* LocalStoreTests.swift in Sources */,
@@ -615,7 +616,6 @@
 				00A96ACC913F667FD553AC6A /* SyncApply.swift in Sources */,
 				C2B619C3EC87A5847A00EAE4 /* SyncCursorStore.swift in Sources */,
 				A90857943ADABEFB25B44996 /* SyncEngine.swift in Sources */,
-				8BF5404657D72CE37547C10A /* TransactionFilterView.swift in Sources */,
 				8418D67FD7BAB31C6629EE5B /* TransactionFormView+Delete.swift in Sources */,
 				F3CCB559F93565682DBAE498 /* TransactionFormView.swift in Sources */,
 				E6D1468DE51E2DA7DD7B71CA /* TransactionRow.swift in Sources */,

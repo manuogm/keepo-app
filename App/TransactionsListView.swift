@@ -33,14 +33,12 @@ struct TransactionsListView: View {
     @State var transactions: [PublicSchema.TransactionsWithDetailsSelect] = []
     @State var isLoading = true
     @State var loadErrorMessage: String?
-    @State var filterAccounts: [LocalAccountRow] = []
     @State var filterCategories: [PublicSchema.CategoriesSelect] = []
     @State private var isAddingTransaction = false
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
     @State private var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
     @State private var editingRecurringRule: PublicSchema.RecurringRulesSelect?
     @State var filter = TransactionFilter()
-    @State private var isFilterSheetPresented = false
     @State private var isSearching = false
 
     // Not `private` — read/written from TransactionsListView+Period.swift.
@@ -135,23 +133,16 @@ struct TransactionsListView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    isAddingTransaction = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
                     isSearching = true
                 } label: {
                     Image(systemName: "magnifyingglass")
                 }
             }
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
-                    isFilterSheetPresented = true
+                    isAddingTransaction = true
                 } label: {
-                    Image(systemName: filterIconName)
+                    Image(systemName: "plus")
                 }
             }
         }
@@ -179,9 +170,6 @@ struct TransactionsListView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-        .sheet(isPresented: $isFilterSheetPresented) {
-            TransactionFilterView(filter: $filter, accounts: filterAccounts, categories: filterCategories)
-        }
         .sheet(isPresented: $isCustomRangePresented) {
             customRangeSheet
         }
@@ -192,10 +180,6 @@ struct TransactionsListView: View {
 
     private var searchBinding: Binding<String> {
         Binding(get: { filter.search ?? "" }, set: { filter.search = $0.isEmpty ? nil : $0 })
-    }
-
-    private var filterIconName: String {
-        filter.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill"
     }
 
     func sibling(

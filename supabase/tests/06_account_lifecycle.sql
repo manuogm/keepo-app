@@ -7,7 +7,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(9);
+select plan(10);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -73,6 +73,15 @@ select is(
   )),
   true,
   'archive_account(true) sets archived_at'
+);
+
+-- 4b. net_worth('total') excludes an archived account's balance (H: the
+-- account_lifecycle migration's own comment flagged this as unfinished
+-- until account_balances_base/net_worth learned to filter archived_at).
+select is(
+  net_worth('total'),
+  0::bigint,
+  'net_worth(''total'') excludes the archived account, counting only the still-active Cash account'
 );
 
 select is(

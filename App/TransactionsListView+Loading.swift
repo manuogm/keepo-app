@@ -23,14 +23,10 @@ extension TransactionsListView {
                     transactions: try LocalTransactionRow.fetchFiltered(
                         database, filter: effectiveFilter, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
                     ),
-                    accounts: try LocalAccountRow.fetchAll(
-                        database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
-                    ),
                     categories: try LocalTableQueries.categories(database)
                 )
             }
             transactions = loaded.transactions
-            filterAccounts = loaded.accounts
             filterCategories = loaded.categories
         } catch {
             loadErrorMessage = UserFacingError.describe(error)
@@ -67,6 +63,5 @@ extension TransactionsListView {
 
 private struct LoadedTransactionsState {
     let transactions: [PublicSchema.TransactionsWithDetailsSelect]
-    let accounts: [LocalAccountRow]
     let categories: [PublicSchema.CategoriesSelect]
 }

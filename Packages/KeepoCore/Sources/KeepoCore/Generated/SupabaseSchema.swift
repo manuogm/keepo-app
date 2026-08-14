@@ -1552,6 +1552,7 @@ public enum PublicSchema {
   }
   public struct AccountBalancesBaseSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
+    public let archivedAt: String?
     public let balanceBaseE4: Int64?
     public let balanceE4: Int64?
     public let baseCurrency: String?
@@ -1560,6 +1561,7 @@ public enum PublicSchema {
     public let ownerId: UUID?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
+      case archivedAt = "archived_at"
       case balanceBaseE4 = "balance_base_e4"
       case balanceE4 = "balance_e4"
       case baseCurrency = "base_currency"

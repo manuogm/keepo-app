@@ -85,11 +85,13 @@ enum LocalMoneyConversion {
         return results
     }
 
-    /// Accounts (not deleted) in scope, mirroring the `EXISTS`/`NOT EXISTS
-    /// household_accounts` predicate every scoped server function repeats.
+    /// Accounts (not deleted, not archived) in scope, mirroring the
+    /// `EXISTS`/`NOT EXISTS household_accounts` predicate every scoped
+    /// server function repeats, plus `net_worth()`'s own `archived_at is
+    /// null` filter (20260820100000_archived_account_net_worth_exclusion).
     static func scopedAccountIds(_ database: Database, scope: PublicSchema.AccountScope) throws -> [String] {
         let scopeClause = LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "id")
-        let sql = "SELECT id FROM accounts WHERE deleted_at IS NULL AND (\(scopeClause))"
+        let sql = "SELECT id FROM accounts WHERE deleted_at IS NULL AND archived_at IS NULL AND (\(scopeClause))"
         return try String.fetchAll(database, sql: sql)
     }
 
