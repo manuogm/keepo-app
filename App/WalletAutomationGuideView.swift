@@ -19,8 +19,18 @@ struct WalletAutomationGuideView: View {
                 step(1, "Open Shortcuts → Automation → New Automation → Wallet.")
                 step(2, "Choose the card to capture, then \"Any Transaction Amount.\"")
                 step(3, "Add an action → Keepo → \"Log Apple Pay Purchase.\"")
-                step(4, "Turn off \"Ask Before Running\" so it captures silently.")
-                step(5, "In Keepo, map the card to an account from Needs Review after its first purchase.")
+                step(4, "Map Card, Merchant, and Amount to the trigger's matching variables — nothing else to fill in.")
+                step(5, "Turn off \"Ask Before Running\" so it captures silently, without opening Keepo.")
+                step(6, "In Keepo, map the card to an account from Needs Review after its first purchase.")
+            }
+
+            Section {
+                Text(
+                    "A purchase never opens the app — you'll get a notification with the amount, category, and "
+                        + "account to glance at, and can tap it to review or fix anything that looks off."
+                )
+                .font(.footnote)
+                .foregroundStyle(Color.secondary)
             }
 
             Section {

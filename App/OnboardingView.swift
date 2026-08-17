@@ -1,6 +1,5 @@
 import KeepoCore
 import SwiftUI
-import UserNotifications
 
 /// Base currency → first account → opening balance → the Wallet-automation
 /// walkthrough, per keepo-v1-feature-spec.md §Onboarding.
@@ -172,12 +171,6 @@ struct OnboardingView: View {
             Button("Done") { onComplete() }
                 .buttonStyle(.borderedProminent)
                 .tint(Color.primary)
-        }
-        .task {
-            // A capture confirms via local notification, not by the app
-            // being open — request permission here, once, rather than
-            // waiting for the first capture to ask (and lose it).
-            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
         }
     }
 }

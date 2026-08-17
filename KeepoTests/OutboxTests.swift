@@ -11,11 +11,15 @@ import Testing
 @MainActor
 struct OutboxTests {
     private func makeOutbox(sender: StubTransactionSender) throws -> Outbox {
+        try makeOutboxWithQueue(sender: sender).0
+    }
+
+    private func makeOutboxWithQueue(sender: StubTransactionSender) throws -> (Outbox, DatabaseQueue) {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("v1") { database in try LocalSchemaV1.migrate(database) }
         let dbQueue = try DatabaseQueue()
         try migrator.migrate(dbQueue)
-        return Outbox(dbQueue: dbQueue, sender: sender)
+        return (Outbox(dbQueue: dbQueue, sender: sender), dbQueue)
     }
 
     @Test("a failed send queues the item; a later successful drain removes it")
@@ -116,6 +120,30 @@ struct OutboxTests {
         #expect(outbox.pendingCount == 0)
     }
 
+    /// Regression: a server-side RPC signature mismatch (an unpushed
+    /// migration) failed every capture while the queue reported only a
+    /// growing count and no reason — the failure that made a one-line
+    /// server fix take five rounds of device testing to find.
+    @Test("a queued write exposes why it failed, not just that it is pending")
+    func queuedWriteExposesItsFailureReason() async throws {
+        let sender = StubTransactionSender()
+        sender.captureTransactionResult = .failure(StubSenderError.network)
+        let outbox = try makeOutbox(sender: sender)
+        let payload = CaptureTransactionPayload(
+            id: UUID(), cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
+            amountE4: -45000, occurredAt: Date(), externalId: "ext-1"
+        )
+
+        _ = await outbox.submitCaptureTransaction(payload)
+        #expect(outbox.pendingCount == 1)
+        #expect(outbox.lastError != nil)
+
+        sender.captureTransactionResult = .success(())
+        await outbox.drainAll()
+        #expect(outbox.pendingCount == 0)
+        #expect(outbox.lastError == nil)
+    }
+
     @Test("a capture that fails to send is queued; draining replays it")
     func captureQueuesThenDrains() async throws {
         let sender = StubTransactionSender()
@@ -130,15 +158,15 @@ struct OutboxTests {
         #expect(submitResult == .queued)
         #expect(outbox.pendingCount == 1)
 
-        sender.captureTransactionResult = .success(CaptureResult(mapped: true, accountId: UUID()))
+        sender.captureTransactionResult = .success(())
         await outbox.drainAll()
         #expect(outbox.pendingCount == 0)
     }
 
-    @Test("an unmapped-card capture is delivered, not queued — mapped=false is data, not a failure")
-    func captureUnmappedIsDeliveredNotQueued() async throws {
+    @Test("a capture delivered immediately over the RPC-only path is applied, not queued")
+    func captureRPCOnlyIsDeliveredNotQueued() async throws {
         let sender = StubTransactionSender()
-        sender.captureTransactionResult = .success(CaptureResult(mapped: false, accountId: nil))
+        sender.captureTransactionResult = .success(())
         let outbox = try makeOutbox(sender: sender)
         let payload = CaptureTransactionPayload(
             id: UUID(), cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
@@ -146,7 +174,97 @@ struct OutboxTests {
         )
 
         let submitResult = await outbox.submitCaptureTransaction(payload)
-        #expect(submitResult == .applied(mapped: false))
+        #expect(submitResult == .applied)
+        #expect(outbox.pendingCount == 0)
+    }
+
+    @Test("confirming a capture that fails to send is queued; draining replays it")
+    func confirmCaptureQueuesThenDrains() async throws {
+        let sender = StubTransactionSender()
+        sender.confirmCaptureTransactionResult = .failure(StubSenderError.network)
+        let outbox = try makeOutbox(sender: sender)
+        let payload = ConfirmCaptureTransactionPayload(id: UUID(), expectedVersion: 1)
+
+        let submitResult = await outbox.submitConfirmCaptureTransaction(payload).value
+        #expect(submitResult == .queued)
+        #expect(outbox.pendingCount == 1)
+
+        sender.confirmCaptureTransactionResult = .success(true)
+        await outbox.drainAll()
+        #expect(outbox.pendingCount == 0)
+    }
+
+    /// Regression: `enqueue` used to collapse-by-id unconditionally, so a
+    /// confirm for a capture whose create hadn't reached the server yet
+    /// silently discarded that create, permanently. Both must survive as
+    /// their own items so a drain replays the create first, then the confirm.
+    @Test("a confirm for a not-yet-created capture queues separately, never discarding the create")
+    func confirmDuringPendingCaptureDoesNotDiscardTheCreate() async throws {
+        let sender = StubTransactionSender()
+        sender.captureTransactionResult = .failure(StubSenderError.network)
+        sender.confirmCaptureTransactionResult = .failure(StubSenderError.network)
+        let outbox = try makeOutbox(sender: sender)
+        let id = UUID()
+        let payload = CaptureTransactionPayload(
+            id: id, cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
+            amountE4: -45000, occurredAt: Date(), externalId: "ext-1"
+        )
+
+        _ = await outbox.submitCaptureTransaction(payload)
+        #expect(outbox.pendingCount == 1)
+
+        _ = await outbox.submitConfirmCaptureTransaction(
+            ConfirmCaptureTransactionPayload(id: id, expectedVersion: 1)
+        ).value
+        #expect(outbox.pendingCount == 2)
+
+        sender.captureTransactionResult = .success(())
+        sender.confirmCaptureTransactionResult = .success(true)
+        await outbox.drainAll()
+        #expect(outbox.pendingCount == 0)
+    }
+
+    /// Regression: recovers items already corrupted by the bug above — a
+    /// confirm queued alone (its create lost) permanently fails "not
+    /// found." If the local mirror still has the capture, one recovery
+    /// attempt recreates it, then retries the write that actually failed.
+    @Test("a confirm for a capture whose create was lost self-heals by recreating it, then retries")
+    func confirmSelfHealsALostCapture() async throws {
+        let sender = StubTransactionSender()
+        sender.requireCaptureBeforeConfirm = true
+        let (outbox, dbQueue) = try makeOutboxWithQueue(sender: sender)
+        let id = UUID()
+
+        try await dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO transactions (
+                    id, owner_id, created_by, category_id, amount_e4, occurred_at, merchant_raw,
+                    merchant_normalized, card_identifier, source, status, external_id, version,
+                    created_at, updated_at, sync_seq
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'capture', 'pending', ?, 1, ?, ?, 0)
+                """,
+                arguments: [
+                    id.uuidString, "owner-1", "owner-1", UUID().uuidString, -45000,
+                    PostgresDate.sqliteTimestampBoundaryString(Date()), "Blue Bottle", "BLUE BOTTLE", "card-1",
+                    "ext-1", PostgresDate.sqliteTimestampBoundaryString(Date()),
+                    PostgresDate.sqliteTimestampBoundaryString(Date())
+                ]
+            )
+        }
+        // Simulates the already-corrupted state: a confirm queued alone,
+        // no create ever queued alongside it, exactly what the old
+        // `enqueue` produced.
+        await outbox.enqueue(
+            id: id, kind: .confirmCaptureTransaction,
+            payload: ConfirmCaptureTransactionPayload(id: id, expectedVersion: 1), expectedVersion: 1,
+            lastError: "transaction not found or not accessible"
+        )
+        #expect(outbox.pendingCount == 1)
+
+        await outbox.drainAll()
+
+        #expect(sender.captureTransactionCallCount == 1)
         #expect(outbox.pendingCount == 0)
     }
 
@@ -183,7 +301,7 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
     var updateTransferResult: Result<Bool, Error> = .success(true)
     var deleteTransactionResult: Result<Bool, Error> = .success(true)
     var deleteTransferResult: Result<Bool, Error> = .success(true)
-    var captureTransactionResult: Result<CaptureResult, Error> = .success(CaptureResult(mapped: true, accountId: nil))
+    var captureTransactionResult: Result<Void, Error> = .success(())
 
     private(set) var lastUpdateTransactionPayload: UpdateTransactionPayload?
 
@@ -212,7 +330,14 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
         try deleteTransferResult.get()
     }
 
-    func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult {
+    private(set) var captureTransactionCallCount = 0
+    /// Opt-in for `confirmSelfHealsALostCapture` only — every other test
+    /// leaves this `false`, so `confirmCaptureTransaction` behaves exactly
+    /// as before (governed purely by `confirmCaptureTransactionResult`).
+    var requireCaptureBeforeConfirm = false
+
+    func captureTransaction(_ payload: CaptureTransactionPayload) async throws {
+        captureTransactionCallCount += 1
         try captureTransactionResult.get()
     }
 
@@ -245,5 +370,29 @@ private final class StubTransactionSender: OutboxSending, @unchecked Sendable {
 
     func updateCategory(_ payload: UpdateCategoryPayload) async throws {
         try updateCategoryResult.get()
+    }
+
+    var renameCardMappingResult: Result<Void, Error> = .success(())
+    var unmapCardResult: Result<Void, Error> = .success(())
+    var mapCardResult: Result<Void, Error> = .success(())
+    var confirmCaptureTransactionResult: Result<Bool, Error> = .success(true)
+
+    func renameCardMapping(_ payload: RenameCardMappingPayload) async throws {
+        try renameCardMappingResult.get()
+    }
+
+    func unmapCard(_ payload: UnmapCardPayload) async throws {
+        try unmapCardResult.get()
+    }
+
+    func mapCard(_ payload: MapCardPayload) async throws {
+        try mapCardResult.get()
+    }
+
+    func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload) async throws -> Bool {
+        if requireCaptureBeforeConfirm, captureTransactionCallCount == 0 {
+            throw StubSenderError.network
+        }
+        return try confirmCaptureTransactionResult.get()
     }
 }

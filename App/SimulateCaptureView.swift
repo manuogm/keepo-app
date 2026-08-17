@@ -1,11 +1,21 @@
 import KeepoCore
 import SwiftUI
+import UserNotifications
 
 /// Debug-only stand-in for the Wallet automation trigger, which cannot fire
 /// on the Simulator. Calls the exact same `Outbox.submitCaptureTransaction`
 /// path `CaptureIntent.perform()` does — this proves the capture write path
 /// and the pending-review surface end to end without a physical device
 /// (master plan's Phase 12 verify step).
+///
+/// Also schedules the same deep-linking local notification
+/// `CaptureIntent.notify(...)` does for its `appliedLocally` case (same
+/// `userInfo` key, same transaction id) — added so the notification-tap →
+/// `AppDelegate` → `RootView` deep-link path is exercisable on the
+/// Simulator, where the real Wallet automation trigger can't fire. Only
+/// that one case gets a notification here, matching production: a capture
+/// that fell through to the network-only fallback (`applied`/`queued`)
+/// has nothing local yet to deep-link into.
 #if DEBUG
 struct SimulateCaptureView: View {
     let session: SessionStore
@@ -13,8 +23,6 @@ struct SimulateCaptureView: View {
     @State private var card = "card-debug-1"
     @State private var merchant = "SQ *BLUE BOTTLE COFFEE 00042"
     @State private var amount = "$4.50"
-    @State private var name = ""
-    @State private var transaction = ""
     @State private var resultMessage: String?
     @State private var isSending = false
 
@@ -24,8 +32,6 @@ struct SimulateCaptureView: View {
                 TextField("Card", text: $card)
                 TextField("Merchant", text: $merchant)
                 TextField("Amount (e.g. $4.50)", text: $amount)
-                TextField("Name", text: $name)
-                TextField("Transaction", text: $transaction)
             }
 
             Section {
@@ -68,19 +74,32 @@ struct SimulateCaptureView: View {
         )
         let payload = CaptureTransactionPayload(
             id: UUID(), cardIdentifier: card, merchantRaw: merchant, merchantNormalized: merchantNormalized,
-            amountE4: parsedAmount, occurredAt: occurredAt, externalId: externalId
+            amountE4: parsedAmount, occurredAt: occurredAt, externalId: externalId,
+            notes: "Captured automatically — \(merchant)"
         )
 
-        switch await session.outbox.submitCaptureTransaction(payload) {
-        case .applied(mapped: true):
-            resultMessage = "Captured — check Needs Review."
+        switch await session.outbox.submitCaptureTransaction(payload, ownerId: session.profile?.id) {
+        case .appliedLocally(let accountName, let categoryName, _, _):
+            resultMessage = "Captured locally — \(categoryName) · \(accountName). Notification scheduled — "
+                + "background the app and tap it to test the deep link."
             session.refresh.bump()
-        case .applied(mapped: false):
-            resultMessage = "Card not yet mapped — a placeholder mapping now shows in Needs Review."
+            await scheduleDeepLinkNotification(transactionId: payload.id)
+        case .applied:
+            resultMessage = "Captured — check Needs Review."
             session.refresh.bump()
         case .queued:
             resultMessage = "Offline — queued in the outbox, will send on next drain."
         }
+    }
+
+    private func scheduleDeepLinkNotification(transactionId: UUID) async {
+        let content = UNMutableNotificationContent()
+        content.title = "New expense logged automatically!"
+        content.body = "\(merchant) — tap to review (Simulator test)"
+        content.sound = .default
+        content.userInfo = [NotificationRouter.transactionIdKey: transactionId.uuidString]
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        try? await UNUserNotificationCenter.current().add(request)
     }
 }
 #endif

@@ -22,6 +22,13 @@ struct HomeView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var needsReviewCount = 0
+    // Kept, not just the count — so opening the bell popover can seed
+    // `NeedsReviewView` with rows already in hand instead of it blanking to
+    // a spinner and re-querying the same local table this screen just read
+    // (the "notification button ... laggy" complaint: a fresh `NeedsReviewView`
+    // starts `isLoading = true` every time it's constructed here).
+    @State private var needsReviewItems: [PublicSchema.NeedsReviewSelect] = []
+    @State private var needsReviewCurrencyMinorUnits: [String: Int] = [:]
     @State private var showNotifications = false
     @State private var showScopeMenu = false
 
@@ -136,7 +143,9 @@ struct HomeView: View {
 
     private var notificationsCard: some View {
         NavigationStack {
-            NeedsReviewView(session: session)
+            NeedsReviewView(
+                session: session, seed: (items: needsReviewItems, currencyMinorUnits: needsReviewCurrencyMinorUnits)
+            )
         }
         .frame(width: 340, height: 480)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
@@ -233,7 +242,13 @@ struct HomeView: View {
             if let row = currencies.first(where: { $0.code == baseCurrency }) {
                 baseCurrencyInfo = CurrencyInfo(code: row.code, minorUnit: Int(row.minorUnit))
             }
-            needsReviewCount = reviewRows.filter { $0.kind != "reconciliation_gap" }.count
+            needsReviewItems = try reviewRows
+                .filter { $0.kind != "reconciliation_gap" }
+                .map { try LocalTransactionRow.needsReviewSelect(from: $0) }
+            needsReviewCurrencyMinorUnits = Dictionary(
+                uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) }
+            )
+            needsReviewCount = needsReviewItems.count
 
             let parsed: [(date: Date, value: Int64)] = seriesResult.compactMap { point in
                 guard

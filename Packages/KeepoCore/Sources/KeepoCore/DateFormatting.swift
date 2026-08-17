@@ -15,9 +15,22 @@ public enum PostgresDate {
         ISO8601DateFormatter().string(from: date)
     }
 
-    /// Decodes a `timestamptz` column back into a `Date`.
+    /// Decodes a `timestamptz` column back into a `Date`. Tries a
+    /// fractional-seconds formatter first — both PostgREST's own rendering
+    /// and `sqliteTimestampBoundaryString` below always carry a 6-digit
+    /// fractional field, which a bare `ISO8601DateFormatter()` (its default
+    /// `.withInternetDateTime` options exclude fractional seconds) silently
+    /// fails to parse, returning `nil` for every real row. Found via a
+    /// captured transaction's date reverting to `.distantPast` (rendered as
+    /// "Dec 31" in a section header) after review — every call site that
+    /// falls back on a `nil` here was silently eating this. Falls back to
+    /// the whole-second formatter for `timestampString`'s own output, which
+    /// has no fractional part.
     public static func date(fromTimestamp string: String) -> Date? {
-        ISO8601DateFormatter().date(from: string)
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: string) { return date }
+        return ISO8601DateFormatter().date(from: string)
     }
 
     /// Encodes a `date`-only column (`balance_snapshots.as_of`,

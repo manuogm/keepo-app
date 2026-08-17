@@ -10,12 +10,11 @@ enum BalanceReminderScheduler {
 
     /// 1st of the month, 10:00 local time — a fixed default rather than a
     /// user-configurable time, since the request is "remind me monthly,"
-    /// not "let me tune a schedule."
+    /// not "let me tune a schedule." Doesn't request permission itself —
+    /// its one caller, `NotificationSettingsView`, already does that before
+    /// ever reaching here.
     static func schedule() async {
         let center = UNUserNotificationCenter.current()
-        let granted = try? await center.requestAuthorization(options: [.alert, .sound])
-        guard granted == true else { return }
-
         let content = UNMutableNotificationContent()
         content.title = "Time for a check-in"
         content.body = "Take a minute to review your balances in Keepo."

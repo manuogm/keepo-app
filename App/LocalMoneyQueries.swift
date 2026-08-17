@@ -194,7 +194,7 @@ enum LocalMoneyQueries {
                 kind: "pending_capture", itemId: row["id"], accountId: row["account_id"],
                 occurredAt: row["occurred_at"],
                 title: "Review capture — \((row["merchant_raw"] as String?) ?? "Unknown merchant")",
-                subtitle: isDefault ? "Uncategorized" : "Suggested: \(categoryName)",
+                subtitle: isDefault ? "Other" : "Suggested: \(categoryName)",
                 amountE4: row["amount_e4"], currency: row["currency"]
             )
         }

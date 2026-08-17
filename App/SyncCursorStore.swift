@@ -52,6 +52,21 @@ enum SyncCursorStore {
         defaults.removeObject(forKey: key(.globalCursor, userId))
     }
 
+    /// Called once by `LocalStore`'s schema-drift migration, before any
+    /// `userId` is known (it runs at `DatabaseQueue` open time) — every
+    /// stored cursor/epoch, for whichever users have ever synced on this
+    /// device, must drop together so the next pull for each of them is
+    /// forced back to a full re-fetch against the just-rebuilt (empty)
+    /// local tables. `lastSyncedAt` is left alone; it's purely informational
+    /// and the next successful pull overwrites it anyway.
+    static func resetAll() {
+        let defaults = UserDefaults.standard
+        let prefixes = [Field.cursor, .globalCursor, .epoch].map { "app.keepo.sync.\($0.rawValue)." }
+        for key in defaults.dictionaryRepresentation().keys where prefixes.contains(where: key.hasPrefix) {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     private enum Field: String {
         case cursor, globalCursor, epoch, lastSyncedAt
     }

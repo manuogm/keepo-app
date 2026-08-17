@@ -174,6 +174,20 @@ struct TransactionsListView: View {
                                     TransactionRow(transaction: transaction, category: category(for: transaction))
                                         .contentShape(Rectangle())
                                         .onTapGesture { handleTap(on: transaction) }
+                                        .swipeActions(edge: .trailing) {
+                                            // A second, quick path to confirm a capture,
+                                            // alongside the full review form's Save — only
+                                            // offered once an account is actually known
+                                            // (unresolved captures still route through the
+                                            // form, which requires the explicit account
+                                            // verification a blind swipe can't provide).
+                                            if transaction.status == .pending, transaction.accountId != nil {
+                                                Button("Confirm") {
+                                                    Task { await confirmCapture(transaction) }
+                                                }
+                                                .tint(Color.primary)
+                                            }
+                                        }
                                 }
                                 .onDelete { offsets in
                                     Task { await delete(at: offsets, in: group.items) }

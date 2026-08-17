@@ -56,6 +56,34 @@ struct OutboxLocalWriteTests {
         }
     }
 
+    private func seedDefaultCategory(_ dbQueue: DatabaseQueue, id: UUID, ownerId: UUID) async throws {
+        try await dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO categories (id, owner_id, kind, name, is_default, icon, color, version,
+                    created_at, updated_at, sync_seq)
+                VALUES (?, ?, 'expense', 'Other', 1, 'cart', '#000', 1,
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [id.uuidString, ownerId.uuidString]
+            )
+        }
+    }
+
+    private func seedCardMapping(
+        _ dbQueue: DatabaseQueue, ownerId: UUID, cardIdentifier: String, accountId: UUID?
+    ) async throws {
+        try await dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, created_at, updated_at, sync_seq)
+                VALUES (?, ?, ?, ?, '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [UUID().uuidString, ownerId.uuidString, cardIdentifier, accountId?.uuidString]
+            )
+        }
+    }
+
     private func balance(_ dbQueue: DatabaseQueue, accountId: UUID) async throws -> Int64? {
         try await dbQueue.read { database in
             try LocalMoneyQueries.accountBalance(
@@ -196,6 +224,76 @@ struct OutboxLocalWriteTests {
         #expect(account?.name == "New Account")
         #expect(try await balance(dbQueue, accountId: accountId) == 10000)
     }
+
+    @Test("a capture on an already-mapped card resolves and writes locally, offline included")
+    func captureResolvesAndAppliesLocally() async throws {
+        let (outbox, dbQueue) = try makeOutboxAndDatabase()
+        let ownerId = UUID()
+        let accountId = UUID()
+        let defaultCategoryId = UUID()
+        try await seedAccount(dbQueue, id: accountId, ownerId: ownerId)
+        try await seedDefaultCategory(dbQueue, id: defaultCategoryId, ownerId: ownerId)
+        try await seedCardMapping(dbQueue, ownerId: ownerId, cardIdentifier: "card-1", accountId: accountId)
+
+        let payload = CaptureTransactionPayload(
+            id: UUID(), cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
+            amountE4: 45000, occurredAt: Date(), externalId: "ext-1", notes: "Captured automatically — Blue Bottle"
+        )
+
+        let result = await outbox.submitCaptureTransaction(payload, ownerId: ownerId)
+        guard case .appliedLocally(let accountName, let categoryName, let currency, _) = result else {
+            Issue.record("expected .appliedLocally, got \(result)")
+            return
+        }
+        #expect(accountName == "Test")
+        #expect(categoryName == "Other")
+        #expect(currency == "EUR")
+
+        let row = try await dbQueue.read { database in
+            try Row.fetchOne(
+                database, sql: "SELECT status, source, amount_e4, notes FROM transactions WHERE id = ?",
+                arguments: [payload.id.uuidString]
+            )
+        }
+        #expect(row?["status"] == "pending")
+        #expect(row?["source"] == "capture")
+        #expect((row?["amount_e4"] as Int64?) == -45000)
+        #expect(row?["notes"] == "Captured automatically — Blue Bottle")
+    }
+
+    @Test("a capture on an unmapped card still writes locally, with a null account and currency")
+    func captureUnmappedStillAppliesLocally() async throws {
+        let (outbox, dbQueue) = try makeOutboxAndDatabase()
+        let ownerId = UUID()
+        let defaultCategoryId = UUID()
+        try await seedDefaultCategory(dbQueue, id: defaultCategoryId, ownerId: ownerId)
+
+        let payload = CaptureTransactionPayload(
+            id: UUID(), cardIdentifier: "card-unmapped", merchantRaw: "Blue Bottle",
+            merchantNormalized: "BLUE BOTTLE", amountE4: 45000, occurredAt: Date(), externalId: "ext-2"
+        )
+
+        let result = await outbox.submitCaptureTransaction(payload, ownerId: ownerId)
+        guard case .appliedLocally(let accountName, let categoryName, let currency, _) = result else {
+            Issue.record("expected .appliedLocally, got \(result)")
+            return
+        }
+        #expect(accountName == nil)
+        #expect(categoryName == "Other")
+        #expect(currency == nil)
+
+        let row = try await dbQueue.read { database in
+            try Row.fetchOne(
+                database, sql: "SELECT account_id, currency, card_identifier, status FROM transactions WHERE id = ?",
+                arguments: [payload.id.uuidString]
+            )
+        }
+        #expect((row?["account_id"] as String?) == nil)
+        #expect((row?["currency"] as String?) == nil)
+        #expect(row?["card_identifier"] == "card-unmapped")
+        #expect(row?["status"] == "pending")
+    }
+
 }
 
 private enum StubError: Error { case alwaysFails }
@@ -207,7 +305,7 @@ private final class AlwaysFailingSender: OutboxSending, @unchecked Sendable {
     func updateTransfer(_ payload: UpdateTransferPayload) async throws -> Bool { throw StubError.alwaysFails }
     func deleteTransaction(_ payload: DeleteTransactionPayload) async throws -> Bool { throw StubError.alwaysFails }
     func deleteTransfer(_ payload: DeleteTransferPayload) async throws -> Bool { throw StubError.alwaysFails }
-    func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult {
+    func captureTransaction(_ payload: CaptureTransactionPayload) async throws {
         throw StubError.alwaysFails
     }
     func createAccount(_ payload: CreateAccountPayload) async throws { throw StubError.alwaysFails }
@@ -216,4 +314,10 @@ private final class AlwaysFailingSender: OutboxSending, @unchecked Sendable {
     func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool { throw StubError.alwaysFails }
     func createCategory(_ payload: CreateCategoryPayload) async throws { throw StubError.alwaysFails }
     func updateCategory(_ payload: UpdateCategoryPayload) async throws { throw StubError.alwaysFails }
+    func renameCardMapping(_ payload: RenameCardMappingPayload) async throws { throw StubError.alwaysFails }
+    func unmapCard(_ payload: UnmapCardPayload) async throws { throw StubError.alwaysFails }
+    func mapCard(_ payload: MapCardPayload) async throws { throw StubError.alwaysFails }
+    func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload) async throws -> Bool {
+        throw StubError.alwaysFails
+    }
 }

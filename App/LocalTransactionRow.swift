@@ -53,7 +53,8 @@ enum LocalTransactionRow {
         var sql = """
         SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-               t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version, t.recurring_rule_id,
+               t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+               t.recurring_rule_id,
                CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                     WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
         FROM transactions t
@@ -111,7 +112,8 @@ enum LocalTransactionRow {
             sql: """
             SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-                   t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version, t.recurring_rule_id,
+                   t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+                   t.recurring_rule_id,
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                         WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
             FROM transactions t
@@ -125,6 +127,17 @@ enum LocalTransactionRow {
         return try rows.map { try build($0, database: database, baseCurrency: baseCurrency) }
     }
 
+    /// The one place a null-account pending capture (an unmapped Wallet
+    /// automation, or one whose card mapping hasn't resolved to an account
+    /// yet) must still be reachable — this is what both `RootView`'s
+    /// notification deep-link and `NeedsReviewView.openForReview` call to
+    /// open the review form. `LEFT JOIN` (not the `INNER JOIN` every other
+    /// query here keeps) so the row survives having no account yet; the
+    /// `WHERE` clause replaces what the join's `visibleAccountClause` used
+    /// to enforce on its own — a real, inaccessible `account_id` must still
+    /// exclude the row (`a.id IS NOT NULL` proves the join found a
+    /// *visible* account), while a genuinely unresolved capture is allowed
+    /// through only when it's the caller's own (`t.owner_id = ?`).
     static func fetchOne(
         _ database: Database, id: String, baseCurrency: String, ownerId: String
     ) throws -> PublicSchema.TransactionsWithDetailsSelect? {
@@ -133,43 +146,58 @@ enum LocalTransactionRow {
             sql: """
             SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-                   t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version, t.recurring_rule_id,
+                   t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+                   t.recurring_rule_id,
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                         WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
             FROM transactions t
-            JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
+            LEFT JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
-            JOIN currencies cur ON cur.code = t.currency
+            LEFT JOIN currencies cur ON cur.code = t.currency
             WHERE t.deleted_at IS NULL AND t.id = ?
+              AND (t.account_id IS NULL AND t.owner_id = ? OR a.id IS NOT NULL)
             """,
-            arguments: [ownerId, ownerId, id]
+            arguments: [ownerId, ownerId, id, ownerId]
         ) else { return nil }
         return try build(row, database: database, baseCurrency: baseCurrency)
     }
 
+    /// `account_id`/`account_name`/`currency`/`minor_unit` are read as
+    /// optional throughout — the only rows this ever sees with any of them
+    /// null are unresolved pending captures (`fetchFiltered`'s `INNER JOIN`
+    /// already excludes them from the main list; `fetchOne`'s `LEFT JOIN`
+    /// is what lets one reach here at all). `has_missing_rate` stays scoped
+    /// to its original meaning — "currency present but no FX rate for it"
+    /// — not "no currency at all"; both cases already render the amount as
+    /// `—` via `amount_base_e4` being nil either way (money rule 5).
     private static func build(
         _ row: Row, database: Database, baseCurrency: String
     ) throws -> PublicSchema.TransactionsWithDetailsSelect {
         let amountE4: Int64 = row["amount_e4"]
-        let currency: String = row["currency"]
+        let currency: String? = row["currency"]
         let occurredAt: String = row["occurred_at"]
         let occurredDate = String(occurredAt.prefix(10))
-        let amountBaseE4 = try LocalMoneyConversion.convert(
-            database, amountE4: amountE4, from: currency, toCurrency: baseCurrency, date: occurredDate
-        )
+        let amountBaseE4 = try currency.flatMap {
+            try LocalMoneyConversion.convert(
+                database, amountE4: amountE4, from: $0, toCurrency: baseCurrency, date: occurredDate
+            )
+        }
         let baseMinorUnit = try Int16.fetchOne(
             database, sql: "SELECT minor_unit FROM currencies WHERE code = ?", arguments: [baseCurrency]
         )
+        let minorUnit: Int16? = row["minor_unit"]
 
         let json: JSONObject = [
-            "transaction_id": .string(row["id"]), "account_id": .string(row["account_id"]),
-            "account_name": .string(row["account_name"]),
+            "transaction_id": .string(row["id"]),
+            "account_id": (row["account_id"] as String?).map(AnyJSON.string) ?? .null,
+            "account_name": (row["account_name"] as String?).map(AnyJSON.string) ?? .null,
             "category_id": (row["category_id"] as String?).map(AnyJSON.string) ?? .null,
             "category_name": (row["category_name"] as String?).map(AnyJSON.string) ?? .null,
-            "amount_e4": .integer(Int(amountE4)), "currency": .string(currency),
-            "minor_unit": .integer(row["minor_unit"]), "occurred_at": .string(occurredAt),
+            "amount_e4": .integer(Int(amountE4)), "currency": currency.map(AnyJSON.string) ?? .null,
+            "minor_unit": minorUnit.map { .integer(Int($0)) } ?? .null, "occurred_at": .string(occurredAt),
             "merchant_raw": (row["merchant_raw"] as String?).map(AnyJSON.string) ?? .null,
             "merchant_normalized": (row["merchant_normalized"] as String?).map(AnyJSON.string) ?? .null,
+            "notes": (row["notes"] as String?).map(AnyJSON.string) ?? .null,
             "transfer_group_id": (row["transfer_group_id"] as String?).map(AnyJSON.string) ?? .null,
             "source": .string(row["source"]), "status": .string(row["status"]), "kind": .string(row["kind"]),
             "created_by": .string(row["created_by"]), "created_at": .string(row["created_at"]),
@@ -178,7 +206,7 @@ enum LocalTransactionRow {
             "base_currency": .string(baseCurrency),
             "base_minor_unit": baseMinorUnit.map { .integer(Int($0)) } ?? .null,
             "amount_base_e4": amountBaseE4.map { .integer(Int($0)) } ?? .null,
-            "has_missing_rate": .bool(amountBaseE4 == nil)
+            "has_missing_rate": .bool(currency != nil && amountBaseE4 == nil)
         ]
         let data = try JSONEncoder().encode(AnyJSON.object(json))
         return try JSONDecoder().decode(PublicSchema.TransactionsWithDetailsSelect.self, from: data)

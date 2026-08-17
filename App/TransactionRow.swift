@@ -12,6 +12,11 @@ struct TransactionRow: View {
     @Environment(\.isPrivacyMode) private var isPrivacyMode
 
     private var isTransfer: Bool { transaction.kind == "transfer" }
+    // `status == .pending` — an automatic capture still waiting on review,
+    // never true for a manually-entered transaction (those are created
+    // already `confirmed`). Distinct from `isPendingUpdate` (unsynced
+    // outbox write) — this row can be fully synced and still unreviewed.
+    private var isPendingReview: Bool { transaction.status == .pending }
 
     var body: some View {
         HStack {
@@ -24,6 +29,15 @@ struct TransactionRow: View {
                 HStack(spacing: 4) {
                     Text(isTransfer ? "Transfer" : (transaction.categoryName ?? "—"))
                         .foregroundStyle(Color.primary)
+                    if isPendingReview {
+                        Text("Pending")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.orange)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.15), in: Capsule())
+                    }
                     if isPendingUpdate {
                         Image(systemName: "icloud.slash")
                             .font(.caption2)

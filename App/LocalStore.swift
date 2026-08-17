@@ -25,12 +25,21 @@ public enum LocalSchemaV1 {
     /// helpers purely to stay under the project's function-length lint —
     /// there's no ordering dependency between them.
     static func migrate(_ database: Database) throws {
+        try createSyncableTables(database)
+        try createOutboxTable(database)
+    }
+
+    /// Every table a sync pull can populate — everything `migrate` creates
+    /// except `outbox_items`, which holds unsent local writes and must
+    /// never be touched by a schema rebuild. Split out so
+    /// `LocalStore.makeQueue()`'s schema-drift migration can drop and
+    /// recreate exactly this set.
+    static func createSyncableTables(_ database: Database) throws {
         try createAccountAndTransactionTables(database)
         try createBalanceAndCategoryTables(database)
         try createPlanningTables(database)
         try createReferenceTables(database)
         try createHouseholdTables(database)
-        try createOutboxTable(database)
     }
 
     private static func createAccountAndTransactionTables(_ database: Database) throws {
@@ -59,15 +68,23 @@ public enum LocalSchemaV1 {
             table.column("id", .text).primaryKey().collate(.nocase)
             table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("created_by", .text).notNull().collate(.nocase)
-            table.column("account_id", .text).notNull().collate(.nocase)
+            // Nullable — only ever null for a pending capture whose card
+            // isn't resolved to an account yet (server enforces this with
+            // a CHECK: a confirmed row can never have either null).
+            table.column("account_id", .text).collate(.nocase)
             table.column("account_kind", .text)
             table.column("category_id", .text).collate(.nocase)
             table.column("category_kind", .text)
             table.column("amount_e4", .integer).notNull()
-            table.column("currency", .text).notNull()
+            table.column("currency", .text)
             table.column("occurred_at", .text).notNull()
             table.column("merchant_raw", .text)
             table.column("merchant_normalized", .text)
+            table.column("notes", .text)
+            // Only ever set for source='capture' rows — remembers which
+            // card produced this row so resolving its account later (via
+            // OutboxLocalWrite.updateTransaction) can auto-link the card.
+            table.column("card_identifier", .text)
             table.column("transfer_group_id", .text).collate(.nocase)
             table.column("source", .text).notNull()
             table.column("status", .text).notNull()
@@ -315,6 +332,10 @@ public enum LocalStore {
         let storeURL = try storeDirectory().appendingPathComponent("Local.sqlite")
         var migrator = DatabaseMigrator()
         migrator.registerMigration("v1") { database in try LocalSchemaV1.migrate(database) }
+        // Recovers a device whose local schema predates a `LocalSchemaV1`
+        // column change — see `rebuildSyncableTables`'s own header comment
+        // (`LocalStore+SchemaMigration.swift`) for why this is needed.
+        migrator.registerMigration("v2_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)

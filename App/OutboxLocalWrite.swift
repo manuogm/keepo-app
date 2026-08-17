@@ -33,13 +33,10 @@ import Supabase
 /// must never block or corrupt the write itself, which is why this file
 /// never throws out to a caller that would treat it as the write failing.
 ///
-/// Not covered: `captureTransaction`. Its payload has no `accountId`/
-/// `categoryId` (resolved server-side from `card_mappings`/merchant
-/// learning) and every local balance query already filters
-/// `status = 'confirmed'`, excluding the `status = 'pending'` row a capture
-/// would need anyway — so there is nothing for a local write-through to
-/// contribute to balance correctness here. Its own visibility (Needs
-/// Review) is a separate, already-built local read (`LocalMoneyQueries.needsReview`).
+/// Not covered: `captureTransaction`. Unlike every write here, it needs a
+/// read (card → account, merchant → category) before it knows whether it
+/// even *can* write anything — see `CaptureLocalWrite.swift`, its own
+/// resolve-then-optionally-write counterpart, kept separate for that reason.
 enum OutboxLocalWrite {
     static func createTransaction(_ payload: CreateTransactionPayload, in database: Database) throws {
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
@@ -52,6 +49,7 @@ enum OutboxLocalWrite {
                 "category_kind": categoryKind.map(AnyJSON.string) ?? .null,
                 "amount_e4": .integer(Int(payload.amountE4)), "currency": .string(payload.currency),
                 "occurred_at": .string(PostgresDate.sqliteTimestampBoundaryString(payload.occurredAt)),
+                "notes": payload.notes.map(AnyJSON.string) ?? .null,
                 "source": .string("manual"), "status": .string("confirmed"), "version": .integer(1),
                 "created_at": .string(now), "updated_at": .string(now), "sync_seq": .integer(0)
             ],
@@ -59,7 +57,19 @@ enum OutboxLocalWrite {
         )
     }
 
+    /// Mirrors `update_transaction`'s own new auto-link step server-side:
+    /// resolving a previously-null account on a capture links its card to
+    /// that account locally too, so a *second* capture on the same card
+    /// resolves through `CaptureLocalWrite` before the next sync pull ever
+    /// runs. Reads the row's pre-update state first — `account_id`/
+    /// `source`/`card_identifier`/`owner_id` — since the upsert below
+    /// overwrites `account_id` unconditionally.
     static func updateTransaction(_ payload: UpdateTransactionPayload, in database: Database) throws {
+        let previous = try Row.fetchOne(
+            database, sql: "SELECT account_id, source, card_identifier, owner_id FROM transactions WHERE id = ?",
+            arguments: [payload.id.uuidString]
+        )
+
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         let categoryKind = try categoryKind(database, categoryId: payload.categoryId.uuidString)
         try SyncApply.upsertRow(
@@ -70,9 +80,30 @@ enum OutboxLocalWrite {
                 "amount_e4": .integer(Int(payload.amountE4)), "currency": .string(payload.currency),
                 "occurred_at": .string(PostgresDate.sqliteTimestampBoundaryString(payload.occurredAt)),
                 "merchant_raw": payload.merchantRaw.map(AnyJSON.string) ?? .null,
+                "notes": payload.notes.map(AnyJSON.string) ?? .null,
                 "version": .integer(payload.expectedVersion + 1), "updated_at": .string(now)
             ],
             table: "transactions", in: database
+        )
+
+        if let previous, (previous["account_id"] as String?) == nil, (previous["source"] as String?) == "capture",
+           let cardIdentifier = previous["card_identifier"] as String?, let ownerId = previous["owner_id"] as String? {
+            try linkCardLocally(
+                ownerId: ownerId, cardIdentifier: cardIdentifier, accountId: payload.accountId.uuidString, in: database
+            )
+        }
+    }
+
+    /// Version-checked, same as every other edit here — a stale
+    /// `expectedVersion` just no-ops locally (the eventual server reply, or
+    /// the next sync pull, is what surfaces the real conflict).
+    static func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload, in database: Database) throws {
+        let now = PostgresDate.sqliteTimestampBoundaryString(Date())
+        try database.execute(
+            sql: """
+            UPDATE transactions SET status = 'confirmed', version = ?, updated_at = ? WHERE id = ? AND version = ?
+            """,
+            arguments: [payload.expectedVersion + 1, now, payload.id.uuidString, payload.expectedVersion]
         )
     }
 

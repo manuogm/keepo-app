@@ -28,6 +28,7 @@ extension PublicSchema.HouseholdsSelect: @retroactive FetchableRecord {}
 extension PublicSchema.HouseholdMembersSelect: @retroactive FetchableRecord {}
 extension PublicSchema.HouseholdAccountsSelect: @retroactive FetchableRecord {}
 extension PublicSchema.ProfilesSelect: @retroactive FetchableRecord {}
+extension PublicSchema.CardMappingsSelect: @retroactive FetchableRecord {}
 
 enum LocalTableQueries {
     static func categories(_ database: Database) throws -> [PublicSchema.CategoriesSelect] {
@@ -90,6 +91,28 @@ enum LocalTableQueries {
     static func transaction(_ database: Database, id: String) throws -> PublicSchema.TransactionsSelect? {
         try PublicSchema.TransactionsSelect.fetchOne(
             database, sql: "SELECT * FROM transactions WHERE id = ? AND deleted_at IS NULL", arguments: [id]
+        )
+    }
+
+    /// The Account edit sheet's "Mapped Cards" section — every card
+    /// currently linked to this account, owner-scoped like every other
+    /// read here (`card_mappings` is per-user, never household-shared).
+    static func cardMappings(
+        _ database: Database, accountId: String, ownerId: String
+    ) throws -> [PublicSchema.CardMappingsSelect] {
+        try PublicSchema.CardMappingsSelect.fetchAll(
+            database,
+            sql: """
+            SELECT * FROM card_mappings WHERE account_id = ? AND owner_id = ? AND deleted_at IS NULL
+            ORDER BY card_identifier
+            """,
+            arguments: [accountId, ownerId]
+        )
+    }
+
+    static func cardMapping(_ database: Database, id: String) throws -> PublicSchema.CardMappingsSelect? {
+        try PublicSchema.CardMappingsSelect.fetchOne(
+            database, sql: "SELECT * FROM card_mappings WHERE id = ? AND deleted_at IS NULL", arguments: [id]
         )
     }
 

@@ -63,6 +63,20 @@ extension TransactionsListView {
         }
         session.refresh.bump()
     }
+
+    /// The Transactions screen's own quick "Confirm" swipe action — an
+    /// alternative to opening the full review form, same local-first outbox
+    /// path `NeedsReviewView`'s own swipe action and `TransactionFormView`'s
+    /// Save use. `session.refresh.bump()` is what makes the row's "Pending"
+    /// badge disappear here AND clears it out of Needs Review, both reading
+    /// the same local `status` column this write just flipped.
+    func confirmCapture(_ transaction: PublicSchema.TransactionsWithDetailsSelect) async {
+        guard let id = transaction.transactionId, let version = transaction.version else { return }
+        await session.outbox.submitConfirmCaptureTransaction(
+            ConfirmCaptureTransactionPayload(id: id, expectedVersion: Int(version))
+        )
+        session.refresh.bump()
+    }
 }
 
 private struct LoadedTransactionsState {

@@ -127,6 +127,7 @@ struct UpdateTransactionParams: Encodable {
     let currency: String
     let occurredAt: String
     let merchantRaw: String?
+    let notes: String?
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case expectedVersion = "p_expected_version"
@@ -136,6 +137,7 @@ struct UpdateTransactionParams: Encodable {
         case currency = "p_currency"
         case occurredAt = "p_occurred_at"
         case merchantRaw = "p_merchant_raw"
+        case notes = "p_notes"
     }
 }
 

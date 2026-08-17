@@ -9,15 +9,29 @@ import SwiftUI
 struct NeedsReviewView: View {
     let session: SessionStore
 
-    @State private var items: [PublicSchema.NeedsReviewSelect] = []
-    @State private var isLoading = true
-    @State private var currencyMinorUnits: [String: Int] = [:]
+    @State private var items: [PublicSchema.NeedsReviewSelect]
+    @State private var isLoading: Bool
+    @State private var currencyMinorUnits: [String: Int]
     @State private var actionErrorMessage: String?
     @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
     @State private var showEditingTransaction = false
     @State private var mappingCard: PublicSchema.NeedsReviewSelect?
     @State private var showCardMapping = false
     @State private var conflictId: UUID?
+
+    typealias Seed = (items: [PublicSchema.NeedsReviewSelect], currencyMinorUnits: [String: Int])
+
+    /// `seed` lets a caller that already queried `needsReview` for its own
+    /// purposes (`HomeView`'s badge count) hand the same rows straight in —
+    /// renders immediately, no spinner-then-reload flash, while `.task`
+    /// below still runs its own fetch right after to catch anything that
+    /// changed since the caller's own query ran.
+    init(session: SessionStore, seed: Seed? = nil) {
+        self.session = session
+        _items = State(initialValue: seed?.items ?? [])
+        _currencyMinorUnits = State(initialValue: seed?.currencyMinorUnits ?? [:])
+        _isLoading = State(initialValue: seed == nil)
+    }
 
     var body: some View {
         ZStack {
@@ -152,12 +166,37 @@ struct NeedsReviewView: View {
                     try LocalTableQueries.currencies(database)
                 )
             }
-            items = try loaded.0.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
+            // Animated — this is also how a "review, then confirm" trip
+            // through TransactionFormView clears its row here: that screen
+            // dismisses back into this one, `onSaved()` bumps the refresh
+            // token, and this reload is what actually removes the row the
+            // user just confirmed.
+            let freshItems = try loaded.0.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
+            withAnimation {
+                items = freshItems
+            }
             currencyMinorUnits = Dictionary(uniqueKeysWithValues: loaded.1.map { ($0.code, Int($0.minorUnit)) })
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
         }
         isLoading = false
+    }
+
+    /// Removes an item from this screen the instant its underlying local
+    /// row is known to have changed — never waiting on `session.refresh
+    /// .bump()`'s own full reload, which is what made every action here
+    /// feel laggy before (the whole list stayed frozen until a network
+    /// round trip finished). `thenBump` still runs the app-wide refresh
+    /// after, for every other Needs Review badge — safe only when the
+    /// local mirror already reflects the change, or the reload it triggers
+    /// would just resurrect the row this just animated away.
+    private func removeLocally(_ id: UUID, thenBump: Bool = true) {
+        withAnimation {
+            items.removeAll { $0.itemId == id }
+        }
+        if thenBump {
+            session.refresh.bump()
+        }
     }
 
     private func resolve(_ item: PublicSchema.NeedsReviewSelect) async {
@@ -168,7 +207,7 @@ struct NeedsReviewView: View {
             try? await session.dbQueue.write { database in
                 try ConflictLocalQueries.markResolved(id: id.uuidString, in: database)
             }
-            session.refresh.bump()
+            removeLocally(id)
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
         }
@@ -197,7 +236,9 @@ struct NeedsReviewView: View {
     /// Confirming only ever flips `status` — any field edit goes through
     /// `openForReview`'s normal transaction-edit path first. Needs the
     /// row's current version, which `needs_review` doesn't carry, hence
-    /// the extra fetch.
+    /// the extra fetch. Goes through the outbox, not a direct RPC call —
+    /// local-first, so the row is gone from this list before the network
+    /// delivery (still running in the background) even finishes.
     private func confirmCapture(_ item: PublicSchema.NeedsReviewSelect) async {
         guard let id = item.itemId, let ownerId = session.profile?.id,
               let baseCurrency = session.profile?.baseCurrency else { return }
@@ -208,21 +249,27 @@ struct NeedsReviewView: View {
                     database, id: id.uuidString, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
                 )
             }), let version = transaction.version else { return }
-            _ = try await CaptureRepository.confirmCapture(
-                client: session.client, id: id, expectedVersion: Int(version)
+            await session.outbox.submitConfirmCaptureTransaction(
+                ConfirmCaptureTransactionPayload(id: id, expectedVersion: Int(version))
             )
-            session.refresh.bump()
+            removeLocally(id)
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
         }
     }
 
+    /// No local write-through exists for CSV import candidates (a
+    /// server-only concept, no local mirror table for it) — `thenBump:
+    /// false` skips the app-wide reload that would otherwise read the
+    /// still-stale local state and resurrect the row this just animated
+    /// away; the next real sync pull is what actually clears it everywhere
+    /// else.
     private func acceptImportCandidate(_ item: PublicSchema.NeedsReviewSelect) async {
         guard let id = item.itemId else { return }
         actionErrorMessage = nil
         do {
             try await ImportRepository.accept(client: session.client, id: id)
-            session.refresh.bump()
+            removeLocally(id, thenBump: false)
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
         }
@@ -233,87 +280,9 @@ struct NeedsReviewView: View {
         actionErrorMessage = nil
         do {
             try await ImportRepository.reject(client: session.client, id: id)
-            session.refresh.bump()
+            removeLocally(id, thenBump: false)
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
-        }
-    }
-}
-
-/// Resolves an `ambiguous_card` item — `item.subtitle` carries the raw
-/// `card_identifier` (see migration 20260807160000's comment on why it's
-/// there and not parsed out of `title`). Only ledger (spendable) accounts
-/// are offered — `map_card` itself refuses anything else.
-struct MapCardSheet: View {
-    let session: SessionStore
-    let item: PublicSchema.NeedsReviewSelect
-    let onMapped: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var accounts: [LocalAccountRow] = []
-    @State private var selectedAccountId: UUID?
-    @State private var isSaving = false
-    @State private var errorMessage: String?
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                if let cardIdentifier = item.subtitle {
-                    Section("Card") {
-                        Text(cardIdentifier)
-                    }
-                }
-                Section("Route charges to") {
-                    Picker("Account", selection: $selectedAccountId) {
-                        Text("Choose an account").tag(UUID?.none)
-                        ForEach(ledgerAccounts) { account in
-                            Text(account.name).tag(UUID?.some(account.id))
-                        }
-                    }
-                }
-                if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red)
-                }
-            }
-            .navigationTitle("Map Card")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { Task { await mapCard() } } label: { Image(systemName: "checkmark") }
-                        .disabled(selectedAccountId == nil || isSaving)
-                }
-            }
-            .task {
-                guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
-                    return
-                }
-                accounts = (try? await session.dbQueue.read { database in
-                    try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency)
-                }) ?? []
-            }
-        }
-    }
-
-    private var ledgerAccounts: [LocalAccountRow] {
-        accounts.filter { $0.kind == .ledger && $0.archivedAt == nil }
-    }
-
-    private func mapCard() async {
-        guard let selectedAccountId, let cardIdentifier = item.subtitle else { return }
-        isSaving = true
-        errorMessage = nil
-        defer { isSaving = false }
-        do {
-            try await CaptureRepository.mapCard(
-                client: session.client, cardIdentifier: cardIdentifier, accountId: selectedAccountId
-            )
-            onMapped()
-            dismiss()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
         }
     }
 }

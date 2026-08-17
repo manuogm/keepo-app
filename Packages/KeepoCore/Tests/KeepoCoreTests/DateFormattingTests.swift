@@ -17,6 +17,23 @@ struct PostgresDateTests {
         #expect(PostgresDate.date(fromTimestamp: "not-a-date") == nil)
     }
 
+    @Test("decodes a fractional-second timestamp — PostgREST's and sqliteTimestampBoundaryString's own rendering")
+    func decodesFractionalSecondTimestamp() {
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(identifier: "UTC")!
+        let expected = utcCalendar.date(from: DateComponents(
+            year: 2026, month: 8, day: 17, hour: 15, minute: 4, second: 23
+        ))!
+        // Both a 6-digit-microsecond PostgREST row and this file's own
+        // sqlite boundary string must decode back to the same instant — a
+        // bare `ISO8601DateFormatter()` silently returns nil for either
+        // (its default options exclude fractional seconds), which is what
+        // sent a reviewed capture's date to `.distantPast` in
+        // TransactionsListView's grouping fallback.
+        #expect(PostgresDate.date(fromTimestamp: "2026-08-17T15:04:23.000000+00:00") == expected)
+        #expect(PostgresDate.date(fromTimestamp: PostgresDate.sqliteTimestampBoundaryString(expected)) == expected)
+    }
+
     @Test("date-only encoding uses the local calendar day, not a truncated UTC timestamp")
     func dateOnlyUsesLocalDay() {
         // 11:30 PM Pacific Standard Time (UTC-8, January — outside any DST

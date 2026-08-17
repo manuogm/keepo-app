@@ -28,9 +28,9 @@ enum SyncApply {
         ],
         "transactions": [
             "id", "owner_id", "created_by", "account_id", "account_kind", "category_id", "category_kind",
-            "amount_e4", "currency", "occurred_at", "merchant_raw", "merchant_normalized", "transfer_group_id",
-            "source", "status", "external_id", "recurring_rule_id", "version", "deleted_at", "created_at",
-            "updated_at", "sync_seq"
+            "amount_e4", "currency", "occurred_at", "merchant_raw", "merchant_normalized", "notes",
+            "card_identifier", "transfer_group_id", "source", "status", "external_id", "recurring_rule_id",
+            "version", "deleted_at", "created_at", "updated_at", "sync_seq"
         ],
         "balance_snapshots": [
             "id", "account_id", "currency", "as_of", "value_e4", "created_by", "created_at", "deleted_at", "sync_seq"

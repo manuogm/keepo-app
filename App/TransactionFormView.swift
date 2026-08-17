@@ -36,11 +36,15 @@ struct TransactionFormView: View {
     @State private var selectedAccountId: UUID?
     @State private var selectedCategoryId: UUID?
     @State private var amountText = ""
-    @State private var occurredAt = Date()
+    // Not `private` — read from TransactionFormView+Transfer.swift.
+    @State var occurredAt = Date()
     @State private var merchantRaw: String?
+    @State private var notes = ""
 
-    @State private var selectedToAccountId: UUID?
-    @State private var receivedAmountText = ""
+    // Not `private` — read from TransactionFormView+Transfer.swift.
+    @State var selectedToAccountId: UUID?
+    // Not `private` — read from TransactionFormView+Transfer.swift.
+    @State var receivedAmountText = ""
 
     // Edit-mode versions the save call sends back for lost-update detection.
     @State var editingId: UUID?
@@ -50,25 +54,33 @@ struct TransactionFormView: View {
     // created_by (who entered it) differs from the viewer on a shared account.
     @State private var addedByHouseholdMember = false
 
+    // Set from the row being reviewed — a pending, captured transaction —
+    // so Save both applies any edit and confirms it in one tap, per the
+    // Needs Review flow's "review, then it's gone" contract.
+    @State private var isConfirmingCapture = false
+
     @State var isSaving = false
     @State var errorMessage: String?
-    @State private var divergenceWarning: RateDivergence?
-    @State private var transferDivergenceConfirmed = false
+    // Not `private` — read/written from TransactionFormView+Transfer.swift.
+    @State var divergenceWarning: RateDivergence?
+    @State var transferDivergenceConfirmed = false
 
     private var isEditing: Bool {
         if case .edit = mode { return true }
         return false
     }
 
-    private var fromAccount: LocalAccountRow? {
+    // Not `private` — read from TransactionFormView+Transfer.swift.
+    var fromAccount: LocalAccountRow? {
         accounts.first { $0.id == selectedAccountId }
     }
 
-    private var toAccount: LocalAccountRow? {
+    var toAccount: LocalAccountRow? {
         accounts.first { $0.id == selectedToAccountId }
     }
 
-    private var needsReceivedAmount: Bool {
+    // Not `private` — read from TransactionFormView+Transfer.swift.
+    var needsReceivedAmount: Bool {
         guard kind == .transfer, let source = fromAccount, let destination = toAccount else { return false }
         return source.currency != destination.currency
     }
@@ -121,6 +133,12 @@ struct TransactionFormView: View {
                 Section("Date") {
                     DatePicker("Date", selection: $occurredAt, displayedComponents: [.date])
                         .labelsHidden()
+                }
+
+                if kind != .transfer {
+                    Section("Notes") {
+                        TextField("Add a note…", text: $notes, axis: .vertical)
+                    }
                 }
 
                 if addedByHouseholdMember {
@@ -231,6 +249,8 @@ struct TransactionFormView: View {
             selectedAccountId = transaction.accountId
             selectedCategoryId = transaction.categoryId
             merchantRaw = transaction.merchantRaw
+            notes = transaction.notes ?? ""
+            isConfirmingCapture = transaction.status == .pending && transaction.source == .capture
             if let amount = transaction.amountE4 {
                 amountText = AmountFormatter.editableString(amount, minorUnit: Int(transaction.minorUnit ?? 2))
             }
@@ -257,11 +277,11 @@ struct TransactionFormView: View {
 
 extension TransactionFormView {
     fileprivate func save() async {
-        guard
-            let accountId = selectedAccountId,
-            let magnitude = AmountParser.parse(amountText),
-            magnitude > 0
-        else {
+        guard let accountId = selectedAccountId else {
+            errorMessage = "Choose an account."
+            return
+        }
+        guard let magnitude = AmountParser.parse(amountText), magnitude > 0 else {
             errorMessage = "Enter a valid amount."
             return
         }
@@ -278,6 +298,15 @@ extension TransactionFormView {
                 try await updateLedgerTransaction(accountId: accountId, magnitude: magnitude)
             case (true, .transfer):
                 try await updateTransfer(magnitude: magnitude)
+            }
+            // The update above already bumped the local version by one —
+            // confirm against that new version, not the one this screen
+            // was opened with, or a stale-version conflict would log for
+            // no reason on every single review.
+            if isConfirmingCapture, let id = editingId, let expectedVersion = editingFromVersion {
+                await session.outbox.submitConfirmCaptureTransaction(
+                    ConfirmCaptureTransactionPayload(id: id, expectedVersion: expectedVersion + 1)
+                )
             }
             // A: the local write already landed by the time submitX
             // returns — the network delivery keeps running in the
@@ -309,37 +338,10 @@ extension TransactionFormView {
         let signedAmountE4 = kind == .expense ? -magnitude : magnitude
         let payload = CreateTransactionPayload(
             id: UUID(), ownerId: userId, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt
+            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
+            notes: notes.isEmpty ? nil : notes
         )
         await session.outbox.submitCreateTransaction(payload)
-    }
-
-    fileprivate func saveTransfer(accountId: UUID, magnitude: Int64) async throws {
-        guard let toAccountId = selectedToAccountId else {
-            errorMessage = "Choose a destination account."
-            return
-        }
-        let receivedAmount = needsReceivedAmount ? AmountParser.parse(receivedAmountText) : nil
-        if needsReceivedAmount && receivedAmount == nil {
-            errorMessage = "Enter a valid received amount."
-            return
-        }
-
-        if !transferDivergenceConfirmed, needsReceivedAmount, let toAmount = receivedAmount,
-           let source = fromAccount, let destination = toAccount {
-            divergenceWarning = await TransferDivergenceCheck.evaluate(
-                client: session.client, sourceCurrency: source.currency, destinationCurrency: destination.currency,
-                fromAmountE4: magnitude, toAmountE4: toAmount, occurredAt: occurredAt
-            )
-            if divergenceWarning != nil { return }
-        }
-        transferDivergenceConfirmed = false
-
-        let payload = CreateTransferPayload(
-            fromId: UUID(), toId: UUID(), fromAccountId: accountId, toAccountId: toAccountId,
-            fromAmountE4: magnitude, toAmountE4: receivedAmount, occurredAt: occurredAt
-        )
-        await session.outbox.submitCreateTransfer(payload)
     }
 
     fileprivate func updateLedgerTransaction(accountId: UUID, magnitude: Int64) async throws {
@@ -356,29 +358,8 @@ extension TransactionFormView {
         let payload = UpdateTransactionPayload(
             id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
             amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            merchantRaw: merchantRaw
+            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes
         )
         await session.outbox.submitUpdateTransaction(payload)
-    }
-
-    fileprivate func updateTransfer(magnitude: Int64) async throws {
-        guard
-            let transferGroupId = editingTransferGroupId,
-            let fromExpectedVersion = editingFromVersion,
-            let toExpectedVersion = editingToVersion
-        else {
-            errorMessage = "Missing transfer details."
-            return
-        }
-        let receivedAmount = needsReceivedAmount ? AmountParser.parse(receivedAmountText) : magnitude
-        guard let toAmount = receivedAmount, toAmount > 0 else {
-            errorMessage = "Enter a valid received amount."
-            return
-        }
-        let payload = UpdateTransferPayload(
-            transferGroupId: transferGroupId, fromExpectedVersion: fromExpectedVersion,
-            toExpectedVersion: toExpectedVersion, fromAmountE4: magnitude, toAmountE4: toAmount, occurredAt: occurredAt
-        )
-        await session.outbox.submitUpdateTransfer(payload)
     }
 }

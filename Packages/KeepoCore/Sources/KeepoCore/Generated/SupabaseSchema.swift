@@ -1397,19 +1397,21 @@ public enum PublicSchema {
     }
   }
   public struct TransactionsSelect: Codable, Hashable, Sendable {
-    public let accountId: UUID
+    public let accountId: UUID?
     public let accountKind: AccountKind?
     public let amountE4: Int64
+    public let cardIdentifier: String?
     public let categoryId: UUID?
     public let categoryKind: CategoryKind?
     public let createdAt: String
     public let createdBy: UUID
-    public let currency: String
+    public let currency: String?
     public let deletedAt: String?
     public let externalId: String?
     public let id: UUID
     public let merchantNormalized: String?
     public let merchantRaw: String?
+    public let notes: String?
     public let occurredAt: String
     public let ownerId: UUID
     public let recurringRuleId: UUID?
@@ -1423,6 +1425,7 @@ public enum PublicSchema {
       case accountId = "account_id"
       case accountKind = "account_kind"
       case amountE4 = "amount_e4"
+      case cardIdentifier = "card_identifier"
       case categoryId = "category_id"
       case categoryKind = "category_kind"
       case createdAt = "created_at"
@@ -1433,6 +1436,7 @@ public enum PublicSchema {
       case id = "id"
       case merchantNormalized = "merchant_normalized"
       case merchantRaw = "merchant_raw"
+      case notes = "notes"
       case occurredAt = "occurred_at"
       case ownerId = "owner_id"
       case recurringRuleId = "recurring_rule_id"
@@ -1445,19 +1449,21 @@ public enum PublicSchema {
     }
   }
   public struct TransactionsInsert: Codable, Hashable, Sendable {
-    public let accountId: UUID
+    public let accountId: UUID?
     public let accountKind: AccountKind?
     public let amountE4: Int64
+    public let cardIdentifier: String?
     public let categoryId: UUID?
     public let categoryKind: CategoryKind?
     public let createdAt: String?
     public let createdBy: UUID
-    public let currency: String
+    public let currency: String?
     public let deletedAt: String?
     public let externalId: String?
     public let id: UUID?
     public let merchantNormalized: String?
     public let merchantRaw: String?
+    public let notes: String?
     public let occurredAt: String?
     public let ownerId: UUID
     public let recurringRuleId: UUID?
@@ -1471,6 +1477,7 @@ public enum PublicSchema {
       case accountId = "account_id"
       case accountKind = "account_kind"
       case amountE4 = "amount_e4"
+      case cardIdentifier = "card_identifier"
       case categoryId = "category_id"
       case categoryKind = "category_kind"
       case createdAt = "created_at"
@@ -1481,6 +1488,7 @@ public enum PublicSchema {
       case id = "id"
       case merchantNormalized = "merchant_normalized"
       case merchantRaw = "merchant_raw"
+      case notes = "notes"
       case occurredAt = "occurred_at"
       case ownerId = "owner_id"
       case recurringRuleId = "recurring_rule_id"
@@ -1496,6 +1504,7 @@ public enum PublicSchema {
     public let accountId: UUID?
     public let accountKind: AccountKind?
     public let amountE4: Int64?
+    public let cardIdentifier: String?
     public let categoryId: UUID?
     public let categoryKind: CategoryKind?
     public let createdAt: String?
@@ -1506,6 +1515,7 @@ public enum PublicSchema {
     public let id: UUID?
     public let merchantNormalized: String?
     public let merchantRaw: String?
+    public let notes: String?
     public let occurredAt: String?
     public let ownerId: UUID?
     public let recurringRuleId: UUID?
@@ -1519,6 +1529,7 @@ public enum PublicSchema {
       case accountId = "account_id"
       case accountKind = "account_kind"
       case amountE4 = "amount_e4"
+      case cardIdentifier = "card_identifier"
       case categoryId = "category_id"
       case categoryKind = "category_kind"
       case createdAt = "created_at"
@@ -1529,6 +1540,7 @@ public enum PublicSchema {
       case id = "id"
       case merchantNormalized = "merchant_normalized"
       case merchantRaw = "merchant_raw"
+      case notes = "notes"
       case occurredAt = "occurred_at"
       case ownerId = "owner_id"
       case recurringRuleId = "recurring_rule_id"
@@ -1645,6 +1657,7 @@ public enum PublicSchema {
     public let merchantNormalized: String?
     public let merchantRaw: String?
     public let minorUnit: Int16?
+    public let notes: String?
     public let occurredAt: String?
     public let recurringRuleId: UUID?
     public let source: TransactionSource?
@@ -1669,6 +1682,7 @@ public enum PublicSchema {
       case merchantNormalized = "merchant_normalized"
       case merchantRaw = "merchant_raw"
       case minorUnit = "minor_unit"
+      case notes = "notes"
       case occurredAt = "occurred_at"
       case recurringRuleId = "recurring_rule_id"
       case source = "source"

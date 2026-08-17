@@ -11,10 +11,11 @@ public struct CreateTransactionPayload: Codable, Sendable {
     public let amountE4: Int64
     public let currency: String
     public let occurredAt: Date
+    public let notes: String?
 
     public init(
         id: UUID, ownerId: UUID, accountId: UUID, categoryId: UUID, amountE4: Int64, currency: String,
-        occurredAt: Date
+        occurredAt: Date, notes: String? = nil
     ) {
         self.id = id
         self.ownerId = ownerId
@@ -23,6 +24,7 @@ public struct CreateTransactionPayload: Codable, Sendable {
         self.amountE4 = amountE4
         self.currency = currency
         self.occurredAt = occurredAt
+        self.notes = notes
     }
 }
 
@@ -58,10 +60,11 @@ public struct UpdateTransactionPayload: Codable, Sendable {
     public let currency: String
     public let occurredAt: Date
     public let merchantRaw: String?
+    public let notes: String?
 
     public init(
         id: UUID, expectedVersion: Int, accountId: UUID, categoryId: UUID,
-        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?
+        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?, notes: String? = nil
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
@@ -71,6 +74,7 @@ public struct UpdateTransactionPayload: Codable, Sendable {
         self.currency = currency
         self.occurredAt = occurredAt
         self.merchantRaw = merchantRaw
+        self.notes = notes
     }
 }
 
@@ -117,10 +121,11 @@ public struct CaptureTransactionPayload: Codable, Sendable {
     public let amountE4: Int64
     public let occurredAt: Date
     public let externalId: String
+    public let notes: String?
 
     public init(
         id: UUID, cardIdentifier: String, merchantRaw: String, merchantNormalized: String,
-        amountE4: Int64, occurredAt: Date, externalId: String
+        amountE4: Int64, occurredAt: Date, externalId: String, notes: String? = nil
     ) {
         self.id = id
         self.cardIdentifier = cardIdentifier
@@ -129,6 +134,7 @@ public struct CaptureTransactionPayload: Codable, Sendable {
         self.amountE4 = amountE4
         self.occurredAt = occurredAt
         self.externalId = externalId
+        self.notes = notes
     }
 }
 
@@ -276,5 +282,67 @@ public struct ArchiveAccountPayload: Codable, Sendable {
         self.id = id
         self.expectedVersion = expectedVersion
         self.archived = archived
+    }
+}
+
+/// The Account edit sheet's "manage mapped cards" writes. No
+/// `expectedVersion` — `card_mappings` has no `version` column, same
+/// "last write wins" simplicity `map_card` itself already documented (a
+/// single (owner, card) row nobody else can touch has no concurrent-edit
+/// hazard worth one). `id` is the mapping's own row id, not the card
+/// identifier — immutable, so renaming the identifier text has nothing to
+/// race against.
+public struct RenameCardMappingPayload: Codable, Sendable {
+    public let id: UUID
+    public let cardIdentifier: String
+
+    public init(id: UUID, cardIdentifier: String) {
+        self.id = id
+        self.cardIdentifier = cardIdentifier
+    }
+}
+
+/// A soft-delete (`unmap_card` sets `deleted_at`), never an
+/// `account_id = null` reset — see `unmap_card`'s own migration comment on
+/// why: that would immediately resurrect the mapping as an `ambiguous_card`
+/// Needs Review item, the exact nagging this action is meant to dismiss.
+public struct UnmapCardPayload: Codable, Sendable {
+    public let id: UUID
+
+    public init(id: UUID) {
+        self.id = id
+    }
+}
+
+/// The Account edit sheet's manual "Add Card" write — the same `map_card`
+/// RPC an `ambiguous_card` Needs Review item resolves through, just with the
+/// account fixed instead of picked. `id` is a synthetic outbox dedupe key
+/// only (card_mappings has no client-chosen row id of its own — it's keyed
+/// by the natural (owner, card_identifier) pair), so it never collides with
+/// a real row id.
+public struct MapCardPayload: Codable, Sendable {
+    public let id: UUID
+    public let ownerId: UUID
+    public let cardIdentifier: String
+    public let accountId: UUID
+
+    public init(id: UUID, ownerId: UUID, cardIdentifier: String, accountId: UUID) {
+        self.id = id
+        self.ownerId = ownerId
+        self.cardIdentifier = cardIdentifier
+        self.accountId = accountId
+    }
+}
+
+/// No `expectedVersion` — confirming is a plain status flip guarded the same
+/// way every other edit here is (a stale version conflicts, logged to
+/// `sync_conflicts`, never silently overwritten).
+public struct ConfirmCaptureTransactionPayload: Codable, Sendable {
+    public let id: UUID
+    public let expectedVersion: Int
+
+    public init(id: UUID, expectedVersion: Int) {
+        self.id = id
+        self.expectedVersion = expectedVersion
     }
 }

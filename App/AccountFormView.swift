@@ -42,6 +42,9 @@ struct AccountFormView: View {
     @State private var isUpdatingBalance = false
     @State private var balanceUpdateMessage: String?
 
+    // Not `private` — read/written from AccountFormView+Cards.swift (a different file, kept there for file-length).
+    @State var cardMappings: [PublicSchema.CardMappingsSelect] = []
+
     private var isEditing: Bool {
         if case .edit = mode { return true }
         return false
@@ -127,6 +130,10 @@ struct AccountFormView: View {
                                     .foregroundStyle(Color.secondary)
                             }
                         }
+                    }
+
+                    if isEditing {
+                        mappedCardsSection
                     }
 
                     Section("Icon") {
@@ -247,6 +254,7 @@ struct AccountFormView: View {
                 apply(account)
             }
             await prefillCurrentBalance(accountId: id)
+            await loadCardMappings()
         }
         isLoading = false
     }

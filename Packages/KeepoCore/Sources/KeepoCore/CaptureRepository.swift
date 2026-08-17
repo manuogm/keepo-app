@@ -1,26 +1,6 @@
 import Foundation
 import Supabase
 
-/// The result of `capture_transaction` — whether the card was already
-/// mapped to an account. `mapped = false` means no transaction was written
-/// at all (there is nowhere to attach a signed amount); the card's
-/// placeholder mapping still landed, and surfaces via `needs_review`'s
-/// `ambiguous_card` branch until `mapCard` resolves it.
-public struct CaptureResult: Codable, Sendable {
-    public let mapped: Bool
-    public let accountId: UUID?
-
-    public init(mapped: Bool, accountId: UUID?) {
-        self.mapped = mapped
-        self.accountId = accountId
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case mapped
-        case accountId = "account_id"
-    }
-}
-
 /// The App Intent's one write path, plus the two review actions
 /// (`mapCard`/`confirmCaptureTransaction`). Kept alongside
 /// `TransactionRepository` rather than folded into it — captures are a
@@ -36,18 +16,21 @@ public enum CaptureRepository {
         merchantNormalized: String,
         amountE4: Int64,
         occurredAt: Date,
-        externalId: String
-    ) async throws -> CaptureResult {
+        externalId: String,
+        notes: String? = nil
+    ) async throws {
         let params = CaptureTransactionParams(
             id: id, cardIdentifier: cardIdentifier, merchantRaw: merchantRaw,
             merchantNormalized: merchantNormalized, amountE4: amountE4,
-            occurredAt: PostgresDate.timestampString(occurredAt), externalId: externalId
+            occurredAt: PostgresDate.timestampString(occurredAt), externalId: externalId, notes: notes
         )
-        let rows: [CaptureResult] = try await client.rpc("capture_transaction", params: params).execute().value
-        guard let result = rows.first else {
-            throw CaptureRepositoryError.emptyResponse
-        }
-        return result
+        // The RPC still returns `(mapped, account_id)`, deliberately not
+        // decoded: since migration 20260822100000 it always inserts the
+        // transaction, so `mapped` no longer distinguishes "captured" from
+        // "not captured" — it only says whether the account was resolved
+        // yet, which the row itself already carries and the review form
+        // already handles. Nothing branches on it anymore.
+        try await client.rpc("capture_transaction", params: params).execute()
     }
 
     public static func mapCard(client: SupabaseClient, cardIdentifier: String, accountId: UUID) async throws {
@@ -62,10 +45,16 @@ public enum CaptureRepository {
         let rows: [ConflictRow] = try await client.rpc("confirm_capture_transaction", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict
     }
-}
 
-public enum CaptureRepositoryError: Error {
-    case emptyResponse
+    /// The Account edit sheet's "manage mapped cards" actions.
+    public static func renameCardMapping(client: SupabaseClient, id: UUID, cardIdentifier: String) async throws {
+        let params = RenameCardMappingParams(id: id, cardIdentifier: cardIdentifier)
+        try await client.rpc("rename_card_mapping", params: params).execute()
+    }
+
+    public static func unmapCard(client: SupabaseClient, id: UUID) async throws {
+        try await client.rpc("unmap_card", params: UnmapCardParams(id: id)).execute()
+    }
 }
 
 private struct CaptureTransactionParams: Encodable {
@@ -76,6 +65,7 @@ private struct CaptureTransactionParams: Encodable {
     let amountE4: Int64
     let occurredAt: String
     let externalId: String
+    let notes: String?
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case cardIdentifier = "p_card_identifier"
@@ -84,6 +74,7 @@ private struct CaptureTransactionParams: Encodable {
         case amountE4 = "p_amount_e4"
         case occurredAt = "p_occurred_at"
         case externalId = "p_external_id"
+        case notes = "p_notes"
     }
 }
 
@@ -102,5 +93,21 @@ private struct ConfirmCaptureParams: Encodable {
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case expectedVersion = "p_expected_version"
+    }
+}
+
+private struct RenameCardMappingParams: Encodable {
+    let id: UUID
+    let cardIdentifier: String
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
+        case cardIdentifier = "p_card_identifier"
+    }
+}
+
+private struct UnmapCardParams: Encodable {
+    let id: UUID
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
     }
 }

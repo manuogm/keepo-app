@@ -222,7 +222,8 @@ public enum TransactionRepository {
         categoryId: UUID,
         amountE4: Int64,
         currency: String,
-        occurredAt: Date = Date()
+        occurredAt: Date = Date(),
+        notes: String? = nil
     ) async throws -> UUID {
         let row = NewTransactionRow(
             id: id,
@@ -232,7 +233,8 @@ public enum TransactionRepository {
             categoryId: categoryId,
             amountE4: amountE4,
             currency: currency,
-            occurredAt: PostgresDate.timestampString(occurredAt)
+            occurredAt: PostgresDate.timestampString(occurredAt),
+            notes: notes
         )
         try await client.from("transactions").insert(row).execute()
         return id
@@ -258,7 +260,8 @@ public enum TransactionRepository {
         amountE4: Int64,
         currency: String,
         occurredAt: Date = Date(),
-        merchantRaw: String?
+        merchantRaw: String?,
+        notes: String? = nil
     ) async throws -> WriteResult {
         let params = UpdateTransactionParams(
             id: id,
@@ -268,7 +271,8 @@ public enum TransactionRepository {
             amountE4: amountE4,
             currency: currency,
             occurredAt: PostgresDate.timestampString(occurredAt),
-            merchantRaw: merchantRaw
+            merchantRaw: merchantRaw,
+            notes: notes
         )
         let rows: [ConflictRow] = try await client.rpc("update_transaction", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict
@@ -330,8 +334,9 @@ private struct NewTransactionRow: Encodable {
     let amountE4: Int64
     let currency: String
     let occurredAt: String
+    let notes: String?
     enum CodingKeys: String, CodingKey {
-        case id, currency
+        case id, currency, notes
         case amountE4 = "amount_e4"
         case ownerId = "owner_id"
         case createdBy = "created_by"

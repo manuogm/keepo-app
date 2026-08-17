@@ -134,7 +134,7 @@ extension ConflictDetailSheet {
                     accountId: myTransaction.accountId ?? UUID(), categoryId: categoryId,
                     amountE4: myTransaction.amountE4 ?? 0, currency: myTransaction.currency ?? "USD",
                     occurredAt: PostgresDate.date(fromTimestamp: myTransaction.occurredAt ?? "") ?? Date(),
-                    merchantRaw: myTransaction.merchantRaw
+                    merchantRaw: myTransaction.merchantRaw, notes: myTransaction.notes
                 )
             ).value
         }

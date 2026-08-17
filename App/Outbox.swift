@@ -17,10 +17,10 @@ public protocol OutboxSending: Sendable {
     func deleteTransaction(_ payload: DeleteTransactionPayload) async throws -> Bool
     func deleteTransfer(_ payload: DeleteTransferPayload) async throws -> Bool
     /// No conflict/applied distinction — a capture is an insert-or-noop
-    /// keyed by `externalId`, never an edit of an existing row. `mapped`
-    /// tells the caller (the App Intent, composing its local notification)
-    /// whether the card was already known; it is not a retry signal.
-    func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult
+    /// keyed by `externalId`, never an edit of an existing row, and since
+    /// migration 20260822100000 the RPC always inserts, so there is no
+    /// per-outcome data left for a caller to branch on either.
+    func captureTransaction(_ payload: CaptureTransactionPayload) async throws
     func createAccount(_ payload: CreateAccountPayload) async throws
     func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool
     func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool
@@ -29,103 +29,13 @@ public protocol OutboxSending: Sendable {
     /// No applied/conflict distinction — see `UpdateCategoryPayload`'s own
     /// header comment on why a rename has nothing to conflict against.
     func updateCategory(_ payload: UpdateCategoryPayload) async throws
-}
-
-/// The real, network-backed sender — a thin wrapper around
-/// `TransactionRepository`. A retry of `createTransaction`/`createTransfer`
-/// that actually already succeeded server-side hits `transactions`'
-/// primary key (23505); that specific error is swallowed here rather than
-/// surfaced as a failure, since it means the write already landed, not that
-/// it failed (migration 20260807140000's whole reason for existing).
-public struct LiveOutboxSender: OutboxSending {
-    let client: SupabaseClient
-
-    public init(client: SupabaseClient) {
-        self.client = client
-    }
-
-    public func createTransaction(_ payload: CreateTransactionPayload) async throws {
-        do {
-            try await TransactionRepository.create(
-                client: client, id: payload.id, ownerId: payload.ownerId, accountId: payload.accountId,
-                categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
-                occurredAt: payload.occurredAt
-            )
-        } catch {
-            if Self.isDuplicateKey(error) { return }
-            throw error
-        }
-    }
-
-    public func createTransfer(_ payload: CreateTransferPayload) async throws {
-        do {
-            try await TransactionRepository.createTransfer(
-                client: client, fromAccountId: payload.fromAccountId, toAccountId: payload.toAccountId,
-                fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4, occurredAt: payload.occurredAt,
-                fromId: payload.fromId, toId: payload.toId
-            )
-        } catch {
-            if Self.isDuplicateKey(error) { return }
-            throw error
-        }
-    }
-
-    public func updateTransaction(_ payload: UpdateTransactionPayload) async throws -> Bool {
-        let result = try await TransactionRepository.update(
-            client: client, id: payload.id, expectedVersion: payload.expectedVersion, accountId: payload.accountId,
-            categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
-            occurredAt: payload.occurredAt, merchantRaw: payload.merchantRaw
-        )
-        switch result {
-        case .saved: return true
-        case .conflict: return false
-        }
-    }
-
-    public func updateTransfer(_ payload: UpdateTransferPayload) async throws -> Bool {
-        let result = try await TransactionRepository.updateTransfer(
-            client: client, transferGroupId: payload.transferGroupId,
-            fromExpectedVersion: payload.fromExpectedVersion, toExpectedVersion: payload.toExpectedVersion,
-            fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4, occurredAt: payload.occurredAt
-        )
-        switch result {
-        case .saved: return true
-        case .conflict: return false
-        }
-    }
-
-    public func deleteTransaction(_ payload: DeleteTransactionPayload) async throws -> Bool {
-        try await TransactionRepository.delete(client: client, id: payload.id, expectedVersion: payload.expectedVersion)
-    }
-
-    public func deleteTransfer(_ payload: DeleteTransferPayload) async throws -> Bool {
-        try await TransactionRepository.deleteTransfer(
-            client: client, transferGroupId: payload.transferGroupId,
-            fromExpectedVersion: payload.fromExpectedVersion, toExpectedVersion: payload.toExpectedVersion
-        )
-    }
-
-    public func captureTransaction(_ payload: CaptureTransactionPayload) async throws -> CaptureResult {
-        do {
-            return try await CaptureRepository.capture(
-                client: client, id: payload.id, cardIdentifier: payload.cardIdentifier,
-                merchantRaw: payload.merchantRaw, merchantNormalized: payload.merchantNormalized,
-                amountE4: payload.amountE4, occurredAt: payload.occurredAt, externalId: payload.externalId
-            )
-        } catch {
-            // A retried capture already landed under this id — we don't know
-            // whether it was mapped without a re-fetch, and nothing reads
-            // this result on the drain path (see Outbox.replay below), so a
-            // placeholder is fine here; only the immediate, non-retry call
-            // from CaptureIntent ever surfaces `mapped` to a human.
-            if Self.isDuplicateKey(error) { return CaptureResult(mapped: true, accountId: nil) }
-            throw error
-        }
-    }
-
-    static func isDuplicateKey(_ error: Error) -> Bool {
-        (error as? PostgrestError)?.code == "23505"
-    }
+    /// Neither has a conflict concept — see `RenameCardMappingPayload`/`UnmapCardPayload`'s own comments why.
+    func renameCardMapping(_ payload: RenameCardMappingPayload) async throws
+    func unmapCard(_ payload: UnmapCardPayload) async throws
+    /// No conflict concept either — `map_card` is an upsert keyed by
+    /// (owner, card_identifier), same "last write wins" reasoning as rename/unmap.
+    func mapCard(_ payload: MapCardPayload) async throws
+    func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload) async throws -> Bool
 }
 
 // MARK: - Outbox
@@ -137,14 +47,21 @@ public enum OutboxSubmitResult: Equatable, Sendable {
 }
 
 public enum OutboxCaptureResult: Equatable, Sendable {
-    case applied(mapped: Bool)
+    /// The local-first fast path — always taken as long as a category was
+    /// resolvable locally (an unmapped card no longer falls through: the
+    /// pending row is written either way, `accountName`/`currency`/
+    /// `minorUnit` are simply `nil` when the card isn't resolved yet).
+    /// Written and visible in Needs Review — online or offline — before
+    /// the background sync attempt that follows even starts; that attempt
+    /// never revises what's already here.
+    case appliedLocally(accountName: String?, categoryName: String, currency: String?, minorUnit: Int?)
+    /// The rare fallback: the local mirror doesn't even have the owner's
+    /// "Other" category synced down yet — an immediate RPC attempt,
+    /// exactly as before local-first capture existed. Carries no payload:
+    /// the row landed server-side, so nothing about it is on this device
+    /// to describe until the next sync pull brings it down.
+    case applied
     case queued
-}
-
-enum OutboxKind: String {
-    case createTransaction, createTransfer, updateTransaction, updateTransfer, deleteTransaction, deleteTransfer
-    case captureTransaction
-    case createAccount, updateAccount, setAccountBalance, archiveAccount, createCategory, updateCategory
 }
 
 /// Every write attempts to send immediately; only a thrown error (offline,
@@ -160,8 +77,16 @@ enum OutboxKind: String {
 public final class Outbox {
     public private(set) var pendingCount = 0
     public private(set) var oldestPendingAt: Date?
+    /// Why the oldest queued write keeps failing — recorded by `enqueue`
+    /// on every failed attempt since the outbox existed, but surfaced
+    /// nowhere until a real bug made that gap expensive: a server-side RPC
+    /// signature mismatch (an unpushed migration) failed every capture
+    /// silently, so the queue simply grew with no visible reason, and the
+    /// symptom looked identical to a client sync bug. A write that cannot
+    /// reach the server must always be able to say why.
+    public private(set) var lastError: String?
 
-    private let dbQueue: DatabaseQueue
+    let dbQueue: DatabaseQueue
     let sender: OutboxSending
     private let encoder = JSONEncoder()
     let decoder = JSONDecoder()
@@ -261,20 +186,14 @@ public final class Outbox {
         }
     }
 
-    /// The App Intent's write. Not routed through the generic `attempt`
-    /// helper — a capture's success has a third piece of information
-    /// (`mapped`) the intent needs for its notification text, which the
-    /// applied/conflict `Bool` every other write shares can't carry.
-    public func submitCaptureTransaction(_ payload: CaptureTransactionPayload) async -> OutboxCaptureResult {
-        do {
-            let result = try await sender.captureTransaction(payload)
-            return .applied(mapped: result.mapped)
-        } catch {
-            await enqueue(
-                id: payload.id, kind: .captureTransaction, payload: payload, expectedVersion: nil,
-                lastError: String(describing: error)
-            )
-            return .queued
+    /// See `Outbox+Capture.swift` — split out purely to keep this file
+    /// under the project's file-length lint threshold, same precedent as
+    /// `Outbox+AccountsCategories.swift`.
+    func resolveAndApplyCaptureLocally(
+        _ payload: CaptureTransactionPayload, ownerId: UUID
+    ) async -> CaptureLocalWrite.Resolution? {
+        try? await dbQueue.write { database in
+            try CaptureLocalWrite.resolveAndWrite(payload, ownerId: ownerId.uuidString, in: database)
         }
     }
 
@@ -311,11 +230,32 @@ public final class Outbox {
         }
     }
 
-    private func enqueue<P: Encodable>(
+    /// Found chasing a real bug: this used to always overwrite whatever was
+    /// already queued under `id`, on the reasoning that only the latest
+    /// desired state ever needs to reach the server — correct for two
+    /// edits to the same *already-existing* row, but wrong when the
+    /// existing item is a still-undelivered `.captureTransaction` (the
+    /// row's own create). Overwriting it discards the create entirely: the
+    /// row never exists server-side, so the write that replaced it
+    /// (confirm/update/delete) fails forever with "not found," retrying an
+    /// operation that can never succeed. A dependent write for a row whose
+    /// create hasn't landed yet is queued as its own new item instead —
+    /// its `createdAt` sorts after the create's, so `drainAll`'s FIFO order
+    /// replays the create first and this write second, same outcome as if
+    /// both had gone out over the wire in the order the user made them.
+    func enqueue<P: Encodable>(
         id: UUID, kind: OutboxKind, payload: P, expectedVersion: Int?, lastError: String?
     ) async {
         guard let data = try? encoder.encode(payload) else { return }
         try? await dbQueue.write { database in
+            if let existing = try OutboxItemRecord.fetchOne(database, key: id),
+               existing.kind == OutboxKind.captureTransaction.rawValue, kind != .captureTransaction {
+                try OutboxItemRecord(
+                    id: UUID(), kind: kind.rawValue, payloadJSON: data, expectedVersion: expectedVersion,
+                    createdAt: Date(), attempts: 1, lastError: lastError
+                ).insert(database)
+                return
+            }
             if var existing = try OutboxItemRecord.fetchOne(database, key: id) {
                 existing.kind = kind.rawValue
                 existing.payloadJSON = data
@@ -335,7 +275,7 @@ public final class Outbox {
 
     private func drain(_ item: OutboxItemRecord) async {
         do {
-            _ = try await replay(item)
+            try await replayWithRecovery(item)
             try? await dbQueue.write { database in _ = try item.delete(database) }
         } catch {
             try? await dbQueue.write { database in
@@ -351,32 +291,46 @@ public final class Outbox {
     /// Returns applied/conflict — both mean "delivered," so `drain(_:)`
     /// dequeues either way. An unrecognized `kind` (should never happen;
     /// nothing removes cases from `OutboxKind`) is dropped rather than
-    /// retried forever against a decoder that can never succeed.
-    private func replay(_ item: OutboxItemRecord) async throws -> Bool {
+    /// retried forever against a decoder that can never succeed. Not
+    /// `private` — `Outbox+CaptureRecovery.swift`'s `replayWithRecovery`
+    /// calls this directly, same file-split precedent as `Outbox+Capture.swift`.
+    func replay(_ item: OutboxItemRecord) async throws -> Bool {
         guard let kind = OutboxKind(rawValue: item.kind) else { return true }
         switch kind {
-        case .createTransaction:
-            try await sender.createTransaction(decoder.decode(CreateTransactionPayload.self, from: item.payloadJSON))
-            return true
-        case .createTransfer:
-            try await sender.createTransfer(decoder.decode(CreateTransferPayload.self, from: item.payloadJSON))
-            return true
-        case .updateTransaction:
-            let payload = try decoder.decode(UpdateTransactionPayload.self, from: item.payloadJSON)
-            return try await sender.updateTransaction(payload)
-        case .updateTransfer:
-            return try await sender.updateTransfer(decoder.decode(UpdateTransferPayload.self, from: item.payloadJSON))
-        case .deleteTransaction:
-            let payload = try decoder.decode(DeleteTransactionPayload.self, from: item.payloadJSON)
-            return try await sender.deleteTransaction(payload)
-        case .deleteTransfer:
-            return try await sender.deleteTransfer(decoder.decode(DeleteTransferPayload.self, from: item.payloadJSON))
-        case .captureTransaction:
-            let payload = try decoder.decode(CaptureTransactionPayload.self, from: item.payloadJSON)
-            _ = try await sender.captureTransaction(payload)
-            return true
+        case .createTransaction, .createTransfer, .updateTransaction, .updateTransfer, .deleteTransaction,
+             .deleteTransfer, .captureTransaction, .confirmCaptureTransaction:
+            return try await replayTransaction(kind, data: item.payloadJSON)
         case .createAccount, .updateAccount, .setAccountBalance, .archiveAccount, .createCategory, .updateCategory:
             return try await replayAccountOrCategory(kind, data: item.payloadJSON)
+        case .renameCardMapping, .unmapCard, .mapCard:
+            return try await replayCardMapping(kind, data: item.payloadJSON)
+        }
+    }
+
+    private func replayTransaction(_ kind: OutboxKind, data: Data) async throws -> Bool {
+        switch kind {
+        case .createTransaction:
+            try await sender.createTransaction(decoder.decode(CreateTransactionPayload.self, from: data))
+            return true
+        case .createTransfer:
+            try await sender.createTransfer(decoder.decode(CreateTransferPayload.self, from: data))
+            return true
+        case .updateTransaction:
+            return try await sender.updateTransaction(decoder.decode(UpdateTransactionPayload.self, from: data))
+        case .updateTransfer:
+            return try await sender.updateTransfer(decoder.decode(UpdateTransferPayload.self, from: data))
+        case .deleteTransaction:
+            return try await sender.deleteTransaction(decoder.decode(DeleteTransactionPayload.self, from: data))
+        case .deleteTransfer:
+            return try await sender.deleteTransfer(decoder.decode(DeleteTransferPayload.self, from: data))
+        case .captureTransaction:
+            try await sender.captureTransaction(decoder.decode(CaptureTransactionPayload.self, from: data))
+            return true
+        case .confirmCaptureTransaction:
+            let payload = try decoder.decode(ConfirmCaptureTransactionPayload.self, from: data)
+            return try await sender.confirmCaptureTransaction(payload)
+        default:
+            return true
         }
     }
 
@@ -390,5 +344,6 @@ public final class Outbox {
         let items = await pendingItems()
         pendingCount = items.count
         oldestPendingAt = items.first?.createdAt
+        lastError = items.compactMap(\.lastError).first
     }
 }
