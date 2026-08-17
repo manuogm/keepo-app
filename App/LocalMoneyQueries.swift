@@ -156,9 +156,13 @@ enum LocalMoneyQueries {
     // MARK: - needs_review (no money conversion at all — a straight port)
 
     static func needsReview(_ database: Database) throws -> [NeedsReviewLocalRow] {
-        var rows: [NeedsReviewLocalRow] = []
+        try needsReviewSyncConflicts(database)
+            + needsReviewPendingCaptures(database)
+            + needsReviewAmbiguousCards(database)
+    }
 
-        rows += try Row.fetchAll(
+    private static func needsReviewSyncConflicts(_ database: Database) throws -> [NeedsReviewLocalRow] {
+        try Row.fetchAll(
             database,
             sql: """
             SELECT id, table_name, row_id, client_version, server_version, created_at
@@ -178,8 +182,10 @@ enum LocalMoneyQueries {
                 amountE4: nil, currency: nil
             )
         }
+    }
 
-        rows += try Row.fetchAll(
+    private static func needsReviewPendingCaptures(_ database: Database) throws -> [NeedsReviewLocalRow] {
+        try Row.fetchAll(
             database,
             sql: """
             SELECT t.id, t.account_id, t.occurred_at, t.merchant_raw, t.amount_e4, t.currency,
@@ -198,9 +204,25 @@ enum LocalMoneyQueries {
                 amountE4: row["amount_e4"], currency: row["currency"]
             )
         }
+    }
 
-        rows += try Row.fetchAll(
-            database, sql: "SELECT id, card_identifier, created_at FROM card_mappings WHERE account_id IS NULL"
+    /// Mirrors `needs_review`'s own `ambiguous_card` branch exactly:
+    /// `deleted_at IS NULL` (a dismissed/unmapped card must never resurface)
+    /// and the `NOT EXISTS` guard against a pending capture already
+    /// covering the same card (otherwise one unmapped-card event would
+    /// show as two redundant items).
+    private static func needsReviewAmbiguousCards(_ database: Database) throws -> [NeedsReviewLocalRow] {
+        try Row.fetchAll(
+            database,
+            sql: """
+            SELECT cm.id, cm.card_identifier, cm.created_at FROM card_mappings cm
+            WHERE cm.account_id IS NULL AND cm.deleted_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM transactions t2
+                WHERE t2.owner_id = cm.owner_id AND t2.card_identifier = cm.card_identifier
+                  AND t2.source = 'capture' AND t2.status = 'pending' AND t2.deleted_at IS NULL
+              )
+            """
         ).map { row in
             NeedsReviewLocalRow(
                 kind: "ambiguous_card", itemId: row["id"], accountId: nil, occurredAt: row["created_at"],
@@ -208,8 +230,6 @@ enum LocalMoneyQueries {
                 amountE4: nil, currency: nil
             )
         }
-
-        return rows
     }
 }
 

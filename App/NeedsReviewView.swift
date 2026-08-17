@@ -140,6 +140,15 @@ struct NeedsReviewView: View {
                 Task { await acceptImportCandidate(item) }
             }
             .tint(Color.primary)
+        } else if item.kind == "ambiguous_card" {
+            // A card that's never getting mapped (a test card, one no
+            // longer in use) had no way to leave this list short of
+            // mapping it to *some* account — soft-deletes the
+            // `card_mappings` placeholder, same as "Remove Mapping" in the
+            // Account edit sheet's card list.
+            Button("Dismiss", role: .destructive) {
+                Task { await dismissUnmappedCard(item) }
+            }
         }
     }
 
@@ -197,6 +206,12 @@ struct NeedsReviewView: View {
         if thenBump {
             session.refresh.bump()
         }
+    }
+
+    private func dismissUnmappedCard(_ item: PublicSchema.NeedsReviewSelect) async {
+        guard let id = item.itemId else { return }
+        await session.outbox.submitUnmapCard(UnmapCardPayload(id: id))
+        removeLocally(id)
     }
 
     private func resolve(_ item: PublicSchema.NeedsReviewSelect) async {
