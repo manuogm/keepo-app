@@ -37,23 +37,34 @@ extension OutboxLocalWrite {
         }
     }
 
-    /// The Account edit sheet's "manage mapped cards" writes — keyed by the
-    /// mapping's own local `id`, which the UI already has in hand from the
-    /// query that populated the list, unlike `linkCardLocally` above (no
-    /// natural-key lookup ambiguity here).
+    /// The Account edit sheet's "manage mapped cards" writes — keyed by
+    /// natural key (owner + the card's current identifier), matching the
+    /// server RPCs (see `RenameCardMappingPayload`'s own header comment on
+    /// why this changed from the mapping's row id: that id is
+    /// server-generated, and a row created locally before its server
+    /// counterpart ever synced down carries a client-invented id the
+    /// server has never heard of — this `UPDATE` affects every local row
+    /// sharing the natural key, so it also self-heals that exact case
+    /// rather than silently missing the "wrong" one.
     static func renameCardMapping(_ payload: RenameCardMappingPayload, in database: Database) throws {
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         try database.execute(
-            sql: "UPDATE card_mappings SET card_identifier = ?, updated_at = ? WHERE id = ?",
-            arguments: [payload.cardIdentifier, now, payload.id.uuidString]
+            sql: """
+            UPDATE card_mappings SET card_identifier = ?, updated_at = ?
+            WHERE owner_id = ? AND card_identifier = ? AND deleted_at IS NULL
+            """,
+            arguments: [payload.newCardIdentifier, now, payload.ownerId.uuidString, payload.oldCardIdentifier]
         )
     }
 
     static func unmapCard(_ payload: UnmapCardPayload, in database: Database) throws {
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         try database.execute(
-            sql: "UPDATE card_mappings SET deleted_at = ?, updated_at = ? WHERE id = ?",
-            arguments: [now, now, payload.id.uuidString]
+            sql: """
+            UPDATE card_mappings SET deleted_at = ?, updated_at = ?
+            WHERE owner_id = ? AND card_identifier = ? AND deleted_at IS NULL
+            """,
+            arguments: [now, now, payload.ownerId.uuidString, payload.cardIdentifier]
         )
     }
 }

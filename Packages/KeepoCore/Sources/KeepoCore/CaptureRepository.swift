@@ -46,14 +46,20 @@ public enum CaptureRepository {
         return rows.first.map(WriteResult.init) ?? .conflict
     }
 
-    /// The Account edit sheet's "manage mapped cards" actions.
-    public static func renameCardMapping(client: SupabaseClient, id: UUID, cardIdentifier: String) async throws {
-        let params = RenameCardMappingParams(id: id, cardIdentifier: cardIdentifier)
+    /// The Account edit sheet's "manage mapped cards" actions — resolved by
+    /// natural key (owner + the card's current identifier), never by the
+    /// mapping's own row id (see `RenameCardMappingPayload`'s own header
+    /// comment on why: that id is server-generated and the local mirror
+    /// can't reliably know it ahead of a sync pull).
+    public static func renameCardMapping(
+        client: SupabaseClient, oldCardIdentifier: String, newCardIdentifier: String
+    ) async throws {
+        let params = RenameCardMappingParams(oldCardIdentifier: oldCardIdentifier, newCardIdentifier: newCardIdentifier)
         try await client.rpc("rename_card_mapping", params: params).execute()
     }
 
-    public static func unmapCard(client: SupabaseClient, id: UUID) async throws {
-        try await client.rpc("unmap_card", params: UnmapCardParams(id: id)).execute()
+    public static func unmapCard(client: SupabaseClient, cardIdentifier: String) async throws {
+        try await client.rpc("unmap_card", params: UnmapCardParams(cardIdentifier: cardIdentifier)).execute()
     }
 }
 
@@ -97,17 +103,17 @@ private struct ConfirmCaptureParams: Encodable {
 }
 
 private struct RenameCardMappingParams: Encodable {
-    let id: UUID
-    let cardIdentifier: String
+    let oldCardIdentifier: String
+    let newCardIdentifier: String
     enum CodingKeys: String, CodingKey {
-        case id = "p_id"
-        case cardIdentifier = "p_card_identifier"
+        case oldCardIdentifier = "p_old_card_identifier"
+        case newCardIdentifier = "p_new_card_identifier"
     }
 }
 
 private struct UnmapCardParams: Encodable {
-    let id: UUID
+    let cardIdentifier: String
     enum CodingKeys: String, CodingKey {
-        case id = "p_id"
+        case cardIdentifier = "p_card_identifier"
     }
 }

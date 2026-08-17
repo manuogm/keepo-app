@@ -13,6 +13,11 @@ struct CardMappingDetailSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var cardIdentifier = ""
+    /// The identifier as loaded, before any edit — the natural key
+    /// `rename`/`remove` resolve against server- and locally-side (see
+    /// `RenameCardMappingPayload`'s own header comment on why this
+    /// changed from the mapping's row id).
+    @State private var originalCardIdentifier = ""
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var showRemoveConfirm = false
@@ -61,24 +66,33 @@ struct CardMappingDetailSheet: View {
     }
 
     private func load() async {
-        cardIdentifier = (try? await session.dbQueue.read { database in
+        let loaded = (try? await session.dbQueue.read { database in
             try LocalTableQueries.cardMapping(database, id: cardMappingId.uuidString)
         })??.cardIdentifier ?? ""
+        cardIdentifier = loaded
+        originalCardIdentifier = loaded
         isLoading = false
     }
 
     private func save() async {
+        guard let ownerId = session.profile?.id else { return }
         isSaving = true
         await session.outbox.submitRenameCardMapping(
-            RenameCardMappingPayload(id: cardMappingId, cardIdentifier: cardIdentifier)
+            RenameCardMappingPayload(
+                id: UUID(), ownerId: ownerId, oldCardIdentifier: originalCardIdentifier,
+                newCardIdentifier: cardIdentifier
+            )
         )
         onChanged()
         dismiss()
     }
 
     private func remove() async {
+        guard let ownerId = session.profile?.id else { return }
         isSaving = true
-        await session.outbox.submitUnmapCard(UnmapCardPayload(id: cardMappingId))
+        await session.outbox.submitUnmapCard(
+            UnmapCardPayload(id: UUID(), ownerId: ownerId, cardIdentifier: originalCardIdentifier)
+        )
         onChanged()
         dismiss()
     }

@@ -10,12 +10,13 @@ import KeepoCore
 extension LiveOutboxSender {
     public func renameCardMapping(_ payload: RenameCardMappingPayload) async throws {
         try await CaptureRepository.renameCardMapping(
-            client: client, id: payload.id, cardIdentifier: payload.cardIdentifier
+            client: client, oldCardIdentifier: payload.oldCardIdentifier,
+            newCardIdentifier: payload.newCardIdentifier
         )
     }
 
     public func unmapCard(_ payload: UnmapCardPayload) async throws {
-        try await CaptureRepository.unmapCard(client: client, id: payload.id)
+        try await CaptureRepository.unmapCard(client: client, cardIdentifier: payload.cardIdentifier)
     }
 
     public func mapCard(_ payload: MapCardPayload) async throws {

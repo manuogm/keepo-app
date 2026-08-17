@@ -283,10 +283,12 @@ select is(
 -- mapped cards" RPCs.
 -- ----------------------------------------------------------------------------
 
-select rename_card_mapping(
-  (select id from card_mappings where owner_id = auth.uid() and card_identifier = 'card-review-link'),
-  'Revolut'
-);
+-- Resolved by natural key (owner + current card_identifier), not by the
+-- mapping's own row id — that id is server-generated and a client can't
+-- reliably know it ahead of a sync pull, which is exactly what made a
+-- capture's local-first write-through permanently fail "not found" on
+-- retry when it guessed wrong (found chasing a real device bug).
+select rename_card_mapping('card-review-link', 'Revolut');
 
 select is(
   (select count(*) from card_mappings where owner_id = auth.uid() and card_identifier = 'Revolut'
@@ -313,7 +315,7 @@ select is(
   'a deleted, still-unresolved capture lets its card_mappings row reappear as ambiguous_card'
 );
 
-select unmap_card((select id from card_mappings where owner_id = auth.uid() and card_identifier = 'card-to-unmap'));
+select unmap_card('card-to-unmap');
 
 select is(
   (select count(*) from needs_review where kind = 'ambiguous_card'),
@@ -339,11 +341,9 @@ select is(
 );
 
 select throws_like(
-  $$ select rename_card_mapping(
-    (select id from card_mappings limit 1), 'stolen'
-  ) $$,
+  $$ select rename_card_mapping('Revolut', 'stolen') $$,
   '%not found%',
-  'fixture B cannot rename a card mapping (finds none of its own, and can''t see A''s to target one)'
+  'fixture B cannot rename fixture A''s card mapping by its identifier'
 );
 
 select * from finish();

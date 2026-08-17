@@ -224,9 +224,15 @@ enum LocalMoneyQueries {
               )
             """
         ).map { row in
+            // subtitle carries the raw card_identifier — MapCardSheet reads
+            // it from here to resolve the mapping. Mirrors needs_review's
+            // own ambiguous_card branch exactly (found chasing a real bug:
+            // this used to fold the identifier into `title` only, leaving
+            // subtitle nil — the sheet's own guard on it silently failed
+            // every time).
             NeedsReviewLocalRow(
                 kind: "ambiguous_card", itemId: row["id"], accountId: nil, occurredAt: row["created_at"],
-                title: "Unmapped card — \(row["card_identifier"] as String)", subtitle: nil,
+                title: "Unmapped card", subtitle: row["card_identifier"],
                 amountE4: nil, currency: nil
             )
         }

@@ -162,7 +162,11 @@ struct CardMappingLocalWriteTests {
             dbQueue, id: mappingId, ownerId: ownerId, cardIdentifier: "Old Name", accountId: accountId
         )
 
-        _ = await outbox.submitRenameCardMapping(RenameCardMappingPayload(id: mappingId, cardIdentifier: "Revolut"))
+        _ = await outbox.submitRenameCardMapping(
+            RenameCardMappingPayload(
+                id: UUID(), ownerId: ownerId, oldCardIdentifier: "Old Name", newCardIdentifier: "Revolut"
+            )
+        )
 
         let identifier = try await dbQueue.read { database in
             try String.fetchOne(
@@ -184,7 +188,9 @@ struct CardMappingLocalWriteTests {
             dbQueue, id: mappingId, ownerId: ownerId, cardIdentifier: "Revolut", accountId: accountId
         )
 
-        _ = await outbox.submitUnmapCard(UnmapCardPayload(id: mappingId))
+        _ = await outbox.submitUnmapCard(
+            UnmapCardPayload(id: UUID(), ownerId: ownerId, cardIdentifier: "Revolut")
+        )
 
         let row = try await dbQueue.read { database in
             try Row.fetchOne(

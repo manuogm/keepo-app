@@ -289,16 +289,29 @@ public struct ArchiveAccountPayload: Codable, Sendable {
 /// `expectedVersion` — `card_mappings` has no `version` column, same
 /// "last write wins" simplicity `map_card` itself already documented (a
 /// single (owner, card) row nobody else can touch has no concurrent-edit
-/// hazard worth one). `id` is the mapping's own row id, not the card
-/// identifier — immutable, so renaming the identifier text has nothing to
-/// race against.
+/// hazard worth one).
+///
+/// Resolved server- and locally by natural key — `(ownerId,
+/// oldCardIdentifier)` — never by the mapping's own row id. `id` is a
+/// server-generated value no RPC ever lets a client choose, so the local
+/// mirror's optimistic write-through has no way to know it ahead of a sync
+/// pull; keying these writes by it meant a row created locally before its
+/// server counterpart synced down (a real sequence during an offline
+/// capture) permanently failed "not found" on retry — the id itself, not
+/// the network, was wrong. `id` here is only a synthetic outbox dedupe key
+/// (`Outbox.attempt`'s bookkeeping), same role `MapCardPayload.id` already
+/// plays, never sent to the server.
 public struct RenameCardMappingPayload: Codable, Sendable {
     public let id: UUID
-    public let cardIdentifier: String
+    public let ownerId: UUID
+    public let oldCardIdentifier: String
+    public let newCardIdentifier: String
 
-    public init(id: UUID, cardIdentifier: String) {
+    public init(id: UUID, ownerId: UUID, oldCardIdentifier: String, newCardIdentifier: String) {
         self.id = id
-        self.cardIdentifier = cardIdentifier
+        self.ownerId = ownerId
+        self.oldCardIdentifier = oldCardIdentifier
+        self.newCardIdentifier = newCardIdentifier
     }
 }
 
@@ -306,11 +319,17 @@ public struct RenameCardMappingPayload: Codable, Sendable {
 /// `account_id = null` reset — see `unmap_card`'s own migration comment on
 /// why: that would immediately resurrect the mapping as an `ambiguous_card`
 /// Needs Review item, the exact nagging this action is meant to dismiss.
+/// Resolved by natural key — see `RenameCardMappingPayload`'s own header
+/// comment on why this changed from keying by row id.
 public struct UnmapCardPayload: Codable, Sendable {
     public let id: UUID
+    public let ownerId: UUID
+    public let cardIdentifier: String
 
-    public init(id: UUID) {
+    public init(id: UUID, ownerId: UUID, cardIdentifier: String) {
         self.id = id
+        self.ownerId = ownerId
+        self.cardIdentifier = cardIdentifier
     }
 }
 

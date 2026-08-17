@@ -209,8 +209,12 @@ struct NeedsReviewView: View {
     }
 
     private func dismissUnmappedCard(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId else { return }
-        await session.outbox.submitUnmapCard(UnmapCardPayload(id: id))
+        guard let id = item.itemId, let cardIdentifier = item.subtitle, let ownerId = session.profile?.id else {
+            return
+        }
+        await session.outbox.submitUnmapCard(
+            UnmapCardPayload(id: UUID(), ownerId: ownerId, cardIdentifier: cardIdentifier)
+        )
         removeLocally(id)
     }
 
