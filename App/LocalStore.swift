@@ -206,6 +206,16 @@ public enum LocalSchemaV1 {
             table.column("deleted_at", .text)
             table.column("sync_seq", .integer).notNull()
         }
+        // Mirrors the server's own unique(owner_id, card_identifier) —
+        // not partial there either. Items 2/3 fix: without it, a
+        // locally-invented mapping id and the server's own row for the
+        // identical card could both exist; `SyncApply
+        // .reconcileCardMappingDuplicate` is the other half — it deletes
+        // the stale duplicate by natural key before a pull lands.
+        try database.create(
+            index: "idx_card_mappings_owner_card", on: "card_mappings", columns: ["owner_id", "card_identifier"],
+            options: .unique
+        )
 
         try database.create(table: "merchant_category_map") { table in
             table.column("owner_id", .text).notNull().collate(.nocase)
@@ -354,6 +364,11 @@ public enum LocalStore {
         // transactions(owner_id, source, external_id) — GRDB never re-runs
         // a migration name that already succeeded.
         migrator.registerMigration("v3_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — items 2/3's new unique index on
+        // card_mappings(owner_id, card_identifier); also purges any
+        // duplicate row already on disk, since the fresh re-pull runs
+        // through `SyncApply`'s new natural-key reconciliation.
+        migrator.registerMigration("v4_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)

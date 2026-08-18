@@ -30,7 +30,10 @@ struct AccountFormView: View {
 
     @State private var editingId: UUID?
     @State private var editingVersion: Int?
-    @State private var editingKind: PublicSchema.AccountKind?
+    // Not `private` — read from AccountFormView+Cards.swift (a different
+    // file, kept there for file-length) to restrict "Mapped Cards" to
+    // ledger accounts, same reasoning as `cardMappings` below.
+    @State var editingKind: PublicSchema.AccountKind?
     @State private var editingArchivedAt: String?
     @State private var showArchiveConfirm = false
 

@@ -14,6 +14,7 @@
 		04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 884043304F66BADDBBBE1E13 /* KeepoApp.swift */; };
 		07757F6F5323860A58AB2EF0 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06737C4FC884994C69283C0A /* HomeView.swift */; };
 		1258AEE2BE84DBE4A3238432 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4ADFA49D22C598E055F5FB9 /* AppSettings.swift */; };
+		12A356D345021336EACE2540 /* UnmappedCardLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58EC8D21829E6A9DDBC381D8 /* UnmappedCardLifecycleTests.swift */; };
 		16FA5989E86D92AFF0B19497 /* CaptureNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E59AD7E59FDAFDE96E7FDA9 /* CaptureNotify.swift */; };
 		1979678A5304703AB79F5093 /* ConfirmCaptureLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */; };
 		1AC5044D2005A53BA40B40DD /* RecurringRuleFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010F6BE2EDE4A87D2634D6FE /* RecurringRuleFormView.swift */; };
@@ -66,6 +67,7 @@
 		8418D67FD7BAB31C6629EE5B /* TransactionFormView+Delete.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7302E5237413BF6107E4CE /* TransactionFormView+Delete.swift */; };
 		85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A520844CB1127366801CB8 /* KeepoCore */; };
 		8890043FAC9EC87C9D768D17 /* StubTransactionSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242AFF22D448A2969EE96D9C /* StubTransactionSender.swift */; };
+		88B799939E6B0E53900D0DC9 /* CaptureNotificationCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FBEDFDA4FF666C8FA61FF8 /* CaptureNotificationCopyTests.swift */; };
 		8C19ADA540858E61760E4FE7 /* BudgetFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EF478F9C03D81B6E0CCFB1 /* BudgetFormView.swift */; };
 		910929EACA4D7E2B7840D626 /* ArchiveAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26D5FDEC899FFE8FBF9699D /* ArchiveAccountsView.swift */; };
 		916606BE115D52894CF13E4A /* Outbox+AccountsCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF23EF5C13D50D95393B5ABF /* Outbox+AccountsCategories.swift */; };
@@ -81,6 +83,7 @@
 		AD9ECBCDD919F4BB10E4245D /* ConflictDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBAFFDD646D531BB369E684A /* ConflictDetailSheet.swift */; };
 		AEED63AD52F0DA7096061790 /* OutboxPayloads+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 577DC98B3EE96BF639D9CC92 /* OutboxPayloads+Capture.swift */; };
 		B1428E9A36AA3EC93E48566F /* CaptureLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F44CF7DBC59CC3E0D698B4D /* CaptureLocalWrite.swift */; };
+		B24F5A6145F90E63C15BB3DC /* SyncApplyCardMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01EFD57C883787366864BB5 /* SyncApplyCardMappingTests.swift */; };
 		B3D55B77F4EB1B1F699789EB /* UUID+Identifiable.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EFC21F0C8C59B19FFD185A /* UUID+Identifiable.swift */; };
 		B54F02C80D3D973B33154960 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5BCEA514344BDBF220342E /* HouseholdView.swift */; };
 		B58F7AE0F4E46F77167F4677 /* NotificationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E62BF27F1E0B2358AEA3A07C /* NotificationRouter.swift */; };
@@ -101,6 +104,7 @@
 		CDEAFC8D83E97D3B04E20CFD /* LocalStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */; };
 		D1A22957D9168F2FB74BBEA7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C51BAEA2B58FB280672BF8C /* AppDelegate.swift */; };
 		D2249999B755B75AF3BA291E /* LocalMoneyQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3600B8733D14B431A8E3067 /* LocalMoneyQueries.swift */; };
+		D3A7D630E8FE870F4A387DE4 /* CaptureNotificationCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83680DB0AF9EC18EFE56CAEA /* CaptureNotificationCopy.swift */; };
 		D5BF43435891F0747B331635 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F7E462D55BFB72F55965EFE /* LocalStore.swift */; };
 		D60DD08A0A2DD8446CA993CD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8871465199EB566D42ACEC52 /* SettingsView.swift */; };
 		D870CF193CABA5CA3A2B649C /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */; };
@@ -176,6 +180,7 @@
 		2D0DC0C876E0AE5447A36475 /* OfflineStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStatusBar.swift; sourceTree = "<group>"; };
 		2EEDC16F840D1D52F4F06892 /* LocalMoneyTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyTypes.swift; sourceTree = "<group>"; };
 		2F44CF7DBC59CC3E0D698B4D /* CaptureLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureLocalWrite.swift; sourceTree = "<group>"; };
+		30FBEDFDA4FF666C8FA61FF8 /* CaptureNotificationCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationCopyTests.swift; sourceTree = "<group>"; };
 		330A1DB56C7CE8B1BC25180E /* LocalStoreMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoreMigrationTests.swift; sourceTree = "<group>"; };
 		333AEF1387D80D7D4ECFD033 /* RefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinator.swift; sourceTree = "<group>"; };
 		35BD2F32122628E1B36921FA /* Outbox+CaptureRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+CaptureRecovery.swift"; sourceTree = "<group>"; };
@@ -194,6 +199,7 @@
 		4DD4484E755728FA2992E894 /* LocalTransactionRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTransactionRowTests.swift; sourceTree = "<group>"; };
 		56BD1170276112E0659274B6 /* BalanceReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceReminderScheduler.swift; sourceTree = "<group>"; };
 		577DC98B3EE96BF639D9CC92 /* OutboxPayloads+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OutboxPayloads+Capture.swift"; sourceTree = "<group>"; };
+		58EC8D21829E6A9DDBC381D8 /* UnmappedCardLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnmappedCardLifecycleTests.swift; sourceTree = "<group>"; };
 		5A43338D7EE342E9D02ACC23 /* OutboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxTests.swift; sourceTree = "<group>"; };
 		5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVImportView.swift; sourceTree = "<group>"; };
 		5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardMappingLocalWriteTests.swift; sourceTree = "<group>"; };
@@ -207,6 +213,7 @@
 		7742491A185D240463F3F936 /* KeepoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmCaptureLocalWriteTests.swift; sourceTree = "<group>"; };
 		7BA14030637CFFD08A547224 /* KeepoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoUITests.swift; sourceTree = "<group>"; };
+		83680DB0AF9EC18EFE56CAEA /* CaptureNotificationCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationCopy.swift; sourceTree = "<group>"; };
 		864D74AE697E673562039C23 /* OTPSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPSignInView.swift; sourceTree = "<group>"; };
 		884043304F66BADDBBBE1E13 /* KeepoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoApp.swift; sourceTree = "<group>"; };
 		8871465199EB566D42ACEC52 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -246,6 +253,7 @@
 		CDA9FDB15C2C5D6B5B18466D /* WalletAutomationGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAutomationGuideView.swift; sourceTree = "<group>"; };
 		CEE6F0FB1B3DF6715A2BF817 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		CF23EF5C13D50D95393B5ABF /* Outbox+AccountsCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+AccountsCategories.swift"; sourceTree = "<group>"; };
+		D01EFD57C883787366864BB5 /* SyncApplyCardMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncApplyCardMappingTests.swift; sourceTree = "<group>"; };
 		D05E8A22B7751E78E33EBC02 /* OfflineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStore.swift; sourceTree = "<group>"; };
 		D105BF3ECCEFDC84E629D824 /* SimulateCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulateCaptureView.swift; sourceTree = "<group>"; };
 		D26D5FDEC899FFE8FBF9699D /* ArchiveAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveAccountsView.swift; sourceTree = "<group>"; };
@@ -349,6 +357,7 @@
 				C4437A523DE24A64B83A5D54 /* BudgetsView.swift */,
 				EDED98D97ACE3A89820BBD09 /* CaptureIntent.swift */,
 				2F44CF7DBC59CC3E0D698B4D /* CaptureLocalWrite.swift */,
+				83680DB0AF9EC18EFE56CAEA /* CaptureNotificationCopy.swift */,
 				5E59AD7E59FDAFDE96E7FDA9 /* CaptureNotify.swift */,
 				3CAAB71ED4F3AA3764B428BB /* CardMappingDetailSheet.swift */,
 				037CD275DF695BA082E13AE5 /* CategoriesView.swift */,
@@ -447,6 +456,7 @@
 		D8B056B5D3C0D609BDC3AAFD /* KeepoTests */ = {
 			isa = PBXGroup;
 			children = (
+				30FBEDFDA4FF666C8FA61FF8 /* CaptureNotificationCopyTests.swift */,
 				5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */,
 				36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */,
 				7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */,
@@ -466,7 +476,9 @@
 				5A43338D7EE342E9D02ACC23 /* OutboxTests.swift */,
 				983639BA2391235A898AD23F /* ReviewCaptureLocalWriteTests.swift */,
 				242AFF22D448A2969EE96D9C /* StubTransactionSender.swift */,
+				D01EFD57C883787366864BB5 /* SyncApplyCardMappingTests.swift */,
 				9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */,
+				58EC8D21829E6A9DDBC381D8 /* UnmappedCardLifecycleTests.swift */,
 			);
 			path = KeepoTests;
 			sourceTree = "<group>";
@@ -596,6 +608,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				88B799939E6B0E53900D0DC9 /* CaptureNotificationCopyTests.swift in Sources */,
 				BBE92DC63297AE6FDD9EAE9F /* CardMappingLocalWriteTests.swift in Sources */,
 				E43BEBD85BAD11CDD781A200 /* CategoryLocalWriteTests.swift in Sources */,
 				1979678A5304703AB79F5093 /* ConfirmCaptureLocalWriteTests.swift in Sources */,
@@ -615,7 +628,9 @@
 				A38417E3409C44AC9E74975E /* OutboxTests.swift in Sources */,
 				5C2EAAD51D82FD4DA43DAC07 /* ReviewCaptureLocalWriteTests.swift in Sources */,
 				8890043FAC9EC87C9D768D17 /* StubTransactionSender.swift in Sources */,
+				B24F5A6145F90E63C15BB3DC /* SyncApplyCardMappingTests.swift in Sources */,
 				F621BD7F9360149A762CDA34 /* SyncEngineTests.swift in Sources */,
+				12A356D345021336EACE2540 /* UnmappedCardLifecycleTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -647,6 +662,7 @@
 				C886AE5DBD13E41BFE14BA54 /* CSVImportView.swift in Sources */,
 				CA271C456719F30FF84B8FF5 /* CaptureIntent.swift in Sources */,
 				B1428E9A36AA3EC93E48566F /* CaptureLocalWrite.swift in Sources */,
+				D3A7D630E8FE870F4A387DE4 /* CaptureNotificationCopy.swift in Sources */,
 				16FA5989E86D92AFF0B19497 /* CaptureNotify.swift in Sources */,
 				E26E4926F9FD4EA7EB2A17E8 /* CardMappingDetailSheet.swift in Sources */,
 				4184AA431DA561F69AE2C593 /* CategoriesView.swift in Sources */,

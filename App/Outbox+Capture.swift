@@ -93,10 +93,7 @@ extension Outbox {
                     return true
                 }
             }
-            return .appliedLocally(
-                accountName: resolution.accountName, categoryName: resolution.categoryName,
-                currency: resolution.currency, minorUnit: resolution.minorUnit
-            )
+            return .appliedLocally(resolution)
         }
 
         do {

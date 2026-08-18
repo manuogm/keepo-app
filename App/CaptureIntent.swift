@@ -74,8 +74,10 @@ struct CaptureIntent: AppIntent {
             )
             // Fills the "Other" fallback's blind spot: if no merchant match
             // is found, this is the one place the raw merchant name still
-            // shows up on the transaction itself.
-            let notes = "Captured automatically — \(merchant)"
+            // shows up on the transaction itself. Card name too, since a
+            // household or multi-card user needs to know which card this
+            // charge actually came from.
+            let notes = "Paid with \(card) at \(merchant)"
             let payload = CaptureTransactionPayload(
                 id: CaptureIdentity.transactionId(forExternalId: externalId), cardIdentifier: card,
                 merchantRaw: merchant, merchantNormalized: merchantNormalized, amountE4: parsedAmount,
@@ -88,49 +90,30 @@ struct CaptureIntent: AppIntent {
             // lands regardless of `result` (Phase 12), so this fires
             // unconditionally rather than only on the network-backed cases.
             CaptureNotify.post()
-            await notify(for: result, transactionId: payload.id, merchant: merchant, amountE4: parsedAmount)
+            await notify(for: result, transactionId: payload.id, amountE4: parsedAmount)
         } catch {
             await notify(title: "Capture failed", body: UserFacingError.describe(error))
         }
         return .result()
     }
 
-    private func notify(
-        for result: OutboxCaptureResult, transactionId: UUID, merchant: String, amountE4: Int64
-    ) async {
+    private func notify(for result: OutboxCaptureResult, transactionId: UUID, amountE4: Int64) async {
         switch result {
-        case .appliedLocally(let accountName, let categoryName, let currency, let minorUnit):
+        case .appliedLocally(let resolution):
             // The row exists locally either way now (account-resolved or
             // not), so this always deep-links — unlike the two fallback
             // cases below, which have nothing local to open yet.
-            if let accountName, let currency {
-                let amountText = MoneyFormatter.format(
-                    abs(amountE4), currency: CurrencyInfo(code: currency, minorUnit: minorUnit ?? 2)
-                )
-                await notify(
-                    title: "New expense logged automatically!",
-                    body: "\(amountText) · \(categoryName) · \(accountName) — tap to review",
-                    transactionId: transactionId
-                )
-            } else {
-                // No account yet means no currency yet either — a plain
-                // decimal, never a guessed currency symbol that might be
-                // wrong (money rule: an unresolvable value never
-                // fabricates a specific number it doesn't actually know).
-                let amountText = AmountFormatter.editableString(abs(amountE4), minorUnit: 2)
-                await notify(
-                    title: "New expense logged automatically!",
-                    body: "\(amountText) · \(categoryName) — tap to choose an account",
-                    transactionId: transactionId
-                )
-            }
+            let content = CaptureNotificationCopy.appliedLocally(resolution, amountE4: amountE4)
+            await notify(title: content.title, body: content.body, transactionId: transactionId)
         case .applied:
             // Landed server-side; nothing local to deep-link into yet (the
             // next sync pull brings the row down) — same reasoning as the
             // `.queued` case below, just without the wait.
-            await notify(title: "Purchase captured", body: "\(merchant) — check Needs Review.")
+            let content = CaptureNotificationCopy.applied(amountE4: amountE4)
+            await notify(title: content.title, body: content.body)
         case .queued:
-            await notify(title: "Purchase queued", body: "\(merchant) will sync next time Keepo is open.")
+            let content = CaptureNotificationCopy.queued(amountE4: amountE4)
+            await notify(title: content.title, body: content.body)
         }
     }
 

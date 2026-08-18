@@ -237,17 +237,18 @@ struct OutboxLocalWriteTests {
 
         let payload = CaptureTransactionPayload(
             id: UUID(), cardIdentifier: "card-1", merchantRaw: "Blue Bottle", merchantNormalized: "BLUE BOTTLE",
-            amountE4: 45000, occurredAt: Date(), externalId: "ext-1", notes: "Captured automatically — Blue Bottle"
+            amountE4: 45000, occurredAt: Date(), externalId: "ext-1", notes: "Paid with card-1 at Blue Bottle"
         )
 
         let result = await outbox.submitCaptureTransaction(payload, ownerId: ownerId)
-        guard case .appliedLocally(let accountName, let categoryName, let currency, _) = result else {
+        guard case .appliedLocally(let resolution) = result else {
             Issue.record("expected .appliedLocally, got \(result)")
             return
         }
-        #expect(accountName == "Test")
-        #expect(categoryName == "Other")
-        #expect(currency == "EUR")
+        #expect(resolution.accountName == "Test")
+        #expect(resolution.categoryName == "Other")
+        #expect(resolution.categoryIsDefault == true)
+        #expect(resolution.currency == "EUR")
 
         let row = try await dbQueue.read { database in
             try Row.fetchOne(
@@ -258,7 +259,7 @@ struct OutboxLocalWriteTests {
         #expect(row?["status"] == "pending")
         #expect(row?["source"] == "capture")
         #expect((row?["amount_e4"] as Int64?) == -45000)
-        #expect(row?["notes"] == "Captured automatically — Blue Bottle")
+        #expect(row?["notes"] == "Paid with card-1 at Blue Bottle")
     }
 
     @Test("a capture on an unmapped card still writes locally, with a null account and currency")
@@ -274,13 +275,14 @@ struct OutboxLocalWriteTests {
         )
 
         let result = await outbox.submitCaptureTransaction(payload, ownerId: ownerId)
-        guard case .appliedLocally(let accountName, let categoryName, let currency, _) = result else {
+        guard case .appliedLocally(let resolution) = result else {
             Issue.record("expected .appliedLocally, got \(result)")
             return
         }
-        #expect(accountName == nil)
-        #expect(categoryName == "Other")
-        #expect(currency == nil)
+        #expect(resolution.accountName == nil)
+        #expect(resolution.categoryName == "Other")
+        #expect(resolution.categoryIsDefault == true)
+        #expect(resolution.currency == nil)
 
         let row = try await dbQueue.read { database in
             try Row.fetchOne(

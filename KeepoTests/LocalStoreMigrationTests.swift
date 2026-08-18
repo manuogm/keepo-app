@@ -93,6 +93,41 @@ struct LocalStoreMigrationTests {
         }
     }
 
+    /// Items 2/3's local counterpart to the server's own
+    /// `unique (owner_id, card_identifier)` on `card_mappings` — without
+    /// this, a locally-invented mapping id and the server's own row for
+    /// the identical card could both exist at once (confirmed: this is how
+    /// a real device ended up with the same card mapped twice).
+    @Test("rebuildSyncableTables adds the unique index on card_mappings(owner_id, card_identifier)")
+    func rebuildAddsCardMappingUniqueIndex() throws {
+        let dbQueue = try DatabaseQueue()
+        try dbQueue.write { database in try LocalStore.rebuildSyncableTables(database) }
+
+        let now = "2026-01-01T00:00:00.000000+00:00"
+        try dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, created_at, updated_at, sync_seq)
+                VALUES ('m1', 'owner1', 'Revolut', 'a1', ?, ?, 0)
+                """,
+                arguments: [now, now]
+            )
+        }
+
+        #expect(throws: (any Error).self) {
+            try dbQueue.write { database in
+                try database.execute(
+                    sql: """
+                    INSERT INTO card_mappings (
+                        id, owner_id, card_identifier, account_id, created_at, updated_at, sync_seq
+                    ) VALUES ('m2', 'owner1', 'Revolut', 'a2', ?, ?, 0)
+                    """,
+                    arguments: [now, now]
+                )
+            }
+        }
+    }
+
     @Test("resetAll clears every stored sync cursor/epoch, regardless of user")
     func resetAllClearsEveryUser() {
         SyncCursorStore.save(cursor: 42, globalCursor: 7, epoch: 1, for: "user-a")

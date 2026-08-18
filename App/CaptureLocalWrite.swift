@@ -32,12 +32,22 @@ import Supabase
 /// so a client guess here would permanently fork into a duplicate
 /// `ambiguous_card` Needs Review entry the real mapping never resolves);
 /// it only ever reads that table, never writes to it.
-enum CaptureLocalWrite {
-    struct Resolution: Equatable {
-        let accountName: String?
-        let categoryName: String
-        let currency: String?
-        let minorUnit: Int?
+/// `public` — `Resolution` is carried whole by `OutboxCaptureResult
+/// .appliedLocally` (`Outbox.swift`), itself a `public` type, and a nested
+/// type's effective access can never exceed its container's.
+public enum CaptureLocalWrite {
+    public struct Resolution: Equatable, Sendable {
+        public let accountName: String?
+        public let categoryName: String
+        /// True when nothing was actually learned for this merchant and
+        /// resolution fell back to the owner's generic `is_default`
+        /// category — the same signal `needs_review`'s own subtitle
+        /// (`'Other'` vs `'Suggested: ' || c.name`) already uses to mean
+        /// "not really known." Drives the notification copy's "category
+        /// unknown" branch (`CaptureNotificationCopy`).
+        public let categoryIsDefault: Bool
+        public let currency: String?
+        public let minorUnit: Int?
     }
 
     static func resolveAndWrite(
@@ -48,13 +58,19 @@ enum CaptureLocalWrite {
         ) else { return nil }
         let categoryId: String = category["id"]
         let categoryName: String = category["name"]
+        let categoryIsDefault: Bool = category["is_default"]
 
+        // `cm.deleted_at IS NULL` (fix A) — an unmapped card must resolve
+        // to no account locally too, matching capture_transaction's own
+        // fix; without it, a card the user had unmapped kept silently
+        // auto-filing new captures into the account it used to belong to.
         let account = try Row.fetchOne(
             database,
             sql: """
             SELECT a.id, a.name, a.currency FROM card_mappings cm
             JOIN accounts a ON a.id = cm.account_id
-            WHERE cm.owner_id = ? AND cm.card_identifier = ? AND cm.account_id IS NOT NULL AND a.deleted_at IS NULL
+            WHERE cm.owner_id = ? AND cm.card_identifier = ? AND cm.account_id IS NOT NULL
+              AND cm.deleted_at IS NULL AND a.deleted_at IS NULL
             """,
             arguments: [ownerId, payload.cardIdentifier]
         )
@@ -82,7 +98,8 @@ enum CaptureLocalWrite {
         )
 
         return Resolution(
-            accountName: accountName, categoryName: categoryName, currency: currency, minorUnit: minorUnit
+            accountName: accountName, categoryName: categoryName, categoryIsDefault: categoryIsDefault,
+            currency: currency, minorUnit: minorUnit
         )
     }
 
@@ -92,7 +109,7 @@ enum CaptureLocalWrite {
         if let learned = try Row.fetchOne(
             database,
             sql: """
-            SELECT c.id, c.name FROM merchant_category_map m
+            SELECT c.id, c.name, c.is_default FROM merchant_category_map m
             JOIN categories c ON c.id = m.category_id
             WHERE m.owner_id = ? AND m.merchant_pattern = ? AND c.kind = 'expense' AND c.deleted_at IS NULL
             """,
@@ -103,7 +120,7 @@ enum CaptureLocalWrite {
         return try Row.fetchOne(
             database,
             sql: """
-            SELECT id, name FROM categories
+            SELECT id, name, is_default FROM categories
             WHERE owner_id = ? AND kind = 'expense' AND is_default = 1 AND deleted_at IS NULL
             LIMIT 1
             """,

@@ -15,7 +15,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(43);
+select plan(45);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -441,26 +441,74 @@ select is(
 -- real delete_transaction RPC, as if the user deleted it without ever
 -- assigning an account — delete_transaction needed the same null-account
 -- ownership fallback update_transaction did, found by this exact test)
--- makes its still-unmapped card_mappings row ambiguous_card again, then
--- unmap_card removes it from needs_review entirely via deleted_at, not by
--- resurrecting it unmapped. Uses 'card-to-unmap' (captured just before the
--- rate-limit section) rather than 'card-xyz', which section 5 already
--- mapped to a real account and so could never show as ambiguous_card again.
+-- takes its orphaned placeholder card_mappings row with it (fix B, 2026-08
+-- device-testing batch) — deleting the purchase is a clear signal the user
+-- doesn't want the card filed either, so both Needs Review items clear
+-- together rather than leaving a bare "Unmapped card" item behind with
+-- nothing left to explain it. Uses 'card-to-unmap' (captured just before
+-- the rate-limit section) rather than 'card-xyz', which section 5 already
+-- mapped to a real account and so was never a placeholder to begin with.
 select delete_transaction('d2000000-0000-0000-0000-000000000006', 1);
 
 select is(
   (select count(*) from needs_review where kind = 'ambiguous_card'
    and item_id = (select id from card_mappings where card_identifier = 'card-to-unmap')),
-  1::bigint,
-  'a deleted, still-unresolved capture lets its card_mappings row reappear as ambiguous_card'
+  0::bigint,
+  'deleting an unresolved capture also retires its orphaned placeholder card_mappings row'
 );
 
-select unmap_card('card-to-unmap');
+select is(
+  (select deleted_at is not null from card_mappings
+   where owner_id = auth.uid() and card_identifier = 'card-to-unmap'),
+  true,
+  'the placeholder mapping itself is soft-deleted, not merely hidden from needs_review'
+);
+
+-- Re-mapping a card that was ever unmapped (here: auto-retired by the
+-- delete above) must resurrect it, not leave it soft-deleted forever
+-- (item 1 fix): link_card_to_account's upsert set account_id on the
+-- conflict branch but never cleared deleted_at, so a re-map "succeeded"
+-- into a row no deleted_at-filtered read could ever see again — the
+-- exact bug the Account edit sheet's "Add Card" flow hit.
+select map_card('card-to-unmap', 'a2000000-0000-0000-0000-000000000001');
 
 select is(
-  (select count(*) from needs_review where kind = 'ambiguous_card'),
-  0::bigint,
-  'unmap_card removes the mapping from needs_review via deleted_at, not by leaving it unmapped'
+  (select account_id from card_mappings
+   where owner_id = auth.uid() and card_identifier = 'card-to-unmap' and deleted_at is null),
+  'a2000000-0000-0000-0000-000000000001'::uuid,
+  're-mapping a previously unmapped card clears deleted_at, making it visible again'
+);
+
+-- ----------------------------------------------------------------------------
+-- 13b. Unmapping a card must actually stop it routing new captures (fix A,
+-- 2026-08 device-testing batch) — capture_transaction's own card lookup
+-- used to ignore deleted_at, so a card the user had explicitly unmapped
+-- kept silently auto-filing new purchases into the account it used to
+-- belong to, even though every display read correctly showed it as
+-- unmapped: a real discrepancy between what the app surfaced and what the
+-- DB actually resolved. This must be the LAST capture_transaction call in
+-- this file (see this file's own header note on the shared rate-limit
+-- window) — the window is backdated first since section 9 already
+-- exhausted this user's budget.
+-- ----------------------------------------------------------------------------
+
+select unmap_card('card-xyz');
+
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+update ops_rate_limits set window_started_at = now() - interval '2 hours'
+where function_name = 'capture_transaction' and subject = '11111111-1111-1111-1111-111111111111';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+select capture_transaction(
+  'd2000000-0000-0000-0000-000000000009', 'card-xyz', 'SQ *BLUE BOTTLE 004', 'BLUE BOTTLE', 30000, now(), 'ext-9'
+);
+
+select is(
+  (select account_id from transactions where id = 'd2000000-0000-0000-0000-000000000009'),
+  null::uuid,
+  'a capture on a card that was explicitly unmapped resolves to no account, not the account it used to route to'
 );
 
 -- ----------------------------------------------------------------------------

@@ -57,6 +57,7 @@ struct ConflictDetailSheet: View {
                 } else if let detail {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
+                            subjectHeader
                             explanation
                             if !fields.isEmpty {
                                 comparisonCard
@@ -107,6 +108,51 @@ struct ConflictDetailSheet: View {
             }
         }
         .task { await load() }
+    }
+
+    /// Which transaction or account this conflict is actually about — the
+    /// one thing the sheet never showed before. `myTransaction`/`myAccount`
+    /// are already loaded in full for the diff below; this just renders
+    /// their identity instead of only their changed fields, so it appears
+    /// whether or not `fields` ends up empty.
+    @ViewBuilder
+    private var subjectHeader: some View {
+        if let myTransaction {
+            HStack(spacing: 12) {
+                // `TransactionsWithDetailsSelect` carries `categoryName`
+                // but not the category's own icon/color — a neutral badge,
+                // same fallback `CategoryIconView` already uses for a
+                // transfer or an uncached category.
+                CategoryIconView(category: nil)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(myTransaction.merchantRaw ?? myTransaction.categoryName ?? "—")
+                        .font(.headline)
+                    Text("\(formattedDate(myTransaction.occurredAt)) · \(myTransaction.accountName ?? "—")")
+                        .font(.caption)
+                        .foregroundStyle(Color.secondary)
+                }
+                Spacer()
+                Text(formattedAmount(myTransaction))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        } else if let myAccount {
+            HStack(spacing: 12) {
+                CategoryIconView(icon: myAccount.icon, color: Color(hex: myAccount.color))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(myAccount.name).font(.headline)
+                    Text("Account").font(.caption).foregroundStyle(Color.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
     }
 
     private var explanation: some View {

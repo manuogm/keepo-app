@@ -94,12 +94,28 @@ enum OutboxLocalWrite {
         }
     }
 
+    /// Mirrors `delete_transaction`'s own fix: deleting an unreviewed
+    /// capture takes its orphaned placeholder `card_mappings` row with it
+    /// — see `retireOrphanedCardMappingIfNeeded` in
+    /// `OutboxLocalWrite+Cards.swift` (split out purely for file-length).
+    /// Reads the row's pre-delete `source`/`card_identifier`/`owner_id`
+    /// first, same reason `updateTransaction` above does.
     static func deleteTransaction(_ payload: DeleteTransactionPayload, in database: Database) throws {
+        let previous = try Row.fetchOne(
+            database, sql: "SELECT source, card_identifier, owner_id FROM transactions WHERE id = ?",
+            arguments: [payload.id.uuidString]
+        )
+
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         try database.execute(
             sql: "UPDATE transactions SET deleted_at = ?, updated_at = ? WHERE id = ?",
             arguments: [now, now, payload.id.uuidString]
         )
+
+        if let previous, (previous["source"] as String?) == "capture",
+           let cardIdentifier = previous["card_identifier"] as String?, let ownerId = previous["owner_id"] as String? {
+            try retireOrphanedCardMappingIfNeeded(ownerId: ownerId, cardIdentifier: cardIdentifier, in: database)
+        }
     }
 
     /// Both legs get an explicit id from the payload (`fromId`/`toId`) —

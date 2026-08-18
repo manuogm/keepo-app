@@ -126,6 +126,10 @@ enum SyncApply {
         let columns = row.keys.filter { allowedColumns.contains($0) }.sorted()
         guard !columns.isEmpty, primaryKey.allSatisfy(columns.contains) else { return }
 
+        if table == "card_mappings" {
+            try reconcileCardMappingDuplicate(row, database)
+        }
+
         let updateColumns = columns.filter { !primaryKey.contains($0) }
         if !updateColumns.isEmpty {
             let setClause = updateColumns.map { "\($0) = ?" }.joined(separator: ", ")
@@ -146,6 +150,30 @@ enum SyncApply {
         """
         let insertArguments = columns.map { databaseValue(row[$0] ?? .null) }
         try database.execute(sql: insertSQL, arguments: StatementArguments(insertArguments))
+    }
+
+    /// `card_mappings`' real identity is `(owner_id, card_identifier)`, not
+    /// `id` — the server enforces that with its own `unique (owner_id,
+    /// card_identifier)`, mirrored locally by a matching index
+    /// (`LocalStore.swift`'s `v4_rebuild_syncable_tables` migration). This
+    /// generic upsert otherwise only ever matches by primary key, and a
+    /// locally-invented mapping (an offline `OutboxLocalWrite
+    /// .linkCardLocally` insert, made before this card's own server row
+    /// had ever been pulled down) can carry a different id than the
+    /// server's row for the identical card — left to the PK-only upsert
+    /// below, the incoming row would land as a second row instead of
+    /// replacing the first (confirmed: this is exactly how a real device
+    /// ended up with the same card mapped twice). Delete any local row
+    /// sharing this natural key under a different id first, so the
+    /// incoming row becomes the sole survivor either way.
+    private static func reconcileCardMappingDuplicate(_ row: JSONObject, _ database: Database) throws {
+        guard case .string(let ownerId) = row["owner_id"], case .string(let cardIdentifier) = row["card_identifier"],
+            case .string(let id) = row["id"]
+        else { return }
+        try database.execute(
+            sql: "DELETE FROM card_mappings WHERE owner_id = ? AND card_identifier = ? AND id != ?",
+            arguments: [ownerId, cardIdentifier, id]
+        )
     }
 
     private static func databaseValue(_ json: AnyJSON) -> DatabaseValueConvertible? {

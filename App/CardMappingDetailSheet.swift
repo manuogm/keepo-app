@@ -21,6 +21,7 @@ struct CardMappingDetailSheet: View {
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var showRemoveConfirm = false
+    @State private var errorMessage: String?
 
     private var isSaveDisabled: Bool {
         isLoading || isSaving || cardIdentifier.trimmingCharacters(in: .whitespaces).isEmpty
@@ -41,6 +42,11 @@ struct CardMappingDetailSheet: View {
                             showRemoveConfirm = true
                         }
                         .disabled(isSaving)
+                    }
+                    if let errorMessage {
+                        Section {
+                            Text(errorMessage).foregroundStyle(.red)
+                        }
                     }
                 }
             }
@@ -75,8 +81,13 @@ struct CardMappingDetailSheet: View {
     }
 
     private func save() async {
-        guard let ownerId = session.profile?.id else { return }
         isSaving = true
+        defer { isSaving = false }
+        errorMessage = nil
+        guard let ownerId = session.profile?.id else {
+            errorMessage = "Your profile hasn't finished loading yet — try again in a moment."
+            return
+        }
         await session.outbox.submitRenameCardMapping(
             RenameCardMappingPayload(
                 id: UUID(), ownerId: ownerId, oldCardIdentifier: originalCardIdentifier,
@@ -88,8 +99,13 @@ struct CardMappingDetailSheet: View {
     }
 
     private func remove() async {
-        guard let ownerId = session.profile?.id else { return }
         isSaving = true
+        defer { isSaving = false }
+        errorMessage = nil
+        guard let ownerId = session.profile?.id else {
+            errorMessage = "Your profile hasn't finished loading yet — try again in a moment."
+            return
+        }
         await session.outbox.submitUnmapCard(
             UnmapCardPayload(id: UUID(), ownerId: ownerId, cardIdentifier: originalCardIdentifier)
         )

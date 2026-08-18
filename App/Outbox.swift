@@ -56,7 +56,7 @@ public enum OutboxCaptureResult: Equatable, Sendable {
     /// Written and visible in Needs Review — online or offline — before
     /// the background sync attempt that follows even starts; that attempt
     /// never revises what's already here.
-    case appliedLocally(accountName: String?, categoryName: String, currency: String?, minorUnit: Int?)
+    case appliedLocally(CaptureLocalWrite.Resolution)
     /// The rare fallback: the local mirror doesn't even have the owner's
     /// "Other" category synced down yet — an immediate RPC attempt,
     /// exactly as before local-first capture existed. Carries no payload:
@@ -92,10 +92,12 @@ public final class Outbox {
     let sender: OutboxSending
     private let encoder = JSONEncoder()
     let decoder = JSONDecoder()
-    // `nonisolated(unsafe)` — both types are documented safe to cancel from
-    // any thread, and `deinit` runs in a nonisolated context even on a
-    // `@MainActor` class, so it can't otherwise touch actor-isolated state.
-    nonisolated(unsafe) private let pathMonitor = NWPathMonitor()
+    // `deinit` runs in a nonisolated context even on a `@MainActor` class,
+    // so it can't otherwise touch actor-isolated state. `pathMonitor` is
+    // `Sendable` itself so no annotation is needed; `retryTask` is a
+    // mutable `@Observable`-tracked property, which `nonisolated` (without
+    // `(unsafe)`) can't be applied to — `(unsafe)` is still required here.
+    private let pathMonitor = NWPathMonitor()
     private var isOnline = false
     nonisolated(unsafe) private var retryTask: Task<Void, Never>?
 

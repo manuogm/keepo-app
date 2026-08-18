@@ -21,8 +21,16 @@ extension OutboxLocalWrite {
             database, sql: "SELECT id FROM card_mappings WHERE owner_id = ? AND card_identifier = ?",
             arguments: [ownerId, cardIdentifier]
         ) {
+            // `deleted_at = NULL` too (item 1 fix) — the SELECT above
+            // finds a row regardless of its deleted state, and a card
+            // that was ever unmapped must be resurrected on re-map, not
+            // silently updated-while-still-soft-deleted: every read here
+            // (`LocalTableQueries.cardMappings`, `CaptureLocalWrite`'s own
+            // account resolution) filters `deleted_at IS NULL`, so leaving
+            // it set made a successful re-map invisible forever. Mirrors
+            // `link_card_to_account`'s server-side fix exactly.
             try database.execute(
-                sql: "UPDATE card_mappings SET account_id = ?, updated_at = ? WHERE id = ?",
+                sql: "UPDATE card_mappings SET account_id = ?, deleted_at = NULL, updated_at = ? WHERE id = ?",
                 arguments: [accountId, now, existingId]
             )
         } else {
@@ -65,6 +73,33 @@ extension OutboxLocalWrite {
             WHERE owner_id = ? AND card_identifier = ? AND deleted_at IS NULL
             """,
             arguments: [now, now, payload.ownerId.uuidString, payload.cardIdentifier]
+        )
+    }
+
+    /// Mirrors `delete_transaction`'s own fix (item B, 2026-08
+    /// device-testing batch): called by `OutboxLocalWrite.deleteTransaction`
+    /// after a `source = 'capture'` row is soft-deleted — placeholders only
+    /// (`account_id IS NULL`; a card genuinely mapped to an account is a
+    /// deliberate user choice and is never touched here), and only once no
+    /// other live pending capture still needs it. Without this, deleting
+    /// the one purchase that ever referenced an unmapped card left its
+    /// placeholder row behind, surfacing on its own as a bare "Unmapped
+    /// card" Needs Review item with no transaction left to explain it.
+    static func retireOrphanedCardMappingIfNeeded(
+        ownerId: String, cardIdentifier: String, in database: Database
+    ) throws {
+        let now = PostgresDate.sqliteTimestampBoundaryString(Date())
+        try database.execute(
+            sql: """
+            UPDATE card_mappings AS cm SET deleted_at = ?, updated_at = ?
+            WHERE cm.owner_id = ? AND cm.card_identifier = ? AND cm.account_id IS NULL AND cm.deleted_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM transactions t2
+                WHERE t2.owner_id = cm.owner_id AND t2.card_identifier = cm.card_identifier
+                  AND t2.source = 'capture' AND t2.status = 'pending' AND t2.deleted_at IS NULL
+              )
+            """,
+            arguments: [now, now, ownerId, cardIdentifier]
         )
     }
 }

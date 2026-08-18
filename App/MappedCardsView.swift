@@ -54,7 +54,7 @@ struct MappedCardsView: View {
         }
         .navigationTitle("Mapped Cards")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task(id: session.refresh.token) { await load() }
         .sheet(item: $editingCardMappingId) { id in
             CardMappingDetailSheet(session: session, cardMappingId: id) {
                 Task { await load() }
@@ -89,6 +89,7 @@ private struct AddCardMappingSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var cardIdentifier = ""
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     private var isSaveDisabled: Bool {
         isSaving || cardIdentifier.trimmingCharacters(in: .whitespaces).isEmpty
@@ -99,6 +100,11 @@ private struct AddCardMappingSheet: View {
             Form {
                 Section("Card") {
                     TextField("e.g. Revolut", text: $cardIdentifier)
+                }
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage).foregroundStyle(.red)
+                    }
                 }
             }
             .navigationTitle("Add Card")
@@ -115,11 +121,23 @@ private struct AddCardMappingSheet: View {
         }
     }
 
+    /// Item 1 fix: a silent early return here — the profile not loaded
+    /// yet, an empty trimmed identifier — is exactly what "the checkmark
+    /// doesn't work" looks like from the tap that hits it. Both now say
+    /// why. `defer` for `isSaving` matches `MapCardSheet`'s own pattern.
     private func save() async {
-        guard let ownerId = session.profile?.id else { return }
-        let trimmed = cardIdentifier.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
         isSaving = true
+        defer { isSaving = false }
+        errorMessage = nil
+        guard let ownerId = session.profile?.id else {
+            errorMessage = "Your profile hasn't finished loading yet — try again in a moment."
+            return
+        }
+        let trimmed = cardIdentifier.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            errorMessage = "Enter a card name."
+            return
+        }
         let payload = MapCardPayload(id: UUID(), ownerId: ownerId, cardIdentifier: trimmed, accountId: accountId)
         await session.outbox.submitMapCard(payload)
         onMapped()

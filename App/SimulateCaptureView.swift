@@ -75,13 +75,13 @@ struct SimulateCaptureView: View {
         let payload = CaptureTransactionPayload(
             id: UUID(), cardIdentifier: card, merchantRaw: merchant, merchantNormalized: merchantNormalized,
             amountE4: parsedAmount, occurredAt: occurredAt, externalId: externalId,
-            notes: "Captured automatically — \(merchant)"
+            notes: "Paid with \(card) at \(merchant)"
         )
 
         switch await session.outbox.submitCaptureTransaction(payload, ownerId: session.profile?.id) {
-        case .appliedLocally(let accountName, let categoryName, _, _):
-            resultMessage = "Captured locally — \(categoryName) · \(accountName). Notification scheduled — "
-                + "background the app and tap it to test the deep link."
+        case .appliedLocally(let resolution):
+            resultMessage = "Captured locally — \(resolution.categoryName) · \(resolution.accountName ?? "—"). "
+                + "Notification scheduled — background the app and tap it to test the deep link."
             session.refresh.bump()
             await scheduleDeepLinkNotification(transactionId: payload.id)
         case .applied:

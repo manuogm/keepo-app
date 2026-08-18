@@ -201,6 +201,46 @@ struct CardMappingLocalWriteTests {
         #expect((row?["deleted_at"] as String?) != nil)
         #expect(row?["account_id"] == accountId.uuidString)
     }
+
+    /// Regression (item 1): `linkCardLocally`'s UPDATE branch used to set
+    /// `account_id` but never clear `deleted_at`, so re-mapping a card that
+    /// was ever unmapped "succeeded" into a row every `deleted_at IS NULL`
+    /// read then silently excluded forever — the Account edit sheet's own
+    /// "Add Card" flow never showed the mapping it had just written.
+    @Test("re-mapping a previously unmapped card clears deleted_at, making it visible again")
+    func mapCardResurrectsAPreviouslyUnmappedCard() async throws {
+        let (outbox, dbQueue) = try makeOutboxAndDatabase()
+        let ownerId = UUID()
+        let firstAccountId = UUID()
+        let secondAccountId = UUID()
+        let mappingId = UUID()
+        try await seedAccount(dbQueue, id: firstAccountId, ownerId: ownerId)
+        try await seedAccount(dbQueue, id: secondAccountId, ownerId: ownerId)
+        try await seedCardMapping(
+            dbQueue, id: mappingId, ownerId: ownerId, cardIdentifier: "Revolut", accountId: firstAccountId
+        )
+
+        _ = await outbox.submitUnmapCard(UnmapCardPayload(id: UUID(), ownerId: ownerId, cardIdentifier: "Revolut"))
+        _ = await outbox.submitMapCard(
+            MapCardPayload(id: UUID(), ownerId: ownerId, cardIdentifier: "Revolut", accountId: secondAccountId)
+        )
+
+        let row = try await dbQueue.read { database in
+            try Row.fetchOne(
+                database, sql: "SELECT deleted_at, account_id FROM card_mappings WHERE id = ?",
+                arguments: [mappingId.uuidString]
+            )
+        }
+        #expect((row?["deleted_at"] as String?) == nil)
+        #expect(row?["account_id"] == secondAccountId.uuidString)
+
+        let visible = try await dbQueue.read { database in
+            try LocalTableQueries.cardMappings(
+                database, accountId: secondAccountId.uuidString, ownerId: ownerId.uuidString
+            )
+        }
+        #expect(visible.map(\.cardIdentifier) == ["Revolut"])
+    }
 }
 
 private enum StubError: Error { case alwaysFails }
