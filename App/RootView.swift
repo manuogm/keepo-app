@@ -7,13 +7,6 @@ import UIKit
 struct RootView: View {
     @State private var session = SessionStore()
     @State private var network = NetworkMonitor()
-    @State private var needsReviewCount = 0
-    /// Set by a tapped capture notification (via `NotificationRouter`) —
-    /// see `openPendingCaptureIfNeeded` for why this is re-tried on both
-    /// the router firing and `session.phase` changing.
-    @State private var router = NotificationRouter.shared
-    @State private var deepLinkedCapture: PublicSchema.TransactionsWithDetailsSelect?
-    @State private var showDeepLinkedCapture = false
     /// Backs the privacy curtain instead of `@Environment(\.scenePhase)` —
     /// SwiftUI's `scenePhase` is documented (and reproduces on real devices,
     /// never in the simulator) to flicker to `.inactive` for reasons that
@@ -34,7 +27,7 @@ struct RootView: View {
         Group {
             switch session.phase {
             case .loading:
-                loadingView
+                RootLoadingView()
             case .needsSignIn:
                 OTPSignInView(session: session)
             case .needsOnboarding:
@@ -42,55 +35,9 @@ struct RootView: View {
                     Task { try? await session.refreshProfile() }
                 }
             case .ready:
-                TabView {
-                    NavigationStack {
-                        HomeView(session: session)
-                    }
-                    .tabItem { Label("Home", systemImage: "globe") }
-                    .badge(needsReviewCount > 0 ? needsReviewCount : 0)
-
-                    NavigationStack {
-                        AccountsListView(session: session)
-                    }
-                    .tabItem { Label("Accounts", systemImage: "creditcard") }
-
-                    NavigationStack {
-                        TransactionsListView(session: session)
-                    }
-                    .tabItem { Label("Transactions", systemImage: "list.bullet") }
-
-                    NavigationStack {
-                        ProfileView(session: session)
-                    }
-                    .tabItem { Label("My Profile", systemImage: "person.circle") }
-                }
-                .tint(Color.primary)
-                .environment(\.isPrivacyMode, session.isPrivacyMode)
-                .task(id: session.refresh.token) { await loadNeedsReviewCount() }
-                // `.overlay`, not `.safeAreaInset` — iOS 26's floating pill tab
-                // bar renders above the safe area it reports, so a view
-                // placed relative to that reported inset still lands behind
-                // the pill's own visual bounds. Floating our own banner a
-                // fixed distance off the true screen bottom sidesteps that
-                // mismatch entirely.
-                .overlay(alignment: .bottom) {
-                    if network.isOffline {
-                        OfflineStatusBar(lastSyncedAt: session.syncEngine?.lastSyncedAt)
-                            .padding(.horizontal)
-                            .padding(.bottom, 60)
-                    } else if session.outbox.hasStalePending(threshold: 120)
-                        || session.syncEngine?.lastErrorMessage != nil {
-                        PendingSyncStatusBar(
-                            pendingCount: session.outbox.pendingCount,
-                            errorMessage: session.outbox.lastError ?? session.syncEngine?.lastErrorMessage,
-                            retry: { await session.syncNow() }
-                        )
-                        .padding(.horizontal)
-                        .padding(.bottom, 60)
-                    }
-                }
+                MainTabView(session: session, network: network)
             case .failed(let message):
-                errorView(message)
+                RootErrorView(message: message)
             }
         }
         .preferredColorScheme(appearanceMode.colorScheme)
@@ -102,7 +49,7 @@ struct RootView: View {
         // adding these three modifiers directly to this already-long chain
         // pushed the type-checker over its time budget (a real compile
         // failure, not a style preference).
-        .background(captureDeepLinkHandler)
+        .background(CaptureDeepLinkHandler(session: session))
         // C-09: a capture landing while this RootView is already running
         // (the intent fired from a separate host process) otherwise has no
         // way to reach it — same `syncNow()` every other trigger site uses.
@@ -118,7 +65,7 @@ struct RootView: View {
         // both .inactive (switcher gesture starting) and .background.
         .overlay {
             if !isSceneActive {
-                privacyCurtain
+                RootPrivacyCurtainView()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
@@ -158,112 +105,6 @@ struct RootView: View {
         .onChange(of: network.isOffline) { wasOffline, isOffline in
             if wasOffline && !isOffline {
                 Task { await session.syncNow() }
-            }
-        }
-    }
-
-    /// A cold launch from a notification tap sets `router.pendingCaptureId`
-    /// before `session.phase` ever reaches `.ready` — retried on both
-    /// signals so whichever lands second is the one that actually opens
-    /// the sheet.
-    private var captureDeepLinkHandler: some View {
-        Color.clear
-            .sheet(isPresented: $showDeepLinkedCapture) {
-                if let deepLinkedCapture {
-                    TransactionFormView(session: session, mode: .edit(deepLinkedCapture, sibling: nil)) {
-                        session.refresh.bump()
-                    }
-                }
-            }
-            .onChange(of: router.pendingCaptureId) { _, _ in Task { await openPendingCaptureIfNeeded() } }
-            .onChange(of: session.phase) { _, _ in Task { await openPendingCaptureIfNeeded() } }
-    }
-
-    /// Opens the same "review a capture" screen `NeedsReviewView.openForReview`
-    /// does — `TransactionFormView` in edit mode, per app-architecture.md,
-    /// not a bespoke screen — but reachable directly from a notification tap
-    /// instead of a Needs Review list tap. Only fires once `.ready` (needs
-    /// `session.profile`/`session.dbQueue`); `pendingCaptureId` is left set
-    /// until it resolves, so the retry from `session.phase` changing is what
-    /// actually opens it on a cold launch.
-    ///
-    /// `@MainActor` explicitly — every other screen's identical
-    /// read-then-mutate-@State pattern gets this for free from `.task {}`,
-    /// whose closure SwiftUI itself types as `@MainActor`. This function is
-    /// started from a plain `Task { }` inside `.onChange`'s (non-`@MainActor`)
-    /// closure instead, which doesn't carry that guarantee — the `@State`
-    /// writes below could resume on whatever thread `session.dbQueue.read`'s
-    /// continuation happens to land on, which crashed with "Call must be
-    /// made on main thread" (reported: notification tap → app resumes into
-    /// a stuck privacy curtain / crash, deep-link never completing).
-    @MainActor
-    private func openPendingCaptureIfNeeded() async {
-        guard
-            session.phase == .ready,
-            let id = router.pendingCaptureId,
-            let ownerId = session.profile?.id,
-            let baseCurrency = session.profile?.baseCurrency
-        else { return }
-        router.pendingCaptureId = nil
-        guard let transaction = try? await session.dbQueue.read({ database in
-            try LocalTransactionRow.fetchOne(
-                database, id: id.uuidString, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
-            )
-        }) else { return }
-        deepLinkedCapture = transaction
-        showDeepLinkedCapture = true
-    }
-
-    /// Local mirror, not a network read (X-01) — this used to call
-    /// `NeedsReviewRepository.fetchAll` against the server view, which
-    /// disagreed with `HomeView`'s bell-dot count (computed from
-    /// `LocalMoneyQueries.needsReview`) whenever a capture hadn't synced
-    /// yet, and silently dropped to 0 offline (`try?` swallowing the
-    /// network failure). Same query both badges now read.
-    private func loadNeedsReviewCount() async {
-        guard let ownerId = session.profile?.id else {
-            needsReviewCount = 0
-            return
-        }
-        let dbQueue = session.dbQueue
-        needsReviewCount = (try? await dbQueue.read { database in
-            try LocalMoneyQueries.needsReview(database, ownerId: ownerId.uuidString).count
-        }) ?? 0
-    }
-
-    private var loadingView: some View {
-        ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Keepo")
-                    .font(.title2).fontWeight(.bold)
-                    .foregroundStyle(Color.primary)
-            }
-        }
-    }
-
-    private var privacyCurtain: some View {
-        ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            Text("Keepo")
-                .font(.title2).fontWeight(.bold)
-                .foregroundStyle(Color.primary)
-        }
-    }
-
-    private func errorView(_ message: String) -> some View {
-        ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            VStack(spacing: 12) {
-                Text("Couldn't connect")
-                    .font(.title2).fontWeight(.bold)
-                    .foregroundStyle(Color.primary)
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(Color.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
             }
         }
     }
