@@ -106,8 +106,14 @@ struct CategoriesView: View {
 
     private func load() async {
         errorMessage = nil
+        guard let ownerId = session.profile?.id else {
+            isLoading = false
+            return
+        }
         do {
-            categories = try await session.dbQueue.read { database in try LocalTableQueries.categories(database) }
+            categories = try await session.dbQueue.read { database in
+                try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
+            }
         } catch {
             errorMessage = UserFacingError.describe(error)
         }

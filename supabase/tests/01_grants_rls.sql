@@ -7,7 +7,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(6);
+select plan(7);
 
 -- 1. RLS is enabled on every table in public. A table created without
 -- `enable row level security` is a silent full-table leak to any role that
@@ -83,6 +83,20 @@ select is(
       and privilege_type in ('TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN')),
   0::bigint,
   'no TRUNCATE/REFERENCES/TRIGGER/MAINTAIN grants to anon or authenticated'
+);
+
+-- 7. card_mappings/merchant_category_map have no client-facing INSERT or
+-- UPDATE grant at all (S-02) — every real write goes through map_card /
+-- rename_card_mapping / unmap_card / review_capture_transaction /
+-- confirm_capture_transaction, all SECURITY DEFINER, none of which need
+-- these grants to run.
+select is(
+  (select count(*) from information_schema.role_table_grants
+    where table_schema = 'public' and grantee = 'authenticated'
+      and table_name in ('card_mappings', 'merchant_category_map')
+      and privilege_type in ('INSERT', 'UPDATE')),
+  0::bigint,
+  'card_mappings and merchant_category_map have no direct INSERT/UPDATE grant to authenticated'
 );
 
 select * from finish();

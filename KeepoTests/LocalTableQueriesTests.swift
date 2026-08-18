@@ -20,12 +20,14 @@ struct LocalTableQueriesTests {
         return dbQueue
     }
 
-    @Test("categories decode with correct UUID, enum, and bool columns, excluding tombstones")
+    @Test("categories decode with correct UUID, enum, and bool columns, excluding tombstones and other owners")
     func categoriesDecode() async throws {
         let dbQueue = try makeDatabase()
         let ownerId = UUID().uuidString
+        let otherOwnerId = UUID().uuidString
         let liveId = UUID().uuidString
         let deletedId = UUID().uuidString
+        let otherOwnerCategoryId = UUID().uuidString
         try await dbQueue.write { database in
             try database.execute(
                 sql: """
@@ -46,9 +48,24 @@ struct LocalTableQueriesTests {
                 """,
                 arguments: [deletedId, ownerId]
             )
+            // A stale prior-user's category, still sitting in the local
+            // mirror (exactly what a sign-out that failed to wipe would
+            // leave behind) — categories are never household-shared
+            // server-side, so this must never appear for `ownerId`.
+            try database.execute(
+                sql: """
+                INSERT INTO categories (id, owner_id, kind, name, is_default, icon, color, version,
+                    deleted_at, created_at, updated_at, sync_seq)
+                VALUES (?, ?, 'expense', 'Someone Else''s Category', 0, 'cart', '#00FF00', 1, NULL,
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 3)
+                """,
+                arguments: [otherOwnerCategoryId, otherOwnerId]
+            )
         }
 
-        let categories = try await dbQueue.read { database in try LocalTableQueries.categories(database) }
+        let categories = try await dbQueue.read { database in
+            try LocalTableQueries.categories(database, ownerId: ownerId)
+        }
 
         #expect(categories.count == 1)
         #expect(categories.first?.id.uuidString.lowercased() == liveId.lowercased())

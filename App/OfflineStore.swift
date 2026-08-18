@@ -3,24 +3,32 @@ import SwiftData
 
 /// The local cache carries its own schema version and migration path (spec)
 /// — a `VersionedSchema` + `SchemaMigrationPlan` from the very first version,
-/// even though there is only one stage today, so adding a second model
-/// version later is a migration stage, not a from-scratch store redesign.
+/// so a schema change is a migration stage, not a from-scratch store
+/// redesign. V1 also declared `CachedPayload`, a query-result cache for a
+/// design (replay server-computed rows cold-start/offline) superseded by
+/// Phase L6's full local-first mirror before it ever gained a reader or
+/// writer — X-03 drops it in V2 via a lightweight migration rather than
+/// deleting it from V1 outright, since a device that already created the
+/// V1 store still has that table on disk.
 public enum OfflineSchemaV1: VersionedSchema {
     public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
     public static var models: [any PersistentModel.Type] { [CachedPayload.self, OutboxItem.self] }
 }
 
-public enum OfflineMigrationPlan: SchemaMigrationPlan {
-    public static var schemas: [any VersionedSchema.Type] { [OfflineSchemaV1.self] }
-    public static var stages: [MigrationStage] { [] }
+public enum OfflineSchemaV2: VersionedSchema {
+    public static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
+    public static var models: [any PersistentModel.Type] { [OutboxItem.self] }
 }
 
-/// One row per query key (`accounts_with_balances`, a transactions page,
-/// the Home summary, ...) — the *server-computed, already-decoded* rows
-/// from the last successful fetch, replayed cold-start and offline with an
-/// "as of `fetchedAt`" marker. Zero arithmetic happens against this data;
-/// it only ever re-displays numbers Postgres already computed (money rule
-/// 3), which is why a full local-first mirror was rejected for this phase.
+public enum OfflineMigrationPlan: SchemaMigrationPlan {
+    public static var schemas: [any VersionedSchema.Type] { [OfflineSchemaV1.self, OfflineSchemaV2.self] }
+    public static var stages: [MigrationStage] {
+        [.lightweight(fromVersion: OfflineSchemaV1.self, toVersion: OfflineSchemaV2.self)]
+    }
+}
+
+/// V1-only — kept solely so `OfflineMigrationPlan` can still open and
+/// migrate a store created before X-03. Nothing reads or writes it in V2.
 @Model
 public final class CachedPayload {
     @Attribute(.unique) public var key: String
@@ -96,9 +104,9 @@ public enum OfflineStore {
         if let cached { return cached }
 
         let storeURL = try storeDirectory().appendingPathComponent("Offline.store")
-        let configuration = ModelConfiguration(schema: Schema(versionedSchema: OfflineSchemaV1.self), url: storeURL)
+        let configuration = ModelConfiguration(schema: Schema(versionedSchema: OfflineSchemaV2.self), url: storeURL)
         let container = try ModelContainer(
-            for: Schema(versionedSchema: OfflineSchemaV1.self),
+            for: Schema(versionedSchema: OfflineSchemaV2.self),
             migrationPlan: OfflineMigrationPlan.self,
             configurations: configuration
         )

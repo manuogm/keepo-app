@@ -320,4 +320,7 @@ private final class AlwaysFailingSender: OutboxSending, @unchecked Sendable {
     func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload) async throws -> Bool {
         throw StubError.alwaysFails
     }
+    func reviewCaptureTransaction(_ payload: ReviewCaptureTransactionPayload) async throws -> Bool {
+        throw StubError.alwaysFails
+    }
 }

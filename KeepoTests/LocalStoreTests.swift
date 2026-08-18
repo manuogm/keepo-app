@@ -88,4 +88,45 @@ struct LocalStoreTests {
             }
         }
     }
+
+    /// `SessionStore.signOut()`'s own wipe (S-01, the security-review
+    /// finding this fixes) — unlike `wipeServerDerivedTables` (an epoch
+    /// mismatch, where unsent local writes must survive), sign-out is a
+    /// genuine identity change: nothing from the outgoing identity,
+    /// including a still-queued write, may remain for whoever signs in
+    /// next on this device.
+    @Test("wipeAllLocalData clears every syncable table AND outbox_items, unlike wipeServerDerivedTables")
+    func wipeAllLocalDataClearsEverythingIncludingOutbox() throws {
+        let dbQueue = try DatabaseQueue()
+        var migrator = DatabaseMigrator()
+        migrator.registerMigration("v1") { database in try LocalSchemaV1.migrate(database) }
+        try migrator.migrate(dbQueue)
+
+        let ownerId = UUID().uuidString
+        try dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO categories (id, owner_id, kind, name, is_default, icon, color, version,
+                    created_at, updated_at, sync_seq)
+                VALUES (?, ?, 'expense', 'Groceries', 0, 'cart', '#FF0000', 1,
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [UUID().uuidString, ownerId]
+            )
+            try OutboxItemRecord(
+                id: UUID(), kind: "createTransaction", payloadJSON: Data("{}".utf8), createdAt: Date(), attempts: 0
+            ).insert(database)
+        }
+
+        try dbQueue.write { database in try SyncApply.wipeAllLocalData(database) }
+
+        let counts = try dbQueue.read { database in
+            (
+                try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM categories") ?? -1,
+                try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM outbox_items") ?? -1
+            )
+        }
+        #expect(counts.0 == 0)
+        #expect(counts.1 == 0)
+    }
 }

@@ -109,7 +109,11 @@ struct BudgetFormView: View {
     }
 
     private func load() async {
-        categories = (try? await session.dbQueue.read { database in try LocalTableQueries.categories(database) }) ?? []
+        if let ownerId = session.profile?.id {
+            categories = (try? await session.dbQueue.read { database in
+                try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
+            }) ?? []
+        }
         currency = session.profile?.baseCurrency ?? "USD"
 
         if case .edit(let budget) = mode {

@@ -15,7 +15,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(32);
+select plan(43);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -28,17 +28,39 @@ insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, o
 values ('a2000000-0000-0000-0000-000000000003', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 0);
 insert into categories (id, owner_id, kind, name)
 values ('c2000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Coffee');
+insert into categories (id, owner_id, kind, name)
+values ('c2000000-0000-0000-0000-000000000002', auth.uid(), 'expense', 'Dining Out');
+
+-- 0. S-02: a raw client insert can no longer forge a source='capture' row
+-- (which would skip capture_transaction's rate limiter and idempotency
+-- entirely) or set external_id directly.
+select throws_like(
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency,
+       occurred_at, source, status)
+     values (auth.uid(), auth.uid(), 'a2000000-0000-0000-0000-000000000001',
+       'c2000000-0000-0000-0000-000000000001', -1000, 'EUR', now(), 'capture', 'pending') $$,
+  '%row-level security%',
+  'a raw insert cannot forge source = capture, bypassing the rate limiter'
+);
+
+select throws_like(
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency,
+       occurred_at, external_id)
+     values (auth.uid(), auth.uid(), 'a2000000-0000-0000-0000-000000000001',
+       'c2000000-0000-0000-0000-000000000001', -1000, 'EUR', now(), 'forged-ext-id') $$,
+  '%row-level security%',
+  'a raw insert cannot set external_id directly'
+);
 
 -- 1. Capturing on a never-seen card now still creates the transaction —
 -- pending, categorized (fallback "Other"), account/currency null — plus
 -- the placeholder card_mappings row, same as before.
-select is(
-  (select mapped from capture_transaction(
-    'd2000000-0000-0000-0000-000000000001', 'card-xyz', 'SQ *BLUE BOTTLE 001', 'BLUE BOTTLE',
-    45000, now(), 'ext-1'
-  )),
-  false,
-  'capturing on an unmapped card still returns mapped = false'
+-- capture_transaction returns void (X-05) — nothing has decoded its return
+-- value since 20260822100000 made the insert unconditional, so "resolved
+-- or not" is asserted against the row it wrote, not a return column.
+select capture_transaction(
+  'd2000000-0000-0000-0000-000000000001', 'card-xyz', 'SQ *BLUE BOTTLE 001', 'BLUE BOTTLE',
+  45000, now(), 'ext-1'
 );
 
 select is(
@@ -108,13 +130,15 @@ select is(
 );
 
 -- 6. A second capture on the now-mapped card resolves normally.
+select capture_transaction(
+  'd2000000-0000-0000-0000-000000000002', 'card-xyz', 'SQ *BLUE BOTTLE 001', 'BLUE BOTTLE',
+  45000, now(), 'ext-2'
+);
+
 select is(
-  (select mapped from capture_transaction(
-    'd2000000-0000-0000-0000-000000000002', 'card-xyz', 'SQ *BLUE BOTTLE 001', 'BLUE BOTTLE',
-    45000, now(), 'ext-2'
-  )),
-  true,
-  'capturing on a mapped card returns mapped = true'
+  (select account_id from transactions where id = 'd2000000-0000-0000-0000-000000000002'),
+  'a2000000-0000-0000-0000-000000000001'::uuid,
+  'capturing on a mapped card resolves the account'
 );
 
 select is(
@@ -149,8 +173,14 @@ select is(
 
 -- 7. A learned merchant mapping is used on the next capture from the same
 -- normalized merchant, and needs_review shows the suggestion.
+-- merchant_category_map's direct grants were revoked in S-02 (every real
+-- write goes through review_capture_transaction/confirm_capture_transaction,
+-- both SECURITY DEFINER) — this fixture pre-seeds a mapping the same way
+-- those RPCs would, so it needs the same elevated privilege.
+reset role;
 insert into merchant_category_map (owner_id, merchant_pattern, category_id)
 values (auth.uid(), 'BLUE BOTTLE', 'c2000000-0000-0000-0000-000000000001');
+set local role authenticated;
 
 select capture_transaction(
   'd2000000-0000-0000-0000-000000000003', 'card-xyz', 'SQ *BLUE BOTTLE 002', 'BLUE BOTTLE', 52500, now(), 'ext-3'
@@ -203,14 +233,113 @@ select is(
   'resolving the capture via update_transaction auto-links the card to that account'
 );
 
+select capture_transaction(
+  'd2000000-0000-0000-0000-000000000005', 'card-review-link', 'BURGER KING', 'BURGER KING', 5000, now(), 'ext-5'
+);
+
 select is(
-  (select mapped from capture_transaction(
-    'd2000000-0000-0000-0000-000000000005', 'card-review-link', 'BURGER KING', 'BURGER KING', 5000, now(), 'ext-5'
-  )),
-  true,
+  (select account_id from transactions where id = 'd2000000-0000-0000-0000-000000000005'),
+  'a2000000-0000-0000-0000-000000000003'::uuid,
   'a second capture on the now-auto-linked card resolves normally'
 );
 
+-- ----------------------------------------------------------------------------
+-- 8b. review_capture_transaction — the one-write "review, then confirm"
+-- path TransactionFormView.save() actually uses instead of update_transaction
+-- + confirm_capture_transaction as two separate writes (migration
+-- 20260825100000's whole reason for existing — see its header). Re-uses
+-- fixture d2000000-...0003 (still pending, version 1, account resolved by
+-- section 6/7's card-xyz mapping, category the learned Coffee mapping from
+-- section 7 assigned — nothing since section 7 has touched it): proves the
+-- edit and the confirm land atomically, and that reviewing re-teaches
+-- merchant_category_map with whatever category the user actually picked,
+-- not just what capture guessed. Placed here, before section 9's
+-- idempotency check and section 10's rate limit — like section 8 above,
+-- every capture_transaction call in this section must land before the
+-- rate limit section per the file header note.
+-- ----------------------------------------------------------------------------
+
+select review_capture_transaction(
+  'd2000000-0000-0000-0000-000000000003', 1, 'a2000000-0000-0000-0000-000000000001',
+  'c2000000-0000-0000-0000-000000000002', -52500, 'EUR', now(), 'Blue Bottle Coffee', 'Reviewed'
+);
+
+select is(
+  (select status::text from transactions where id = 'd2000000-0000-0000-0000-000000000003'),
+  'confirmed',
+  'review_capture_transaction confirms the row in the same write as the edit'
+);
+
+select is(
+  (select category_id from transactions where id = 'd2000000-0000-0000-0000-000000000003'),
+  'c2000000-0000-0000-0000-000000000002'::uuid,
+  'review_capture_transaction applies the edited category atomically with the confirm'
+);
+
+select is(
+  (select merchant_raw from transactions where id = 'd2000000-0000-0000-0000-000000000003'),
+  'Blue Bottle Coffee',
+  'review_capture_transaction applies the edited merchant_raw'
+);
+
+select is(
+  (select category_id from merchant_category_map where owner_id = auth.uid() and merchant_pattern = 'BLUE BOTTLE'),
+  'c2000000-0000-0000-0000-000000000002'::uuid,
+  'reviewing a capture re-teaches merchant_category_map with the category actually chosen'
+);
+
+select capture_transaction(
+  'd2000000-0000-0000-0000-000000000007', 'card-xyz', 'SQ *BLUE BOTTLE 003', 'BLUE BOTTLE', 60000, now(), 'ext-7'
+);
+
+select is(
+  (select category_id from transactions where id = 'd2000000-0000-0000-0000-000000000007'),
+  'c2000000-0000-0000-0000-000000000002'::uuid,
+  'a later capture from the same merchant resolves to the re-taught category, not the original one'
+);
+
+select throws_like(
+  $$ select review_capture_transaction(
+    'd2000000-0000-0000-0000-000000000003', 2, 'a2000000-0000-0000-0000-000000000001',
+    'c2000000-0000-0000-0000-000000000002', -52500, 'EUR', now()
+  ) $$,
+  '%not a pending capture%',
+  'review_capture_transaction refuses a row that is already confirmed'
+);
+
+-- Captured here (before section 9/10's capture_transaction cutoff, per the
+-- file header) so section 11 below can confirm it with no edit at all and
+-- prove confirm_capture_transaction (migration 20260826100000) re-teaches
+-- merchant_category_map exactly like review_capture_transaction already
+-- does — a plain swipe-confirm of a resolved capture is just as much a
+-- "the user agreed with this category" signal as an edited one.
+select capture_transaction(
+  'd2000000-0000-0000-0000-000000000008', 'card-xyz', 'CORNER CAFE', 'CORNER CAFE', 1200, now(), 'ext-8'
+);
+
+-- d2000000-...0004: resolved via update_transaction in section 8 (account
+-- assigned, never confirmed) — still pending, version bumped to 2 by that
+-- update. Called here with a deliberately stale version (1) to prove a
+-- conflict logs instead of applying, and that the row is left completely
+-- untouched rather than partially edited — the single-statement guarantee
+-- migration 20260825100000 exists for.
+select is(
+  (select conflict from review_capture_transaction(
+    'd2000000-0000-0000-0000-000000000004', 1, 'a2000000-0000-0000-0000-000000000003',
+    (select category_id from transactions where id = 'd2000000-0000-0000-0000-000000000004'),
+    -10660, 'EUR', now()
+  )),
+  true,
+  'review_capture_transaction logs a conflict instead of applying on a stale expected_version'
+);
+
+select is(
+  (select status::text from transactions where id = 'd2000000-0000-0000-0000-000000000004'),
+  'pending',
+  'a conflicted review leaves the row exactly as it was — still pending, not partially applied'
+);
+
+-- ----------------------------------------------------------------------------
 -- Captured now (before the rate-limit section, per the file-wide
 -- ordering note) so section 13 below can delete it and prove the
 -- ambiguous_card/unmap_card interaction without needing another capture
@@ -267,6 +396,17 @@ select is(
   (select count(*) from needs_review where item_id = 'd2000000-0000-0000-0000-000000000002' and kind = 'pending_capture'),
   0::bigint,
   'confirming a capture removes it from needs_review'
+);
+
+-- 11b. confirm_capture_transaction (no edit) re-teaches merchant_category_map
+-- with whatever category capture_transaction already assigned — same
+-- upsert review_capture_transaction does, just on the plain-confirm path.
+select confirm_capture_transaction('d2000000-0000-0000-0000-000000000008', 1);
+
+select is(
+  (select category_id from merchant_category_map where owner_id = auth.uid() and merchant_pattern = 'CORNER CAFE'),
+  (select category_id from transactions where id = 'd2000000-0000-0000-0000-000000000008'),
+  'a plain swipe-confirm re-teaches merchant_category_map with the capture''s own category'
 );
 
 -- 12. A stale expected_version logs a sync_conflicts row instead of confirming.
@@ -344,6 +484,15 @@ select throws_like(
   $$ select rename_card_mapping('Revolut', 'stolen') $$,
   '%not found%',
   'fixture B cannot rename fixture A''s card mapping by its identifier'
+);
+
+select throws_like(
+  $$ select review_capture_transaction(
+    'd2000000-0000-0000-0000-000000000004', 2, 'a2000000-0000-0000-0000-000000000003',
+    gen_random_uuid(), -10660, 'EUR', now()
+  ) $$,
+  '%not found%',
+  'fixture B cannot review fixture A''s pending capture'
 );
 
 select * from finish();

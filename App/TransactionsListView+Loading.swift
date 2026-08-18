@@ -23,7 +23,7 @@ extension TransactionsListView {
                     transactions: try LocalTransactionRow.fetchFiltered(
                         database, filter: effectiveFilter, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
                     ),
-                    categories: try LocalTableQueries.categories(database),
+                    categories: try LocalTableQueries.categories(database, ownerId: ownerId.uuidString),
                     accounts: try LocalAccountRow.fetchAll(
                         database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
                     )

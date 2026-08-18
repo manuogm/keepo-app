@@ -5,7 +5,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(17);
+select plan(19);
 
 -- ----------------------------------------------------------------------------
 -- 1-4. Cron jobs registered exactly once each, with the expected schedule.
@@ -37,9 +37,11 @@ select is(
 );
 
 -- ----------------------------------------------------------------------------
--- 5-6. Locked down: neither ops_health() nor ops_check_rate_limit() is
--- reachable by an ordinary signed-in user — this is an ops-only surface,
--- never exposed to the app (spec).
+-- 5-7. Locked down: neither ops_health() nor the raw, any-subject
+-- ops_check_rate_limit() is reachable by an ordinary signed-in user — only
+-- ops_check_own_rate_limit(), which hardcodes the subject to auth.uid(),
+-- is (S-03: a client granted the raw one could grief another user's budget
+-- by passing their id as the subject).
 -- ----------------------------------------------------------------------------
 
 set local role authenticated;
@@ -52,9 +54,15 @@ select throws_like(
 );
 
 select throws_like(
-  $$ select ops_check_rate_limit('x', 1, 1) $$,
+  $$ select ops_check_rate_limit('x', 'y', 1, 1) $$,
   '%permission denied%',
-  'an authenticated user cannot call ops_check_rate_limit()'
+  'an authenticated user cannot call the raw, any-subject ops_check_rate_limit()'
+);
+
+select is(
+  ops_check_own_rate_limit('test-fn-13-own', 2, 3600),
+  true,
+  'an authenticated user CAN call ops_check_own_rate_limit(), self-scoped only'
 );
 
 reset role;
@@ -100,14 +108,25 @@ rollback to savepoint fx_staleness_check;
 -- the test suite) allows one more.
 -- ----------------------------------------------------------------------------
 
-select is(ops_check_rate_limit('test-fn-13', 2, 3600), true, 'rate limiter allows call 1 of 2');
-select is(ops_check_rate_limit('test-fn-13', 2, 3600), true, 'rate limiter allows call 2 of 2');
-select is(ops_check_rate_limit('test-fn-13', 2, 3600), false, 'rate limiter refuses call 3 within the same window');
+select is(ops_check_rate_limit('test-fn-13', 'sub-a', 2, 3600), true, 'rate limiter allows call 1 of 2');
+select is(ops_check_rate_limit('test-fn-13', 'sub-a', 2, 3600), true, 'rate limiter allows call 2 of 2');
+select is(
+  ops_check_rate_limit('test-fn-13', 'sub-a', 2, 3600), false,
+  'rate limiter refuses call 3 within the same window'
+);
 
-update ops_rate_limits set window_started_at = now() - interval '2 hours' where function_name = 'test-fn-13';
+-- A different subject under the same function_name gets its own budget —
+-- the whole point of S-03/S-04's generalization.
+select is(
+  ops_check_rate_limit('test-fn-13', 'sub-b', 2, 3600), true,
+  'a different subject under the same function_name has its own, unexhausted budget'
+);
+
+update ops_rate_limits set window_started_at = now() - interval '2 hours'
+where function_name = 'test-fn-13' and subject = 'sub-a';
 
 select is(
-  ops_check_rate_limit('test-fn-13', 2, 3600),
+  ops_check_rate_limit('test-fn-13', 'sub-a', 2, 3600),
   true,
   'a call after the window has elapsed is allowed again, with the counter reset'
 );

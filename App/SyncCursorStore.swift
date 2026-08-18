@@ -74,4 +74,30 @@ enum SyncCursorStore {
     private static func key(_ field: Field, _ userId: String) -> String {
         "app.keepo.sync.\(field.rawValue).\(userId)"
     }
+
+    // MARK: - local data ownership
+
+    /// The identity `SessionStore` last confirmed the local GRDB mirror
+    /// belongs to — separate from any per-user cursor above, since this is
+    /// checked *before* trusting anything already on disk, not after a
+    /// pull. A single key, not namespaced (unlike every field above): there
+    /// is only ever one local store on this device, owned by at most one
+    /// identity at a time.
+    private static let localOwnerKey = "app.keepo.sync.localOwnerUserId"
+
+    static var localOwnerUserId: String? {
+        UserDefaults.standard.string(forKey: localOwnerKey)
+    }
+
+    static func setLocalOwner(_ userId: String) {
+        UserDefaults.standard.set(userId, forKey: localOwnerKey)
+    }
+
+    /// Called by `signOut()` alongside its own wipe — belt and suspenders
+    /// with `SessionStore.ensureLocalDataBelongsTo`, which independently
+    /// catches the case this miss (a crash or force-quit between the wipe
+    /// and the next sign-in) would otherwise let through.
+    static func clearLocalOwner() {
+        UserDefaults.standard.removeObject(forKey: localOwnerKey)
+    }
 }

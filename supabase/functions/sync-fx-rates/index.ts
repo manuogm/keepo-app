@@ -38,12 +38,19 @@ interface FrankfurterResponse {
 //      Vault secret provisioning on the hosted project; see ops_platform
 //      migration). Keeps the cron path working once secrets are set.
 //   2. Bearer JWT — lets the app's own authenticated client invoke the
-//      function on demand without embedding the sync secret in the binary.
-//      Any valid Supabase session is enough; the rate limiter still applies.
-async function isAuthorized(req: Request): Promise<boolean> {
+//      function on demand (Settings/Data & Privacy's "Sync exchange rates
+//      now" — a real, deliberate feature, not dead code) without embedding
+//      the sync secret in the binary. Any valid Supabase session is enough.
+//
+// Returns the rate-limit subject alongside the authorization result (S-04):
+// a fixed 'cron' string for the secret path, the caller's own user id for
+// the JWT path — never one shared bucket, so one signed-in user looping
+// this endpoint can only ever exhaust their own budget, not the nightly
+// cron's.
+async function authorize(req: Request): Promise<{ subject: string } | null> {
   const expectedSecret = Deno.env.get("FX_SYNC_SECRET");
   const providedSecret = req.headers.get("x-fx-sync-secret");
-  if (expectedSecret && providedSecret === expectedSecret) return true;
+  if (expectedSecret && providedSecret === expectedSecret) return { subject: "cron" };
 
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
@@ -51,14 +58,15 @@ async function isAuthorized(req: Request): Promise<boolean> {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
     ).auth.getUser(authHeader.slice("Bearer ".length));
-    if (user) return true;
+    if (user) return { subject: user.id };
   }
 
-  return false;
+  return null;
 }
 
 Deno.serve(async (req) => {
-  if (!await isAuthorized(req)) {
+  const auth = await authorize(req);
+  if (!auth) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "content-type": "application/json" },
@@ -70,10 +78,11 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Rate-limited via the same Phase 13 mechanism every Edge Function uses —
-  // a forged or looping caller against this secret is still bounded.
+  // Rate-limited per caller (S-04) — a user looping the on-demand path can
+  // only ever exhaust their own budget, never the nightly cron's.
   const { data: allowed, error: rateLimitError } = await supabase.rpc("ops_check_rate_limit", {
     p_function_name: "sync-fx-rates",
+    p_subject: auth.subject,
     p_max_calls: 20,
     p_window_seconds: 3600,
   });

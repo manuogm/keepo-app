@@ -167,4 +167,18 @@ enum SyncApply {
             try database.execute(sql: "DELETE FROM \(table)")
         }
     }
+
+    /// Sign-out's own wipe — everything `wipeServerDerivedTables` drops,
+    /// plus `outbox_items` too. An epoch mismatch keeps the outbox on
+    /// purpose (unsent local writes are not what changed), but sign-out is
+    /// a genuine identity change: a write still queued under the outgoing
+    /// identity must never drain into whichever identity signs in next on
+    /// this device. Found chasing a real gap — `signOut()` used to clear
+    /// only `SessionStore`'s in-memory properties, leaving the entire local
+    /// mirror (every account, transaction, category — a full financial
+    /// history) resident on disk for the next person to sign in and see.
+    static func wipeAllLocalData(_ database: Database) throws {
+        try wipeServerDerivedTables(database)
+        try database.execute(sql: "DELETE FROM outbox_items")
+    }
 }

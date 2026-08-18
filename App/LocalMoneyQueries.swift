@@ -155,19 +155,32 @@ enum LocalMoneyQueries {
 
     // MARK: - needs_review (no money conversion at all — a straight port)
 
-    static func needsReview(_ database: Database) throws -> [NeedsReviewLocalRow] {
-        try needsReviewSyncConflicts(database)
+    /// `ownerId` scopes `sync_conflicts` and `card_mappings` — both genuinely
+    /// private per-user server-side (`sync_conflicts_select`/
+    /// `card_mappings_select` both read `owner_id = auth.uid()`, no household
+    /// clause) — the same visibility the server's own RLS already enforces,
+    /// so this is a match, not a new restriction. `pending_captures` is
+    /// deliberately NOT scoped by `ownerId`: a capture on a *shared* account
+    /// is visible to every household member via `can_read_account`, exactly
+    /// like `transactions_select`'s own RLS — an owner_id filter here would
+    /// hide a shared account's pending review from the household member who
+    /// didn't make the purchase, a real regression, not a security fix.
+    static func needsReview(_ database: Database, ownerId: String) throws -> [NeedsReviewLocalRow] {
+        try needsReviewSyncConflicts(database, ownerId: ownerId)
             + needsReviewPendingCaptures(database)
-            + needsReviewAmbiguousCards(database)
+            + needsReviewAmbiguousCards(database, ownerId: ownerId)
     }
 
-    private static func needsReviewSyncConflicts(_ database: Database) throws -> [NeedsReviewLocalRow] {
+    private static func needsReviewSyncConflicts(
+        _ database: Database, ownerId: String
+    ) throws -> [NeedsReviewLocalRow] {
         try Row.fetchAll(
             database,
             sql: """
             SELECT id, table_name, row_id, client_version, server_version, created_at
-            FROM sync_conflicts WHERE resolved_at IS NULL AND deleted_at IS NULL
-            """
+            FROM sync_conflicts WHERE resolved_at IS NULL AND deleted_at IS NULL AND owner_id = ?
+            """,
+            arguments: [ownerId]
         ).map { row in
             let tableName: String = row["table_name"]
             let rowId: String = row["row_id"]
@@ -211,18 +224,21 @@ enum LocalMoneyQueries {
     /// and the `NOT EXISTS` guard against a pending capture already
     /// covering the same card (otherwise one unmapped-card event would
     /// show as two redundant items).
-    private static func needsReviewAmbiguousCards(_ database: Database) throws -> [NeedsReviewLocalRow] {
+    private static func needsReviewAmbiguousCards(
+        _ database: Database, ownerId: String
+    ) throws -> [NeedsReviewLocalRow] {
         try Row.fetchAll(
             database,
             sql: """
             SELECT cm.id, cm.card_identifier, cm.created_at FROM card_mappings cm
-            WHERE cm.account_id IS NULL AND cm.deleted_at IS NULL
+            WHERE cm.owner_id = ? AND cm.account_id IS NULL AND cm.deleted_at IS NULL
               AND NOT EXISTS (
                 SELECT 1 FROM transactions t2
                 WHERE t2.owner_id = cm.owner_id AND t2.card_identifier = cm.card_identifier
                   AND t2.source = 'capture' AND t2.status = 'pending' AND t2.deleted_at IS NULL
               )
-            """
+            """,
+            arguments: [ownerId]
         ).map { row in
             // subtitle carries the raw card_identifier — MapCardSheet reads
             // it from here to resolve the mapping. Mirrors needs_review's

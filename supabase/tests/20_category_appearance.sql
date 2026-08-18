@@ -5,7 +5,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(6);
+select plan(7);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -63,6 +63,16 @@ select results_eq(
      where owner_id = '11111111-1111-1111-1111-111111111111' and kind = 'expense' and is_default $$,
   $$ values ('star.fill', '#007AFF') $$,
   'the default category''s icon/color can still change even though its name cannot'
+);
+
+-- 7. S-02: a raw insert can no longer forge is_default = true — every real
+-- default category is seeded server-side (ensure_user_bootstrap and
+-- friends), never through this policy.
+select throws_like(
+  $$ insert into categories (owner_id, kind, name, is_default)
+     values (auth.uid(), 'expense', 'Fake Default', true) $$,
+  '%row-level security%',
+  'a raw insert cannot forge is_default = true on a new category'
 );
 
 select * from finish();

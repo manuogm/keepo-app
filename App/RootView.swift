@@ -26,6 +26,7 @@ struct RootView: View {
     /// authoritative signal for "about to stop being the active app" (the
     /// same instant the OS takes the switcher snapshot) without that quirk.
     @State private var isSceneActive = true
+    @State private var captureObserver: DarwinNotificationObserver?
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
 
@@ -82,11 +83,7 @@ struct RootView: View {
                         PendingSyncStatusBar(
                             pendingCount: session.outbox.pendingCount,
                             errorMessage: session.outbox.lastError ?? session.syncEngine?.lastErrorMessage,
-                            retry: {
-                                await session.outbox.drainAll()
-                                await session.syncEngine?.pull()
-                                session.refresh.bump()
-                            }
+                            retry: { await session.syncNow() }
                         )
                         .padding(.horizontal)
                         .padding(.bottom, 60)
@@ -106,6 +103,15 @@ struct RootView: View {
         // pushed the type-checker over its time budget (a real compile
         // failure, not a style preference).
         .background(captureDeepLinkHandler)
+        // C-09: a capture landing while this RootView is already running
+        // (the intent fired from a separate host process) otherwise has no
+        // way to reach it — same `syncNow()` every other trigger site uses.
+        .onAppear {
+            guard captureObserver == nil else { return }
+            captureObserver = DarwinNotificationObserver(name: CaptureNotify.name) {
+                Task { await session.syncNow() }
+            }
+        }
         // Dashboard (Phase 8) is the first screen whose whole purpose is a
         // large balance — the OS captures the app-switcher snapshot the
         // instant the scene stops being .active, so the curtain has to cover
@@ -139,22 +145,19 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 isSceneActive = true
-                Task {
-                    await session.outbox.drainAll()
-                    await session.syncEngine?.pull()
-                    session.refresh.bump()
-                }
+                Task { await session.syncNow() }
             }
         }
         // L5: connectivity regained is exactly the other "went offline,
         // came back" moment `Outbox.drainAll()` already needed on
         // foreground — the sync engine's pull needs the identical trigger.
+        // `syncNow()` drains first — found chasing a real bug: this used to
+        // call only `syncEngine?.pull()`, so a write made offline sat
+        // queued while the pull's stale server row silently overwrote the
+        // optimistic local one on screen the moment connectivity returned.
         .onChange(of: network.isOffline) { wasOffline, isOffline in
             if wasOffline && !isOffline {
-                Task {
-                    await session.syncEngine?.pull()
-                    session.refresh.bump()
-                }
+                Task { await session.syncNow() }
             }
         }
     }
@@ -211,9 +214,21 @@ struct RootView: View {
         showDeepLinkedCapture = true
     }
 
+    /// Local mirror, not a network read (X-01) — this used to call
+    /// `NeedsReviewRepository.fetchAll` against the server view, which
+    /// disagreed with `HomeView`'s bell-dot count (computed from
+    /// `LocalMoneyQueries.needsReview`) whenever a capture hadn't synced
+    /// yet, and silently dropped to 0 offline (`try?` swallowing the
+    /// network failure). Same query both badges now read.
     private func loadNeedsReviewCount() async {
-        let items = (try? await NeedsReviewRepository.fetchAll(client: session.client)) ?? []
-        needsReviewCount = items.filter { $0.kind != "reconciliation_gap" }.count
+        guard let ownerId = session.profile?.id else {
+            needsReviewCount = 0
+            return
+        }
+        let dbQueue = session.dbQueue
+        needsReviewCount = (try? await dbQueue.read { database in
+            try LocalMoneyQueries.needsReview(database, ownerId: ownerId.uuidString).count
+        }) ?? 0
     }
 
     private var loadingView: some View {

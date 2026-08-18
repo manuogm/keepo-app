@@ -14,6 +14,8 @@
 		04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 884043304F66BADDBBBE1E13 /* KeepoApp.swift */; };
 		07757F6F5323860A58AB2EF0 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06737C4FC884994C69283C0A /* HomeView.swift */; };
 		1258AEE2BE84DBE4A3238432 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4ADFA49D22C598E055F5FB9 /* AppSettings.swift */; };
+		16FA5989E86D92AFF0B19497 /* CaptureNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E59AD7E59FDAFDE96E7FDA9 /* CaptureNotify.swift */; };
+		1979678A5304703AB79F5093 /* ConfirmCaptureLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */; };
 		1AC5044D2005A53BA40B40DD /* RecurringRuleFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010F6BE2EDE4A87D2634D6FE /* RecurringRuleFormView.swift */; };
 		1EC09254E0001743EC8EDD97 /* MapCardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38EB62A43407D0B23B657726 /* MapCardSheet.swift */; };
 		203E3DE0C583D51FFA3CC973 /* LocalMoneyConversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9BE688265BE8E6EB9C7C6BF /* LocalMoneyConversion.swift */; };
@@ -41,7 +43,9 @@
 		503974F3E8B7F0D828A0C6CA /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 333AEF1387D80D7D4ECFD033 /* RefreshCoordinator.swift */; };
 		5A2180249656BC92A8318CC6 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A97072C145C825A7BC117C5 /* Outbox.swift */; };
 		5B6A59AAF63449FAEBC3CF35 /* LocalStore+SchemaMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11055A448FD60F76A166290 /* LocalStore+SchemaMigration.swift */; };
+		5C2EAAD51D82FD4DA43DAC07 /* ReviewCaptureLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983639BA2391235A898AD23F /* ReviewCaptureLocalWriteTests.swift */; };
 		6105E1260E91CD154666CAB5 /* AccountFormView+Cards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6B48175179606B884053E1 /* AccountFormView+Cards.swift */; };
+		621A3C6786C490FBDFBC99CF /* OutboxLocalWrite+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20516F4772B65CF5B60219FA /* OutboxLocalWrite+Capture.swift */; };
 		64470F7C4235974F4A802F12 /* OutboxLocalWrite+Cards.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA254D2AA993C35885CF6D23 /* OutboxLocalWrite+Cards.swift */; };
 		649260AB466D73CF5F1EB347 /* Outbox+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE126A60515A777C07E6E8E /* Outbox+Capture.swift */; };
 		6A667687CB7EC9234BAAE2E6 /* BalanceHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3680339542A1E05C2216A883 /* BalanceHeaderView.swift */; };
@@ -49,6 +53,7 @@
 		6D136EF3E95EB5BD256F22C7 /* KeepoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA14030637CFFD08A547224 /* KeepoUITests.swift */; };
 		71B3793D62B3873E559E84B3 /* LocalTableQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F54724997986A0ED81DEF3B /* LocalTableQueries.swift */; };
 		720AA92A68E578F823FA5F4D /* NeedsReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A0AEC925B7A3FF79E7F977 /* NeedsReviewView.swift */; };
+		780E6C8FBD039D39D34868B0 /* OutboxCaptureRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */; };
 		795E10B3A734DE453CAE50DE /* TransactionFormView+Transfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AD65DF3C6006ED1FDF192FF /* TransactionFormView+Transfer.swift */; };
 		7B5828DB0F36A3D6B2ED4DEB /* ConflictResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D55AC5A489A7549317ADB19 /* ConflictResolution.swift */; };
 		7C5F40F75BBB39A3364D07AD /* DataPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27663EBB8FB0BA605B81BDE /* DataPrivacyView.swift */; };
@@ -60,6 +65,7 @@
 		826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */; };
 		8418D67FD7BAB31C6629EE5B /* TransactionFormView+Delete.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7302E5237413BF6107E4CE /* TransactionFormView+Delete.swift */; };
 		85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A520844CB1127366801CB8 /* KeepoCore */; };
+		8890043FAC9EC87C9D768D17 /* StubTransactionSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242AFF22D448A2969EE96D9C /* StubTransactionSender.swift */; };
 		8C19ADA540858E61760E4FE7 /* BudgetFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EF478F9C03D81B6E0CCFB1 /* BudgetFormView.swift */; };
 		910929EACA4D7E2B7840D626 /* ArchiveAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26D5FDEC899FFE8FBF9699D /* ArchiveAccountsView.swift */; };
 		916606BE115D52894CF13E4A /* Outbox+AccountsCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF23EF5C13D50D95393B5ABF /* Outbox+AccountsCategories.swift */; };
@@ -73,6 +79,7 @@
 		A84A63EA9F34755A0DFB9067 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E416B10D5153DF1638B0ED9 /* ColorHex.swift */; };
 		A90857943ADABEFB25B44996 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EB6980116C8080A7ADF85D /* SyncEngine.swift */; };
 		AD9ECBCDD919F4BB10E4245D /* ConflictDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBAFFDD646D531BB369E684A /* ConflictDetailSheet.swift */; };
+		AEED63AD52F0DA7096061790 /* OutboxPayloads+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 577DC98B3EE96BF639D9CC92 /* OutboxPayloads+Capture.swift */; };
 		B1428E9A36AA3EC93E48566F /* CaptureLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F44CF7DBC59CC3E0D698B4D /* CaptureLocalWrite.swift */; };
 		B3D55B77F4EB1B1F699789EB /* UUID+Identifiable.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EFC21F0C8C59B19FFD185A /* UUID+Identifiable.swift */; };
 		B54F02C80D3D973B33154960 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5BCEA514344BDBF220342E /* HouseholdView.swift */; };
@@ -159,8 +166,10 @@
 		1D55AC5A489A7549317ADB19 /* ConflictResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictResolution.swift; sourceTree = "<group>"; };
 		1F7E462D55BFB72F55965EFE /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
 		2022ED7EAFC392568FE06C52 /* LocalMoneyRefereeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyRefereeTests.swift; sourceTree = "<group>"; };
+		20516F4772B65CF5B60219FA /* OutboxLocalWrite+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OutboxLocalWrite+Capture.swift"; sourceTree = "<group>"; };
 		2214EBA81A427AD5FC7EE5B5 /* ScopeSwitcherButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeSwitcherButton.swift; sourceTree = "<group>"; };
 		223C215A93C8B4A390E17F34 /* TransactionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFormView.swift; sourceTree = "<group>"; };
+		242AFF22D448A2969EE96D9C /* StubTransactionSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StubTransactionSender.swift; sourceTree = "<group>"; };
 		2AE126A60515A777C07E6E8E /* Outbox+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+Capture.swift"; sourceTree = "<group>"; };
 		2C2A67AC30C1C63B214F69A1 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		2CD74535C9BAD0B3D22700F1 /* PrivacyToggleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyToggleButton.swift; sourceTree = "<group>"; };
@@ -184,9 +193,11 @@
 		4DC8348A94F64846D6389F14 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		4DD4484E755728FA2992E894 /* LocalTransactionRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTransactionRowTests.swift; sourceTree = "<group>"; };
 		56BD1170276112E0659274B6 /* BalanceReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceReminderScheduler.swift; sourceTree = "<group>"; };
+		577DC98B3EE96BF639D9CC92 /* OutboxPayloads+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OutboxPayloads+Capture.swift"; sourceTree = "<group>"; };
 		5A43338D7EE342E9D02ACC23 /* OutboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxTests.swift; sourceTree = "<group>"; };
 		5B5DA16A17CDFBEC3DCF6BDB /* CSVImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVImportView.swift; sourceTree = "<group>"; };
 		5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardMappingLocalWriteTests.swift; sourceTree = "<group>"; };
+		5E59AD7E59FDAFDE96E7FDA9 /* CaptureNotify.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotify.swift; sourceTree = "<group>"; };
 		6234223F609F295F8F13BDED /* AccountFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountFormView.swift; sourceTree = "<group>"; };
 		66A0AEC925B7A3FF79E7F977 /* NeedsReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsReviewView.swift; sourceTree = "<group>"; };
 		68C5239FB8E94D256E60F0EF /* AutomationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationsView.swift; sourceTree = "<group>"; };
@@ -194,6 +205,7 @@
 		735529C00019B4CABBA21C30 /* CategoryFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryFormView.swift; sourceTree = "<group>"; };
 		768F4CDF0632B8A323F51BF1 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7742491A185D240463F3F936 /* KeepoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmCaptureLocalWriteTests.swift; sourceTree = "<group>"; };
 		7BA14030637CFFD08A547224 /* KeepoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoUITests.swift; sourceTree = "<group>"; };
 		864D74AE697E673562039C23 /* OTPSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPSignInView.swift; sourceTree = "<group>"; };
 		884043304F66BADDBBBE1E13 /* KeepoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoApp.swift; sourceTree = "<group>"; };
@@ -207,6 +219,7 @@
 		8F2FC3C71C9E5CC965BC8F3F /* NetWorthChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthChartView.swift; sourceTree = "<group>"; };
 		8F54724997986A0ED81DEF3B /* LocalTableQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTableQueries.swift; sourceTree = "<group>"; };
 		980DDA3E769ECAE135ECF895 /* OutboxKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxKind.swift; sourceTree = "<group>"; };
+		983639BA2391235A898AD23F /* ReviewCaptureLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewCaptureLocalWriteTests.swift; sourceTree = "<group>"; };
 		99345A8328BECF736129DE7F /* OutboxMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxMigration.swift; sourceTree = "<group>"; };
 		9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
 		9FD9B0EBCF053E1B3E86E65C /* SyncCursorStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCursorStore.swift; sourceTree = "<group>"; };
@@ -223,11 +236,12 @@
 		B8E38E1BEBD69551349E9D4E /* OutboxMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxMigrationTests.swift; sourceTree = "<group>"; };
 		BBAFFDD646D531BB369E684A /* ConflictDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictDetailSheet.swift; sourceTree = "<group>"; };
 		C00320C6876E1B14C807E478 /* TransactionsListView+Period.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionsListView+Period.swift"; sourceTree = "<group>"; };
-		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4437A523DE24A64B83A5D54 /* BudgetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetsView.swift; sourceTree = "<group>"; };
 		C4ADFA49D22C598E055F5FB9 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoreTests.swift; sourceTree = "<group>"; };
 		C91440E871E1BD48AB796B63 /* Keepo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Keepo.entitlements; sourceTree = "<group>"; };
+		C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxCaptureRecoveryTests.swift; sourceTree = "<group>"; };
 		CBFD2591FA160113DE1732DE /* LiveOutboxSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveOutboxSender.swift; sourceTree = "<group>"; };
 		CDA9FDB15C2C5D6B5B18466D /* WalletAutomationGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAutomationGuideView.swift; sourceTree = "<group>"; };
 		CEE6F0FB1B3DF6715A2BF817 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
@@ -335,6 +349,7 @@
 				C4437A523DE24A64B83A5D54 /* BudgetsView.swift */,
 				EDED98D97ACE3A89820BBD09 /* CaptureIntent.swift */,
 				2F44CF7DBC59CC3E0D698B4D /* CaptureLocalWrite.swift */,
+				5E59AD7E59FDAFDE96E7FDA9 /* CaptureNotify.swift */,
 				3CAAB71ED4F3AA3764B428BB /* CardMappingDetailSheet.swift */,
 				037CD275DF695BA082E13AE5 /* CategoriesView.swift */,
 				735529C00019B4CABBA21C30 /* CategoryFormView.swift */,
@@ -385,9 +400,11 @@
 				E77C50795C5EE7B77F6AD5DE /* Outbox+Cards.swift */,
 				980DDA3E769ECAE135ECF895 /* OutboxKind.swift */,
 				13730E415ACEB27F1646E3CE /* OutboxLocalWrite.swift */,
+				20516F4772B65CF5B60219FA /* OutboxLocalWrite+Capture.swift */,
 				FA254D2AA993C35885CF6D23 /* OutboxLocalWrite+Cards.swift */,
 				99345A8328BECF736129DE7F /* OutboxMigration.swift */,
 				0ABA32C5D1B5DFF5297CA7CC /* OutboxPayloads.swift */,
+				577DC98B3EE96BF639D9CC92 /* OutboxPayloads+Capture.swift */,
 				CEE6F0FB1B3DF6715A2BF817 /* PreferencesView.swift */,
 				2CD74535C9BAD0B3D22700F1 /* PrivacyToggleButton.swift */,
 				2C2A67AC30C1C63B214F69A1 /* ProfileView.swift */,
@@ -432,6 +449,7 @@
 			children = (
 				5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */,
 				36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */,
+				7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */,
 				8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */,
 				38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */,
 				A5D45833432D943398CC902D /* LocalMoneyConversionArchivedAccountTests.swift */,
@@ -442,9 +460,12 @@
 				F3D1996C00A3B200872FFDA8 /* LocalTableQueriesTests.swift */,
 				4DD4484E755728FA2992E894 /* LocalTransactionRowTests.swift */,
 				B74F9A6C1456B3EC4ED7C6C1 /* OfflineStoreTests.swift */,
+				C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */,
 				10A3C001E043B35FE6CF03CC /* OutboxLocalWriteTests.swift */,
 				B8E38E1BEBD69551349E9D4E /* OutboxMigrationTests.swift */,
 				5A43338D7EE342E9D02ACC23 /* OutboxTests.swift */,
+				983639BA2391235A898AD23F /* ReviewCaptureLocalWriteTests.swift */,
+				242AFF22D448A2969EE96D9C /* StubTransactionSender.swift */,
 				9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */,
 			);
 			path = KeepoTests;
@@ -544,7 +565,7 @@
 			mainGroup = 7EFAF88579B01776BD0774BC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */,
+				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				ADEF292666A264221272220B /* XCLocalSwiftPackageReference "Packages/KeepoCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -577,6 +598,7 @@
 			files = (
 				BBE92DC63297AE6FDD9EAE9F /* CardMappingLocalWriteTests.swift in Sources */,
 				E43BEBD85BAD11CDD781A200 /* CategoryLocalWriteTests.swift in Sources */,
+				1979678A5304703AB79F5093 /* ConfirmCaptureLocalWriteTests.swift in Sources */,
 				4C27DB33415AF4D03D91EEE8 /* KeepoTests.swift in Sources */,
 				BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */,
 				CBA1F8EB27B25B3AE8413965 /* LocalMoneyConversionArchivedAccountTests.swift in Sources */,
@@ -587,9 +609,12 @@
 				E9C9D4B3DF078A1CC161900E /* LocalTableQueriesTests.swift in Sources */,
 				FAB07834FBBFD8A76C96E47B /* LocalTransactionRowTests.swift in Sources */,
 				EA430EC5D2F03C8C3197B7D0 /* OfflineStoreTests.swift in Sources */,
+				780E6C8FBD039D39D34868B0 /* OutboxCaptureRecoveryTests.swift in Sources */,
 				3A9AACA2AC8D02F3ED6645C3 /* OutboxLocalWriteTests.swift in Sources */,
 				E923E0F08CF810D2921A687A /* OutboxMigrationTests.swift in Sources */,
 				A38417E3409C44AC9E74975E /* OutboxTests.swift in Sources */,
+				5C2EAAD51D82FD4DA43DAC07 /* ReviewCaptureLocalWriteTests.swift in Sources */,
+				8890043FAC9EC87C9D768D17 /* StubTransactionSender.swift in Sources */,
 				F621BD7F9360149A762CDA34 /* SyncEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -622,6 +647,7 @@
 				C886AE5DBD13E41BFE14BA54 /* CSVImportView.swift in Sources */,
 				CA271C456719F30FF84B8FF5 /* CaptureIntent.swift in Sources */,
 				B1428E9A36AA3EC93E48566F /* CaptureLocalWrite.swift in Sources */,
+				16FA5989E86D92AFF0B19497 /* CaptureNotify.swift in Sources */,
 				E26E4926F9FD4EA7EB2A17E8 /* CardMappingDetailSheet.swift in Sources */,
 				4184AA431DA561F69AE2C593 /* CategoriesView.swift in Sources */,
 				475B1C8ADEBEC90129CDBB89 /* CategoryFormView.swift in Sources */,
@@ -668,9 +694,11 @@
 				2F75A6443C5BBCB8CA99DED5 /* Outbox+Cards.swift in Sources */,
 				5A2180249656BC92A8318CC6 /* Outbox.swift in Sources */,
 				E3E9C407E2DE673A929AA6EE /* OutboxKind.swift in Sources */,
+				621A3C6786C490FBDFBC99CF /* OutboxLocalWrite+Capture.swift in Sources */,
 				64470F7C4235974F4A802F12 /* OutboxLocalWrite+Cards.swift in Sources */,
 				3ECB038FFEE93D5A2897E950 /* OutboxLocalWrite.swift in Sources */,
 				015458CD49918309F410CBAF /* OutboxMigration.swift in Sources */,
+				AEED63AD52F0DA7096061790 /* OutboxPayloads+Capture.swift in Sources */,
 				ED0C39EA3E52A60BC689B4EA /* OutboxPayloads.swift in Sources */,
 				C95EADE3438BF04F99EBE006 /* PreferencesView.swift in Sources */,
 				303F4C318CFC27290CD85D25 /* PrivacyToggleButton.swift in Sources */,
@@ -843,7 +871,6 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -885,7 +912,6 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1002,7 +1028,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */ = {
+		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -1015,7 +1041,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		0D525863FB5ABAE4C22CDAE5 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
 		};
 		55A520844CB1127366801CB8 /* KeepoCore */ = {
@@ -1024,7 +1050,7 @@
 		};
 		6CF67C6B40F5CAB317C7F6FC /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */

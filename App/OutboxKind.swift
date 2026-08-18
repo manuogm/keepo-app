@@ -7,4 +7,5 @@ enum OutboxKind: String {
     case createAccount, updateAccount, setAccountBalance, archiveAccount, createCategory, updateCategory
     case renameCardMapping, unmapCard, mapCard
     case confirmCaptureTransaction
+    case reviewCapture
 }

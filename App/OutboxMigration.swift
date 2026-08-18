@@ -18,10 +18,31 @@ import SwiftData
 /// already treats a same-id `enqueue` as an update elsewhere) is left as-is
 /// rather than duplicated.
 enum OutboxMigration {
+    /// X-10/X-03: `isDone` lets a caller skip opening `OfflineStore`'s
+    /// `ModelContainer` at all once the legacy store is confirmed empty —
+    /// the container itself, not this fetch, is the expensive part, and
+    /// `CaptureIntent` was paying it on every single capture (every Apple
+    /// Pay tap) since it has no persisted state of its own to short-circuit
+    /// on. Only ever set once this method observes zero legacy rows left.
+    /// `defaults` is injectable (default `.standard`) so tests can pass an
+    /// isolated suite instead of polluting the shared one across runs.
+    private static let doneKey = "app.keepo.outboxMigration.done"
+
+    static func isDone(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: doneKey)
+    }
+
     @MainActor
-    static func migrateIfNeeded(swiftDataContext: ModelContext, to dbQueue: DatabaseQueue) {
+    static func migrateIfNeeded(
+        swiftDataContext: ModelContext, to dbQueue: DatabaseQueue, defaults: UserDefaults = .standard
+    ) {
+        guard !isDone(in: defaults) else { return }
         let descriptor = FetchDescriptor<OutboxItem>(sortBy: [SortDescriptor(\.createdAt)])
-        guard let legacyItems = try? swiftDataContext.fetch(descriptor), !legacyItems.isEmpty else { return }
+        guard let legacyItems = try? swiftDataContext.fetch(descriptor) else { return }
+        guard !legacyItems.isEmpty else {
+            defaults.set(true, forKey: doneKey)
+            return
+        }
 
         for legacy in legacyItems {
             do {
@@ -39,5 +60,11 @@ enum OutboxMigration {
             }
         }
         try? swiftDataContext.save()
+
+        // A row that hit the `continue` above is still legacy-side and must
+        // be retried next launch — only mark done once genuinely empty.
+        if let remaining = try? swiftDataContext.fetch(descriptor), remaining.isEmpty {
+            defaults.set(true, forKey: doneKey)
+        }
     }
 }

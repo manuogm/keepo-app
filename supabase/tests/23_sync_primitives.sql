@@ -23,7 +23,7 @@
 
 begin;
 
-select plan(22);
+select plan(25);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -293,6 +293,48 @@ select is(
   (select sync_epoch from profiles where id = '11111111-1111-1111-1111-111111111111'),
   3::bigint,
   'accept_invite bumps the accepting member''s own sync_epoch (domain change)'
+);
+
+-- S-06: a raw client update can no longer touch sync_epoch directly — the
+-- exact door that would let a removed household member suppress LH2/LH3's
+-- forced local wipe by writing back whatever epoch their device already
+-- has cached. Column-scoped grant only allows base_currency/onboarded_at.
+-- Still running as fixture A/authenticated from the accept_invite case above.
+select throws_like(
+  $$ update profiles set sync_epoch = sync_epoch + 100 where id = auth.uid() $$,
+  '%permission denied%',
+  'a raw update cannot touch profiles.sync_epoch'
+);
+
+select throws_like(
+  $$ update profiles set deleted_at = now() where id = auth.uid() $$,
+  '%permission denied%',
+  'a raw update cannot touch profiles.deleted_at'
+);
+
+-- S-03: pull_changes — "the expensive one" (unpaginated, aggregates every
+-- syncable table) — is now rate-limited too. Clears whatever budget
+-- fixture A's earlier pull_changes calls above already spent (this section
+-- tests the limiter itself, not how much of it those calls used), then
+-- tops up to the 30/60s threshold and confirms the next call is refused.
+reset role;
+delete from ops_rate_limits where function_name = 'pull_changes';
+set local role authenticated;
+
+do $$
+declare
+  i int;
+begin
+  for i in 1..30 loop
+    perform pull_changes(0, 0);
+  end loop;
+end;
+$$;
+
+select throws_like(
+  $$ select pull_changes(0, 0) $$,
+  '%rate limit%',
+  'pull_changes past its per-minute threshold is rejected by the rate guard'
 );
 
 -- ----------------------------------------------------------------------------

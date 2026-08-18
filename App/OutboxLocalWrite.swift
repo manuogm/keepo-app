@@ -94,19 +94,6 @@ enum OutboxLocalWrite {
         }
     }
 
-    /// Version-checked, same as every other edit here — a stale
-    /// `expectedVersion` just no-ops locally (the eventual server reply, or
-    /// the next sync pull, is what surfaces the real conflict).
-    static func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload, in database: Database) throws {
-        let now = PostgresDate.sqliteTimestampBoundaryString(Date())
-        try database.execute(
-            sql: """
-            UPDATE transactions SET status = 'confirmed', version = ?, updated_at = ? WHERE id = ? AND version = ?
-            """,
-            arguments: [payload.expectedVersion + 1, now, payload.id.uuidString, payload.expectedVersion]
-        )
-    }
-
     static func deleteTransaction(_ payload: DeleteTransactionPayload, in database: Database) throws {
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         try database.execute(
@@ -308,7 +295,10 @@ enum OutboxLocalWrite {
 
     // MARK: - helpers
 
-    private static func categoryKind(_ database: Database, categoryId: String) throws -> String? {
+    /// Not `private` — `OutboxLocalWrite+Capture.swift`'s `reviewCaptureTransaction`
+    /// needs it too, same cross-file reuse `linkCardLocally`
+    /// (`OutboxLocalWrite+Cards.swift`) already has.
+    static func categoryKind(_ database: Database, categoryId: String) throws -> String? {
         try String.fetchOne(database, sql: "SELECT kind FROM categories WHERE id = ?", arguments: [categoryId])
     }
 

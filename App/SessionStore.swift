@@ -96,6 +96,7 @@ public final class SessionStore {
         let context = ModelContext(container)
         OutboxMigration.migrateIfNeeded(swiftDataContext: context, to: dbQueue)
         self.outbox = Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
+        self.outbox.startRetryLoop()
     }
 
     /// Rebuilds `syncEngine` for the now-known `userId` — called from every
@@ -106,12 +107,59 @@ public final class SessionStore {
         SyncEngine(dbQueue: dbQueue, puller: LiveSyncPuller(client: client), userId: userId.uuidString)
     }
 
+    /// Drains the outbox, then pulls, then notifies every screen — push
+    /// before pull, always, since an offline edit must reach the server
+    /// before the next pull can correct anything against it. The one place
+    /// every "we might be catching up on missed writes" trigger (returning
+    /// to the foreground, regaining connectivity, the pending-sync banner's
+    /// manual retry, a magic-link sign-in) goes through, so a site can't
+    /// drop the drain by hand-copying just the pull — exactly what
+    /// happened at the reconnect trigger before this existed: it called
+    /// only `syncEngine?.pull()`, so a write made offline sat queued while
+    /// the pull's authoritative (but stale, since the write behind it
+    /// hadn't been sent yet) row silently overwrote the optimistic local
+    /// one on screen.
+    ///
+    /// `afterPull` (X-06) runs between the pull and the bump, for the one
+    /// caller — `startWithLocalFirstProfile`'s local-profile-exists branch
+    /// — that needs to re-check `profile`/`phase` before every screen's
+    /// `.task(id: refresh.token)` re-fires. Every other caller just omits it.
+    public func syncNow(afterPull: (() async -> Void)? = nil) async {
+        await outbox.drainAll()
+        await syncEngine?.pull()
+        await afterPull?()
+        refresh.bump()
+    }
+
+    /// Guards against a stale prior identity's data ever rendering: the
+    /// local store's own last-known owner is persisted (`SyncCursorStore
+    /// .localOwnerUserId`), not just wiped in-memory by `signOut()`, so a
+    /// launch that finds itself signed in as someone other than whoever
+    /// last owned the local mirror wipes and self-heals here — the backstop
+    /// for a crash or force-quit between `signOut()`'s own wipe and the
+    /// next sign-in, which would otherwise leave a full financial history
+    /// on disk for the next identity to read. Called before anything reads
+    /// or renders local data, at every place `userId` becomes known.
+    private func ensureLocalDataBelongsTo(_ userId: UUID) async {
+        let incoming = userId.uuidString
+        if let owner = SyncCursorStore.localOwnerUserId, owner != incoming {
+            try? await dbQueue.write { database in try SyncApply.wipeAllLocalData(database) }
+            SyncCursorStore.resetAll()
+        }
+        SyncCursorStore.setLocalOwner(incoming)
+    }
+
     public func start() async {
         do {
             if let restored = try await authProvider.restoreSession() {
                 userId = restored.user.id
                 userEmail = restored.user.email
+                await ensureLocalDataBelongsTo(restored.user.id)
                 syncEngine = makeSyncEngine(userId: restored.user.id)
+                // X-02: runs once, before the first drain below gets a
+                // chance to fail on a pre-upgrade corrupted outbox item —
+                // see Outbox+CaptureRecovery.swift's own header comment.
+                await outbox.repairLegacyCaptureQueueIfNeeded()
                 try await startWithLocalFirstProfile()
             } else if isLocal {
                 // Local dev stack: auto-sign in via StubAuthProvider's fixed
@@ -119,7 +167,9 @@ public final class SessionStore {
                 let session = try await authProvider.signIn()
                 userId = session.user.id
                 userEmail = session.user.email
+                await ensureLocalDataBelongsTo(session.user.id)
                 syncEngine = makeSyncEngine(userId: session.user.id)
+                await outbox.repairLegacyCaptureQueueIfNeeded()
                 try await startWithLocalFirstProfile()
             } else {
                 // Hosted: no cached session — present the OTP sign-in UI.
@@ -151,19 +201,19 @@ public final class SessionStore {
             profile = localProfile
             phase = localProfile.onboardedAt == nil ? .needsOnboarding : .ready
             Task {
-                await outbox.drainAll()
-                await syncEngine?.pull()
-                if let refreshed = try? await dbQueue.read({ database in
-                    try LocalTableQueries.profile(database, id: userId.uuidString)
-                }), refreshed != profile {
-                    profile = refreshed
-                    phase = refreshed.onboardedAt == nil ? .needsOnboarding : .ready
-                }
                 // The pull can bring in accounts/transactions/balances that
                 // existed on the server before this device's first local
                 // row, even when the profile row itself is unchanged — every
-                // screen keys its load off this token, not off `profile`.
-                refresh.bump()
+                // screen keys its load off `syncNow`'s own bump, not off
+                // `profile`.
+                await syncNow {
+                    if let refreshed = try? await self.dbQueue.read({ database in
+                        try LocalTableQueries.profile(database, id: userId.uuidString)
+                    }), refreshed != self.profile {
+                        self.profile = refreshed
+                        self.phase = refreshed.onboardedAt == nil ? .needsOnboarding : .ready
+                    }
+                }
             }
         } else {
             // First-ever login on this device: nothing local to render yet,
@@ -176,9 +226,7 @@ public final class SessionStore {
             // actually lands data, or every screen shows "—" until a
             // manual tab switch happens to re-trigger its load.
             try await refreshProfile()
-            await outbox.drainAll()
-            await syncEngine?.pull()
-            refresh.bump()
+            await syncNow()
         }
     }
 
@@ -202,17 +250,28 @@ public final class SessionStore {
             linkError = nil
             userId = session.user.id
             userEmail = session.user.email
+            await ensureLocalDataBelongsTo(session.user.id)
             syncEngine = makeSyncEngine(userId: session.user.id)
             try await refreshProfile()
-            await outbox.drainAll()
-            await syncEngine?.pull()
+            await syncNow()
         } catch {
             linkError = UserFacingError.describe(error)
         }
     }
 
+    /// Wipes the local mirror and the outbox along with the server session
+    /// — a queued write or a cached balance from the outgoing identity must
+    /// never be visible to, or drain into, whoever signs in next on this
+    /// device (a real gap: this used to clear only these four in-memory
+    /// properties, leaving the entire local GRDB store — every account,
+    /// transaction, category — resident on disk for the next person to see).
+    /// `ensureLocalDataBelongsTo` is the independent backstop for a crash or
+    /// force-quit between this wipe and the next sign-in.
     public func signOut() async throws {
         try await client.auth.signOut()
+        try? await dbQueue.write { database in try SyncApply.wipeAllLocalData(database) }
+        SyncCursorStore.resetAll()
+        SyncCursorStore.clearLocalOwner()
         userId = nil
         userEmail = nil
         profile = nil

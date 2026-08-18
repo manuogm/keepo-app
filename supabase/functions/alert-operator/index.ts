@@ -38,8 +38,11 @@ Deno.serve(async (req) => {
   // Rate-limited independently of sync-fx-rates's own limit — a flapping
   // health check must not be able to spam the webhook every 30 minutes
   // forever without at least a visible ceiling.
+  // Cron-only caller (ops_check_and_alert via pg_net, never a signed-in
+  // user) — a fixed subject is fine, same reasoning as sync-fx-rates.
   const { data: allowed, error: rateLimitError } = await supabase.rpc("ops_check_rate_limit", {
     p_function_name: "alert-operator",
+    p_subject: "cron",
     p_max_calls: 10,
     p_window_seconds: 3600,
   });

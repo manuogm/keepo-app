@@ -53,6 +53,46 @@ struct LocalStoreMigrationTests {
         }
     }
 
+    /// C-07's local counterpart to the server's transactions_external_id_idx
+    /// — without this, a re-fired automation minting the same deterministic
+    /// id from `CaptureIdentity.transactionId(forExternalId:)` twice would
+    /// still be caught by the primary key, but a bug that ever regressed the
+    /// id derivation back to a random UUID would silently write two rows
+    /// for the same purchase. This index is the same idempotency guarantee
+    /// the server enforces, applied to the mirror too.
+    @Test("rebuildSyncableTables adds the partial unique index on (owner_id, source, external_id)")
+    func rebuildAddsExternalIdUniqueIndex() throws {
+        let dbQueue = try DatabaseQueue()
+        try dbQueue.write { database in try LocalStore.rebuildSyncableTables(database) }
+
+        let now = "2026-01-01T00:00:00.000000+00:00"
+        try dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO transactions (
+                    id, owner_id, created_by, category_id, amount_e4, occurred_at, source, status,
+                    external_id, version, created_at, updated_at, sync_seq
+                ) VALUES (?, ?, ?, ?, ?, ?, 'capture', 'pending', 'ext-1', 1, ?, ?, 0)
+                """,
+                arguments: ["t1", "owner1", "owner1", "cat1", -4500, now, now, now]
+            )
+        }
+
+        #expect(throws: (any Error).self) {
+            try dbQueue.write { database in
+                try database.execute(
+                    sql: """
+                    INSERT INTO transactions (
+                        id, owner_id, created_by, category_id, amount_e4, occurred_at, source, status,
+                        external_id, version, created_at, updated_at, sync_seq
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'capture', 'pending', 'ext-1', 1, ?, ?, 0)
+                    """,
+                    arguments: ["t2", "owner1", "owner1", "cat1", -4500, now, now, now]
+                )
+            }
+        }
+    }
+
     @Test("resetAll clears every stored sync cursor/epoch, regardless of user")
     func resetAllClearsEveryUser() {
         SyncCursorStore.save(cursor: 42, globalCursor: 7, epoch: 1, for: "user-a")

@@ -96,7 +96,7 @@ struct RecurringRulesView: View {
                     accounts: try LocalAccountRow.fetchAll(
                         database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
                     ),
-                    categories: try LocalTableQueries.categories(database)
+                    categories: try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
                 )
             }
             rules = loaded.rules

@@ -210,7 +210,7 @@ struct TransactionFormView: View {
             let loaded = try? await session.dbQueue.read { database in
                 (
                     try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency),
-                    try LocalTableQueries.categories(database)
+                    try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
                 )
             }
             accounts = loaded?.0 ?? []
@@ -295,18 +295,13 @@ extension TransactionFormView {
             case (false, .transfer):
                 try await saveTransfer(accountId: accountId, magnitude: magnitude)
             case (true, .expense), (true, .income):
-                try await updateLedgerTransaction(accountId: accountId, magnitude: magnitude)
+                if isConfirmingCapture {
+                    try await reviewCaptureTransaction(accountId: accountId, magnitude: magnitude)
+                } else {
+                    try await updateLedgerTransaction(accountId: accountId, magnitude: magnitude)
+                }
             case (true, .transfer):
                 try await updateTransfer(magnitude: magnitude)
-            }
-            // The update above already bumped the local version by one —
-            // confirm against that new version, not the one this screen
-            // was opened with, or a stale-version conflict would log for
-            // no reason on every single review.
-            if isConfirmingCapture, let id = editingId, let expectedVersion = editingFromVersion {
-                await session.outbox.submitConfirmCaptureTransaction(
-                    ConfirmCaptureTransactionPayload(id: id, expectedVersion: expectedVersion + 1)
-                )
             }
             // A: the local write already landed by the time submitX
             // returns — the network delivery keeps running in the
@@ -361,5 +356,31 @@ extension TransactionFormView {
             merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes
         )
         await session.outbox.submitUpdateTransaction(payload)
+    }
+
+    /// The Needs Review "review, then confirm" path — one write instead of
+    /// `updateLedgerTransaction` followed by a separate confirm. See
+    /// `ReviewCaptureTransactionPayload`'s own header for why sending those
+    /// as two independently-queued outbox writes was a real bug: they could
+    /// race (whichever arrived second sent a now-stale `expectedVersion`),
+    /// and offline, the outbox's own collapse-by-row-id rule could let the
+    /// confirm silently discard the edit outright.
+    fileprivate func reviewCaptureTransaction(accountId: UUID, magnitude: Int64) async throws {
+        guard
+            let categoryId = selectedCategoryId,
+            let account = fromAccount,
+            let id = editingId,
+            let expectedVersion = editingFromVersion
+        else {
+            errorMessage = "Choose a category."
+            return
+        }
+        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
+        let payload = ReviewCaptureTransactionPayload(
+            id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
+            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
+            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes
+        )
+        await session.outbox.submitReviewCaptureTransaction(payload)
     }
 }

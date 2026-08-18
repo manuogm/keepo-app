@@ -96,8 +96,15 @@ select is(
 );
 
 -- A pending (unconfirmed capture) row must never move the balance either.
+-- source='capture'/status='pending' is only ever written by
+-- capture_transaction (SECURITY DEFINER, bypasses RLS) since S-02 tightened
+-- transactions_insert's own WITH CHECK — this is testing account_balances'
+-- own filtering, not insert authorization, so the fixture inserts with the
+-- same elevated privilege that RPC has, then drops back to authenticated.
+reset role;
 insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at, status, source)
 values (auth.uid(), auth.uid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', -5000000, 'EUR', now(), 'pending', 'capture');
+set local role authenticated;
 
 select is(
   (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000001'),

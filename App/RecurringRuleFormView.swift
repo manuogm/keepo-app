@@ -143,7 +143,7 @@ struct RecurringRuleFormView: View {
             let loaded = try? await session.dbQueue.read { database in
                 (
                     try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency),
-                    try LocalTableQueries.categories(database)
+                    try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
                 )
             }
             accounts = loaded?.0 ?? []

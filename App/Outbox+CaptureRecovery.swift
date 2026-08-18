@@ -6,30 +6,56 @@ import KeepoCore
 // file-length lint threshold — same precedent as Outbox+Capture.swift.
 
 extension Outbox {
-    /// Recovers items that were already corrupted by the old `enqueue`
-    /// behavior its own fix (`Outbox.swift`'s own header comment on
-    /// `enqueue`) prevents going forward: a confirm/update/delete whose
-    /// row was never actually created server-side — because the create
-    /// that belonged under this same id got silently overwritten before
-    /// that fix existed — fails every replay with "not found," permanently.
-    /// No amount of retrying ever helps, because nothing ever creates the
-    /// row. If the local mirror still has the row (`source = 'capture'`,
-    /// exactly the only case this can happen), one recovery attempt
-    /// reconstructs and resends the original create from its still-present
-    /// local fields — `external_id` keeps this idempotent against a
-    /// second, unrelated failure that isn't this bug — then retries the
-    /// write that actually failed. If the row is gone or isn't a capture,
-    /// there is nothing to recover and the original error propagates
-    /// unchanged.
-    func replayWithRecovery(_ item: OutboxItemRecord) async throws {
-        do {
-            _ = try await replay(item)
-        } catch {
-            guard let rowId = targetRowId(for: item), await recreateMissingCapture(id: rowId) else {
-                throw error
-            }
-            _ = try await replay(item)
+    /// One-time repair (X-02 revisited) for outbox rows already corrupted
+    /// by the old `enqueue` behavior its own fix (`Outbox.swift`'s
+    /// `enqueue` header comment) prevents going forward: a review/confirm/
+    /// update/delete whose row was never actually created server-side,
+    /// because the create that belonged under this same id got silently
+    /// overwritten before that fix shipped. Left unrepaired, every replay
+    /// of that item fails with "not found," forever — no amount of
+    /// retrying ever helps, because nothing ever creates the row.
+    ///
+    /// This used to run reactively, wrapping every single replay attempt
+    /// (any kind, not just capture-derived ones) in a catch-and-recover —
+    /// permanent runtime machinery for a bug class that can only exist on
+    /// a device that already had a corrupted item queued *before*
+    /// upgrading to the `enqueue` fix. That design also fired on
+    /// genuinely unrelated failures (offline, a real 5xx, a real
+    /// conflict), burning an extra `capture_transaction` call — and its
+    /// rate-limit budget — on every one of them.
+    ///
+    /// Converted to a one-time sweep instead: `SessionStore.start()` calls
+    /// this once per launch, before the first drain, so a corrupted
+    /// create is resent before the dependent write ever gets a chance to
+    /// fail on it. Gated by a one-shot flag once every currently-queued
+    /// item has been handled — a device that's never had this bug
+    /// (everyone from here forward, since `enqueue` can no longer produce
+    /// it) pays for one cheap, empty scan and never touches this code
+    /// again. `defaults` is injectable for tests, same pattern as
+    /// `OutboxMigration`.
+    private static let repairDoneKey = "app.keepo.legacyCaptureQueueRepair.done"
+
+    func repairLegacyCaptureQueueIfNeeded(defaults: UserDefaults = .standard) async {
+        guard !defaults.bool(forKey: Self.repairDoneKey) else { return }
+
+        let targetIds = await targetRowIdsOfQueuedItems()
+        guard !targetIds.isEmpty else {
+            defaults.set(true, forKey: Self.repairDoneKey)
+            return
         }
+
+        var everythingHandled = true
+        for id in targetIds where await repairIfLegacyCapture(id: id) == .failed {
+            everythingHandled = false
+        }
+        if everythingHandled {
+            defaults.set(true, forKey: Self.repairDoneKey)
+        }
+    }
+
+    private func targetRowIdsOfQueuedItems() async -> Set<String> {
+        let items = (try? await dbQueue.read { database in try OutboxItemRecord.fetchAll(database) }) ?? []
+        return Set(items.compactMap(targetRowId(for:)))
     }
 
     private func targetRowId(for item: OutboxItemRecord) -> String? {
@@ -39,6 +65,8 @@ extension Outbox {
             return (try? decoder.decode(UpdateTransactionPayload.self, from: item.payloadJSON))?.id.uuidString
         case .confirmCaptureTransaction:
             return (try? decoder.decode(ConfirmCaptureTransactionPayload.self, from: item.payloadJSON))?.id.uuidString
+        case .reviewCapture:
+            return (try? decoder.decode(ReviewCaptureTransactionPayload.self, from: item.payloadJSON))?.id.uuidString
         case .deleteTransaction:
             return (try? decoder.decode(DeleteTransactionPayload.self, from: item.payloadJSON))?.id.uuidString
         default:
@@ -46,7 +74,22 @@ extension Outbox {
         }
     }
 
-    private func recreateMissingCapture(id: String) async -> Bool {
+    private enum RepairOutcome {
+        /// Not a legacy-corrupted capture row — either it isn't a
+        /// `source = 'capture'` row at all, or it's already gone. Nothing
+        /// to do; counts as handled.
+        case notApplicable
+        /// The create was resent successfully (or, just as often, the row
+        /// already existed server-side and this was a harmless idempotent
+        /// no-op — `capture_transaction`'s own `external_id` uniqueness
+        /// makes a redundant resend safe either way).
+        case recovered
+        /// The resend itself failed (offline, a real 5xx) — must retry the
+        /// whole sweep on a later launch, not just this one id.
+        case failed
+    }
+
+    private func repairIfLegacyCapture(id: String) async -> RepairOutcome {
         guard let row = try? await dbQueue.read({ database -> Row? in
             try Row.fetchOne(
                 database,
@@ -65,13 +108,13 @@ extension Outbox {
         let occurredAt = PostgresDate.date(fromTimestamp: occurredAtString),
         let externalId = row["external_id"] as String?,
         let uuid = UUID(uuidString: id)
-        else { return false }
+        else { return .notApplicable }
 
         let payload = CaptureTransactionPayload(
             id: uuid, cardIdentifier: cardIdentifier, merchantRaw: merchantRaw,
             merchantNormalized: merchantNormalized, amountE4: abs(amountE4), occurredAt: occurredAt,
             externalId: externalId, notes: row["notes"] as String?
         )
-        return (try? await sender.captureTransaction(payload)) != nil
+        return (try? await sender.captureTransaction(payload)) != nil ? .recovered : .failed
     }
 }

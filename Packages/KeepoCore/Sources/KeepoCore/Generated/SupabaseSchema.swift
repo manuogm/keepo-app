@@ -1111,30 +1111,36 @@ public enum PublicSchema {
   public struct OpsRateLimitsSelect: Codable, Hashable, Sendable {
     public let count: Int32
     public let functionName: String
+    public let subject: String
     public let windowStartedAt: String
     public enum CodingKeys: String, CodingKey {
       case count = "count"
       case functionName = "function_name"
+      case subject = "subject"
       case windowStartedAt = "window_started_at"
     }
   }
   public struct OpsRateLimitsInsert: Codable, Hashable, Sendable {
     public let count: Int32?
     public let functionName: String
+    public let subject: String?
     public let windowStartedAt: String?
     public enum CodingKeys: String, CodingKey {
       case count = "count"
       case functionName = "function_name"
+      case subject = "subject"
       case windowStartedAt = "window_started_at"
     }
   }
   public struct OpsRateLimitsUpdate: Codable, Hashable, Sendable {
     public let count: Int32?
     public let functionName: String?
+    public let subject: String?
     public let windowStartedAt: String?
     public enum CodingKeys: String, CodingKey {
       case count = "count"
       case functionName = "function_name"
+      case subject = "subject"
       case windowStartedAt = "window_started_at"
     }
   }

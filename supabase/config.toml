@@ -397,6 +397,14 @@ verify_jwt = false
 [functions.alert-operator]
 verify_jwt = false
 
+# notify-household is gated by an X-Notify-Household-Secret header, same
+# caller pattern as its two siblings above (ops_http_post via pg_net, never
+# a signed-in user). Missing this block left it on the CLI's verify_jwt =
+# true default, which fails the cron's secret-only request before it ever
+# reaches the function's own check (S-07).
+[functions.notify-household]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

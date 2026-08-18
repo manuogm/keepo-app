@@ -27,6 +27,14 @@ struct OutboxMigrationTests {
         return dbQueue
     }
 
+    /// A fresh suite per test, not `.standard` — `migrateIfNeeded` now
+    /// short-circuits once it has ever seen the legacy store empty (X-03,
+    /// to skip opening `OfflineStore`'s `ModelContainer` on every capture),
+    /// and `.standard` persists across test runs on the same simulator.
+    private func makeDefaults() throws -> UserDefaults {
+        try #require(UserDefaults(suiteName: "OutboxMigrationTests-\(UUID().uuidString)"))
+    }
+
     @Test("upgrade with three queued items while offline moves all three, exactly once")
     func migratesThreeQueuedItemsExactlyOnce() throws {
         let swiftDataContext = try makeSwiftDataContext()
@@ -43,7 +51,8 @@ struct OutboxMigrationTests {
         }
         try swiftDataContext.save()
 
-        OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue)
+        let defaults = try makeDefaults()
+        OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue, defaults: defaults)
 
         let migratedIds = try dbQueue.read { database in
             try OutboxItemRecord.fetchAll(database).map(\.id)
@@ -52,10 +61,11 @@ struct OutboxMigrationTests {
 
         let remainingLegacy = try swiftDataContext.fetch(FetchDescriptor<OutboxItem>())
         #expect(remainingLegacy.isEmpty)
+        #expect(OutboxMigration.isDone(in: defaults))
 
         // Idempotent: nothing left in SwiftData, so a second cold start's
         // migration pass is a no-op — no duplicate rows, no error.
-        OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue)
+        OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue, defaults: defaults)
         let countAfterSecondRun = try dbQueue.read { database in try OutboxItemRecord.fetchCount(database) }
         #expect(countAfterSecondRun == 3)
     }
@@ -64,10 +74,12 @@ struct OutboxMigrationTests {
     func emptyLegacyStoreIsNoop() throws {
         let swiftDataContext = try makeSwiftDataContext()
         let dbQueue = try makeDbQueue()
+        let defaults = try makeDefaults()
 
-        OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue)
+        OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue, defaults: defaults)
 
         let count = try dbQueue.read { database in try OutboxItemRecord.fetchCount(database) }
         #expect(count == 0)
+        #expect(OutboxMigration.isDone(in: defaults))
     }
 }

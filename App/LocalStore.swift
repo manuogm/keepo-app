@@ -96,8 +96,21 @@ public enum LocalSchemaV1 {
             table.column("updated_at", .text).notNull()
             table.column("sync_seq", .integer).notNull()
         }
+        try createTransactionIndexes(database)
+    }
+
+    private static func createTransactionIndexes(_ database: Database) throws {
         try database.create(index: "idx_transactions_account_id", on: "transactions", columns: ["account_id"])
         try database.create(index: "idx_transactions_owner_id", on: "transactions", columns: ["owner_id"])
+        // Mirrors the server's own transactions_external_id_idx (C-07) —
+        // without it, a re-fired automation that mints its id from
+        // CaptureIdentity.transactionId(forExternalId:) the same way twice
+        // writes two local rows before the server's 23505 ever comes back,
+        // leaving an orphaned duplicate no local write can clean up.
+        try database.create(
+            index: "idx_transactions_external_id", on: "transactions", columns: ["owner_id", "source", "external_id"],
+            options: .unique, condition: Column("external_id") != nil
+        )
     }
 
     private static func createBalanceAndCategoryTables(_ database: Database) throws {
@@ -336,6 +349,11 @@ public enum LocalStore {
         // column change — see `rebuildSyncableTables`'s own header comment
         // (`LocalStore+SchemaMigration.swift`) for why this is needed.
         migrator.registerMigration("v2_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild, re-run under a new name so a device that already
+        // completed v2 still picks up C-07's new partial unique index on
+        // transactions(owner_id, source, external_id) — GRDB never re-runs
+        // a migration name that already succeeded.
+        migrator.registerMigration("v3_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)

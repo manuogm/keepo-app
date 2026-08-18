@@ -210,7 +210,7 @@ struct HomeView: View {
 
     private func load() async {
         errorMessage = nil
-        guard let baseCurrency = session.profile?.baseCurrency else {
+        guard let baseCurrency = session.profile?.baseCurrency, let ownerId = session.profile?.id else {
             isLoading = false
             return
         }
@@ -233,7 +233,7 @@ struct HomeView: View {
                         database, moneyScope, from: fromString, through: todayString, now: today
                     ),
                     try LocalTableQueries.currencies(database),
-                    try LocalMoneyQueries.needsReview(database)
+                    try LocalMoneyQueries.needsReview(database, ownerId: ownerId.uuidString)
                 )
             }
             let (netWorthValue, previousMonthValue, seriesResult, currencies, reviewRows) = loaded
@@ -242,9 +242,7 @@ struct HomeView: View {
             if let row = currencies.first(where: { $0.code == baseCurrency }) {
                 baseCurrencyInfo = CurrencyInfo(code: row.code, minorUnit: Int(row.minorUnit))
             }
-            needsReviewItems = try reviewRows
-                .filter { $0.kind != "reconciliation_gap" }
-                .map { try LocalTransactionRow.needsReviewSelect(from: $0) }
+            needsReviewItems = try reviewRows.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
             needsReviewCurrencyMinorUnits = Dictionary(
                 uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) }
             )

@@ -1,6 +1,7 @@
 import Foundation
 import GRDB
 import KeepoCore
+import Network
 import Supabase
 
 // MARK: - The testable seam
@@ -36,6 +37,7 @@ public protocol OutboxSending: Sendable {
     /// (owner, card_identifier), same "last write wins" reasoning as rename/unmap.
     func mapCard(_ payload: MapCardPayload) async throws
     func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload) async throws -> Bool
+    func reviewCaptureTransaction(_ payload: ReviewCaptureTransactionPayload) async throws -> Bool
 }
 
 // MARK: - Outbox
@@ -90,6 +92,12 @@ public final class Outbox {
     let sender: OutboxSending
     private let encoder = JSONEncoder()
     let decoder = JSONDecoder()
+    // `nonisolated(unsafe)` — both types are documented safe to cancel from
+    // any thread, and `deinit` runs in a nonisolated context even on a
+    // `@MainActor` class, so it can't otherwise touch actor-isolated state.
+    nonisolated(unsafe) private let pathMonitor = NWPathMonitor()
+    private var isOnline = false
+    nonisolated(unsafe) private var retryTask: Task<Void, Never>?
 
     public init(dbQueue: DatabaseQueue, sender: OutboxSending) {
         self.dbQueue = dbQueue
@@ -97,9 +105,45 @@ public final class Outbox {
         Task { await refreshCounts() }
     }
 
+    deinit {
+        pathMonitor.cancel()
+        retryTask?.cancel()
+    }
+
     public func hasStalePending(threshold: TimeInterval) -> Bool {
         guard let oldestPendingAt else { return false }
         return Date().timeIntervalSince(oldestPendingAt) > threshold
+    }
+
+    /// C-10: every existing drain trigger (cold start, sign-in, foreground,
+    /// reconnect, manual banner tap) needs an app-lifecycle or connectivity
+    /// *event* to fire. A transient 5xx during an otherwise-online, otherwise
+    /// idle session left the write parked for however long the user happened
+    /// to keep the app foregrounded, with only `hasStalePending`'s 120s
+    /// banner as a symptom. Called once by `SessionStore` — not from `init`,
+    /// so the short-lived `Outbox` `CaptureIntent` constructs for a single
+    /// capture never starts a network monitor it has no use for.
+    ///
+    /// Backs off 30s → 5min, capped, resetting to the floor once the queue
+    /// actually drains — a lingering failure doesn't retry as eagerly as a
+    /// fresh one.
+    public func startRetryLoop() {
+        guard retryTask == nil else { return }
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor in self?.isOnline = path.status == .satisfied }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "app.keepo.outbox-retry-monitor"))
+        retryTask = Task { [weak self] in
+            var delay: Duration = .seconds(30)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: delay)
+                guard let self, !Task.isCancelled else { return }
+                if self.pendingCount > 0 && self.isOnline {
+                    await self.drainAll()
+                }
+                delay = self.pendingCount > 0 ? min(delay * 2, .seconds(300)) : .seconds(30)
+            }
+        }
     }
 
     /// A: every submit* here awaits only the local write-through before
@@ -275,7 +319,7 @@ public final class Outbox {
 
     private func drain(_ item: OutboxItemRecord) async {
         do {
-            try await replayWithRecovery(item)
+            _ = try await replay(item)
             try? await dbQueue.write { database in _ = try item.delete(database) }
         } catch {
             try? await dbQueue.write { database in
@@ -291,14 +335,12 @@ public final class Outbox {
     /// Returns applied/conflict — both mean "delivered," so `drain(_:)`
     /// dequeues either way. An unrecognized `kind` (should never happen;
     /// nothing removes cases from `OutboxKind`) is dropped rather than
-    /// retried forever against a decoder that can never succeed. Not
-    /// `private` — `Outbox+CaptureRecovery.swift`'s `replayWithRecovery`
-    /// calls this directly, same file-split precedent as `Outbox+Capture.swift`.
-    func replay(_ item: OutboxItemRecord) async throws -> Bool {
+    /// retried forever against a decoder that can never succeed.
+    private func replay(_ item: OutboxItemRecord) async throws -> Bool {
         guard let kind = OutboxKind(rawValue: item.kind) else { return true }
         switch kind {
         case .createTransaction, .createTransfer, .updateTransaction, .updateTransfer, .deleteTransaction,
-             .deleteTransfer, .captureTransaction, .confirmCaptureTransaction:
+             .deleteTransfer, .captureTransaction, .confirmCaptureTransaction, .reviewCapture:
             return try await replayTransaction(kind, data: item.payloadJSON)
         case .createAccount, .updateAccount, .setAccountBalance, .archiveAccount, .createCategory, .updateCategory:
             return try await replayAccountOrCategory(kind, data: item.payloadJSON)
@@ -329,6 +371,9 @@ public final class Outbox {
         case .confirmCaptureTransaction:
             let payload = try decoder.decode(ConfirmCaptureTransactionPayload.self, from: data)
             return try await sender.confirmCaptureTransaction(payload)
+        case .reviewCapture:
+            let payload = try decoder.decode(ReviewCaptureTransactionPayload.self, from: data)
+            return try await sender.reviewCaptureTransaction(payload)
         default:
             return true
         }

@@ -15,6 +15,18 @@ extension LiveOutboxSender {
         case .conflict: return false
         }
     }
+
+    public func reviewCaptureTransaction(_ payload: ReviewCaptureTransactionPayload) async throws -> Bool {
+        let result = try await CaptureRepository.reviewCapture(
+            client: client, id: payload.id, expectedVersion: payload.expectedVersion, accountId: payload.accountId,
+            categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
+            occurredAt: payload.occurredAt, merchantRaw: payload.merchantRaw, notes: payload.notes
+        )
+        switch result {
+        case .saved: return true
+        case .conflict: return false
+        }
+    }
 }
 
 extension Outbox {
@@ -34,6 +46,26 @@ extension Outbox {
                 expectedVersion: payload.expectedVersion
             ) {
                 try await self.sender.confirmCaptureTransaction(payload)
+            }
+        }
+    }
+
+    /// The single-write replacement for what used to be a
+    /// `submitUpdateTransaction` + `submitConfirmCaptureTransaction` pair —
+    /// see `ReviewCaptureTransactionPayload`'s own header for why sending
+    /// them separately was a real bug (a race, and an offline data-loss
+    /// hazard), not just a style preference. One outbox item, one queued
+    /// write, exactly like every other edit here.
+    @discardableResult
+    public func submitReviewCaptureTransaction(
+        _ payload: ReviewCaptureTransactionPayload
+    ) async -> Task<OutboxSubmitResult, Never> {
+        await applyLocally { try OutboxLocalWrite.reviewCaptureTransaction(payload, in: $0) }
+        return Task {
+            await self.attempt(
+                id: payload.id, kind: .reviewCapture, payload: payload, expectedVersion: payload.expectedVersion
+            ) {
+                try await self.sender.reviewCaptureTransaction(payload)
             }
         }
     }

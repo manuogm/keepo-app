@@ -62,4 +62,42 @@ struct CaptureIdentityTests {
         #expect(id == id.lowercased())
         #expect(id.allSatisfy { $0.isHexDigit })
     }
+
+    // MARK: - transactionId(forExternalId:) — C-07
+
+    @Test("is deterministic — the same externalId always mints the same transaction id")
+    func transactionIdIsDeterministic() {
+        let a = CaptureIdentity.transactionId(forExternalId: "abc123")
+        let b = CaptureIdentity.transactionId(forExternalId: "abc123")
+        #expect(a == b)
+    }
+
+    @Test("a re-fired automation (same externalId) mints the same transaction id, not a random one")
+    func transactionIdMatchesARefiredAutomation() {
+        let date = Date(timeIntervalSinceReferenceDate: 1_000_000)
+        let firstExternalId = CaptureIdentity.externalId(card: "card-1", amount: 45000, merchant: "BLUE BOTTLE", at: date)
+        let secondExternalId = CaptureIdentity.externalId(
+            card: "card-1", amount: 45000, merchant: "BLUE BOTTLE", at: date.addingTimeInterval(5)
+        )
+        #expect(firstExternalId == secondExternalId)
+        #expect(
+            CaptureIdentity.transactionId(forExternalId: firstExternalId)
+                == CaptureIdentity.transactionId(forExternalId: secondExternalId)
+        )
+    }
+
+    @Test("a different externalId never collides")
+    func transactionIdDiffersForDifferentExternalId() {
+        let a = CaptureIdentity.transactionId(forExternalId: "abc123")
+        let b = CaptureIdentity.transactionId(forExternalId: "abc124")
+        #expect(a != b)
+    }
+
+    @Test("sets the RFC 4122 version 5 and variant bits")
+    func transactionIdHasV5VersionAndVariantBits() {
+        let id = CaptureIdentity.transactionId(forExternalId: "abc123")
+        let bytes = id.uuid
+        #expect((bytes.6 & 0xF0) == 0x50)
+        #expect((bytes.8 & 0xC0) == 0x80)
+    }
 }

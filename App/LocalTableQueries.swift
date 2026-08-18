@@ -31,9 +31,16 @@ extension PublicSchema.ProfilesSelect: @retroactive FetchableRecord {}
 extension PublicSchema.CardMappingsSelect: @retroactive FetchableRecord {}
 
 enum LocalTableQueries {
-    static func categories(_ database: Database) throws -> [PublicSchema.CategoriesSelect] {
+    /// `ownerId`-scoped — `categories_select`'s own RLS is `owner_id =
+    /// auth.uid()` with no household clause (categories are never shared),
+    /// so this matches the server's own visibility exactly rather than
+    /// relying only on the local mirror never holding a stale prior
+    /// identity's rows.
+    static func categories(_ database: Database, ownerId: String) throws -> [PublicSchema.CategoriesSelect] {
         try PublicSchema.CategoriesSelect.fetchAll(
-            database, sql: "SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY kind, name"
+            database,
+            sql: "SELECT * FROM categories WHERE owner_id = ? AND deleted_at IS NULL ORDER BY kind, name",
+            arguments: [ownerId]
         )
     }
 

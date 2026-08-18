@@ -49,9 +49,15 @@ struct CaptureIntent: AppIntent {
             let client = makeSupabaseClient(
                 config: config, localStorage: config.isLocal ? nil : KeychainSessionStorage()
             )
-            let swiftDataContext = ModelContext(try OfflineStore.makeContainer())
             let dbQueue = try LocalStore.makeQueue()
-            await OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue)
+            // X-03: skip opening `OfflineStore`'s `ModelContainer` at all
+            // once the legacy SwiftData outbox is confirmed drained — that
+            // container, not this check, was the real cost of running this
+            // migration on every single capture.
+            if !OutboxMigration.isDone() {
+                let swiftDataContext = ModelContext(try OfflineStore.makeContainer())
+                await OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue)
+            }
             let outbox = await Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
 
             guard let parsedAmount = AmountParser.parseFormattedCurrency(amount) else {
@@ -71,12 +77,17 @@ struct CaptureIntent: AppIntent {
             // shows up on the transaction itself.
             let notes = "Captured automatically — \(merchant)"
             let payload = CaptureTransactionPayload(
-                id: UUID(), cardIdentifier: card, merchantRaw: merchant, merchantNormalized: merchantNormalized,
-                amountE4: parsedAmount, occurredAt: occurredAt, externalId: externalId, notes: notes
+                id: CaptureIdentity.transactionId(forExternalId: externalId), cardIdentifier: card,
+                merchantRaw: merchant, merchantNormalized: merchantNormalized, amountE4: parsedAmount,
+                occurredAt: occurredAt, externalId: externalId, notes: notes
             )
 
             let ownerId = try? await client.auth.session.user.id
             let result = await outbox.submitCaptureTransaction(payload, ownerId: ownerId)
+            // Wake a foregrounded RootView (C-09) — the local write always
+            // lands regardless of `result` (Phase 12), so this fires
+            // unconditionally rather than only on the network-backed cases.
+            CaptureNotify.post()
             await notify(for: result, transactionId: payload.id, merchant: merchant, amountE4: parsedAmount)
         } catch {
             await notify(title: "Capture failed", body: UserFacingError.describe(error))
@@ -126,9 +137,16 @@ struct CaptureIntent: AppIntent {
     /// Capture confirmations are a "functional" notification (spec:
     /// automatic payment capture) — suppressed only at the "No
     /// Notifications" level, unlike the monthly balance reminder which
-    /// needs the "Full Experience" level specifically.
+    /// needs the "Full Experience" level specifically. Also gates on the
+    /// live system `authorizationStatus` (C-06) rather than trusting the
+    /// stored preference alone — `notificationLevel` defaults to `.full`
+    /// on a fresh install regardless of whether iOS has ever actually been
+    /// asked, and `UNUserNotificationCenter.add` no-ops silently rather
+    /// than erroring when it hasn't.
     private func notify(title: String, body: String, transactionId: UUID? = nil) async {
         guard AppSettings.notificationLevel != .none else { return }
+        guard await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .authorized
+        else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

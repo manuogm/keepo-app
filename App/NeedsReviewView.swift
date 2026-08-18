@@ -39,12 +39,12 @@ struct NeedsReviewView: View {
 
             if isLoading {
                 ProgressView()
-            } else if displayItems.isEmpty {
+            } else if items.isEmpty {
                 Text("Nothing needs review")
                     .foregroundStyle(Color.secondary)
             } else {
                 List {
-                    ForEach(displayItems, id: \.itemId) { item in
+                    ForEach(items, id: \.itemId) { item in
                         row(item)
                     }
                 }
@@ -84,10 +84,6 @@ struct NeedsReviewView: View {
                 session.refresh.bump()
             }
         }
-    }
-
-    private var displayItems: [PublicSchema.NeedsReviewSelect] {
-        items.filter { $0.kind != "reconciliation_gap" }
     }
 
     @ViewBuilder
@@ -130,7 +126,11 @@ struct NeedsReviewView: View {
                 Task { await resolve(item) }
             }
             .tint(Color.primary)
-        } else if item.kind == "pending_capture" {
+        } else if item.kind == "pending_capture", item.accountId != nil {
+            // Matches TransactionsListView's own guard — an unmapped
+            // capture still routes through the full review form, which
+            // requires the explicit account choice a blind swipe can't
+            // provide (C-05).
             Button("Confirm") {
                 Task { await confirmCapture(item) }
             }
@@ -168,10 +168,14 @@ struct NeedsReviewView: View {
 
     private func load() async {
         actionErrorMessage = nil
+        guard let ownerId = session.profile?.id else {
+            isLoading = false
+            return
+        }
         do {
             let loaded = try await session.dbQueue.read { database in
                 (
-                    try LocalMoneyQueries.needsReview(database),
+                    try LocalMoneyQueries.needsReview(database, ownerId: ownerId.uuidString),
                     try LocalTableQueries.currencies(database)
                 )
             }

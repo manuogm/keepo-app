@@ -1,14 +1,13 @@
 import Foundation
 import Supabase
 
-/// One inbox, one query — `needs_review` is a view with a stable column
-/// contract that later phases (12/14/18/19) each extend with their own
-/// `UNION ALL` branch, never a schema change this repository has to track.
+/// `needs_review` the view still backs conflict resolution — every local
+/// read of the inbox itself goes through `LocalMoneyQueries.needsReview`
+/// instead (X-01: RootView's tab badge and HomeView's bell dot used to
+/// compute independently, one from this network view and one from the
+/// local mirror, and could disagree — especially offline, where the
+/// network read failed silently to an empty list. One source now.)
 public enum NeedsReviewRepository {
-    public static func fetchAll(client: SupabaseClient) async throws -> [PublicSchema.NeedsReviewSelect] {
-        try await client.from("needs_review").select().order("occurred_at", ascending: false).execute().value
-    }
-
     /// Idempotent — resolving an already-resolved conflict is a no-op on
     /// the DB side, not an error, so a client retry after a dropped
     /// connection can't fail on the second attempt.

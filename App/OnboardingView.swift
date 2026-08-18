@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import UserNotifications
 
 /// Base currency → first account → opening balance → the Wallet-automation
 /// walkthrough, per keepo-v1-feature-spec.md §Onboarding.
@@ -168,9 +169,29 @@ struct OnboardingView: View {
             }
             .frame(maxHeight: 320)
 
-            Button("Done") { onComplete() }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.primary)
+            Button("Done") {
+                Task {
+                    await requestNotificationAuthorizationIfNeeded()
+                    onComplete()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.primary)
         }
+    }
+
+    /// The one point in the app that both explains Wallet automation *and*
+    /// runs unconditionally for every new sign-in (C-06) — unlike
+    /// `NotificationSettingsView`'s deliberate per-level ask, this is a
+    /// single one-time request so a fresh install's default `.full`
+    /// preference is backed by an iOS permission that was actually
+    /// requested, not just assumed. A user who already answered this
+    /// system dialog (any status other than `.notDetermined`) gets no
+    /// second prompt — `requestAuthorization` would just silently replay
+    /// the existing answer.
+    private func requestNotificationAuthorizationIfNeeded() async {
+        let center = UNUserNotificationCenter.current()
+        guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
+        _ = try? await center.requestAuthorization(options: [.alert, .sound])
     }
 }

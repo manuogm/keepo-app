@@ -47,6 +47,12 @@ enum LocalTransactionRow {
     /// account's own archived state, not copied onto every transaction, so
     /// unarchiving makes them reappear with no backfill needed. The FK
     /// itself is untouched either way.
+    ///
+    /// `LEFT JOIN` (not `INNER JOIN`) on `accounts`/`currencies`, with the
+    /// same escape-hatch `WHERE` clause `fetchOne` uses (C-08) — an
+    /// unmapped capture (`account_id`/`currency` both null) must still show
+    /// up here with its Pending badge, per spec step B9, instead of only
+    /// existing in Needs Review.
     static func fetchFiltered(
         _ database: Database, filter: TransactionFilter, baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
@@ -58,13 +64,14 @@ enum LocalTransactionRow {
                CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                     WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
         FROM transactions t
-        JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN accounts a ON a.id = t.account_id
             AND a.deleted_at IS NULL AND a.archived_at IS NULL AND \(visibleAccountClause)
         LEFT JOIN categories c ON c.id = t.category_id
-        JOIN currencies cur ON cur.code = t.currency
+        LEFT JOIN currencies cur ON cur.code = t.currency
         WHERE t.deleted_at IS NULL
+          AND (t.account_id IS NULL AND t.owner_id = ? OR a.id IS NOT NULL)
         """
-        var arguments: [DatabaseValueConvertible] = [ownerId, ownerId]
+        var arguments: [DatabaseValueConvertible] = [ownerId, ownerId, ownerId]
         if let accountId = filter.accountId {
             sql += " AND t.account_id = ?"
             arguments.append(accountId.uuidString)
@@ -163,11 +170,11 @@ enum LocalTransactionRow {
     }
 
     /// `account_id`/`account_name`/`currency`/`minor_unit` are read as
-    /// optional throughout — the only rows this ever sees with any of them
-    /// null are unresolved pending captures (`fetchFiltered`'s `INNER JOIN`
-    /// already excludes them from the main list; `fetchOne`'s `LEFT JOIN`
-    /// is what lets one reach here at all). `has_missing_rate` stays scoped
-    /// to its original meaning — "currency present but no FX rate for it"
+    /// optional throughout — the only rows any of these queries ever see
+    /// with any of them null are unresolved pending captures, now visible
+    /// via `fetchFiltered`'s and `fetchOne`'s matching `LEFT JOIN`s.
+    /// `has_missing_rate` stays scoped to its original meaning — "currency
+    /// present but no FX rate for it"
     /// — not "no currency at all"; both cases already render the amount as
     /// `—` via `amount_base_e4` being nil either way (money rule 5).
     private static func build(
