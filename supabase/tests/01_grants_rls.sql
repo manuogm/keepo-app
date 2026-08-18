@@ -7,7 +7,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(7);
+select plan(9);
 
 -- 1. RLS is enabled on every table in public. A table created without
 -- `enable row level security` is a silent full-table leak to any role that
@@ -97,6 +97,44 @@ select is(
       and privilege_type in ('INSERT', 'UPDATE')),
   0::bigint,
   'card_mappings and merchant_category_map have no direct INSERT/UPDATE grant to authenticated'
+);
+
+-- 8. Every view in public runs as the invoker, not the definer (Supabase
+-- Advisor ERROR 0010). A view's default mode runs as whoever created it —
+-- the database owner, who is exempt from RLS — so a view missing this
+-- clause hands every row in its underlying tables to anyone with SELECT on
+-- the view, regardless of who they are. Caught accounts_with_balances
+-- losing this clause in a DROP+CREATE rewrite (CREATE OR REPLACE VIEW
+-- cannot remove a column from the middle of the list, which forced the
+-- drop); confirmed locally it was not yet exploitable only by the
+-- accident of joining exclusively through other invoker views, not by any
+-- property of its own grant.
+select is(
+  (select count(*) from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'v'
+      and not coalesce(c.reloptions::text like '%security_invoker=true%', false)),
+  0::bigint,
+  'every view in public runs as the invoker, not the definer'
+);
+
+-- 9. No function in public is executable by PUBLIC (Supabase Advisor WARN
+-- 0028/0029). Postgres grants EXECUTE to PUBLIC on every new function by
+-- default; the dangerous state is a function nobody ever ran `revoke`
+-- against, which leaves proacl NULL (meaning "defaults apply") rather
+-- than an empty, explicit ACL — so this checks both NULL and an explicit
+-- PUBLIC ('=') grantee entry. Caught fork_one_account (a SECURITY DEFINER
+-- household-forking helper with no auth check of its own, confirmed
+-- callable and exploitable by an anonymous caller against an arbitrary
+-- account id) and 24 other functions that had a `grant execute ... to
+-- postgres` line without the `revoke` it silently assumed.
+select is(
+  (select count(*) from pg_proc p
+    where p.pronamespace = 'public'::regnamespace
+      and (p.proacl is null
+           or exists (select 1 from unnest(p.proacl) a where a::text like '=%'))),
+  0::bigint,
+  'no function in public is executable by PUBLIC'
 );
 
 select * from finish();
