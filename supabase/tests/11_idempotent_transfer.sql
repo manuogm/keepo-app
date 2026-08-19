@@ -12,10 +12,10 @@ select plan(5);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a2000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'From', 'EUR', 1000);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a2000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'ledger', 'checking', 'To', 'EUR', 0);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a2000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'regular', 'From', 'EUR', 1000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a2000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'regular', 'To', 'EUR', 0);
 
 -- 1. Omitting the id params still works exactly as before (backward
 -- compatible — every existing online caller never passes them).

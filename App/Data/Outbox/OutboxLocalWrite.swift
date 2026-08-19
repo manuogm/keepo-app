@@ -193,7 +193,7 @@ enum OutboxLocalWrite {
             [
                 "id": .string(payload.id.uuidString), "owner_id": .string(payload.ownerId.uuidString),
                 "created_by": .string(payload.ownerId.uuidString), "kind": .string(payload.kind.rawValue),
-                "subtype": .string(payload.subtype.rawValue), "name": .string(payload.name),
+                "name": .string(payload.name),
                 "currency": .string(payload.currency), "opening_balance_e4": .integer(Int(payload.openingBalanceE4)),
                 "opening_balance_at": .string(today), "include_in_total": .bool(true),
                 "icon": .string(payload.icon), "color": .string(payload.color),
@@ -202,16 +202,6 @@ enum OutboxLocalWrite {
             ],
             table: "accounts", in: database
         )
-        guard payload.kind == .valuation else { return }
-        try SyncApply.upsertRow(
-            [
-                "id": .string(UUID().uuidString), "account_id": .string(payload.id.uuidString),
-                "currency": .string(payload.currency), "as_of": .string(today),
-                "value_e4": .integer(Int(payload.openingBalanceE4)), "created_by": .string(payload.ownerId.uuidString),
-                "created_at": .string(now), "sync_seq": .integer(0)
-            ],
-            table: "balance_snapshots", in: database
-        )
     }
 
     static func updateAccount(_ payload: UpdateAccountPayload, in database: Database) throws {
@@ -219,7 +209,6 @@ enum OutboxLocalWrite {
         try SyncApply.upsertRow(
             [
                 "id": .string(payload.id.uuidString), "name": .string(payload.name),
-                "subtype": .string(payload.subtype.rawValue),
                 "opening_balance_e4": .integer(Int(payload.openingBalanceE4)),
                 "include_in_total": .bool(payload.includeInTotal),
                 "icon": .string(payload.icon), "color": .string(payload.color),
@@ -241,14 +230,13 @@ enum OutboxLocalWrite {
         )
     }
 
-    /// Mirrors `set_account_balance`'s own branch: a ledger account gets an
-    /// adjustment transaction for the gap between today's computed balance
-    /// and the new one (never a stored balance — money rule "never store a
-    /// balance", `reconcile_ledger_account`'s own reasoning, reused here); a
-    /// valuation account gets a new snapshot instead, no transaction at all.
+    /// Mirrors `set_account_balance`'s own single path now: every account
+    /// kind gets an adjustment transaction for the gap between today's
+    /// computed balance and the new one (never a stored balance — money
+    /// rule "never store a balance").
     static func setAccountBalance(_ payload: SetAccountBalancePayload, in database: Database) throws {
         guard let account = try Row.fetchOne(
-            database, sql: "SELECT kind, currency, owner_id FROM accounts WHERE id = ?",
+            database, sql: "SELECT currency, owner_id FROM accounts WHERE id = ?",
             arguments: [payload.accountId.uuidString]
         ) else { return }
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
@@ -256,33 +244,21 @@ enum OutboxLocalWrite {
         let currency: String = account["currency"]
         let ownerId: String = account["owner_id"]
 
-        if (account["kind"] as String) == "ledger" {
-            let current = try LocalMoneyQueries.accountBalance(
-                database, accountId: payload.accountId.uuidString, asOf: today, now: Date()
-            ) ?? 0
-            let delta = payload.newBalanceE4 - current
-            guard delta != 0 else { return }
-            try SyncApply.upsertRow(
-                [
-                    "id": .string(payload.id.uuidString), "owner_id": .string(ownerId), "created_by": .string(ownerId),
-                    "account_id": .string(payload.accountId.uuidString), "category_id": .null,
-                    "amount_e4": .integer(Int(delta)), "currency": .string(currency), "occurred_at": .string(now),
-                    "source": .string("adjustment"), "status": .string("confirmed"), "version": .integer(1),
-                    "created_at": .string(now), "updated_at": .string(now), "sync_seq": .integer(0)
-                ],
-                table: "transactions", in: database
-            )
-        } else {
-            try SyncApply.upsertRow(
-                [
-                    "id": .string(UUID().uuidString), "account_id": .string(payload.accountId.uuidString),
-                    "currency": .string(currency), "as_of": .string(today),
-                    "value_e4": .integer(Int(payload.newBalanceE4)), "created_by": .string(ownerId),
-                    "created_at": .string(now), "sync_seq": .integer(0)
-                ],
-                table: "balance_snapshots", in: database
-            )
-        }
+        let current = try LocalMoneyQueries.accountBalance(
+            database, accountId: payload.accountId.uuidString, asOf: today, now: Date()
+        ) ?? 0
+        let delta = payload.newBalanceE4 - current
+        guard delta != 0 else { return }
+        try SyncApply.upsertRow(
+            [
+                "id": .string(payload.id.uuidString), "owner_id": .string(ownerId), "created_by": .string(ownerId),
+                "account_id": .string(payload.accountId.uuidString), "category_id": .null,
+                "amount_e4": .integer(Int(delta)), "currency": .string(currency), "occurred_at": .string(now),
+                "source": .string("adjustment"), "status": .string("confirmed"), "version": .integer(1),
+                "created_at": .string(now), "updated_at": .string(now), "sync_seq": .integer(0)
+            ],
+            table: "transactions", in: database
+        )
     }
 
     static func createCategory(_ payload: CreateCategoryPayload, in database: Database) throws {

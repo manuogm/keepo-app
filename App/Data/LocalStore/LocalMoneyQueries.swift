@@ -43,65 +43,28 @@ import KeepoCore
 enum LocalMoneyQueries {
     // MARK: - account_balance_on / account_balances
 
-    /// Port of `account_balance_on(p_account_id, p_date)`. `asOf` is a
+    /// Port of `account_balance_on(p_account_id, p_date)` — one formula for
+    /// every account kind now: opening_balance_e4 + SUM(amount_e4) of
+    /// confirmed, non-deleted transactions up to `asOf`. `asOf` is a
     /// `YYYY-MM-DD` string; `now` bounds a same-day `asOf` to "so far today"
     /// exactly like Postgres's `least(p_date + 1 day, now())`.
     static func accountBalance(_ database: Database, accountId: String, asOf: String, now: Date) throws -> Int64? {
         guard let account = try Row.fetchOne(
-            database, sql: "SELECT kind, currency, opening_balance_e4 FROM accounts WHERE id = ?",
+            database, sql: "SELECT opening_balance_e4 FROM accounts WHERE id = ?",
             arguments: [accountId]
         ) else { return nil }
 
         let boundary = occurredAtBoundary(asOf: asOf, now: now)
-        let kind: String = account["kind"]
-
-        if kind == "ledger" {
-            let openingBalance: Int64 = account["opening_balance_e4"]
-            let delta: Int64 = try Int64.fetchOne(
-                database,
-                sql: """
-                SELECT COALESCE(SUM(amount_e4), 0) FROM transactions
-                WHERE account_id = ? AND deleted_at IS NULL AND status = 'confirmed' AND occurred_at <= ?
-                """,
-                arguments: [accountId, boundary]
-            ) ?? 0
-            return openingBalance + delta
-        }
-
-        // Prefer the latest snapshot at-or-before asOf; if none exists, fall
-        // back to the account's earliest snapshot overall rather than
-        // returning nil for the account's entire pre-history — mirrors
-        // account_balance_on's own fallback (20260818100000), which keeps a
-        // ledger account computable via opening_balance_e4 in the same
-        // situation. Still nil if the account has no snapshot at all.
-        guard let snapshot = try Row.fetchOne(
-            database,
-            sql: """
-            SELECT id, value_e4, created_at FROM balance_snapshots
-            WHERE account_id = ?
-            ORDER BY
-                CASE WHEN as_of <= ? THEN 0 ELSE 1 END,
-                CASE WHEN as_of <= ? THEN as_of END DESC,
-                CASE WHEN as_of <= ? THEN created_at END DESC,
-                CASE WHEN as_of > ? THEN as_of END ASC,
-                CASE WHEN as_of > ? THEN created_at END ASC
-            LIMIT 1
-            """,
-            arguments: [accountId, asOf, asOf, asOf, asOf, asOf]
-        ) else { return nil }
-
-        let snapshotValue: Int64 = snapshot["value_e4"]
-        let snapshotCreatedAt: String = snapshot["created_at"]
+        let openingBalance: Int64 = account["opening_balance_e4"]
         let delta: Int64 = try Int64.fetchOne(
             database,
             sql: """
             SELECT COALESCE(SUM(amount_e4), 0) FROM transactions
-            WHERE account_id = ? AND deleted_at IS NULL AND status = 'confirmed'
-              AND occurred_at <= ? AND occurred_at > ?
+            WHERE account_id = ? AND deleted_at IS NULL AND status = 'confirmed' AND occurred_at <= ?
             """,
-            arguments: [accountId, boundary, snapshotCreatedAt]
+            arguments: [accountId, boundary]
         ) ?? 0
-        return snapshotValue + delta
+        return openingBalance + delta
     }
 
     /// One native `(accountId, currency, balanceE4)` row per non-deleted
@@ -260,8 +223,8 @@ enum LocalMoneyQueries {
 struct NativeAccountBalance {
     let accountId: String
     let currency: String
-    /// `nil` propagates money rule 5 — a valuation account with no snapshot
-    /// yet has no computable balance, never a `0`.
+    /// `nil` propagates money rule 5 — an account that can't be found has
+    /// no computable balance, never a `0`.
     let balanceE4: Int64?
 }
 

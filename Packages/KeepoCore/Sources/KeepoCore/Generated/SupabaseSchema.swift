@@ -5,20 +5,13 @@ public enum GraphqlPublicSchema {
 }
 public enum PublicSchema {
   public enum AccountKind: String, Codable, Hashable, Sendable {
-    case ledger = "ledger"
-    case valuation = "valuation"
+    case regular = "regular"
+    case investment = "investment"
   }
   public enum AccountScope: String, Codable, Hashable, Sendable {
     case me = "me"
     case household = "household"
     case total = "total"
-  }
-  public enum AccountSubtype: String, Codable, Hashable, Sendable {
-    case checking = "checking"
-    case cash = "cash"
-    case creditCard = "credit_card"
-    case loan = "loan"
-    case investment = "investment"
   }
   public enum CategoryKind: String, Codable, Hashable, Sendable {
     case expense = "expense"
@@ -79,7 +72,6 @@ public enum PublicSchema {
     public let openingBalanceAt: String
     public let openingBalanceE4: Int64
     public let ownerId: UUID
-    public let subtype: AccountSubtype
     public let syncSeq: Int64
     public let updatedAt: String
     public let version: Int32
@@ -98,7 +90,6 @@ public enum PublicSchema {
       case openingBalanceAt = "opening_balance_at"
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
-      case subtype = "subtype"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
@@ -119,7 +110,6 @@ public enum PublicSchema {
     public let openingBalanceAt: String?
     public let openingBalanceE4: Int64?
     public let ownerId: UUID
-    public let subtype: AccountSubtype
     public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
@@ -138,7 +128,6 @@ public enum PublicSchema {
       case openingBalanceAt = "opening_balance_at"
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
-      case subtype = "subtype"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
@@ -159,7 +148,6 @@ public enum PublicSchema {
     public let openingBalanceAt: String?
     public let openingBalanceE4: Int64?
     public let ownerId: UUID?
-    public let subtype: AccountSubtype?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
@@ -178,76 +166,9 @@ public enum PublicSchema {
       case openingBalanceAt = "opening_balance_at"
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
-      case subtype = "subtype"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
-    }
-  }
-  public struct BalanceSnapshotsSelect: Codable, Hashable, Sendable {
-    public let accountId: UUID
-    public let asOf: String
-    public let createdAt: String
-    public let createdBy: UUID
-    public let currency: String
-    public let deletedAt: String?
-    public let id: UUID
-    public let syncSeq: Int64
-    public let valueE4: Int64
-    public enum CodingKeys: String, CodingKey {
-      case accountId = "account_id"
-      case asOf = "as_of"
-      case createdAt = "created_at"
-      case createdBy = "created_by"
-      case currency = "currency"
-      case deletedAt = "deleted_at"
-      case id = "id"
-      case syncSeq = "sync_seq"
-      case valueE4 = "value_e4"
-    }
-  }
-  public struct BalanceSnapshotsInsert: Codable, Hashable, Sendable {
-    public let accountId: UUID
-    public let asOf: String
-    public let createdAt: String?
-    public let createdBy: UUID
-    public let currency: String
-    public let deletedAt: String?
-    public let id: UUID?
-    public let syncSeq: Int64?
-    public let valueE4: Int64
-    public enum CodingKeys: String, CodingKey {
-      case accountId = "account_id"
-      case asOf = "as_of"
-      case createdAt = "created_at"
-      case createdBy = "created_by"
-      case currency = "currency"
-      case deletedAt = "deleted_at"
-      case id = "id"
-      case syncSeq = "sync_seq"
-      case valueE4 = "value_e4"
-    }
-  }
-  public struct BalanceSnapshotsUpdate: Codable, Hashable, Sendable {
-    public let accountId: UUID?
-    public let asOf: String?
-    public let createdAt: String?
-    public let createdBy: UUID?
-    public let currency: String?
-    public let deletedAt: String?
-    public let id: UUID?
-    public let syncSeq: Int64?
-    public let valueE4: Int64?
-    public enum CodingKeys: String, CodingKey {
-      case accountId = "account_id"
-      case asOf = "as_of"
-      case createdAt = "created_at"
-      case createdBy = "created_by"
-      case currency = "currency"
-      case deletedAt = "deleted_at"
-      case id = "id"
-      case syncSeq = "sync_seq"
-      case valueE4 = "value_e4"
     }
   }
   public struct BudgetsSelect: Codable, Hashable, Sendable {
@@ -1404,7 +1325,6 @@ public enum PublicSchema {
   }
   public struct TransactionsSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
-    public let accountKind: AccountKind?
     public let amountE4: Int64
     public let cardIdentifier: String?
     public let categoryId: UUID?
@@ -1429,7 +1349,6 @@ public enum PublicSchema {
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case accountKind = "account_kind"
       case amountE4 = "amount_e4"
       case cardIdentifier = "card_identifier"
       case categoryId = "category_id"
@@ -1456,7 +1375,6 @@ public enum PublicSchema {
   }
   public struct TransactionsInsert: Codable, Hashable, Sendable {
     public let accountId: UUID?
-    public let accountKind: AccountKind?
     public let amountE4: Int64
     public let cardIdentifier: String?
     public let categoryId: UUID?
@@ -1481,7 +1399,6 @@ public enum PublicSchema {
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case accountKind = "account_kind"
       case amountE4 = "amount_e4"
       case cardIdentifier = "card_identifier"
       case categoryId = "category_id"
@@ -1508,7 +1425,6 @@ public enum PublicSchema {
   }
   public struct TransactionsUpdate: Codable, Hashable, Sendable {
     public let accountId: UUID?
-    public let accountKind: AccountKind?
     public let amountE4: Int64?
     public let cardIdentifier: String?
     public let categoryId: UUID?
@@ -1533,7 +1449,6 @@ public enum PublicSchema {
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
-      case accountKind = "account_kind"
       case amountE4 = "amount_e4"
       case cardIdentifier = "card_identifier"
       case categoryId = "category_id"
@@ -1604,7 +1519,6 @@ public enum PublicSchema {
     public let kind: AccountKind?
     public let minorUnit: Int16?
     public let name: String?
-    public let subtype: AccountSubtype?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case accountId = "account_id"
@@ -1622,7 +1536,6 @@ public enum PublicSchema {
       case kind = "kind"
       case minorUnit = "minor_unit"
       case name = "name"
-      case subtype = "subtype"
       case version = "version"
     }
   }

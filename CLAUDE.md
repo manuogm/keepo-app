@@ -26,7 +26,7 @@ Before starting work on a new version, **read every file in `version-logs/`** �
 - `supabase functions deploy <name>`
 
 ## Money rules (non-negotiable)
-1. `amount` is **signed** — negative outflow, positive inflow. Two account kinds, two balance rules: `ledger` accounts (checking, cash, credit card, loan) take income/expense/transfer and balance is `SUM(amount)`; `valuation` accounts (investment) take transfers only and balance is the latest valuation snapshot plus `SUM(transfers dated after it)`. Never re-sign in application code, and never let a valuation change post as income or expense.
+1. `amount` is **signed** — negative outflow, positive inflow. Every account behaves identically: `regular` and `investment` are the only two kinds, both take income/expense/transfer, and balance is `opening_balance + SUM(amount)` for both — there is no second balance formula. `kind` is purely presentational (drives the "Investment" badge only); never branch behavior on it. Never re-sign in application code.
 2. `numeric(20,4)`, never `(14,2)` — JPY has 0 minor digits, and FX conversion intermediates need the extra headroom even though v1's supported currencies (the ECB/Frankfurter set) are all 2-decimal. Round only for display, from `currencies.minor_unit`.
 3. **All money arithmetic in SQL**, never Swift. `supabase-swift` should decode `numeric` columns as `String`/`Decimal`, never `Double` — and never sum decoded amounts client-side.
 4. Postgres **enums, not `text` + CHECK** — a CHECK generates as a plain string in codegen, an enum as a proper type.

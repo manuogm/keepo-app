@@ -30,8 +30,8 @@ select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111
 
 -- 1. Before any household exists, B genuinely cannot see A's account
 -- (plain cross-domain RLS, not yet about sync_seq at all).
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('e0000000-0000-0000-0000-00000000e000', auth.uid(), auth.uid(), 'ledger', 'checking', 'Presolo', 'EUR', 0);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('e0000000-0000-0000-0000-00000000e000', auth.uid(), auth.uid(), 'regular', 'Presolo', 'EUR', 0);
 
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
@@ -68,8 +68,8 @@ select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111
 
 -- 2. A fresh insert is stamped with a positive sync_seq, not the column
 -- default of 0.
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('e0000000-0000-0000-0000-00000000e001', auth.uid(), auth.uid(), 'ledger', 'checking', 'Sync A1', 'EUR', 0);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('e0000000-0000-0000-0000-00000000e001', auth.uid(), auth.uid(), 'regular', 'Sync A1', 'EUR', 0);
 
 select ok(
   (select sync_seq from accounts where id = 'e0000000-0000-0000-0000-00000000e001') > 0,
@@ -77,8 +77,8 @@ select ok(
 );
 
 -- 3. Two writes to the SAME domain get strictly increasing tickets.
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('e0000000-0000-0000-0000-00000000e002', auth.uid(), auth.uid(), 'ledger', 'cash', 'Sync A2', 'EUR', 0);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('e0000000-0000-0000-0000-00000000e002', auth.uid(), auth.uid(), 'regular', 'Sync A2', 'EUR', 0);
 
 select ok(
   (select sync_seq from accounts where id = 'e0000000-0000-0000-0000-00000000e002')

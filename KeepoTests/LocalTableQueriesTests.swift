@@ -82,10 +82,10 @@ struct LocalTableQueriesTests {
         try await dbQueue.write { database in
             try database.execute(
                 sql: """
-                INSERT INTO accounts (id, owner_id, created_by, kind, subtype, name, currency,
+                INSERT INTO accounts (id, owner_id, created_by, kind, name, currency,
                     opening_balance_e4, opening_balance_at, include_in_total, icon, color,
                     version, created_at, updated_at, sync_seq)
-                VALUES (?, ?, ?, 'ledger', 'checking', 'Checking', 'EUR', 1000000, '2026-01-01', 1, 'banknote',
+                VALUES (?, ?, ?, 'regular', 'Checking', 'EUR', 1000000, '2026-01-01', 1, 'banknote',
                     '#8E8E93', 1, '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
                 """,
                 arguments: [accountId, ownerId, ownerId]
@@ -95,8 +95,7 @@ struct LocalTableQueriesTests {
         let account = try await dbQueue.read { database in try LocalTableQueries.account(database, id: accountId) }
 
         #expect(account?.name == "Checking")
-        #expect(account?.kind == .ledger)
-        #expect(account?.subtype == .checking)
+        #expect(account?.kind == .regular)
         #expect(account?.currency == "EUR")
         #expect(account?.includeInTotal == true)
     }

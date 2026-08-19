@@ -13,18 +13,14 @@ extension LiveOutboxSender {
         do {
             try await AccountRepository.create(
                 client: client, id: payload.id, ownerId: payload.ownerId, kind: payload.kind,
-                subtype: payload.subtype, name: payload.name, currency: payload.currency,
+                name: payload.name, currency: payload.currency,
                 openingBalanceE4: payload.openingBalanceE4, icon: payload.icon, color: payload.color
             )
         } catch {
             // A retried create that already landed hits `accounts`' primary
-            // key. Known, accepted gap for a valuation account specifically:
-            // if the very first attempt inserted the account row but never
-            // got a response before its first snapshot insert, that retry
-            // (now swallowed here) never gets a second chance to write the
-            // snapshot either — the same class of two-statement partial-
-            // success risk `CreateTransferPayload` already carries and
-            // isn't compensated for there either.
+            // key — a plain, single-statement insert now for every kind, so
+            // this is the whole retry story (no second statement that could
+            // partially succeed).
             if Self.isDuplicateKey(error) { return }
             throw error
         }
@@ -33,7 +29,7 @@ extension LiveOutboxSender {
     public func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool {
         let result = try await AccountRepository.update(
             client: client, id: payload.id, expectedVersion: payload.expectedVersion, name: payload.name,
-            subtype: payload.subtype, openingBalanceE4: payload.openingBalanceE4,
+            openingBalanceE4: payload.openingBalanceE4,
             includeInTotal: payload.includeInTotal, icon: payload.icon, color: payload.color
         )
         switch result {

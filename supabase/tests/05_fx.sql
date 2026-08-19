@@ -88,16 +88,18 @@ select is(
 
 reset role;
 
--- account_balances_base: has_missing_rate distinguishes "rate missing" from
--- "balance missing" (an unsnapshotted valuation account), and correctly
+-- account_balances_base: has_missing_rate is false whenever the balance
+-- itself resolves and a rate is available (every account kind now shares
+-- the same opening_balance_e4 + SUM(amount_e4) formula, so there's no
+-- "balance missing" case left to distinguish it from), and correctly
 -- converts for two viewers with different base currencies.
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'USD Checking', 'USD', 2000000);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'valuation', 'investment', 'Brokerage', 'EUR', 0);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'regular', 'USD Checking', 'USD', 2000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'investment', 'Brokerage', 'EUR', 0);
 
 -- Compared against fx_convert directly — account_balances_base's
 -- balance_base_e4 is exactly fx_convert's output, including its one
@@ -111,7 +113,7 @@ select is(
 select is(
   (select has_missing_rate from account_balances_base where account_id = 'a0000000-0000-0000-0000-000000000002'),
   false,
-  'has_missing_rate is false, not true, when the balance itself is null (unsnapshotted valuation)'
+  'has_missing_rate is false for an investment account converting into its own currency'
 );
 
 -- Not-yet-onboarded (null base_currency) flows through as null, never

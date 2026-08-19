@@ -1,8 +1,10 @@
 import KeepoCore
 import SwiftUI
 
-/// UI labels are "Everyday" and "Investments" — `valuation` never appears in
-/// the interface, per keepo-v1-feature-spec.md §Accounts & Multi-Currency.
+/// UI labels are "Everyday" and "Investments" — the sections still split by
+/// `kind` for organization, even though `kind` no longer changes an
+/// account's behavior; each investment row also carries its own permanent
+/// `InvestmentBadge`, per keepo-v1-feature-spec.md §Accounts & Multi-Currency.
 ///
 /// Reads straight off the local GRDB mirror (Phase L6) — no server round
 /// trip, no payload cache, no pending-write overlay. `Outbox`'s optimistic
@@ -17,13 +19,15 @@ struct AccountsListView: View {
     @State private var editingAccountId: UUID?
     @State private var actionErrorMessage: String?
     @State private var archiveCandidate: LocalAccountRow?
+    @State private var isEverydayExpanded = true
+    @State private var isInvestmentsExpanded = true
 
     private var everyday: [LocalAccountRow] {
-        accounts.filter { $0.kind == .ledger && $0.archivedAt == nil }
+        accounts.filter { $0.kind == .regular && $0.archivedAt == nil }
     }
 
     private var investments: [LocalAccountRow] {
-        accounts.filter { $0.kind == .valuation && $0.archivedAt == nil }
+        accounts.filter { $0.kind == .investment && $0.archivedAt == nil }
     }
 
     private var archived: [LocalAccountRow] {
@@ -40,14 +44,20 @@ struct AccountsListView: View {
                 List {
                     if !everyday.isEmpty {
                         Section {
-                            aggregateRow(title: "Everyday", accounts: everyday)
-                            ForEach(everyday) { accountRow($0) }
+                            aggregateRow(title: "Everyday", accounts: everyday, isExpanded: $isEverydayExpanded)
+                            if isEverydayExpanded {
+                                ForEach(everyday) { accountRow($0) }
+                            }
                         }
                     }
                     if !investments.isEmpty {
                         Section {
-                            aggregateRow(title: "Investments", accounts: investments)
-                            ForEach(investments) { accountRow($0) }
+                            aggregateRow(
+                                title: "Investments", accounts: investments, isExpanded: $isInvestmentsExpanded
+                            )
+                            if isInvestmentsExpanded {
+                                ForEach(investments) { accountRow($0) }
+                            }
                         }
                     }
                     if !archived.isEmpty {
@@ -89,7 +99,7 @@ struct AccountsListView: View {
             }
         }
         .sheet(isPresented: $isAddingAccount) {
-            AccountFormView(session: session) {
+            AddAccountFlowView(session: session) {
                 session.refresh.bump()
             }
         }
@@ -146,19 +156,25 @@ struct AccountsListView: View {
     /// Lives inside the card as the group's own first row (not a floating
     /// `Section` header) so the aggregate reads as part of the group rather
     /// than a label above it — a distinct shade sets it apart from the
-    /// account rows underneath, and it pushes to its own (currently blank)
-    /// detail screen.
-    private func aggregateRow(title: String, accounts: [LocalAccountRow]) -> some View {
-        NavigationLink {
-            AccountGroupDetailView(title: title)
+    /// account rows underneath. Tapping collapses/expands the group's rows
+    /// in place; expanded by default.
+    private func aggregateRow(title: String, accounts: [LocalAccountRow], isExpanded: Binding<Bool>) -> some View {
+        Button {
+            withAnimation(.default) { isExpanded.wrappedValue.toggle() }
         } label: {
             HStack {
                 Text(title).font(.headline)
                 Spacer()
                 Text(isPrivacyMode ? "••••" : subtotalText(for: accounts))
                     .foregroundStyle(Color.secondary)
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
+                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 0 : -90))
             }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .listRowBackground(Color(.tertiarySystemGroupedBackground))
     }
 
@@ -237,6 +253,9 @@ private struct AccountRow: View {
                     Image(systemName: "person.2.fill")
                         .font(.caption)
                         .foregroundStyle(Color.secondary)
+                }
+                if row.kind == .investment {
+                    InvestmentBadge()
                 }
             }
             Spacer()

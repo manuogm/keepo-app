@@ -71,7 +71,7 @@ struct RecurringRuleFormView: View {
                     Section("Account") {
                         Picker("Account", selection: $selectedAccountId) {
                             Text("Select…").tag(UUID?.none)
-                            ForEach(accounts.filter { $0.kind == .ledger }) { account in
+                            ForEach(accounts) { account in
                                 Text(account.name).tag(UUID?.some(account.id))
                             }
                         }

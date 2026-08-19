@@ -39,7 +39,6 @@ enum RefereeFixture {
         try seedCategories(database)
         try seedAccounts(database)
         try seedFxRates(database)
-        try seedValuationLeg(database)
         try seedTransactions(database)
         try seedBudget(database)
     }
@@ -81,19 +80,29 @@ enum RefereeFixture {
 
     private static func seedAccounts(_ database: Database) throws {
         let accounts = [
-            Account(id: eurChecking, kind: "ledger", currency: "EUR", opening: 10_000_000),
-            Account(id: usdSavings, kind: "ledger", currency: "USD", opening: 5_000_000),
-            Account(id: jpyWallet, kind: "ledger", currency: "JPY", opening: 100_000_000),
-            Account(id: gbpCash, kind: "ledger", currency: "GBP", opening: 2_000_000),
-            Account(id: eurBrokerage, kind: "valuation", currency: "EUR", opening: 0)
+            Account(id: eurChecking, kind: "regular", currency: "EUR", opening: 10_000_000),
+            Account(id: usdSavings, kind: "regular", currency: "USD", opening: 5_000_000),
+            Account(id: jpyWallet, kind: "regular", currency: "JPY", opening: 100_000_000),
+            Account(id: gbpCash, kind: "regular", currency: "GBP", opening: 2_000_000),
+            // Opening balance carries what used to be the account's only
+            // balance_snapshots row (50_000_000 as of 2026-07-01) — the
+            // unify-account-kinds migration collapsed both kinds onto one
+            // opening_balance_e4 + transactions formula, so an investment
+            // account's pre-history now lives in opening_balance_e4 exactly
+            // like a regular account's. The 10_000_000 transaction fixture
+            // below (2026-07-15) is the same "unrealized gain since" leg
+            // the old snapshot's delta query used to compute — together
+            // they reproduce the same pinned 60_000_000 balance
+            // `LocalMoneyRefereeTests` asserts.
+            Account(id: eurBrokerage, kind: "investment", currency: "EUR", opening: 50_000_000)
         ]
         for account in accounts {
             try database.execute(
                 sql: """
                 INSERT INTO accounts (
-                    id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4, opening_balance_at,
+                    id, owner_id, created_by, kind, name, currency, opening_balance_e4, opening_balance_at,
                     include_in_total, icon, color, version, created_at, updated_at, sync_seq
-                ) VALUES (?, ?, ?, ?, 'checking', ?, ?, ?, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
                           '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
                 """,
                 arguments: [
@@ -113,17 +122,6 @@ enum RefereeFixture {
                 arguments: [currency, rate]
             )
         }
-    }
-
-    private static func seedValuationLeg(_ database: Database) throws {
-        try database.execute(
-            sql: """
-            INSERT INTO balance_snapshots (id, account_id, currency, as_of, value_e4, created_by, created_at, sync_seq)
-            VALUES ('aaaaaaaa-0000-0000-0000-000000000001', ?, 'EUR', '2026-07-01', 50000000, ?,
-                    '2026-07-01T00:00:00.000000+00:00', 1)
-            """,
-            arguments: [eurBrokerage, ownerId]
-        )
     }
 
     private static func seedTransactions(_ database: Database) throws {

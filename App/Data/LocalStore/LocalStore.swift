@@ -36,7 +36,7 @@ public enum LocalSchemaV1 {
     /// recreate exactly this set.
     static func createSyncableTables(_ database: Database) throws {
         try createAccountAndTransactionTables(database)
-        try createBalanceAndCategoryTables(database)
+        try createCategoryTables(database)
         try createPlanningTables(database)
         try createReferenceTables(database)
         try createHouseholdTables(database)
@@ -48,7 +48,6 @@ public enum LocalSchemaV1 {
             table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("created_by", .text).notNull().collate(.nocase)
             table.column("kind", .text).notNull()
-            table.column("subtype", .text).notNull()
             table.column("name", .text).notNull()
             table.column("currency", .text).notNull()
             table.column("opening_balance_e4", .integer).notNull()
@@ -72,7 +71,6 @@ public enum LocalSchemaV1 {
             // isn't resolved to an account yet (server enforces this with
             // a CHECK: a confirmed row can never have either null).
             table.column("account_id", .text).collate(.nocase)
-            table.column("account_kind", .text)
             table.column("category_id", .text).collate(.nocase)
             table.column("category_kind", .text)
             table.column("amount_e4", .integer).notNull()
@@ -113,22 +111,7 @@ public enum LocalSchemaV1 {
         )
     }
 
-    private static func createBalanceAndCategoryTables(_ database: Database) throws {
-        try database.create(table: "balance_snapshots") { table in
-            table.column("id", .text).primaryKey().collate(.nocase)
-            table.column("account_id", .text).notNull().collate(.nocase)
-            table.column("currency", .text).notNull()
-            table.column("as_of", .text).notNull()
-            table.column("value_e4", .integer).notNull()
-            table.column("created_by", .text).notNull().collate(.nocase)
-            table.column("created_at", .text).notNull()
-            table.column("deleted_at", .text)
-            table.column("sync_seq", .integer).notNull()
-        }
-        try database.create(
-            index: "idx_balance_snapshots_account_id", on: "balance_snapshots", columns: ["account_id"]
-        )
-
+    private static func createCategoryTables(_ database: Database) throws {
         try database.create(table: "categories") { table in
             table.column("id", .text).primaryKey().collate(.nocase)
             table.column("owner_id", .text).notNull().collate(.nocase)
@@ -369,6 +352,12 @@ public enum LocalStore {
         // duplicate row already on disk, since the fresh re-pull runs
         // through `SyncApply`'s new natural-key reconciliation.
         migrator.registerMigration("v4_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — the unify-account-kinds migration dropped
+        // accounts.subtype, transactions.account_kind, and balance_snapshots
+        // entirely server-side; a device that already completed v4 needs
+        // this rebuild to drop them locally too, or every pull row omitting
+        // those columns hits an INSERT NOT NULL violation.
+        migrator.registerMigration("v5_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)

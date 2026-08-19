@@ -96,35 +96,32 @@ update profiles set base_currency = 'USD', onboarded_at = now()
 where id = '88888888-8888-8888-8888-888888888888';
 
 -- User A: EUR checking, USD checking, an investment account — covers the
--- ledger/valuation split and a cross-currency FX line in one seed.
+-- regular/investment kinds and a cross-currency FX line in one seed. Every
+-- kind takes the same opening_balance_e4 + SUM(amount_e4) formula now, so
+-- the investment account's value is just its opening balance like any
+-- other — no separate balance_snapshots seed needed.
 -- Money columns are bigint at fixed scale 4 (see the L1 migration) — 1000
 -- becomes 10000000, i.e. amount_e4 = decimal_amount * 10000.
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
 values
   (
     'aaaaaaaa-0000-0000-0000-000000000001', '99999999-9999-9999-9999-999999999999',
-    '99999999-9999-9999-9999-999999999999', 'ledger', 'checking', 'Everyday Checking', 'EUR', 10000000
+    '99999999-9999-9999-9999-999999999999', 'regular', 'Everyday Checking', 'EUR', 10000000
   ),
   (
     'aaaaaaaa-0000-0000-0000-000000000002', '99999999-9999-9999-9999-999999999999',
-    '99999999-9999-9999-9999-999999999999', 'ledger', 'checking', 'US Checking', 'USD', 5000000
+    '99999999-9999-9999-9999-999999999999', 'regular', 'US Checking', 'USD', 5000000
   ),
   (
     'aaaaaaaa-0000-0000-0000-000000000003', '99999999-9999-9999-9999-999999999999',
-    '99999999-9999-9999-9999-999999999999', 'valuation', 'investment', 'Brokerage', 'EUR', 0
+    '99999999-9999-9999-9999-999999999999', 'investment', 'Brokerage', 'EUR', 50000000
   );
 
-insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by)
-values (
-  'aaaaaaaa-0000-0000-0000-000000000003', 'EUR', current_date, 50000000,
-  '99999999-9999-9999-9999-999999999999'
-);
-
 -- User B: a single USD checking account, kept simple.
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
 values (
   'bbbbbbbb-0000-0000-0000-000000000001', '88888888-8888-8888-8888-888888888888',
-  '88888888-8888-8888-8888-888888888888', 'ledger', 'checking', 'Checking', 'USD', 20000000
+  '88888888-8888-8888-8888-888888888888', 'regular', 'Checking', 'USD', 20000000
 );
 
 -- A handful of transactions against user A's default "Other" categories.

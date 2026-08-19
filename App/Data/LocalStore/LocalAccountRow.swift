@@ -62,7 +62,7 @@ struct LocalAccountRow: Identifiable {
             return LocalAccountRow(
                 id: UUID(uuidString: accountId) ?? UUID(), name: row["name"], currency: currency,
                 currencyInfo: CurrencyInfo(code: currency, minorUnit: currencies[currency] ?? 2),
-                kind: PublicSchema.AccountKind(rawValue: kindRaw) ?? .ledger,
+                kind: PublicSchema.AccountKind(rawValue: kindRaw) ?? .regular,
                 icon: row["icon"], color: row["color"], archivedAt: row["archived_at"],
                 version: row["version"], isShared: sharedIds.contains(accountId), balanceE4: balance,
                 balanceBaseE4: balanceBase,

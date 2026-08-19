@@ -13,8 +13,8 @@ select plan(17);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('e8000000-0000-0000-0000-00000000e001', auth.uid(), auth.uid(), 'ledger', 'checking', 'Ledger', 'EUR', 10000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('e8000000-0000-0000-0000-00000000e001', auth.uid(), auth.uid(), 'regular', 'Ledger', 'EUR', 10000000);
 insert into categories (id, owner_id, kind, name)
 values ('c8000000-0000-0000-0000-00000000c001', auth.uid(), 'expense', 'Test Expense');
 
@@ -152,8 +152,8 @@ select is(
 
 -- A private USD account with no resolvable rate renders the day as NULL in
 -- net_worth_series('me'), never a silently-partial sum (money rule 5).
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('e8000000-0000-0000-0000-00000000e002', auth.uid(), auth.uid(), 'ledger', 'checking', 'USD Ledger', 'USD', 5000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('e8000000-0000-0000-0000-00000000e002', auth.uid(), auth.uid(), 'regular', 'USD Ledger', 'USD', 5000000);
 
 select refresh_net_worth_daily(auth.uid(), current_date, current_date);
 

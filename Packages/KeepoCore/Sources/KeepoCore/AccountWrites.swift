@@ -31,7 +31,6 @@ struct UpdateAccountParams: Encodable {
     let id: UUID
     let expectedVersion: Int
     let name: String
-    let subtype: PublicSchema.AccountSubtype
     let openingBalanceE4: Int64
     let includeInTotal: Bool
     let icon: String
@@ -40,7 +39,6 @@ struct UpdateAccountParams: Encodable {
         case id = "p_id"
         case expectedVersion = "p_expected_version"
         case name = "p_name"
-        case subtype = "p_subtype"
         case openingBalanceE4 = "p_opening_balance_e4"
         case includeInTotal = "p_include_in_total"
         case icon = "p_icon"
@@ -81,9 +79,11 @@ struct SetAccountBalanceParams: Encodable {
     }
 }
 
-/// Exactly one of `transactionId`/`snapshotId` is non-nil on a successful
-/// (non-conflicting) write — which one depends on the account's kind,
-/// decided server-side (see the migration's own header comment).
+/// `transactionId` is set on a successful (non-conflicting) write — every
+/// account kind now takes the same adjustment-transaction path server-side
+/// (see the migration's own header comment). `snapshotId` is always nil;
+/// the RPC still returns the column for shape compatibility but nothing
+/// populates it since balance_snapshots was dropped.
 /// `conflict` mirrors every other versioned write RPC: a version mismatch
 /// on a *new* edit is reported as data, not an exception — a replay of an
 /// already-applied `id` is never a conflict, no matter how stale
@@ -101,12 +101,12 @@ public struct SetAccountBalanceResult: Decodable, Sendable {
 }
 
 public extension AccountRepository {
-    /// Editable: name, subtype, opening_balance_e4, include_in_total, icon,
-    /// color. Not editable, by omission from this call's parameters, not a
+    /// Editable: name, opening_balance_e4, include_in_total, icon, color.
+    /// Not editable, by omission from this call's parameters, not a
     /// client-side check: currency and kind (see migration 20260805180000's
     /// header comment for why).
     ///
-    /// Seven named, self-explanatory parameters — same reasoning as
+    /// Six named, self-explanatory parameters — same reasoning as
     /// AccountRepository.create.
     @discardableResult
     // swiftlint:disable:next function_parameter_count
@@ -115,7 +115,6 @@ public extension AccountRepository {
         id: UUID,
         expectedVersion: Int,
         name: String,
-        subtype: PublicSchema.AccountSubtype,
         openingBalanceE4: Int64,
         includeInTotal: Bool,
         icon: String,
@@ -125,7 +124,6 @@ public extension AccountRepository {
             id: id,
             expectedVersion: expectedVersion,
             name: name,
-            subtype: subtype,
             openingBalanceE4: openingBalanceE4,
             includeInTotal: includeInTotal,
             icon: icon,
@@ -155,12 +153,10 @@ public extension AccountRepository {
         return !(rows.first?.conflict ?? true)
     }
 
-    /// "This account is worth X right now" — for a ledger account the gap
-    /// against its own computed balance becomes an adjustment transaction
-    /// (filed under "Other"); for a valuation account it's a new balance
-    /// snapshot. Which one happens is decided server-side from the
-    /// account's kind, not by the caller. `id` is the same client-
-    /// generated idempotency key every outbox write uses — replaying it
+    /// "This account is worth X right now" — the gap against the account's
+    /// own computed balance becomes an adjustment transaction (filed under
+    /// "Other"), the same path for every account kind. `id` is the same
+    /// client-generated idempotency key every outbox write uses — replaying it
     /// twice (e.g. a queued write synced, then retried) has no double
     /// effect and never conflicts, even against a stale `expectedVersion`
     /// (the migration's idempotency-before-version-check ordering).

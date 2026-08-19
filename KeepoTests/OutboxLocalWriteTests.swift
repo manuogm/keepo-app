@@ -23,16 +23,16 @@ struct OutboxLocalWriteTests {
     }
 
     private func seedAccount(
-        _ dbQueue: DatabaseQueue, id: UUID, ownerId: UUID, kind: String = "ledger", currency: String = "EUR",
+        _ dbQueue: DatabaseQueue, id: UUID, ownerId: UUID, kind: String = "regular", currency: String = "EUR",
         openingBalanceE4: Int64 = 0
     ) async throws {
         try await dbQueue.write { database in
             try database.execute(
                 sql: """
-                INSERT INTO accounts (id, owner_id, created_by, kind, subtype, name, currency,
+                INSERT INTO accounts (id, owner_id, created_by, kind, name, currency,
                     opening_balance_e4, opening_balance_at, include_in_total, icon, color, version,
                     created_at, updated_at, sync_seq)
-                VALUES (?, ?, ?, ?, 'checking', 'Test', ?, ?, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
+                VALUES (?, ?, ?, ?, 'Test', ?, ?, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
                     '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
                 """,
                 arguments: [id.uuidString, ownerId.uuidString, ownerId.uuidString, kind, currency, openingBalanceE4]
@@ -154,8 +154,8 @@ struct OutboxLocalWriteTests {
         #expect(try await balance(dbQueue, accountId: toAccountId) == 30000)
     }
 
-    @Test("setting a ledger account's balance inserts an adjustment for exactly the gap")
-    func setLedgerBalanceInsertsAdjustment() async throws {
+    @Test("setting a regular account's balance inserts an adjustment for exactly the gap")
+    func setRegularBalanceInsertsAdjustment() async throws {
         let (outbox, dbQueue) = try makeOutboxAndDatabase()
         let ownerId = UUID()
         let accountId = UUID()
@@ -168,12 +168,17 @@ struct OutboxLocalWriteTests {
         #expect(try await balance(dbQueue, accountId: accountId) == 250000)
     }
 
-    @Test("setting a valuation account's balance inserts a snapshot, never a transaction")
-    func setValuationBalanceInsertsSnapshot() async throws {
+    /// Proves the unification, not just a rename of the old snapshot test:
+    /// an investment-kind account's balance-set now goes through the exact
+    /// same adjustment-transaction path a regular account's does — no
+    /// `balance_snapshots` table exists anymore for it to write into
+    /// instead.
+    @Test("setting an investment account's balance also files an adjustment transaction, same as regular")
+    func setInvestmentBalanceInsertsAdjustment() async throws {
         let (outbox, dbQueue) = try makeOutboxAndDatabase()
         let ownerId = UUID()
         let accountId = UUID()
-        try await seedAccount(dbQueue, id: accountId, ownerId: ownerId, kind: "valuation", openingBalanceE4: 100000)
+        try await seedAccount(dbQueue, id: accountId, ownerId: ownerId, kind: "investment", openingBalanceE4: 100000)
 
         _ = await outbox.submitSetAccountBalance(
             SetAccountBalancePayload(id: UUID(), accountId: accountId, newBalanceE4: 500000, expectedVersion: 1)
@@ -184,7 +189,7 @@ struct OutboxLocalWriteTests {
             try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM transactions WHERE account_id = ?",
                               arguments: [accountId.uuidString])
         }
-        #expect(transactionCount == 0)
+        #expect(transactionCount == 1)
     }
 
     @Test("B: archiving an account sets archived_at locally before any sync pull")
@@ -213,7 +218,7 @@ struct OutboxLocalWriteTests {
 
         _ = await outbox.submitCreateAccount(
             CreateAccountPayload(
-                id: accountId, ownerId: ownerId, kind: .ledger, subtype: .checking, name: "New Account",
+                id: accountId, ownerId: ownerId, kind: .regular, name: "New Account",
                 currency: "USD", openingBalanceE4: 10000, icon: "banknote", color: "#8E8E93"
             )
         )

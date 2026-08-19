@@ -20,8 +20,8 @@ select throws_like(
 
 select create_household();
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a4000000-0000-0000-0000-00000000a001', auth.uid(), auth.uid(), 'ledger', 'checking', 'Shared Checking', 'EUR', 10000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a4000000-0000-0000-0000-00000000a001', auth.uid(), auth.uid(), 'regular', 'Shared Checking', 'EUR', 10000000);
 insert into categories (id, owner_id, kind, name)
 values ('c4000000-0000-0000-0000-00000000a001', auth.uid(), 'expense', 'Groceries');
 select share_account('a4000000-0000-0000-0000-00000000a001');
@@ -215,8 +215,8 @@ select is(
 -- caller's own resulting copy without touching the other member's.
 -- ----------------------------------------------------------------------------
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a4000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'ledger', 'checking', 'Erase Shared', 'EUR', 1000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a4000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'regular', 'Erase Shared', 'EUR', 1000000);
 select share_account('a4000000-0000-0000-0000-00000000a002');
 insert into transactions (id, owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at, merchant_raw)
 values (

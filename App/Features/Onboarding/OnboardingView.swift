@@ -10,6 +10,7 @@ struct OnboardingView: View {
 
     private enum Step {
         case currency
+        case accountKind
         case firstAccount
         case captureWalkthrough
     }
@@ -18,7 +19,7 @@ struct OnboardingView: View {
     @State private var currencies: [PublicSchema.CurrenciesSelect] = []
     @State private var selectedCurrency: String = "USD"
     @State private var accountName = ""
-    @State private var accountSubtype: PublicSchema.AccountSubtype = .checking
+    @State private var accountKind: PublicSchema.AccountKind = .regular
     @State private var openingBalanceText = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -31,6 +32,8 @@ struct OnboardingView: View {
                 switch step {
                 case .currency:
                     currencyStep
+                case .accountKind:
+                    accountKindStep
                 case .firstAccount:
                     firstAccountStep
                 case .captureWalkthrough:
@@ -71,30 +74,37 @@ struct OnboardingView: View {
             }
             .pickerStyle(.wheel)
 
-            Button("Continue") { step = .firstAccount }
+            Button("Continue") { step = .accountKind }
                 .buttonStyle(.borderedProminent)
                 .tint(Color.primary)
                 .disabled(currencies.isEmpty)
         }
     }
 
-    private var firstAccountStep: some View {
+    private var accountKindStep: some View {
         VStack(spacing: 16) {
             Text("Add your first account")
+                .font(.title2).fontWeight(.bold)
+                .foregroundStyle(Color.primary)
+            Text("What kind of account is this?")
+                .font(.callout)
+                .foregroundStyle(Color.secondary)
+
+            AccountKindPicker { kind in
+                accountKind = kind
+                step = .firstAccount
+            }
+        }
+    }
+
+    private var firstAccountStep: some View {
+        VStack(spacing: 16) {
+            Text(accountKind == .investment ? "Name your investment account" : "Name your account")
                 .font(.title2).fontWeight(.bold)
                 .foregroundStyle(Color.primary)
 
             TextField("Account name (e.g. Checking)", text: $accountName)
                 .textFieldStyle(.roundedBorder)
-
-            Picker("Type", selection: $accountSubtype) {
-                Text("Checking").tag(PublicSchema.AccountSubtype.checking)
-                Text("Cash").tag(PublicSchema.AccountSubtype.cash)
-                Text("Credit Card").tag(PublicSchema.AccountSubtype.creditCard)
-                Text("Loan").tag(PublicSchema.AccountSubtype.loan)
-                Text("Investment").tag(PublicSchema.AccountSubtype.investment)
-            }
-            .pickerStyle(.segmented)
 
             TextField("Opening balance", text: $openingBalanceText)
                 .textFieldStyle(.roundedBorder)
@@ -132,18 +142,15 @@ struct OnboardingView: View {
         isLoading = true
         errorMessage = nil
         do {
-            let kind: PublicSchema.AccountKind = accountSubtype == .investment ? .valuation : .ledger
-            try await AccountRepository.create(
-                client: session.client,
-                ownerId: userId,
-                kind: kind,
-                subtype: accountSubtype,
-                name: accountName,
-                currency: selectedCurrency,
-                openingBalanceE4: openingBalanceE4,
-                icon: AccountAppearance.defaultIcon(forSubtype: accountSubtype),
-                color: CategoryAppearance.randomColor()
+            // Goes through the outbox, same as AccountFormView — the local
+            // write-through means this account exists in the on-device
+            // mirror by the time this call returns, even offline.
+            let payload = CreateAccountPayload(
+                id: UUID(), ownerId: userId, kind: accountKind,
+                name: accountName, currency: selectedCurrency, openingBalanceE4: openingBalanceE4,
+                icon: AccountAppearance.defaultIcon(forKind: accountKind), color: CategoryAppearance.randomColor()
             )
+            await session.outbox.submitCreateAccount(payload)
             try await session.completeOnboarding(baseCurrency: selectedCurrency)
             step = .captureWalkthrough
         } catch {

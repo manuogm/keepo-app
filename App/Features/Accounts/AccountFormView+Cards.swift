@@ -6,20 +6,17 @@ import SwiftUI
 // precedent as TransactionFormView+Delete.swift.
 
 extension AccountFormView {
-    /// Always shown once editing a ledger account, even with zero rows — a
+    /// Always shown once editing an account, even with zero rows — a
     /// missing row would read as "unknown", not "none", and knowing
     /// there's nothing mapped is exactly what this row exists to answer at
     /// a glance. Tapping it pushes to `MappedCardsView`, which owns the
     /// actual add/rename/remove affordances.
     ///
-    /// Ledger-only (item 1 fix) — `map_card`/`link_card_to_account` refuse
-    /// anything but a spendable ledger account, matching the restriction
-    /// `MapCardSheet`'s account picker already applies for the exact same
-    /// reason. Offering this on a valuation account let a user map a card
-    /// that could only ever fail server-side, with no error surfaced.
+    /// Every account is mappable now — `map_card`/`link_card_to_account` no
+    /// longer restrict by kind, matching `MapCardSheet`'s account picker.
     @ViewBuilder
     var mappedCardsSection: some View {
-        if case .edit(let accountId) = mode, editingKind == .ledger {
+        if case .edit(let accountId) = mode {
             Section {
                 NavigationLink {
                     MappedCardsView(session: session, accountId: accountId) {

@@ -36,8 +36,8 @@ select is(
 -- the same fixed scale 4 as every other currency; the money layer itself
 -- never special-cases it; only display (KeepoCore MoneyFormatter, Swift
 -- side) divides by 10^minor_unit instead of a constant 10^4.
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a9000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'JPY Wallet', 'JPY', 1000000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a9000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'regular', 'JPY Wallet', 'JPY', 1000000000);
 
 insert into categories (id, owner_id, kind, name)
 values ('c9000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Test Expense');
@@ -62,8 +62,8 @@ select is(
 -- precision loss — bigint's ceiling (~9.2e18) is not reachable by any
 -- balance this app will ever hold, only by the FX-conversion multiply at
 -- the extreme end documented in keepo-local-first-plan.md (LH7).
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a9000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'ledger', 'checking', 'Large Balance', 'EUR', 999999999990000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a9000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'regular', 'Large Balance', 'EUR', 999999999990000);
 
 select is(
   account_balance_on('a9000000-0000-0000-0000-000000000002', current_date),

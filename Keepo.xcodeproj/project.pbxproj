@@ -60,7 +60,6 @@
 		7B93AACA4E794F220F70DB5E /* CurrencyConversionLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0C82F5CF87BF218D907A0D /* CurrencyConversionLabel.swift */; };
 		7E4CFB0A409BA5192EF654F6 /* Outbox+AccountsCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB85EAA8C8236A80CB106A6 /* Outbox+AccountsCategories.swift */; };
 		7EDE33A4F6222B26E379DFCC /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6172260F18B9BD85969A88 /* NetworkMonitor.swift */; };
-		815DED987F3C28C3B6D2683E /* AccountGroupDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16B8670E9A81CD727D291BCF /* AccountGroupDetailView.swift */; };
 		826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */; };
 		85244C8F050B324E4D342EBD /* CaptureDeepLinkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FA5C950BCD044A1FAE9B8AF /* CaptureDeepLinkHandler.swift */; };
 		8525C2DA0046AEC5CE3A14AA /* Outbox+CaptureRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C523EC45C1A5230DC5341B /* Outbox+CaptureRecovery.swift */; };
@@ -85,9 +84,11 @@
 		B03FB07E318C04AE8F7EC30D /* LocalTransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBF6795112FAE14AF6A9964 /* LocalTransactionRow.swift */; };
 		B18C1FD694FDD097B6344A64 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF71A7732689A19B52D34F44 /* LocalStore.swift */; };
 		B24F5A6145F90E63C15BB3DC /* SyncApplyCardMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01EFD57C883787366864BB5 /* SyncApplyCardMappingTests.swift */; };
+		B286284590780CBB794D4894 /* AddAccountFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1453E697E1B07D74AA03206 /* AddAccountFlowView.swift */; };
 		B56CD7104491C9185E447004 /* CaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A3543E6EF9E4AA8A2E59C5 /* CaptureIntent.swift */; };
 		B6AFED7F80D9590D6FE78E6A /* OutboxLocalWrite+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BE797DD17C18848D3232ED /* OutboxLocalWrite+Capture.swift */; };
 		B73F69DDD306376D630EA60F /* OfflineStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D152F0778818C2C0DAF37B15 /* OfflineStatusBar.swift */; };
+		B9A1A4D4B42ACEA800227B4C /* InvestmentBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */; };
 		BBE92DC63297AE6FDD9EAE9F /* CardMappingLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */; };
 		BC2164BD9D96F9AB4C55FDDD /* DataPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20EF1D660F02003383C6EDE /* DataPrivacyView.swift */; };
 		BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */; };
@@ -169,7 +170,6 @@
 		12FF29F32E42DD3CA5E20B7D /* KeepoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1506F139C92C88A14BDEE6BE /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		165D0C1A1BF53D4803DE5FBC /* LocalMoneyTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyTypes.swift; sourceTree = "<group>"; };
-		16B8670E9A81CD727D291BCF /* AccountGroupDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountGroupDetailView.swift; sourceTree = "<group>"; };
 		2022ED7EAFC392568FE06C52 /* LocalMoneyRefereeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyRefereeTests.swift; sourceTree = "<group>"; };
 		2175B61B78B33F2633D36AE5 /* AutomationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationsView.swift; sourceTree = "<group>"; };
 		242AFF22D448A2969EE96D9C /* StubTransactionSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StubTransactionSender.swift; sourceTree = "<group>"; };
@@ -250,7 +250,7 @@
 		B74F9A6C1456B3EC4ED7C6C1 /* OfflineStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStoreTests.swift; sourceTree = "<group>"; };
 		B8E38E1BEBD69551349E9D4E /* OutboxMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxMigrationTests.swift; sourceTree = "<group>"; };
 		C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
-		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2304E1D42EB8B69A267C0AC /* MetricKitSubscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitSubscriber.swift; sourceTree = "<group>"; };
 		C2C989DB9E673F3B36CD29E0 /* TransactionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFormView.swift; sourceTree = "<group>"; };
 		C3AF9A7AEAB1809042F92E29 /* OTPSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPSignInView.swift; sourceTree = "<group>"; };
@@ -259,10 +259,12 @@
 		C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxCaptureRecoveryTests.swift; sourceTree = "<group>"; };
 		CC1030F8FB6C2054143CD703 /* BudgetFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetFormView.swift; sourceTree = "<group>"; };
 		D01EFD57C883787366864BB5 /* SyncApplyCardMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncApplyCardMappingTests.swift; sourceTree = "<group>"; };
+		D1453E697E1B07D74AA03206 /* AddAccountFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAccountFlowView.swift; sourceTree = "<group>"; };
 		D152F0778818C2C0DAF37B15 /* OfflineStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStatusBar.swift; sourceTree = "<group>"; };
 		D24680F7D0E74D48EC916E28 /* RecurringRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRulesView.swift; sourceTree = "<group>"; };
 		D3CD02450207FB6B2E822D2F /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		D55B75F5BB63294D175C651F /* ScopeSwitcherButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeSwitcherButton.swift; sourceTree = "<group>"; };
+		D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentBadge.swift; sourceTree = "<group>"; };
 		D8D7E92D6ABD885DD23F123D /* Outbox+Cards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+Cards.swift"; sourceTree = "<group>"; };
 		D9C5DE696770F9C03A0C7B11 /* MapCardSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapCardSheet.swift; sourceTree = "<group>"; };
 		DEA5F7A5638575941827DEC1 /* SyncCursorStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCursorStore.swift; sourceTree = "<group>"; };
@@ -410,6 +412,7 @@
 			children = (
 				C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */,
 				9F0C82F5CF87BF218D907A0D /* CurrencyConversionLabel.swift */,
+				D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */,
 				03941D7DA3A9DB1450A09F83 /* OfflineInfoSheet.swift */,
 				D152F0778818C2C0DAF37B15 /* OfflineStatusBar.swift */,
 				D55B75F5BB63294D175C651F /* ScopeSwitcherButton.swift */,
@@ -680,8 +683,8 @@
 			children = (
 				8891E2F7A286195BCA12BC03 /* AccountFormView.swift */,
 				8039C17F3DF03A29FB0D1365 /* AccountFormView+Cards.swift */,
-				16B8670E9A81CD727D291BCF /* AccountGroupDetailView.swift */,
 				8B43265F15809313F001391C /* AccountsListView.swift */,
+				D1453E697E1B07D74AA03206 /* AddAccountFlowView.swift */,
 				53D9EAB76EB400CCB1FA535D /* CardMappingDetailSheet.swift */,
 				D9C5DE696770F9C03A0C7B11 /* MapCardSheet.swift */,
 				2E715B894DCCE3AD2603D04A /* MappedCardsView.swift */,
@@ -775,7 +778,7 @@
 			mainGroup = 7EFAF88579B01776BD0774BC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */,
 				ADEF292666A264221272220B /* XCLocalSwiftPackageReference "Packages/KeepoCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -846,9 +849,9 @@
 			files = (
 				DB9AE2A3AFF6265C834A63E4 /* AccountFormView+Cards.swift in Sources */,
 				FB2AC3D154B13437974DAC63 /* AccountFormView.swift in Sources */,
-				815DED987F3C28C3B6D2683E /* AccountGroupDetailView.swift in Sources */,
 				1FDF557AFBD5BA0222622C8F /* AccountLocalWrite.swift in Sources */,
 				A0A3C7CA5A7F03F096D79844 /* AccountsListView.swift in Sources */,
+				B286284590780CBB794D4894 /* AddAccountFlowView.swift in Sources */,
 				D1A22957D9168F2FB74BBEA7 /* AppDelegate.swift in Sources */,
 				0187390179020E4EFD45AE22 /* AppSettings.swift in Sources */,
 				5492F80D5A1C99F245A83D9C /* ArchiveAccountsView.swift in Sources */,
@@ -878,6 +881,7 @@
 				CB8A49862EF7A7D661EA7CD2 /* HomeView.swift in Sources */,
 				44359E27B4DD139EB052A64B /* HouseholdView.swift in Sources */,
 				26491FB10AAF9512039B8AC4 /* HouseholdViewLoader.swift in Sources */,
+				B9A1A4D4B42ACEA800227B4C /* InvestmentBadge.swift in Sources */,
 				04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */,
 				581E09E6D236BB73E9A99B64 /* LiveOutboxSender.swift in Sources */,
 				48B57064BBC55CA213316957 /* LocalAccountRow.swift in Sources */,
@@ -1087,6 +1091,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1128,6 +1133,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1244,7 +1250,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -1257,7 +1263,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		0D525863FB5ABAE4C22CDAE5 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 		55A520844CB1127366801CB8 /* KeepoCore */ = {
@@ -1266,7 +1272,7 @@
 		};
 		6CF67C6B40F5CAB317C7F6FC /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */

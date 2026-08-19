@@ -20,12 +20,12 @@ select plan(45);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a2000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'credit_card', 'A Card', 'EUR', 0);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a2000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'valuation', 'investment', 'A Brokerage', 'EUR', 0);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a2000000-0000-0000-0000-000000000003', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 0);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a2000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'regular', 'A Card', 'EUR', 0);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a2000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'investment', 'A Brokerage', 'EUR', 0);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a2000000-0000-0000-0000-000000000003', auth.uid(), auth.uid(), 'regular', 'A Checking', 'EUR', 0);
 insert into categories (id, owner_id, kind, name)
 values ('c2000000-0000-0000-0000-000000000001', auth.uid(), 'expense', 'Coffee');
 insert into categories (id, owner_id, kind, name)
@@ -111,11 +111,16 @@ select throws_like(
   'confirm_capture_transaction refuses a capture with no account yet'
 );
 
--- 4. map_card refuses a non-ledger (valuation) account.
-select throws_like(
-  $$ select map_card('card-xyz', 'a2000000-0000-0000-0000-000000000002') $$,
-  '%ledger%',
-  'map_card refuses a valuation account'
+-- 4. map_card no longer refuses an investment-kind account — every account
+-- kind can have a card mapped to it now (link_card_to_account's old
+-- "spendable (ledger) account" guard was dropped along with the ledger/
+-- valuation split).
+select map_card('card-brokerage', 'a2000000-0000-0000-0000-000000000002');
+
+select is(
+  (select account_id from card_mappings where owner_id = auth.uid() and card_identifier = 'card-brokerage'),
+  'a2000000-0000-0000-0000-000000000002'::uuid,
+  'map_card accepts an investment-kind account exactly like a regular one'
 );
 
 -- 5. map_card assigns a ledger account going forward, but does NOT

@@ -9,8 +9,8 @@ select plan(8);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-000000000020', auth.uid(), auth.uid(), 'ledger', 'checking', 'Checking', 'EUR', 100);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000020', auth.uid(), auth.uid(), 'regular', 'Checking', 'EUR', 100);
 
 insert into categories (id, owner_id, kind, name)
 values ('c0000000-0000-0000-0000-000000000020', auth.uid(), 'expense', 'Groceries');

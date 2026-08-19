@@ -30,10 +30,10 @@ select throws_like(
   'create_household raises if the caller already belongs to one'
 );
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-00000000a001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Shared', 'EUR', 10000000);
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Private', 'EUR', 5000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-00000000a001', auth.uid(), auth.uid(), 'regular', 'A Shared', 'EUR', 10000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'regular', 'A Private', 'EUR', 5000000);
 insert into categories (id, owner_id, kind, name)
 values ('c0000000-0000-0000-0000-00000000a001', auth.uid(), 'expense', 'Test Expense');
 
@@ -44,8 +44,8 @@ select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('b0000000-0000-0000-0000-00000000b001', auth.uid(), auth.uid(), 'ledger', 'checking', 'B Private', 'USD', 20000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('b0000000-0000-0000-0000-00000000b001', auth.uid(), auth.uid(), 'regular', 'B Private', 'USD', 20000000);
 
 -- 2. Before B joins any household, A's shared account is invisible to her —
 -- "shared" means shared into a household B actually belongs to, not a
@@ -154,7 +154,7 @@ select is(
 -- owns it (Phase 6's update_account/archive_account addendum to H2).
 select is(
   (select conflict from update_account(
-    'a0000000-0000-0000-0000-00000000a001', 1, 'A Shared (renamed by B)', 'checking', 10000000, true,
+    'a0000000-0000-0000-0000-00000000a001', 1, 'A Shared (renamed by B)', 10000000, true,
     'banknote', '#8E8E93'
   )),
   false,

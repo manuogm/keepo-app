@@ -44,11 +44,9 @@ A cached session (item 1 above) is enough for everyday use, but export, account 
 - Local cache carries its own schema version and migration path
 
 ## Accounts & Multi-Currency
-- Two account kinds:
-  - **`ledger`** — accepts income, expenses, transfers. Balance = `SUM(amount)`. Subtypes: checking, cash, credit card, loan
-  - **`valuation`** — accepts transfers only, never income or expenses. Balance = latest valuation + `SUM(transfers dated after it)`. Subtype: investment
-- UI labels: "Everyday" and "Investments" — `valuation` never appears in the interface
-- Opening balance at creation; for a `valuation` account this is the first snapshot
+- Two account kinds, chosen once at creation via a Regular/Investment chooser and immutable after — both behave identically (income, expenses, and transfers all accepted; balance = `opening_balance + SUM(amount)`; card mapping allowed on either). `kind` is purely presentational: an `investment` account carries a permanent "Investment" badge everywhere it's shown, a `regular` account carries none
+- UI labels: "Everyday" and "Investments" sections group the account list by kind
+- Opening balance at creation
 - Account archival and exclude-from-total
 - Separate **`counts_toward_fi`** flag — a primary residence or a car belongs in net worth but not in the FI calculation
 - **Base currency is a per-user display preference.** Every household figure converts using the *viewer's* base, so two members with different base currencies each see a coherent total. No converted amount is ever stored, so this costs nothing

@@ -3,9 +3,9 @@ import SwiftUI
 
 /// Resolves an `ambiguous_card` Needs Review item — `item.subtitle` carries
 /// the raw `card_identifier` (see migration 20260807160000's comment on why
-/// it's there and not parsed out of `title`). Only ledger (spendable)
-/// accounts are offered — `map_card` itself refuses anything else. Split out
-/// of `NeedsReviewView.swift` purely to keep that file under the project's
+/// it's there and not parsed out of `title`). Any non-archived account can
+/// be mapped — `map_card` no longer restricts by kind. Split out of
+/// `NeedsReviewView.swift` purely to keep that file under the project's
 /// file-length lint threshold.
 struct MapCardSheet: View {
     let session: SessionStore
@@ -28,7 +28,7 @@ struct MapCardSheet: View {
                 Section("Route charges to") {
                     Picker("Account", selection: $selectedAccountId) {
                         Text("Choose an account").tag(UUID?.none)
-                        ForEach(ledgerAccounts) { account in
+                        ForEach(mappableAccounts) { account in
                             Text(account.name).tag(UUID?.some(account.id))
                         }
                     }
@@ -56,8 +56,8 @@ struct MapCardSheet: View {
         }
     }
 
-    private var ledgerAccounts: [LocalAccountRow] {
-        accounts.filter { $0.kind == .ledger && $0.archivedAt == nil }
+    private var mappableAccounts: [LocalAccountRow] {
+        accounts.filter { $0.archivedAt == nil }
     }
 
     private func mapCard() async {

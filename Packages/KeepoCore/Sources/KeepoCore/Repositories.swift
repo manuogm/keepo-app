@@ -66,11 +66,9 @@ public enum AccountRepository {
 
     /// Creates an account with a client-generated id (money rule: client-
     /// generated UUIDs, not server defaults — see app-architecture.md §Data
-    /// & Offline). For a `valuation` account, opening_balance alone is not
-    /// enough to render a balance: account_balances reads valuation balances
-    /// only from balance_snapshots, so this also writes the first snapshot
-    /// in the same call, reusing the just-generated id rather than a
-    /// round-trip insert-then-fetch.
+    /// & Offline). Every account kind computes its balance the same way now
+    /// (opening_balance_e4 + transactions), so there is no per-kind
+    /// follow-up write — a single insert is the whole operation.
     ///
     /// `id` defaults to a fresh `UUID()` for an ordinary online caller; the
     /// offline outbox is the one caller that supplies its own, generated
@@ -79,7 +77,7 @@ public enum AccountRepository {
     /// inserting a duplicate row — same convention as
     /// `TransactionRepository.create`.
     ///
-    /// Otherwise nine named, self-explanatory parameters describing one new
+    /// Otherwise eight named, self-explanatory parameters describing one new
     /// account — splitting into a params struct here would be an
     /// indirection layer with no reader benefit, not a simplification.
     @discardableResult
@@ -89,7 +87,6 @@ public enum AccountRepository {
         id: UUID = UUID(),
         ownerId: UUID,
         kind: PublicSchema.AccountKind,
-        subtype: PublicSchema.AccountSubtype,
         name: String,
         currency: String,
         openingBalanceE4: Int64,
@@ -102,7 +99,6 @@ public enum AccountRepository {
             ownerId: ownerId,
             createdBy: ownerId,
             kind: kind,
-            subtype: subtype,
             name: name,
             currency: currency,
             openingBalanceE4: openingBalanceE4,
@@ -111,34 +107,7 @@ public enum AccountRepository {
         )
         try await client.from("accounts").insert(row).execute()
 
-        if kind == .valuation {
-            try await insertFirstSnapshot(
-                client: client,
-                accountId: accountId,
-                currency: currency,
-                valueE4: openingBalanceE4,
-                ownerId: ownerId
-            )
-        }
-
         return accountId
-    }
-
-    private static func insertFirstSnapshot(
-        client: SupabaseClient,
-        accountId: UUID,
-        currency: String,
-        valueE4: Int64,
-        ownerId: UUID
-    ) async throws {
-        let snapshot = NewSnapshotRow(
-            accountId: accountId,
-            currency: currency,
-            asOf: PostgresDate.dateOnlyString(Date()),
-            valueE4: valueE4,
-            createdBy: ownerId
-        )
-        try await client.from("balance_snapshots").insert(snapshot).execute()
     }
 }
 
@@ -147,32 +116,16 @@ private struct NewAccountRow: Encodable {
     let ownerId: UUID
     let createdBy: UUID
     let kind: PublicSchema.AccountKind
-    let subtype: PublicSchema.AccountSubtype
     let name: String
     let currency: String
     let openingBalanceE4: Int64
     let icon: String
     let color: String
     enum CodingKeys: String, CodingKey {
-        case id, kind, subtype, name, currency, icon, color
+        case id, kind, name, currency, icon, color
         case ownerId = "owner_id"
         case createdBy = "created_by"
         case openingBalanceE4 = "opening_balance_e4"
-    }
-}
-
-private struct NewSnapshotRow: Encodable {
-    let accountId: UUID
-    let currency: String
-    let asOf: String
-    let valueE4: Int64
-    let createdBy: UUID
-    enum CodingKeys: String, CodingKey {
-        case accountId = "account_id"
-        case currency
-        case valueE4 = "value_e4"
-        case asOf = "as_of"
-        case createdBy = "created_by"
     }
 }
 

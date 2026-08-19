@@ -5,6 +5,9 @@
 -- check idempotency BEFORE the version check, so a retried outbox write
 -- with the same client-generated id still succeeds even though the
 -- account's version has since moved past what the retry claims to expect.
+-- Collapsed by 20260902100000_unify_account_kinds.sql to a single path —
+-- every account kind now files an adjustment transaction, never a
+-- balance_snapshots row (that table and the old valuation branch are gone).
 -- Fixture A = 11111111-...
 
 \ir _helpers.psql
@@ -15,20 +18,11 @@ select plan(14);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-000000000021', auth.uid(), auth.uid(), 'ledger', 'checking', 'Checking', 'EUR', 1000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000021', auth.uid(), auth.uid(), 'regular', 'Checking', 'EUR', 1000000);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-000000000022', auth.uid(), auth.uid(), 'valuation', 'investment', 'Brokerage', 'EUR', 0);
-
--- Backdated to yesterday, not today: `now()` is frozen for this whole test
--- transaction (_helpers.psql's own documented gotcha), so a same-day
--- snapshot inserted here and one inserted later by set_account_balance
--- would carry an identical created_at too — as_of desc alone should be
--- what disambiguates the common case, and created_at is only the tiebreak
--- for the genuine same-day case, exercised separately below.
-insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by)
-values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date - 1, 10000000, auth.uid());
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000022', auth.uid(), auth.uid(), 'investment', 'Brokerage', 'EUR', 10000000);
 
 -- 1. Raising a ledger account's balance creates a positive adjustment
 -- transaction for exactly the gap. Both accounts start at version 1.
@@ -78,37 +72,30 @@ select is(
   'no-op balance set left the adjustment count unchanged'
 );
 
--- 6. A valuation account's balance edit writes a new snapshot, not a
--- transaction. Brokerage is still at version 1.
+-- 6. An investment account's balance edit is identical to a regular
+-- account's — a plain adjustment transaction for the gap, no separate code
+-- path. Brokerage is still at version 1.
 select set_account_balance('a0000000-0000-0000-0000-000000000022', 12000000, 1);
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000022', current_date)),
   12000000::bigint,
-  'a valuation account''s computed balance matches the newly entered value'
+  'an investment account''s computed balance matches the newly entered value'
 );
 
 select is(
-  (select count(*) from transactions where account_id = 'a0000000-0000-0000-0000-000000000022'),
-  0::bigint,
-  'a valuation balance edit never creates a transaction'
+  (select amount_e4 from transactions where account_id = 'a0000000-0000-0000-0000-000000000022' and source = 'adjustment'),
+  2000000::bigint,
+  'an investment account''s balance edit files an adjustment transaction, exactly like a regular account'
 );
 
--- 7. Same-day tiebreak: two snapshots sharing an `as_of` (editing the
--- balance twice in one day, now realistic thanks to this RPC) resolve to
--- the later `created_at`, not an unspecified row. `now()` is frozen for
--- this whole transaction — including for step 6's own set_account_balance
--- call above, which already wrote a same-day snapshot at the frozen
--- now() — so both rows here are inserted with an explicit `created_at`
--- strictly after that frozen instant, not just after each other.
-insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by, created_at)
-values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date, 11500000, auth.uid(), now() + interval '1 minute');
-insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by, created_at)
-values ('a0000000-0000-0000-0000-000000000022', 'EUR', current_date, 13000000, auth.uid(), now() + interval '2 minutes');
+-- 7. A second same-day edit on the investment account also just files
+-- another adjustment transaction, version-checked like any other write.
+select set_account_balance('a0000000-0000-0000-0000-000000000022', 13000000, 2);
 
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000022', current_date)),
   13000000::bigint,
-  'two same-day snapshots resolve to the one with the later created_at'
+  'a second same-day investment balance edit reaches the newly entered value'
 );
 
 -- 8. Idempotency: replaying the same client-supplied id twice does not

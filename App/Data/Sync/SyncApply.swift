@@ -22,18 +22,15 @@ enum SyncApply {
     /// string interpolation as a column name.
     private static let tableColumns: [String: Set<String>] = [
         "accounts": [
-            "id", "owner_id", "created_by", "kind", "subtype", "name", "currency", "opening_balance_e4",
+            "id", "owner_id", "created_by", "kind", "name", "currency", "opening_balance_e4",
             "opening_balance_at", "include_in_total", "icon", "color", "archived_at", "version", "deleted_at",
             "created_at", "updated_at", "sync_seq"
         ],
         "transactions": [
-            "id", "owner_id", "created_by", "account_id", "account_kind", "category_id", "category_kind",
+            "id", "owner_id", "created_by", "account_id", "category_id", "category_kind",
             "amount_e4", "currency", "occurred_at", "merchant_raw", "merchant_normalized", "notes",
             "card_identifier", "transfer_group_id", "source", "status", "external_id", "recurring_rule_id",
             "version", "deleted_at", "created_at", "updated_at", "sync_seq"
-        ],
-        "balance_snapshots": [
-            "id", "account_id", "currency", "as_of", "value_e4", "created_by", "created_at", "deleted_at", "sync_seq"
         ],
         "categories": [
             "id", "owner_id", "kind", "name", "is_default", "icon", "color", "version", "deleted_at", "created_at",
@@ -68,7 +65,7 @@ enum SyncApply {
     ]
 
     private static let primaryKeys: [String: [String]] = [
-        "accounts": ["id"], "transactions": ["id"], "balance_snapshots": ["id"], "categories": ["id"],
+        "accounts": ["id"], "transactions": ["id"], "categories": ["id"],
         "recurring_rules": ["id"], "budgets": ["id"], "currencies": ["code"],
         "fx_rates": ["currency", "rate_date"], "card_mappings": ["id"],
         "merchant_category_map": ["owner_id", "merchant_pattern"], "sync_conflicts": ["id"], "households": ["id"],
@@ -77,7 +74,7 @@ enum SyncApply {
     ]
 
     /// Every table `SyncCursorStore`'s epoch-mismatch wipe clears, keeping
-    /// `outbox_items` untouched — the exact same 16-table set `tableColumns`
+    /// `outbox_items` untouched — the exact same table set `tableColumns`
     /// covers, kept as its own list so a caller doesn't need to import GRDB
     /// just to enumerate `tableColumns.keys`.
     static let syncableTables = Array(tableColumns.keys)

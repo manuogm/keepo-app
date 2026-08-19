@@ -142,7 +142,7 @@ struct SyncEngineTests {
     private func accountJSON(id: String, deletedAt: String? = nil) -> AnyJSON {
         .object([
             "id": .string(id), "owner_id": .string("owner-1"), "created_by": .string("owner-1"),
-            "kind": .string("ledger"), "subtype": .string("checking"), "name": .string("Checking"),
+            "kind": .string("regular"), "name": .string("Checking"),
             "currency": .string("EUR"), "opening_balance_e4": .integer(0),
             "opening_balance_at": .string("2026-01-01"), "include_in_total": .bool(true),
             "icon": .string("banknote"), "color": .string("#8E8E93"), "version": .integer(1),

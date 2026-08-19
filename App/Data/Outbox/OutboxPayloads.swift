@@ -160,7 +160,6 @@ public struct CreateAccountPayload: Codable, Sendable {
     public let id: UUID
     public let ownerId: UUID
     public let kind: PublicSchema.AccountKind
-    public let subtype: PublicSchema.AccountSubtype
     public let name: String
     public let currency: String
     public let openingBalanceE4: Int64
@@ -168,13 +167,12 @@ public struct CreateAccountPayload: Codable, Sendable {
     public let color: String
 
     public init(
-        id: UUID, ownerId: UUID, kind: PublicSchema.AccountKind, subtype: PublicSchema.AccountSubtype,
+        id: UUID, ownerId: UUID, kind: PublicSchema.AccountKind,
         name: String, currency: String, openingBalanceE4: Int64, icon: String, color: String
     ) {
         self.id = id
         self.ownerId = ownerId
         self.kind = kind
-        self.subtype = subtype
         self.name = name
         self.currency = currency
         self.openingBalanceE4 = openingBalanceE4
@@ -183,24 +181,25 @@ public struct CreateAccountPayload: Codable, Sendable {
     }
 }
 
+/// `kind` stays absent by omission, same as before the subtype/kind
+/// unification — an account's kind was already immutable, and the
+/// migration's `update_account` RPC still takes no kind parameter.
 public struct UpdateAccountPayload: Codable, Sendable {
     public let id: UUID
     public let expectedVersion: Int
     public let name: String
-    public let subtype: PublicSchema.AccountSubtype
     public let openingBalanceE4: Int64
     public let includeInTotal: Bool
     public let icon: String
     public let color: String
 
     public init(
-        id: UUID, expectedVersion: Int, name: String, subtype: PublicSchema.AccountSubtype,
+        id: UUID, expectedVersion: Int, name: String,
         openingBalanceE4: Int64, includeInTotal: Bool, icon: String, color: String
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
         self.name = name
-        self.subtype = subtype
         self.openingBalanceE4 = openingBalanceE4
         self.includeInTotal = includeInTotal
         self.icon = icon

@@ -16,9 +16,9 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
 -- 1. icon/color round-trip through a plain insert.
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4, icon, color)
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4, icon, color)
 values (
-  'a7000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'Custom Look', 'EUR',
+  'a7000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'regular', 'Custom Look', 'EUR',
   0, 'creditcard.fill', '#5856D6'
 );
 
@@ -32,7 +32,7 @@ select results_eq(
 select results_eq(
   $$ select (account).name, (account).icon, (account).color
      from update_account(
-       'a7000000-0000-0000-0000-000000000001', 1, 'Custom Look', 'checking', 0, true,
+       'a7000000-0000-0000-0000-000000000001', 1, 'Custom Look', 0, true,
        'star.fill', '#FF3B30'
      ) $$,
   $$ values ('Custom Look', 'star.fill', '#FF3B30') $$,

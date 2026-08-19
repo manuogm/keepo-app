@@ -2,26 +2,39 @@ import KeepoCore
 import SwiftUI
 
 /// Create and edit share one form, mirroring `TransactionFormView`. Kind is
-/// locked once an account exists — the composite FKs from `transactions`
-/// tie a transaction's currency and account_kind to its account's, and
-/// changing kind would change which of the two balance formulas applies —
-/// so edit mode only ever fetches the raw `accounts` row it needs and never
-/// offers a kind picker at all.
+/// chosen once, up front, by `AddAccountFlowView` (create mode only) and
+/// locked forever after — this form never offers a kind picker itself.
 struct AccountFormView: View {
     let session: SessionStore
-    var mode: Mode = .create
+    var mode: Mode = .create(kind: .regular)
     var onSaved: () -> Void
 
+    /// `false` when pushed onto `AddAccountFlowView`'s stack (create) rather
+    /// than being the sheet's own root (edit) — skips the nested
+    /// `NavigationStack` and the cancellation "x" (back button + swipe cover it).
+    var embedInNavigationStack = true
+
+    /// Set only by `AddAccountFlowView`: closes the whole sheet after save,
+    /// since a pushed `dismiss()` would only pop back to the chooser.
+    var onDismissRequested: (() -> Void)?
+
     enum Mode {
-        case create
+        case create(kind: PublicSchema.AccountKind)
         case edit(UUID)
     }
 
     @Environment(\.dismiss) private var dismiss
 
+    private func dismissSelf() {
+        if let onDismissRequested {
+            onDismissRequested()
+        } else {
+            dismiss()
+        }
+    }
+
     @State private var currencies: [PublicSchema.CurrenciesSelect] = []
     @State private var name = ""
-    @State private var subtype: PublicSchema.AccountSubtype = .checking
     @State private var currency = ""
     @State private var openingBalanceText = ""
     @State private var includeInTotal = true
@@ -31,8 +44,7 @@ struct AccountFormView: View {
     @State private var editingId: UUID?
     @State private var editingVersion: Int?
     // Not `private` — read from AccountFormView+Cards.swift (a different
-    // file, kept there for file-length) to restrict "Mapped Cards" to
-    // ledger accounts, same reasoning as `cardMappings` below.
+    // file, kept there for file-length).
     @State var editingKind: PublicSchema.AccountKind?
     @State private var editingArchivedAt: String?
     @State private var showArchiveConfirm = false
@@ -53,23 +65,21 @@ struct AccountFormView: View {
         return false
     }
 
-    /// Ledger accounts choose among the four ledger subtypes; a valuation
-    /// account's subtype is always `investment` — subtype_matches_kind's
-    /// CHECK makes any other combination impossible, so the picker never
-    /// offers one.
-    private var subtypeOptions: [PublicSchema.AccountSubtype] {
-        if isEditing {
-            return editingKind == .valuation ? [.investment] : [.checking, .cash, .creditCard, .loan]
-        }
-        return [.checking, .cash, .creditCard, .loan, .investment]
-    }
-
     private var selectedCurrencyMinorUnit: Int {
         Int(currencies.first { $0.code == currency }?.minorUnit ?? 2)
     }
 
     var body: some View {
-        NavigationStack {
+        if embedInNavigationStack {
+            NavigationStack { formContent }
+        } else {
+            formContent
+        }
+    }
+
+    @ViewBuilder
+    private var formContent: some View {
+        Group {
             Form {
                 if isLoading {
                     ProgressView()
@@ -78,14 +88,14 @@ struct AccountFormView: View {
                         TextField("Account name", text: $name)
                     }
 
-                    Section("Type") {
-                        Picker("Type", selection: $subtype) {
-                            ForEach(subtypeOptions, id: \.self) { option in
-                                Text(label(for: option)).tag(option)
+                    if editingKind == .investment {
+                        Section {
+                            HStack {
+                                Text("Type")
+                                Spacer()
+                                InvestmentBadge()
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .disabled(subtypeOptions.count == 1)
                     }
 
                     Section("Currency") {
@@ -175,8 +185,10 @@ struct AccountFormView: View {
             .navigationTitle(isEditing ? "Edit Account" : "New Account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                if embedInNavigationStack {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button { dismissSelf() } label: { Image(systemName: "xmark") }
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
@@ -222,16 +234,6 @@ struct AccountFormView: View {
         .padding(.vertical, 4)
     }
 
-    private func label(for subtype: PublicSchema.AccountSubtype) -> String {
-        switch subtype {
-        case .checking: return "Checking"
-        case .cash: return "Cash"
-        case .creditCard: return "Credit Card"
-        case .loan: return "Loan"
-        case .investment: return "Investment"
-        }
-    }
-
     private var isSaveDisabled: Bool {
         isLoading || isSaving
             || name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -247,7 +249,9 @@ struct AccountFormView: View {
         currencies = (try? await session.dbQueue.read { database in try LocalTableQueries.currencies(database) }) ?? []
 
         switch mode {
-        case .create:
+        case .create(let kind):
+            editingKind = kind
+            icon = AccountAppearance.defaultIcon(forKind: kind)
             currency = session.profile?.baseCurrency ?? currencies.first?.code ?? "USD"
             openingBalanceText = AmountFormatter.editableString(0, minorUnit: selectedCurrencyMinorUnit)
         case .edit(let id):
@@ -285,7 +289,6 @@ struct AccountFormView: View {
         editingKind = account.kind
         editingArchivedAt = account.archivedAt
         name = account.name
-        subtype = account.subtype
         currency = account.currency
         includeInTotal = account.includeInTotal
         icon = account.icon
@@ -307,8 +310,8 @@ extension AccountFormView {
         errorMessage = nil
         do {
             switch mode {
-            case .create:
-                try await createAccount(openingBalanceE4: openingBalanceE4)
+            case .create(let kind):
+                try await createAccount(kind: kind, openingBalanceE4: openingBalanceE4)
             case .edit:
                 try await updateAccount(openingBalanceE4: openingBalanceE4)
             }
@@ -318,7 +321,7 @@ extension AccountFormView {
             // A version conflict, if one happens, surfaces later via
             // Needs Review, not as a reason to keep this sheet open.
             onSaved()
-            dismiss()
+            dismissSelf()
         } catch {
             errorMessage = UserFacingError.describe(error)
         }
@@ -328,11 +331,10 @@ extension AccountFormView {
     /// Goes through `session.outbox`, never `AccountRepository` directly —
     /// same reasoning as TransactionFormView's writes: an offline create
     /// queues instead of erroring.
-    fileprivate func createAccount(openingBalanceE4: Int64) async throws {
+    fileprivate func createAccount(kind: PublicSchema.AccountKind, openingBalanceE4: Int64) async throws {
         guard let userId = session.profile?.id else { return }
-        let kind: PublicSchema.AccountKind = subtype == .investment ? .valuation : .ledger
         let payload = CreateAccountPayload(
-            id: UUID(), ownerId: userId, kind: kind, subtype: subtype,
+            id: UUID(), ownerId: userId, kind: kind,
             name: name, currency: currency, openingBalanceE4: openingBalanceE4,
             icon: icon, color: color.hexString ?? CategoryAppearance.randomColor()
         )
@@ -345,7 +347,7 @@ extension AccountFormView {
             return
         }
         let payload = UpdateAccountPayload(
-            id: id, expectedVersion: expectedVersion, name: name, subtype: subtype,
+            id: id, expectedVersion: expectedVersion, name: name,
             openingBalanceE4: openingBalanceE4, includeInTotal: includeInTotal,
             icon: icon, color: color.hexString ?? CategoryAppearance.randomColor()
         )
@@ -361,14 +363,14 @@ extension AccountFormView {
         let payload = ArchiveAccountPayload(id: id, expectedVersion: expectedVersion, archived: archived)
         await session.outbox.submitArchiveAccount(payload)
         onSaved()
-        dismiss()
+        dismissSelf()
     }
 
     /// A separate action from Save, on purpose — "this account is worth X
-    /// right now" doesn't touch name/subtype/opening balance, and
-    /// `set_account_balance` computes the actual gap server-side (or, for
-    /// a valuation account, just writes a new snapshot) rather than this
-    /// form guessing one. Offline-capable like every other write here: it
+    /// right now" doesn't touch name/opening balance, and
+    /// `set_account_balance` computes the actual gap server-side and files
+    /// an adjustment transaction rather than this form guessing one.
+    /// Offline-capable like every other write here: it
     /// queues through the outbox and the RPC recomputes the true gap
     /// fresh whenever it finally runs, so a queued edit is never stale by
     /// the time it lands.

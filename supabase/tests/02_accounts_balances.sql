@@ -1,6 +1,8 @@
--- accounts / balance_snapshots: RLS visibility and the two balance formulas
--- (money rule 1). Fixture A = 11111111-..., fixture B = 22222222-...
--- (supabase/tests/_helpers.sql).
+-- accounts: RLS visibility and the one balance formula every account kind
+-- shares (opening_balance_e4 + SUM(amount_e4)) — the ledger/valuation split
+-- was eliminated in 20260902100000_unify_account_kinds.sql; `kind` is now
+-- purely presentational (an "Investment" badge), never a second formula.
+-- Fixture A = 11111111-..., fixture B = 22222222-... (supabase/tests/_helpers.sql).
 --
 -- Money is bigint at fixed scale 4 (L1, migration 20260815100000) — 100.00
 -- is written as 1000000.
@@ -8,7 +10,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(12);
+select plan(11);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -17,16 +19,16 @@ select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111
 -- RLS visibility
 -- ----------------------------------------------------------------------------
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'A Checking', 'EUR', 1000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'regular', 'A Checking', 'EUR', 1000000);
 
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('b0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'ledger', 'checking', 'B Checking', 'USD', 1000000);
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('b0000000-0000-0000-0000-000000000001', auth.uid(), auth.uid(), 'regular', 'B Checking', 'USD', 1000000);
 
 select is(
   (select count(*) from accounts where id = 'a0000000-0000-0000-0000-000000000001'),
@@ -113,63 +115,42 @@ select is(
 );
 
 -- ----------------------------------------------------------------------------
--- Valuation balance: latest snapshot at/before today + SUM(transfers after
--- the snapshot's created_at, confirmed, occurred_at <= now())
+-- Investment-kind balance: identical formula to a regular account —
+-- opening_balance_e4 + SUM(confirmed, non-deleted, occurred_at <= now()).
+-- `kind` no longer selects a formula; it's presentational only.
 -- ----------------------------------------------------------------------------
 
-insert into accounts (id, owner_id, created_by, kind, subtype, name, currency, opening_balance_e4)
-values ('a0000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'valuation', 'investment', 'Brokerage', 'EUR', 0);
-
-select is(
-  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
-  null::bigint,
-  'an unsnapshotted valuation account renders no balance (never 0)'
-);
-
--- created_at is backdated by a minute explicitly: now() is frozen for the
--- whole enclosing transaction in Postgres, so inside this one test-file
--- transaction the snapshot and the transfer below would otherwise share
--- the EXACT same now()-derived timestamp, making occurred_at > created_at
--- false and silently failing to reproduce the same-day-transfer scenario
--- this test exists to cover. Two separate client calls in production never
--- have this problem — each gets its own transaction and its own now().
-insert into balance_snapshots (account_id, currency, as_of, value_e4, created_by, created_at)
-values ('a0000000-0000-0000-0000-000000000002', 'EUR', current_date, 10000000, auth.uid(), clock_timestamp() - interval '1 minute');
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values ('a0000000-0000-0000-0000-000000000002', auth.uid(), auth.uid(), 'investment', 'Brokerage', 'EUR', 10000000);
 
 select is(
   (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
   10000000::bigint,
-  'valuation balance with zero transfers after the snapshot is exactly the snapshot value'
+  'an investment account with zero transactions is exactly opening_balance_e4, same as a regular account'
 );
 
--- A same-day transfer must count — the exact bug the Phase 2 log documents
--- comparing occurred_at::date > as_of (both "today", so false) instead of
--- occurred_at > created_at.
+-- A transfer into an investment account is a plain confirmed transaction,
+-- moving its balance the same way it would for any other account kind.
 select create_transfer('a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 500000);
 
 select is(
   (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
   10500000::bigint,
-  'a same-day transfer after the snapshot is included in the valuation balance'
+  'a transfer into an investment account moves its balance exactly like a regular account'
 );
 
--- valuation_transfers_only: a valuation account can never take a plain
--- expense/income insert, only transfers.
--- The 4-arg form (sql, errcode, errmsg, description) is the only one that
--- can pin the SQLSTATE while leaving the message unchecked and still
--- supplying a friendly description: the 3-arg (sql, errcode, X) form
--- dispatches X as errmsg to match, NOT as a free-text description —
--- confirmed against pgtap's own source while building this test, after the
--- 3-arg form failed here expecting the description text verbatim as the
--- constraint's error message.
-select throws_ok(
-  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
-     values (
-       '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
-       'a0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000001', -100000, 'EUR', now()
-     ) $$,
-  '23514', null,
-  'a valuation account rejects a plain expense/income insert (transfers only)'
+-- valuation_transfers_only is gone: an investment account now accepts a
+-- plain expense/income insert exactly like a regular account.
+insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
+values (
+  '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
+  'a0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000001', -100000, 'EUR', now()
+);
+
+select is(
+  (select balance_e4 from account_balances where account_id = 'a0000000-0000-0000-0000-000000000002'),
+  10400000::bigint,
+  'an investment account accepts a plain expense insert and its balance reflects it'
 );
 
 -- accounts_with_balances exposes the join every screen relies on.

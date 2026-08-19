@@ -24,7 +24,7 @@ struct CSVImportView: View {
             Section("Account") {
                 Picker("Import into", selection: $selectedAccountId) {
                     Text("Choose an account").tag(UUID?.none)
-                    ForEach(ledgerAccounts) { account in
+                    ForEach(importableAccounts) { account in
                         Text(account.name).tag(UUID?.some(account.id))
                     }
                 }
@@ -82,8 +82,8 @@ struct CSVImportView: View {
         }
     }
 
-    private var ledgerAccounts: [LocalAccountRow] {
-        accounts.filter { $0.kind == .ledger && $0.archivedAt == nil }
+    private var importableAccounts: [LocalAccountRow] {
+        accounts.filter { $0.archivedAt == nil }
     }
 
     private func handlePickedFile(_ result: Result<URL, Error>) {
