@@ -38,6 +38,20 @@ extension LiveOutboxSender {
         }
     }
 
+    public func reorderAccounts(_ payload: ReorderAccountsPayload) async throws {
+        try await AccountRepository.reorder(client: client, accountIds: payload.accountIds)
+    }
+
+    public func setAccountKind(_ payload: SetAccountKindPayload) async throws -> Bool {
+        let result = try await AccountRepository.setKind(
+            client: client, id: payload.id, expectedVersion: payload.expectedVersion, kind: payload.kind
+        )
+        switch result {
+        case .saved: return true
+        case .conflict: return false
+        }
+    }
+
     public func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool {
         let result = try await AccountRepository.setBalance(
             client: client, accountId: payload.accountId, newBalanceE4: payload.newBalanceE4,
@@ -104,6 +118,33 @@ extension Outbox {
         }
     }
 
+    /// Both drag writes. `submitReorderAccounts` carries no
+    /// `expectedVersion` (ordering never conflicts), while
+    /// `submitSetAccountKind` does — see their payload types for why they
+    /// differ, and `AccountsListView` for why one gesture can queue both.
+    @discardableResult
+    public func submitReorderAccounts(_ payload: ReorderAccountsPayload) async -> Task<OutboxSubmitResult, Never> {
+        await applyLocally { try OutboxLocalWrite.reorderAccounts(payload, in: $0) }
+        return Task {
+            await self.attempt(id: payload.id, kind: .reorderAccounts, payload: payload) {
+                try await self.sender.reorderAccounts(payload)
+                return true
+            }
+        }
+    }
+
+    @discardableResult
+    public func submitSetAccountKind(_ payload: SetAccountKindPayload) async -> Task<OutboxSubmitResult, Never> {
+        await applyLocally { try OutboxLocalWrite.setAccountKind(payload, in: $0) }
+        return Task {
+            await self.attempt(
+                id: payload.id, kind: .setAccountKind, payload: payload, expectedVersion: payload.expectedVersion
+            ) {
+                try await self.sender.setAccountKind(payload)
+            }
+        }
+    }
+
     /// `id` is the adjustment-transaction/snapshot id, freshly generated
     /// per edit — two balance edits made offline before either syncs are
     /// deliberately NOT collapsed into one queued item the way an edit to
@@ -155,7 +196,7 @@ extension Outbox {
         }
     }
 
-    /// Called only for the four cases `replay(_:)` delegates here — the
+    /// Called only for the cases `replay(_:)` delegates here — the
     /// `default` branch is unreachable in practice, kept only because a
     /// non-exhaustive switch over `OutboxKind` isn't allowed.
     func replayAccountOrCategory(_ kind: OutboxKind, data: Data) async throws -> Bool {
@@ -169,6 +210,11 @@ extension Outbox {
             return try await sender.setAccountBalance(decoder.decode(SetAccountBalancePayload.self, from: data))
         case .archiveAccount:
             return try await sender.archiveAccount(decoder.decode(ArchiveAccountPayload.self, from: data))
+        case .reorderAccounts:
+            try await sender.reorderAccounts(decoder.decode(ReorderAccountsPayload.self, from: data))
+            return true
+        case .setAccountKind:
+            return try await sender.setAccountKind(decoder.decode(SetAccountKindPayload.self, from: data))
         case .createCategory:
             try await sender.createCategory(decoder.decode(CreateCategoryPayload.self, from: data))
             return true

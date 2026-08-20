@@ -20,7 +20,8 @@ public extension TransactionRepository {
         toAmountE4: Int64? = nil,
         occurredAt: Date = Date(),
         fromId: UUID? = nil,
-        toId: UUID? = nil
+        toId: UUID? = nil,
+        notes: String? = nil
     ) async throws {
         let params = CreateTransferParams(
             fromAccountId: fromAccountId,
@@ -29,7 +30,8 @@ public extension TransactionRepository {
             toAmountE4: toAmountE4,
             occurredAt: PostgresDate.timestampString(occurredAt),
             fromId: fromId,
-            toId: toId
+            toId: toId,
+            notes: notes
         )
         try await client.rpc("create_transfer", params: params).execute()
     }
@@ -148,6 +150,7 @@ struct UpdateTransferParams: Encodable {
     let fromAmountE4: Int64
     let toAmountE4: Int64
     let occurredAt: String
+    let notes: String?
     enum CodingKeys: String, CodingKey {
         case transferGroupId = "p_transfer_group_id"
         case fromExpectedVersion = "p_from_expected_version"
@@ -155,6 +158,7 @@ struct UpdateTransferParams: Encodable {
         case fromAmountE4 = "p_from_amount_e4"
         case toAmountE4 = "p_to_amount_e4"
         case occurredAt = "p_occurred_at"
+        case notes = "p_notes"
     }
 }
 
@@ -186,6 +190,7 @@ private struct CreateTransferParams: Encodable {
     let occurredAt: String
     let fromId: UUID?
     let toId: UUID?
+    let notes: String?
     enum CodingKeys: String, CodingKey {
         case fromAccountId = "p_from_account_id"
         case toAccountId = "p_to_account_id"
@@ -194,5 +199,6 @@ private struct CreateTransferParams: Encodable {
         case occurredAt = "p_occurred_at"
         case fromId = "p_from_id"
         case toId = "p_to_id"
+        case notes = "p_notes"
     }
 }

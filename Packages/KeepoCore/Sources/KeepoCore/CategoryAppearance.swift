@@ -41,23 +41,13 @@ public enum CategoryAppearance {
         return kind == .income ? fallbackIncomeIcon : fallbackExpenseIcon
     }
 
-    /// The picker's full menu — one flat, deduplicated list covering both
-    /// the keyword set above and a handful of generic extras, so a user
-    /// picking a different icon isn't limited to whatever the heuristic
-    /// already knows about.
-    public static let pickerIcons: [String] = {
-        let candidates = keywordIcons.map(\.icon) + [fallbackExpenseIcon, fallbackIncomeIcon] + [
-            "ellipsis.circle.fill", "wrench.and.screwdriver.fill", "star.fill", "cross.case.fill",
-            "graduationcap.fill", "wifi", "creditcard.fill", "building.columns.fill", "leaf.fill", "cup.and.saucer.fill"
-        ]
-        var seen = Set<String>()
-        return candidates.filter { seen.insert($0).inserted }
-    }()
-
     /// A curated palette rather than uniform-random RGB — every value here
     /// reads clearly against both a white icon glyph and the app's own
     /// light/dark backgrounds, which arbitrary random hues can't promise.
-    private static let palette = [
+    /// Public because it is also the swatch row `IconCatalogView` offers —
+    /// the colours a new category is assigned and the colours a user can
+    /// pick must be the same set, not two lists that drift.
+    public static let palette = [
         "#FF3B30", "#FF9500", "#FFCC00", "#34C759", "#00C7BE", "#30B0C7",
         "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#A2845E", "#8E8E93"
     ]

@@ -55,6 +55,10 @@ public enum LocalSchemaV1 {
             table.column("include_in_total", .boolean).notNull()
             table.column("icon", .text).notNull()
             table.column("color", .text).notNull()
+            // The user's own arrangement of the Accounts list. Presentational,
+            // like icon/color — nothing here reads it but the ORDER BY in
+            // `LocalAccountRow.fetchAll`.
+            table.column("sort_order", .integer).notNull().defaults(to: 0)
             table.column("archived_at", .text)
             table.column("version", .integer).notNull()
             table.column("deleted_at", .text)
@@ -184,6 +188,12 @@ public enum LocalSchemaV1 {
             table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("card_identifier", .text).notNull()
             table.column("account_id", .text).collate(.nocase)
+            // 'manual' (the user named this card) vs 'automatic' (the capture
+            // pipeline linked it while they reviewed a transaction) — the
+            // Mapped Card popup's only use for it. Defaulted rather than
+            // NOT NULL-without-default so a row pulled from a server that
+            // predates the column still applies.
+            table.column("source", .text).notNull().defaults(to: "manual")
             table.column("created_at", .text).notNull()
             table.column("updated_at", .text).notNull()
             table.column("deleted_at", .text)
@@ -286,41 +296,6 @@ public enum LocalSchemaV1 {
     }
 }
 
-/// The GRDB row backing `outbox_items` — the storage `Outbox` (App/Outbox.swift)
-/// reads and writes. `id` is the queued write's own client-generated UUID
-/// (see `Outbox`'s own doc comment on why), stored as `TEXT`, matching every
-/// other id column across this store.
-struct OutboxItemRecord: Codable, FetchableRecord, PersistableRecord {
-    static let databaseTableName = "outbox_items"
-    // `created_at` here is purely local bookkeeping (FIFO ordering,
-    // staleness checks) — never compared against a server-issued timestamp —
-    // so unlike every synced table's `TEXT` date columns, this one is
-    // encoded as a `timeIntervalSince1970` numeric string: full sub-second
-    // precision, no ISO 8601 whole-second truncation that could round a
-    // just-inserted row's timestamp into the future relative to `Date()`
-    // read a moment later (confirmed empirically — `.iso8601`'s truncation
-    // made `hasStalePending(threshold: 0)` flaky immediately after `enqueue`).
-    static let databaseDateEncodingStrategy: DatabaseDateEncodingStrategy = .timeIntervalSince1970
-    static let databaseDateDecodingStrategy: DatabaseDateDecodingStrategy = .timeIntervalSince1970
-
-    var id: UUID
-    var kind: String
-    var payloadJSON: Data
-    var expectedVersion: Int?
-    var createdAt: Date
-    var attempts: Int
-    var lastError: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, kind
-        case payloadJSON = "payload_json"
-        case expectedVersion = "expected_version"
-        case createdAt = "created_at"
-        case attempts
-        case lastError = "last_error"
-    }
-}
-
 public enum LocalStore {
     /// Same one-process, one-container reasoning as `OfflineStore` — the
     /// App target (not an extension) is exactly why `CaptureIntent` can
@@ -358,6 +333,14 @@ public enum LocalStore {
         // this rebuild to drop them locally too, or every pull row omitting
         // those columns hits an INSERT NOT NULL violation.
         migrator.registerMigration("v5_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260903100000 adds accounts.sort_order
+        // and card_mappings.source server-side. Unlike the v5 case these are
+        // additive, so a stale device would not hard-fail on them; it would
+        // silently drop both columns from every pulled row (SyncApply's
+        // whitelist is intersected with the local schema), leaving the
+        // Accounts list unable to remember its own order. Same rebuild, same
+        // self-heal.
+        migrator.registerMigration("v6_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)

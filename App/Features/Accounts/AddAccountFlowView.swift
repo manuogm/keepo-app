@@ -20,11 +20,10 @@ struct AddAccountFlowView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                Text("What kind of account is this?")
-                    .font(.callout)
-                    .foregroundStyle(Color.secondary)
-                    .padding(.top, 8)
+            VStack(alignment: .leading, spacing: 20) {
+                Text("What are you tracking?")
+                    .font(.title3.weight(.semibold))
+                    .padding(.top, 4)
 
                 AccountKindPicker { kind in
                     selectedKind = kind
@@ -32,7 +31,9 @@ struct AddAccountFlowView: View {
 
                 Spacer()
             }
-            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("New Account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -55,56 +56,63 @@ struct AddAccountFlowView: View {
 /// inline step in an already-full-screen flow, wraps this in its own header
 /// text instead), so the two entry points can never drift apart on what the
 /// two cards say or look like.
+///
+/// Both kinds behave identically (income/expense/transfer, card mapping —
+/// all offered on either), so these cards are not sorting the account into
+/// different capabilities. Since migration 20260903100000 the choice is not
+/// even permanent any more: dragging a row between the two groups on the
+/// Accounts list converts it. That is why the copy leans on what the user
+/// is *tracking* rather than warning them to choose carefully.
 struct AccountKindPicker: View {
     let onSelect: (PublicSchema.AccountKind) -> Void
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             kindCard(
                 kind: .regular,
-                title: "Regular Account",
-                subtitle: "Checking, cash, credit card, loan — everyday spending and income.",
-                icon: "creditcard"
+                title: "Everyday",
+                subtitle: "Checking, cash, credit card, loan — money you spend and receive.",
+                icon: "creditcard.fill"
             )
             kindCard(
                 kind: .investment,
-                title: "Investment Account",
-                subtitle: "Brokerage, retirement, or any account you're tracking as an investment.",
+                title: "Investment",
+                subtitle: "Brokerage, retirement, or anything you track as an investment.",
                 icon: "chart.line.uptrend.xyaxis"
             )
         }
     }
 
-    private func kindCard(kind: PublicSchema.AccountKind, title: String, subtitle: String, icon: String) -> some View {
+    private func kindCard(
+        kind: PublicSchema.AccountKind, title: String, subtitle: String, icon: String
+    ) -> some View {
         Button {
             onSelect(kind)
         } label: {
-            HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
                 Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 44, height: 44)
-                    .background(Color.accentColor.opacity(0.15), in: Circle())
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(Color.primary)
+                    .frame(width: 56, height: 56)
+                    .background(Color(.tertiarySystemGroupedBackground), in: Circle())
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.headline)
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(Color.primary)
                     Text(subtitle)
-                        .font(.footnote)
+                        .font(.subheadline)
                         .foregroundStyle(Color.secondary)
                         .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
             }
-            .padding()
+            .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressableCard)
+        .sensoryFeedback(.selection, trigger: title)
+        .accessibilityLabel("\(title). \(subtitle)")
     }
 }

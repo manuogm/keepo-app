@@ -39,7 +39,7 @@ public struct LiveOutboxSender: OutboxSending {
             try await TransactionRepository.createTransfer(
                 client: client, fromAccountId: payload.fromAccountId, toAccountId: payload.toAccountId,
                 fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4, occurredAt: payload.occurredAt,
-                fromId: payload.fromId, toId: payload.toId
+                fromId: payload.fromId, toId: payload.toId, notes: payload.notes
             )
         } catch {
             if Self.isDuplicateKey(error) { return }
@@ -63,7 +63,8 @@ public struct LiveOutboxSender: OutboxSending {
         let result = try await TransactionRepository.updateTransfer(
             client: client, transferGroupId: payload.transferGroupId,
             fromExpectedVersion: payload.fromExpectedVersion, toExpectedVersion: payload.toExpectedVersion,
-            fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4, occurredAt: payload.occurredAt
+            fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4,
+            occurredAt: payload.occurredAt, notes: payload.notes
         )
         switch result {
         case .saved: return true

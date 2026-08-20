@@ -70,4 +70,68 @@ struct MoneyFormatterTests {
         #expect(split.whole == "—")
         #expect(split.fraction.isEmpty)
     }
+
+    // MARK: - Ledger sign style
+    //
+    // The stored value is never re-signed (money rule 1) — these only
+    // assert what is *drawn*, which is why every case below passes the same
+    // negative/positive Int64 the standard style also renders.
+
+    @Test("ledger style drops an outflow's minus sign")
+    func ledgerDropsMinus() {
+        let drawn = MoneyFormatter.format(-123_450, currency: usd, locale: usLocale, signStyle: .ledger)
+        #expect(!drawn.contains("-"))
+        #expect(drawn == MoneyFormatter.format(123_450, currency: usd, locale: usLocale))
+    }
+
+    @Test("ledger style prefixes an inflow with an explicit plus")
+    func ledgerAddsPlus() {
+        let drawn = MoneyFormatter.format(123_450, currency: usd, locale: usLocale, signStyle: .ledger)
+        #expect(drawn.hasPrefix("+"))
+        #expect(drawn.dropFirst() == MoneyFormatter.format(123_450, currency: usd, locale: usLocale))
+    }
+
+    @Test("ledger style leaves zero unsigned")
+    func ledgerZeroUnsigned() {
+        let drawn = MoneyFormatter.format(0, currency: usd, locale: usLocale, signStyle: .ledger)
+        #expect(drawn == MoneyFormatter.format(0, currency: usd, locale: usLocale))
+    }
+
+    @Test("ledger style still renders a missing value as an em dash, never a signed zero")
+    func ledgerMissingValue() {
+        #expect(MoneyFormatter.format(nil, currency: usd, locale: usLocale, signStyle: .ledger) == "—")
+    }
+
+    @Test("ledger formatSplit keeps the plus on the whole part, not the fraction")
+    func ledgerFormatSplit() {
+        let split = MoneyFormatter.formatSplit(123_450, currency: usd, locale: usLocale, signStyle: .ledger)
+        #expect(split.whole.hasPrefix("+"))
+        // 123_450 e4 is 12.345, which rounds half-away-from-zero to 12.35.
+        #expect(split.fraction == ".35")
+        #expect(split.whole + split.fraction
+            == MoneyFormatter.format(123_450, currency: usd, locale: usLocale, signStyle: .ledger))
+    }
+
+    @Test("ledger style does not trap on Int64.min")
+    func ledgerExtremeValue() {
+        #expect(!MoneyFormatter.format(.min, currency: usd, locale: usLocale, signStyle: .ledger).isEmpty)
+    }
+
+    // MARK: - Symbol + separator accessors
+
+    @Test("symbol(for:) returns the locale's currency symbol")
+    func currencySymbol() {
+        #expect(MoneyFormatter.symbol(for: usd, locale: usLocale) == "$")
+    }
+
+    @Test("a cached formatter is not shared across currencies")
+    func cacheKeyedByCurrency() {
+        let dollars = MoneyFormatter.format(123_450, currency: usd, locale: usLocale)
+        let yen = MoneyFormatter.format(15_000_000, currency: jpy, locale: usLocale)
+        #expect(dollars != yen)
+        // Re-reading each must be stable — a cache that mutated a shared
+        // formatter in place would only show up on the second call.
+        #expect(MoneyFormatter.format(123_450, currency: usd, locale: usLocale) == dollars)
+        #expect(MoneyFormatter.format(15_000_000, currency: jpy, locale: usLocale) == yen)
+    }
 }

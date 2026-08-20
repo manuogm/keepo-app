@@ -36,10 +36,15 @@ public struct CreateTransferPayload: Codable, Sendable {
     public let fromAmountE4: Int64
     public let toAmountE4: Int64?
     public let occurredAt: Date
+    /// Written to BOTH legs — a transfer is one act by the user, and either
+    /// account's history read on its own must still show what they wrote.
+    /// Optional so an already-queued payload from before migration
+    /// 20260904100000 still decodes.
+    public let notes: String?
 
     public init(
         fromId: UUID, toId: UUID, fromAccountId: UUID, toAccountId: UUID,
-        fromAmountE4: Int64, toAmountE4: Int64?, occurredAt: Date
+        fromAmountE4: Int64, toAmountE4: Int64?, occurredAt: Date, notes: String? = nil
     ) {
         self.fromId = fromId
         self.toId = toId
@@ -48,6 +53,7 @@ public struct CreateTransferPayload: Codable, Sendable {
         self.fromAmountE4 = fromAmountE4
         self.toAmountE4 = toAmountE4
         self.occurredAt = occurredAt
+        self.notes = notes
     }
 }
 
@@ -85,10 +91,12 @@ public struct UpdateTransferPayload: Codable, Sendable {
     public let fromAmountE4: Int64
     public let toAmountE4: Int64
     public let occurredAt: Date
+    /// See `CreateTransferPayload.notes` — same both-legs rule.
+    public let notes: String?
 
     public init(
         transferGroupId: UUID, fromExpectedVersion: Int, toExpectedVersion: Int,
-        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date
+        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date, notes: String? = nil
     ) {
         self.transferGroupId = transferGroupId
         self.fromExpectedVersion = fromExpectedVersion
@@ -96,6 +104,7 @@ public struct UpdateTransferPayload: Codable, Sendable {
         self.fromAmountE4 = fromAmountE4
         self.toAmountE4 = toAmountE4
         self.occurredAt = occurredAt
+        self.notes = notes
     }
 }
 
@@ -181,9 +190,9 @@ public struct CreateAccountPayload: Codable, Sendable {
     }
 }
 
-/// `kind` stays absent by omission, same as before the subtype/kind
-/// unification — an account's kind was already immutable, and the
-/// migration's `update_account` RPC still takes no kind parameter.
+/// `kind` stays absent by omission — `update_account` still takes no kind
+/// parameter, and kind now has its own dedicated write
+/// (`SetAccountKindPayload`) rather than riding along with every rename.
 public struct UpdateAccountPayload: Codable, Sendable {
     public let id: UUID
     public let expectedVersion: Int

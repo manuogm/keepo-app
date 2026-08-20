@@ -242,7 +242,8 @@ public enum TransactionRepository {
         toExpectedVersion: Int,
         fromAmountE4: Int64,
         toAmountE4: Int64,
-        occurredAt: Date = Date()
+        occurredAt: Date = Date(),
+        notes: String? = nil
     ) async throws -> WriteResult {
         let params = UpdateTransferParams(
             transferGroupId: transferGroupId,
@@ -250,7 +251,8 @@ public enum TransactionRepository {
             toExpectedVersion: toExpectedVersion,
             fromAmountE4: fromAmountE4,
             toAmountE4: toAmountE4,
-            occurredAt: PostgresDate.timestampString(occurredAt)
+            occurredAt: PostgresDate.timestampString(occurredAt),
+            notes: notes
         )
         let rows: [ConflictRow] = try await client.rpc("update_transfer", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict

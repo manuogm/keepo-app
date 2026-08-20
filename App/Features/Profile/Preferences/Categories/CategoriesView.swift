@@ -12,6 +12,10 @@ struct CategoriesView: View {
     private enum KindTab: String, CaseIterable {
         case expense = "Expense"
         case income = "Income"
+
+        var categoryKind: PublicSchema.CategoryKind {
+            self == .income ? .income : .expense
+        }
     }
 
     @State private var categories: [PublicSchema.CategoriesSelect] = []
@@ -45,6 +49,7 @@ struct CategoriesView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding()
+                .sensoryFeedback(.selection, trigger: selectedTab)
 
                 if isLoading {
                     Spacer()
@@ -89,8 +94,11 @@ struct CategoriesView: View {
                 }
             }
         }
+        // The tab bar above has already answered "expense or income", so the
+        // form is opened for that kind rather than asking a second time. Two
+        // entry points, one form — the kind is a parameter, not a control.
         .sheet(isPresented: $isAddingCategory) {
-            CategoryFormView(session: session) {
+            CategoryFormView(session: session, mode: .create(kind: selectedTab.categoryKind)) {
                 session.refresh.bump()
             }
         }

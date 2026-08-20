@@ -51,6 +51,7 @@ struct BudgetFormView: View {
                     } else {
                         Section {
                             Toggle("Overall (not tied to a category)", isOn: $isOverall)
+                    .tint(.green)
                         }
                         if !isOverall {
                             Section("Category") {

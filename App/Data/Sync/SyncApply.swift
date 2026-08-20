@@ -23,8 +23,8 @@ enum SyncApply {
     private static let tableColumns: [String: Set<String>] = [
         "accounts": [
             "id", "owner_id", "created_by", "kind", "name", "currency", "opening_balance_e4",
-            "opening_balance_at", "include_in_total", "icon", "color", "archived_at", "version", "deleted_at",
-            "created_at", "updated_at", "sync_seq"
+            "opening_balance_at", "include_in_total", "icon", "color", "sort_order", "archived_at", "version",
+            "deleted_at", "created_at", "updated_at", "sync_seq"
         ],
         "transactions": [
             "id", "owner_id", "created_by", "account_id", "category_id", "category_kind",
@@ -47,7 +47,8 @@ enum SyncApply {
         "currencies": ["code", "minor_unit", "sync_seq"],
         "fx_rates": ["currency", "rate_date", "rate_to_eur", "source", "fetched_at", "sync_seq"],
         "card_mappings": [
-            "id", "owner_id", "card_identifier", "account_id", "created_at", "updated_at", "deleted_at", "sync_seq"
+            "id", "owner_id", "card_identifier", "account_id", "source", "created_at", "updated_at", "deleted_at",
+            "sync_seq"
         ],
         "merchant_category_map": [
             "owner_id", "merchant_pattern", "category_id", "updated_at", "deleted_at", "sync_seq"

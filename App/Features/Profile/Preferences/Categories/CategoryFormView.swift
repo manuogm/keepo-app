@@ -1,8 +1,12 @@
 import KeepoCore
 import SwiftUI
 
-/// Create and edit share one form, mirroring `AccountFormView`. Kind is
-/// locked once a category exists, same reasoning as an account's kind/
+/// Create and edit share one form, mirroring `AccountFormView` — including
+/// its shape: a `ScrollView` of cards rather than a labelled `Form`, the big
+/// tappable icon standing in for an "Icon" section plus a "Color" section,
+/// and one centred destructive action at the bottom.
+///
+/// Kind is locked once a category exists, same reasoning as an account's
 /// currency being locked on edit: `sign_matches_category_kind` ties every
 /// transaction already referencing this category to its current kind, so
 /// changing it would invalidate history rather than just this row.
@@ -11,15 +15,19 @@ import SwiftUI
 /// `AccountFormView`, there's no separate "raw row vs. enriched view" split
 /// for categories (`CategoriesSelect` already has every field this form
 /// needs), so the caller's already-loaded list row is reused directly and
-/// no network fetch (and therefore no offline fallback) is needed to open
-/// this sheet at all.
+/// no fetch is needed to open this sheet at all. That is also why this form
+/// never shows a loading spinner.
 struct CategoryFormView: View {
     let session: SessionStore
-    var mode: Mode = .create
+    var mode: Mode = .create(kind: .expense)
     var onSaved: () -> Void
 
     enum Mode {
-        case create
+        /// The kind is decided by whichever tab the user was on when they
+        /// tapped "+", not by a control inside this sheet — asking twice for
+        /// something already answered is exactly the redundant labelling this
+        /// redesign is removing.
+        case create(kind: PublicSchema.CategoryKind)
         case edit(PublicSchema.CategoriesSelect)
     }
 
@@ -27,10 +35,15 @@ struct CategoryFormView: View {
 
     @State private var name = ""
     @State private var kind: PublicSchema.CategoryKind = .expense
-    @State private var icon = CategoryAppearance.pickerIcons[0]
+    @State private var icon = CategoryAppearance.defaultIcon(forName: "", kind: .expense)
     @State private var color = Color(hex: CategoryAppearance.randomColor())
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var isPickingIcon = false
+    /// True once the user has opened the catalogue and chosen for
+    /// themselves, which is what stops the name-driven icon suggestion from
+    /// overwriting a deliberate choice.
+    @State private var hasPickedIcon = false
 
     @State private var deleteTransactionCount = 0
     @State private var isCheckingDelete = false
@@ -52,53 +65,53 @@ struct CategoryFormView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Name", text: $name)
-                        .disabled(isDefaultCategory)
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 16) {
+                        IconPickerButton(icon: icon, color: color) { isPickingIcon = true }
+                            .padding(.top, 8)
 
-                    if isEditing {
-                        Text(kind == .income ? "Income" : "Expense")
-                            .foregroundStyle(Color.secondary)
-                    } else {
-                        Picker("Kind", selection: $kind) {
-                            Text("Expense").tag(PublicSchema.CategoryKind.expense)
-                            Text("Income").tag(PublicSchema.CategoryKind.income)
+                        identityCard
+
+                        if isDefaultCategory {
+                            Text("The default category can't be renamed or deleted.")
+                                .font(.footnote)
+                                .foregroundStyle(Color.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .pickerStyle(.segmented)
+
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
                     }
-                } footer: {
-                    if isDefaultCategory {
-                        Text("The default category can't be renamed or deleted.")
-                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
                 }
-
-                Section("Icon") {
-                    iconGrid
-                }
-
-                Section("Color") {
-                    ColorPicker("Category Color", selection: $color, supportsOpacity: false)
-                }
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-
-                if isEditing && !isDefaultCategory {
-                    Section {
-                        Button(role: .destructive) {
+                .scrollDismissesKeyboard(.interactively)
+                // Same reasoning as `AccountFormView`: the destructive action
+                // belongs at the bottom of the SHEET, one predictable place,
+                // not at the bottom of however much content there happens to be.
+                .safeAreaInset(edge: .bottom) {
+                    if isEditing && !isDefaultCategory {
+                        DestructiveActionButton(
+                            title: "Delete Category", isEnabled: !isCheckingDelete && !isDeleting
+                        ) {
                             Task { await confirmDelete() }
-                        } label: {
-                            HStack {
-                                Text("Delete Category")
-                                Spacer()
-                                if isCheckingDelete { ProgressView() }
+                        }
+                        .overlay(alignment: .trailing) {
+                            if isCheckingDelete {
+                                ProgressView().controlSize(.small).padding(.trailing, 20)
                             }
                         }
-                        .disabled(isCheckingDelete || isDeleting)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        .padding(.bottom, 12)
+                        .background(.bar)
                     }
                 }
             }
@@ -106,11 +119,7 @@ struct CategoryFormView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
@@ -121,10 +130,16 @@ struct CategoryFormView: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
                 }
             }
-            .alert(
-                "Delete \"\(name)\"?",
-                isPresented: $showDeleteConfirm
-            ) {
+            .sheet(isPresented: $isPickingIcon) {
+                IconCatalogView(icon: $icon, color: $color)
+            }
+            // Visiting the catalogue at all counts as choosing: from that
+            // point the name-driven suggestion stops overriding what is on
+            // screen, whether the user changed it or confirmed it.
+            .onChange(of: isPickingIcon) { _, isPresented in
+                if !isPresented { hasPickedIcon = true }
+            }
+            .alert("Delete \"\(name)\"?", isPresented: $showDeleteConfirm) {
                 Button("Delete", role: .destructive) {
                     Task { await performDelete() }
                 }
@@ -141,34 +156,35 @@ struct CategoryFormView: View {
         .task { prefill() }
     }
 
-    @ViewBuilder
-    private var iconGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
-            ForEach(CategoryAppearance.pickerIcons, id: \.self) { candidate in
-                Button {
-                    icon = candidate
-                } label: {
-                    Image(systemName: candidate)
-                        .font(.title3)
-                        .frame(width: 36, height: 36)
-                        .foregroundStyle(icon == candidate ? Color.white : Color.primary)
-                        .background(icon == candidate ? color : Color(.systemGray5))
-                        .clipShape(Circle())
+    private var identityCard: some View {
+        FormCard {
+            TextField("Category Name", text: $name)
+                .font(.title3.weight(.medium))
+                .textInputAutocapitalization(.words)
+                .disabled(isDefaultCategory)
+                .foregroundStyle(isDefaultCategory ? Color.secondary : Color.primary)
+                // Only while creating, and only until the user picks
+                // something themselves — typing "Groceries" suggesting a
+                // cart is helpful; silently reverting a chosen icon on the
+                // next keystroke is not.
+                .onChange(of: name) { _, newValue in
+                    guard !isEditing, !hasPickedIcon else { return }
+                    icon = CategoryAppearance.defaultIcon(forName: newValue, kind: kind)
                 }
-                .buttonStyle(.plain)
-            }
         }
-        .padding(.vertical, 4)
     }
 
     private func prefill() {
-        if case .edit(let category) = mode {
+        switch mode {
+        case .edit(let category):
             name = category.name
             kind = category.kind
             icon = category.icon
             color = Color(hex: category.color)
-        } else {
-            icon = CategoryAppearance.defaultIcon(forName: "", kind: kind)
+            hasPickedIcon = true
+        case .create(let createKind):
+            kind = createKind
+            icon = CategoryAppearance.defaultIcon(forName: "", kind: createKind)
         }
     }
 

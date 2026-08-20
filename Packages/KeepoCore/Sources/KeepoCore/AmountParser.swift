@@ -27,10 +27,7 @@ public enum AmountParser {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
 
-        let formatter = NumberFormatter()
-        formatter.locale = locale
-        formatter.numberStyle = .decimal
-        formatter.generatesDecimalNumbers = true
+        let formatter = FormatterCache.parsing(locale: locale)
         if let number = formatter.number(from: trimmed) as? NSDecimalNumber {
             return number.decimalValue
         }
@@ -76,16 +73,22 @@ public extension AmountParser {
 /// reverse: editing an expense on a comma-decimal locale prefilled "12.50"
 /// into a field where only "12,50" parses back out.
 public enum AmountFormatter {
-    /// - Parameter amountE4: always rendered unsigned — sign is a property
-    ///   of the transaction kind the caller already tracks, never the field.
-    public static func editableString(_ amountE4: Int64, minorUnit: Int, locale: Locale = .current) -> String {
-        let magnitude = Decimal(amountE4.magnitude) / Decimal(10_000)
-        let formatter = NumberFormatter()
-        formatter.locale = locale
-        formatter.numberStyle = .decimal
-        formatter.usesGroupingSeparator = false
-        formatter.minimumFractionDigits = minorUnit
-        formatter.maximumFractionDigits = minorUnit
-        return formatter.string(from: magnitude as NSDecimalNumber) ?? "\(magnitude)"
+    /// - Parameter amountE4: rendered unsigned by default — for a transaction
+    ///   the sign is a property of the kind the caller already tracks, never
+    ///   of the field, and prefilling "-12.50" into an expense field invites
+    ///   the user to negate it a second time.
+    /// - Parameter signed: pass `true` for a figure whose sign is genuinely
+    ///   the user's to see and change — an ACCOUNT BALANCE, where negative
+    ///   means overdrawn or owed. Dropping the sign there is a real money bug:
+    ///   the field round-trips through `AmountParser`, so an unsigned prefill
+    ///   of an overdrawn account silently saves it back as a positive balance.
+    public static func editableString(
+        _ amountE4: Int64, minorUnit: Int, locale: Locale = .current, signed: Bool = false
+    ) -> String {
+        let value = signed
+            ? Decimal(amountE4) / Decimal(10_000)
+            : Decimal(amountE4.magnitude) / Decimal(10_000)
+        let formatter = FormatterCache.editable(minorUnit: minorUnit, locale: locale)
+        return formatter.string(from: value as NSDecimalNumber) ?? "\(value)"
     }
 }

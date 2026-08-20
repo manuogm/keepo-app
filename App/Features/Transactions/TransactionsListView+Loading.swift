@@ -32,6 +32,10 @@ extension TransactionsListView {
             transactions = loaded.transactions
             filterCategories = loaded.categories
             filterAccounts = loaded.accounts
+            // Day grouping and the category lookup are derived here, once,
+            // rather than recomputed inside `body` — see `regroup`'s own
+            // comment on why that mattered.
+            regroup()
         } catch {
             loadErrorMessage = UserFacingError.describe(error)
         }

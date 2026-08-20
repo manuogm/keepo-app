@@ -13,6 +13,10 @@ public enum PublicSchema {
     case household = "household"
     case total = "total"
   }
+  public enum CardMappingSource: String, Codable, Hashable, Sendable {
+    case manual = "manual"
+    case automatic = "automatic"
+  }
   public enum CategoryKind: String, Codable, Hashable, Sendable {
     case expense = "expense"
     case income = "income"
@@ -72,6 +76,7 @@ public enum PublicSchema {
     public let openingBalanceAt: String
     public let openingBalanceE4: Int64
     public let ownerId: UUID
+    public let sortOrder: Int32
     public let syncSeq: Int64
     public let updatedAt: String
     public let version: Int32
@@ -90,6 +95,7 @@ public enum PublicSchema {
       case openingBalanceAt = "opening_balance_at"
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
+      case sortOrder = "sort_order"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
@@ -110,6 +116,7 @@ public enum PublicSchema {
     public let openingBalanceAt: String?
     public let openingBalanceE4: Int64?
     public let ownerId: UUID
+    public let sortOrder: Int32?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
@@ -128,6 +135,7 @@ public enum PublicSchema {
       case openingBalanceAt = "opening_balance_at"
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
+      case sortOrder = "sort_order"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
@@ -148,6 +156,7 @@ public enum PublicSchema {
     public let openingBalanceAt: String?
     public let openingBalanceE4: Int64?
     public let ownerId: UUID?
+    public let sortOrder: Int32?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
@@ -166,6 +175,7 @@ public enum PublicSchema {
       case openingBalanceAt = "opening_balance_at"
       case openingBalanceE4 = "opening_balance_e4"
       case ownerId = "owner_id"
+      case sortOrder = "sort_order"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
@@ -256,6 +266,7 @@ public enum PublicSchema {
     public let deletedAt: String?
     public let id: UUID
     public let ownerId: UUID
+    public let source: CardMappingSource
     public let syncSeq: Int64
     public let updatedAt: String
     public enum CodingKeys: String, CodingKey {
@@ -265,6 +276,7 @@ public enum PublicSchema {
       case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
+      case source = "source"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
@@ -276,6 +288,7 @@ public enum PublicSchema {
     public let deletedAt: String?
     public let id: UUID?
     public let ownerId: UUID
+    public let source: CardMappingSource?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
@@ -285,6 +298,7 @@ public enum PublicSchema {
       case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
+      case source = "source"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }
@@ -296,6 +310,7 @@ public enum PublicSchema {
     public let deletedAt: String?
     public let id: UUID?
     public let ownerId: UUID?
+    public let source: CardMappingSource?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
@@ -305,6 +320,7 @@ public enum PublicSchema {
       case deletedAt = "deleted_at"
       case id = "id"
       case ownerId = "owner_id"
+      case source = "source"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
     }

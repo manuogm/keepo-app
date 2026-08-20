@@ -16,6 +16,13 @@ struct CurrencyConversionLabel: View {
     let baseCurrency: String?
     let baseMinorUnit: Int16?
     let hasMissingRate: Bool
+    /// Must match whatever the primary amount above it used. A transaction
+    /// row draws its amount in `.ledger` style (no minus on an outflow), so
+    /// a conversion line still rendering "-$115.00" under a "€125.00" reads
+    /// as two different numbers rather than one number twice. Defaults to
+    /// `.standard` because a balance — the other caller — genuinely does
+    /// need its sign.
+    var signStyle: MoneySignStyle = .standard
 
     var body: some View {
         if let text {
@@ -28,6 +35,6 @@ struct CurrencyConversionLabel: View {
     private var text: String? {
         guard let baseCurrency, let baseMinorUnit, baseCurrency != nativeCurrency else { return nil }
         let currency = CurrencyInfo(code: baseCurrency, minorUnit: Int(baseMinorUnit))
-        return MoneyFormatter.format(hasMissingRate ? nil : amountBase, currency: currency)
+        return MoneyFormatter.format(hasMissingRate ? nil : amountBase, currency: currency, signStyle: signStyle)
     }
 }

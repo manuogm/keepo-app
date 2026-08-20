@@ -19,6 +19,7 @@ struct SecuritySettingsView: View {
             Section {
                 if session.authCapabilities.requiresBiometricStepUp {
                     Toggle("Enable Face ID", isOn: $isFaceIDEnabled)
+                    .tint(.green)
                 } else {
                     Text("Biometric step-up isn't available with this account type.")
                         .foregroundStyle(Color.secondary)
@@ -34,6 +35,7 @@ struct SecuritySettingsView: View {
 
             Section {
                 Toggle("Enable Hiding Balance", isOn: $isHideBalanceEnabled)
+                    .tint(.green)
             } footer: {
                 Text(
                     "Adds a button to Home, Accounts, and Transactions to hide financial figures "

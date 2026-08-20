@@ -136,7 +136,7 @@ enum OutboxLocalWrite {
         try SyncApply.upsertRow(
             transferLegRow(
                 id: payload.fromId, ownerId: ownerId, accountId: payload.fromAccountId, amountE4: payload.fromAmountE4,
-                currency: fromCurrency, occurredAt: occurredAt, groupId: groupId, now: now
+                currency: fromCurrency, occurredAt: occurredAt, groupId: groupId, now: now, notes: payload.notes
             ),
             table: "transactions", in: database
         )
@@ -147,7 +147,7 @@ enum OutboxLocalWrite {
         try SyncApply.upsertRow(
             transferLegRow(
                 id: payload.toId, ownerId: ownerId, accountId: payload.toAccountId, amountE4: toAmountE4,
-                currency: toCurrency, occurredAt: occurredAt, groupId: groupId, now: now
+                currency: toCurrency, occurredAt: occurredAt, groupId: groupId, now: now, notes: payload.notes
             ),
             table: "transactions", in: database
         )
@@ -164,17 +164,17 @@ enum OutboxLocalWrite {
         let occurredAt = PostgresDate.sqliteTimestampBoundaryString(payload.occurredAt)
         try database.execute(
             sql: """
-            UPDATE transactions SET amount_e4 = ?, occurred_at = ?, updated_at = ?
+            UPDATE transactions SET amount_e4 = ?, occurred_at = ?, notes = ?, updated_at = ?
             WHERE transfer_group_id = ? AND amount_e4 < 0
             """,
-            arguments: [payload.fromAmountE4, occurredAt, now, payload.transferGroupId.uuidString]
+            arguments: [payload.fromAmountE4, occurredAt, payload.notes, now, payload.transferGroupId.uuidString]
         )
         try database.execute(
             sql: """
-            UPDATE transactions SET amount_e4 = ?, occurred_at = ?, updated_at = ?
+            UPDATE transactions SET amount_e4 = ?, occurred_at = ?, notes = ?, updated_at = ?
             WHERE transfer_group_id = ? AND amount_e4 > 0
             """,
-            arguments: [payload.toAmountE4, occurredAt, now, payload.transferGroupId.uuidString]
+            arguments: [payload.toAmountE4, occurredAt, payload.notes, now, payload.transferGroupId.uuidString]
         )
     }
 
@@ -224,6 +224,33 @@ enum OutboxLocalWrite {
             [
                 "id": .string(payload.id.uuidString),
                 "archived_at": payload.archived ? .string(now) : .null,
+                "version": .integer(payload.expectedVersion + 1), "updated_at": .string(now)
+            ],
+            table: "accounts", in: database
+        )
+    }
+
+    /// Mirrors `reorder_accounts` exactly: position from place in the
+    /// array, and nothing else touched — no `version` bump and no
+    /// `updated_at`, matching the RPC's own `keepo.restamp_only` opt-out.
+    /// Getting that wrong locally would be worse than the server getting it
+    /// wrong, since the local row is what every screen actually renders: a
+    /// bumped local version would make the user's next edit conflict against
+    /// a server that never moved.
+    static func reorderAccounts(_ payload: ReorderAccountsPayload, in database: Database) throws {
+        for (position, accountId) in payload.accountIds.enumerated() {
+            try SyncApply.upsertRow(
+                ["id": .string(accountId.uuidString), "sort_order": .integer(position + 1)],
+                table: "accounts", in: database
+            )
+        }
+    }
+
+    static func setAccountKind(_ payload: SetAccountKindPayload, in database: Database) throws {
+        let now = PostgresDate.sqliteTimestampBoundaryString(Date())
+        try SyncApply.upsertRow(
+            [
+                "id": .string(payload.id.uuidString), "kind": .string(payload.kind.rawValue),
                 "version": .integer(payload.expectedVersion + 1), "updated_at": .string(now)
             ],
             table: "accounts", in: database
@@ -303,16 +330,21 @@ enum OutboxLocalWrite {
     }
 
     // swiftlint:disable:next function_parameter_count
+    // swiftlint:disable:next function_parameter_count
     private static func transferLegRow(
         id: UUID, ownerId: String, accountId: UUID, amountE4: Int64, currency: String, occurredAt: String,
-        groupId: String, now: String
+        groupId: String, now: String, notes: String?
     ) -> JSONObject {
         [
             "id": .string(id.uuidString), "owner_id": .string(ownerId), "created_by": .string(ownerId),
             "account_id": .string(accountId.uuidString), "category_id": .null,
             "amount_e4": .integer(Int(amountE4)), "currency": .string(currency),
             "occurred_at": .string(occurredAt), "transfer_group_id": .string(groupId), "source": .string("manual"),
-            "status": .string("confirmed"), "version": .integer(1), "created_at": .string(now),
+            "status": .string("confirmed"),
+            // Both legs, matching `create_transfer` server-side — see
+            // `CreateTransferPayload.notes` for why.
+            "notes": notes.map(AnyJSON.string) ?? .null,
+            "version": .integer(1), "created_at": .string(now),
             "updated_at": .string(now), "sync_seq": .integer(0)
         ]
     }

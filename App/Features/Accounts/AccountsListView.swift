@@ -1,38 +1,47 @@
 import KeepoCore
 import SwiftUI
 
-/// UI labels are "Everyday" and "Investments" — the sections still split by
-/// `kind` for organization, even though `kind` no longer changes an
-/// account's behavior; each investment row also carries its own permanent
-/// `InvestmentBadge`, per keepo-v1-feature-spec.md §Accounts & Multi-Currency.
+/// UI labels are "Everyday" and "Investments" — the groups still split by
+/// `kind`, and each investment row carries its own `InvestmentBadge`, per
+/// keepo-v1-feature-spec.md §Accounts & Multi-Currency.
 ///
 /// Reads straight off the local GRDB mirror (Phase L6) — no server round
 /// trip, no payload cache, no pending-write overlay. `Outbox`'s optimistic
 /// write-through means an offline (or just-submitted online) edit is
 /// already in the same tables this screen queries.
+///
+/// **On the drag model.** All three requested behaviours — reorder within a
+/// group, drag Everyday→Investments to convert, drag back to convert
+/// back — are one mechanism, not three. The two groups render as a single
+/// `ForEach` over a flat `[Item]` in which the group headers are themselves
+/// items, so a single `.onMove` sees every drag: an account's kind is
+/// simply the kind of the nearest header above it once the move lands, and
+/// its position is its index within that run. Mixing `.onMove` for the
+/// within-group case with `.draggable`/`.dropDestination` for the
+/// across-group case was the obvious alternative and is worse — the two
+/// gesture systems fight for the same row, and drop targets cannot express
+/// "between these two rows" the way an insertion point does.
+///
+/// Both headers always render, including for an empty group: an empty
+/// Investments section with nothing to drop onto would make the conversion
+/// gesture undiscoverable exactly when the user most needs it.
 struct AccountsListView: View {
     let session: SessionStore
 
-    @State private var accounts: [LocalAccountRow] = []
+    /// The two groups are held as ordered arrays, not derived by filtering
+    /// on every render: a drag mutates them directly so the row follows the
+    /// finger immediately, with the outbox write happening behind that.
+    @State var everyday: [LocalAccountRow] = []
+    @State var investments: [LocalAccountRow] = []
+    @State private var archived: [LocalAccountRow] = []
+
     @State private var isLoading = true
     @State private var isAddingAccount = false
     @State private var editingAccountId: UUID?
     @State private var actionErrorMessage: String?
     @State private var archiveCandidate: LocalAccountRow?
-    @State private var isEverydayExpanded = true
-    @State private var isInvestmentsExpanded = true
-
-    private var everyday: [LocalAccountRow] {
-        accounts.filter { $0.kind == .regular && $0.archivedAt == nil }
-    }
-
-    private var investments: [LocalAccountRow] {
-        accounts.filter { $0.kind == .investment && $0.archivedAt == nil }
-    }
-
-    private var archived: [LocalAccountRow] {
-        accounts.filter { $0.archivedAt != nil }
-    }
+    @State var isEverydayExpanded = true
+    @State var isInvestmentsExpanded = true
 
     var body: some View {
         ZStack {
@@ -41,34 +50,7 @@ struct AccountsListView: View {
             if isLoading {
                 ProgressView()
             } else {
-                List {
-                    if !everyday.isEmpty {
-                        Section {
-                            aggregateRow(title: "Everyday", accounts: everyday, isExpanded: $isEverydayExpanded)
-                            if isEverydayExpanded {
-                                ForEach(everyday) { accountRow($0) }
-                            }
-                        }
-                    }
-                    if !investments.isEmpty {
-                        Section {
-                            aggregateRow(
-                                title: "Investments", accounts: investments, isExpanded: $isInvestmentsExpanded
-                            )
-                            if isInvestmentsExpanded {
-                                ForEach(investments) { accountRow($0) }
-                            }
-                        }
-                    }
-                    if !archived.isEmpty {
-                        Section {
-                            archivedRow
-                        }
-                    }
-                }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                .refreshable { await load() }
+                accountList
             }
 
             if let actionErrorMessage {
@@ -125,57 +107,79 @@ struct AccountsListView: View {
         }
     }
 
-    private var archiveConfirmationBinding: Binding<Bool> {
-        Binding(get: { archiveCandidate != nil }, set: { if !$0 { archiveCandidate = nil } })
+    /// `.plain` with every row drawing its own background, rather than
+    /// `.insetGrouped`. An inset-grouped `List` draws ONE rounded card per
+    /// `Section`, and the drag model needs the headers and the accounts in a
+    /// single `ForEach` (see this type's header comment) — so the card would
+    /// have wrapped the headers too, leaving every account row with square
+    /// corners in the middle of it. Styling rows individually also makes each
+    /// account read as its own liftable object, which is exactly the
+    /// affordance a drag-to-reorder list wants.
+    private var accountList: some View {
+        List {
+            ForEach(items) { item in
+                row(for: item)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+            .onMove { offsets, destination in
+                Task { await handleMove(from: offsets, to: destination) }
+            }
+
+            if !archived.isEmpty {
+                archivedRow
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .moveDisabled(true)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .refreshable { await load() }
     }
 
     @ViewBuilder
-    private func accountRow(_ row: LocalAccountRow) -> some View {
-        AccountRow(row: row)
-            .contentShape(Rectangle())
-            .onTapGesture { editingAccountId = row.id }
+    private func row(for item: Item) -> some View {
+        switch item {
+        case .header(let kind):
+            AccountGroupHeaderRow(
+                title: kind == .regular ? "Everyday" : "Investments",
+                subtitle: subtotalText(for: accounts(for: kind)),
+                isExpanded: kind == .regular ? $isEverydayExpanded : $isInvestmentsExpanded
+            )
+            .listRowInsets(EdgeInsets(top: 18, leading: 20, bottom: 6, trailing: 20))
+
+        case .account(let row):
+            Button {
+                editingAccountId = row.id
+            } label: {
+                AccountRowView(row: row)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16)
+                    )
+            }
+            .buttonStyle(.pressableRow)
+            .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+            // Without this the lift preview snapshots the whole row rect —
+            // a full-bleed, square-cornered slab that looks nothing like the
+            // card the user grabbed. `.dragPreview` clips it to the same
+            // rounded rectangle the row draws.
+            .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 16))
             .swipeActions(edge: .trailing) {
                 Button(role: .destructive) {
-                    if row.archivedAt == nil {
-                        archiveCandidate = row
-                    } else {
-                        Task { await setArchived(row, archived: false) }
-                    }
+                    archiveCandidate = row
                 } label: {
-                    if row.archivedAt == nil {
-                        Label("Archive", systemImage: "archivebox")
-                    } else {
-                        Label("Unarchive", systemImage: "arrow.uturn.backward")
-                    }
+                    Label("Archive", systemImage: "archivebox")
                 }
             }
+        }
     }
 
-    @Environment(\.isPrivacyMode) private var isPrivacyMode
-
-    /// Lives inside the card as the group's own first row (not a floating
-    /// `Section` header) so the aggregate reads as part of the group rather
-    /// than a label above it — a distinct shade sets it apart from the
-    /// account rows underneath. Tapping collapses/expands the group's rows
-    /// in place; expanded by default.
-    private func aggregateRow(title: String, accounts: [LocalAccountRow], isExpanded: Binding<Bool>) -> some View {
-        Button {
-            withAnimation(.default) { isExpanded.wrappedValue.toggle() }
-        } label: {
-            HStack {
-                Text(title).font(.headline)
-                Spacer()
-                Text(isPrivacyMode ? "••••" : subtotalText(for: accounts))
-                    .foregroundStyle(Color.secondary)
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
-                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 0 : -90))
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .listRowBackground(Color(.tertiarySystemGroupedBackground))
+    private var archiveConfirmationBinding: Binding<Bool> {
+        Binding(get: { archiveCandidate != nil }, set: { if !$0 { archiveCandidate = nil } })
     }
 
     /// A plain `NavigationLink` always appends its own trailing disclosure
@@ -187,13 +191,14 @@ struct AccountsListView: View {
             NavigationLink("", destination: ArchiveAccountsView(session: session)).opacity(0)
             HStack(spacing: 4) {
                 Text("Archived (\(archived.count))")
+                    .foregroundStyle(Color.secondary)
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(Color.secondary)
                 Spacer()
             }
         }
-        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 20, leading: 20, bottom: 8, trailing: 20))
     }
 
     /// A subtotal only means anything converted into one common currency —
@@ -208,8 +213,7 @@ struct AccountsListView: View {
         return MoneyFormatter.format(total, currency: baseCurrency)
     }
 
-    private func load() async {
-        isLoading = true
+    func load() async {
         actionErrorMessage = nil
         guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
             isLoading = false
@@ -217,9 +221,12 @@ struct AccountsListView: View {
         }
         let dbQueue = session.dbQueue
         do {
-            accounts = try await dbQueue.read { database in
+            let rows = try await dbQueue.read { database in
                 try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency)
             }
+            everyday = rows.filter { $0.kind == .regular && $0.archivedAt == nil }
+            investments = rows.filter { $0.kind == .investment && $0.archivedAt == nil }
+            archived = rows.filter { $0.archivedAt != nil }
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
         }
@@ -235,47 +242,5 @@ struct AccountsListView: View {
         let payload = ArchiveAccountPayload(id: row.id, expectedVersion: row.version, archived: archived)
         await session.outbox.submitArchiveAccount(payload)
         session.refresh.bump()
-    }
-}
-
-private struct AccountRow: View {
-    let row: LocalAccountRow
-
-    @Environment(\.isPrivacyMode) private var isPrivacyMode
-
-    var body: some View {
-        HStack {
-            CategoryIconView(icon: row.icon, color: Color(hex: row.color), diameter: 32)
-            HStack(spacing: 4) {
-                Text(row.name)
-                    .foregroundStyle(row.archivedAt == nil ? Color.primary : Color.secondary)
-                if row.isShared {
-                    Image(systemName: "person.2.fill")
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
-                }
-                if row.kind == .investment {
-                    InvestmentBadge()
-                }
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(isPrivacyMode ? "••••" : formattedBalance)
-                    .monospacedDigit()
-                    .foregroundStyle(Color.primary)
-                if !isPrivacyMode {
-                    CurrencyConversionLabel(
-                        nativeCurrency: row.currency, amountBase: row.balanceBaseE4,
-                        baseCurrency: row.baseCurrencyInfo?.code,
-                        baseMinorUnit: row.baseCurrencyInfo.map { Int16($0.minorUnit) },
-                        hasMissingRate: row.balanceE4 != nil && row.balanceBaseE4 == nil
-                    )
-                }
-            }
-        }
-    }
-
-    private var formattedBalance: String {
-        MoneyFormatter.format(row.balanceE4, currency: row.currencyInfo)
     }
 }

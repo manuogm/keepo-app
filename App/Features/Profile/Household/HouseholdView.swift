@@ -92,6 +92,7 @@ struct HouseholdView: View {
         Section {
             ForEach(myAccounts, id: \.id) { account in
                 Toggle(account.name, isOn: sharedBinding(for: account.id))
+                    .tint(.green)
             }
         } header: {
             Text("Share accounts")

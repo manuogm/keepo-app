@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Device-local UI preferences — the first use of this pattern in the app.
 /// Everything else in Keepo is either Supabase-backed or session-lifetime
-/// state in `SessionStore`; these four are genuinely device preferences
+/// state in `SessionStore`; these are genuinely device preferences
 /// (appearance, notification level, whether Face ID/hide-balance are even
 /// offered), not financial data, and deliberately don't sync across a
 /// household's two devices. Views read/write them via `@AppStorage` for
@@ -16,6 +16,11 @@ enum AppSettingsKeys {
     static let notificationLevel = "notificationLevel"
     static let isFaceIDEnabled = "isFaceIDEnabled"
     static let isHideBalanceEnabled = "isHideBalanceEnabled"
+    /// Comma-separated "#RRGGBB" values the user mixed in the icon
+    /// catalogue's custom-colour picker, most recent first. Device-local
+    /// for the same reason the four above are: it is a convenience palette,
+    /// not data about their money.
+    static let customIconColors = "customIconColors"
 }
 
 enum AppearanceMode: String, CaseIterable, Hashable {

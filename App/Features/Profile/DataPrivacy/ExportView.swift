@@ -27,9 +27,11 @@ struct ExportView: View {
         Form {
             Section {
                 Toggle("All Accounts", isOn: $exportAllAccounts)
+                    .tint(.green)
                 if !exportAllAccounts {
                     ForEach(accounts) { account in
                         Toggle(account.name, isOn: selectionBinding(for: account.id))
+                    .tint(.green)
                     }
                 }
             } header: {
@@ -40,6 +42,7 @@ struct ExportView: View {
 
             Section {
                 Toggle("All Time", isOn: $exportAllTime)
+                    .tint(.green)
                 if !exportAllTime {
                     DatePicker("From", selection: $from, displayedComponents: .date)
                     DatePicker("Through", selection: $through, displayedComponents: .date)

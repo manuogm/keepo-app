@@ -10,6 +10,18 @@ import KeepoCore
 /// of a Postgres view (`accounts_with_balances` bakes in `is_shared`/
 /// `base_currency` columns this file derives instead) — it's the shape one
 /// specific screen wants, built from the same underlying reads.
+///
+/// Ordered the way the Accounts list reads top to bottom: Everyday group
+/// first, then Investments, each in the user's own drag arrangement
+/// (`sort_order`), with name as the tiebreak for rows never dragged.
+///
+/// The `kind` term is load-bearing, not cosmetic. `sort_order` is only
+/// unique WITHIN a kind (see the migration's own trigger), so ordering by
+/// it alone interleaves the two groups — every consumer of this flat list
+/// then sees a jumbled order. Caught in the simulator: a new expense
+/// defaulted to the brokerage account, because a `sort_order` of 1 in the
+/// Investments group tied with `sort_order` 1 in Everyday and lost the
+/// tiebreak on name.
 struct LocalAccountRow: Identifiable {
     let id: UUID
     let name: String
@@ -19,6 +31,7 @@ struct LocalAccountRow: Identifiable {
     let icon: String
     let color: String
     let archivedAt: String?
+    let sortOrder: Int
     let version: Int
     let isShared: Bool
     let balanceE4: Int64?
@@ -29,7 +42,7 @@ struct LocalAccountRow: Identifiable {
         let accounts = try Row.fetchAll(
             database,
             sql: """
-            SELECT id, name, currency, kind, icon, color, archived_at, version FROM accounts
+            SELECT id, name, currency, kind, icon, color, sort_order, archived_at, version FROM accounts
             WHERE deleted_at IS NULL AND (
                 owner_id = ? OR id IN (
                     SELECT ha.account_id FROM household_accounts ha
@@ -37,7 +50,7 @@ struct LocalAccountRow: Identifiable {
                     WHERE hm.user_id = ? AND hm.deleted_at IS NULL AND ha.deleted_at IS NULL
                 )
             )
-            ORDER BY name
+            ORDER BY CASE kind WHEN 'regular' THEN 0 ELSE 1 END, sort_order, name
             """,
             arguments: [ownerId, ownerId]
         )
@@ -64,7 +77,8 @@ struct LocalAccountRow: Identifiable {
                 currencyInfo: CurrencyInfo(code: currency, minorUnit: currencies[currency] ?? 2),
                 kind: PublicSchema.AccountKind(rawValue: kindRaw) ?? .regular,
                 icon: row["icon"], color: row["color"], archivedAt: row["archived_at"],
-                version: row["version"], isShared: sharedIds.contains(accountId), balanceE4: balance,
+                sortOrder: row["sort_order"], version: row["version"],
+                isShared: sharedIds.contains(accountId), balanceE4: balance,
                 balanceBaseE4: balanceBase,
                 baseCurrencyInfo: baseMinorUnit.map { CurrencyInfo(code: baseCurrency, minorUnit: $0) }
             )

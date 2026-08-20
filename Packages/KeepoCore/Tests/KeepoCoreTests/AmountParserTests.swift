@@ -103,3 +103,32 @@ struct AmountFormatterTests {
         #expect(!text.contains(","))
     }
 }
+
+@Suite("AmountFormatter signed mode")
+struct AmountFormatterSignedTests {
+    let usLocale = Locale(identifier: "en_US")
+
+    @Test("unsigned is still the default, so a transaction field never prefills a minus")
+    func defaultsToUnsigned() {
+        #expect(AmountFormatter.editableString(-125_000, minorUnit: 2, locale: usLocale) == "12.50")
+    }
+
+    @Test("signed keeps a negative balance negative")
+    func signedKeepsMinus() {
+        #expect(AmountFormatter.editableString(-8_400_000, minorUnit: 2, locale: usLocale, signed: true) == "-840.00")
+    }
+
+    @Test("a signed balance round-trips through AmountParser unchanged")
+    func signedRoundTrips() {
+        let stored: Int64 = -8_400_000
+        let text = AmountFormatter.editableString(stored, minorUnit: 2, locale: usLocale, signed: true)
+        #expect(AmountParser.parse(text, locale: usLocale) == stored)
+    }
+
+    @Test("an unsigned round-trip is what silently flips an overdrawn account positive")
+    func unsignedRoundTripLosesTheSign() {
+        let stored: Int64 = -8_400_000
+        let text = AmountFormatter.editableString(stored, minorUnit: 2, locale: usLocale)
+        #expect(AmountParser.parse(text, locale: usLocale) == 8_400_000)
+    }
+}

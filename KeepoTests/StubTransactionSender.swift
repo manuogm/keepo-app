@@ -75,6 +75,21 @@ final class StubTransactionSender: OutboxSending, @unchecked Sendable {
         try setAccountBalanceResult.get()
     }
 
+    var reorderAccountsResult: Result<Void, Error> = .success(())
+    var setAccountKindResult: Result<Bool, Error> = .success(true)
+    private(set) var reorderAccountsPayloads: [ReorderAccountsPayload] = []
+    private(set) var setAccountKindPayloads: [SetAccountKindPayload] = []
+
+    func reorderAccounts(_ payload: ReorderAccountsPayload) async throws {
+        reorderAccountsPayloads.append(payload)
+        try reorderAccountsResult.get()
+    }
+
+    func setAccountKind(_ payload: SetAccountKindPayload) async throws -> Bool {
+        setAccountKindPayloads.append(payload)
+        return try setAccountKindResult.get()
+    }
+
     func archiveAccount(_ payload: ArchiveAccountPayload) async throws -> Bool {
         try archiveAccountResult.get()
     }

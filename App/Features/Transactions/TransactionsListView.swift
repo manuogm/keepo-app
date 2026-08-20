@@ -41,6 +41,8 @@ struct TransactionsListView: View {
     @State private var editingRecurringRule: PublicSchema.RecurringRulesSelect?
     @State var filter = TransactionFilter()
     @State private var isSearching = false
+    @State private var groupedByDay: [DayGroup] = []
+    @State private var categoriesById: [UUID: PublicSchema.CategoriesSelect] = [:]
 
     // Not `private` — read/written from TransactionsListView+Period.swift.
     @State var period: Period = .month
@@ -59,20 +61,36 @@ struct TransactionsListView: View {
         return calendar.dateInterval(of: component, for: anchor) ?? DateInterval(start: anchor, duration: 0)
     }
 
-    private var groupedByDay: [(day: Date, items: [PublicSchema.TransactionsWithDetailsSelect])] {
+    /// Computed once per load into `@State`, never as a computed property
+    /// read from `body`. SwiftUI re-evaluates a body on every unrelated
+    /// state change — a sheet opening, the privacy toggle, a scroll-driven
+    /// update — and this is a full `Dictionary(grouping:)` plus a sort over
+    /// every transaction in the period. As a computed property it ran on
+    /// every one of those, which is a real part of why this screen felt
+    /// heavy on a busy month.
+    struct DayGroup: Identifiable {
+        let day: Date
+        let items: [PublicSchema.TransactionsWithDetailsSelect]
+        var id: Date { day }
+    }
+
+    func regroup() {
         let groups = Dictionary(grouping: transactions) { transaction -> Date in
             guard
                 let occurredAt = transaction.occurredAt, let date = PostgresDate.date(fromTimestamp: occurredAt)
             else { return .distantPast }
             return calendar.startOfDay(for: date)
         }
-        return groups.keys.sorted(by: >).map { day in (day: day, items: groups[day] ?? []) }
+        groupedByDay = groups.keys.sorted(by: >).map { day in DayGroup(day: day, items: groups[day] ?? []) }
+        // Same reasoning: the filter list is small but the lookup runs once
+        // per row per render, so it is built once here instead.
+        categoriesById = Dictionary(filterCategories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     private func category(
         for transaction: PublicSchema.TransactionsWithDetailsSelect
     ) -> PublicSchema.CategoriesSelect? {
-        filterCategories.first { $0.id == transaction.categoryId }
+        transaction.categoryId.flatMap { categoriesById[$0] }
     }
 
     // MARK: - Body
@@ -168,12 +186,22 @@ struct TransactionsListView: View {
                     Spacer()
                 } else {
                     List {
-                        ForEach(groupedByDay, id: \.day) { group in
+                        ForEach(groupedByDay) { group in
                             Section {
                                 ForEach(group.items, id: \.transactionId) { transaction in
-                                    TransactionRow(transaction: transaction, category: category(for: transaction))
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { handleTap(on: transaction) }
+                                    // A `Button`, not `.onTapGesture`: a bare
+                                    // tap gesture inside a `List` loses races
+                                    // with the scroll recogniser (the "first
+                                    // tap does nothing after scrolling" bug)
+                                    // and draws no press state at all.
+                                    Button {
+                                        handleTap(on: transaction)
+                                    } label: {
+                                        TransactionRow(
+                                            transaction: transaction, category: category(for: transaction)
+                                        )
+                                    }
+                                        .buttonStyle(.pressableRow)
                                         .swipeActions(edge: .trailing) {
                                             // A second, quick path to confirm a capture,
                                             // alongside the full review form's Save — only

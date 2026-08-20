@@ -46,6 +46,24 @@ struct UpdateAccountParams: Encodable {
     }
 }
 
+struct ReorderAccountsParams: Encodable {
+    let accountIds: [UUID]
+    enum CodingKeys: String, CodingKey {
+        case accountIds = "p_account_ids"
+    }
+}
+
+struct SetAccountKindParams: Encodable {
+    let id: UUID
+    let expectedVersion: Int
+    let kind: PublicSchema.AccountKind
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
+        case expectedVersion = "p_expected_version"
+        case kind = "p_kind"
+    }
+}
+
 struct ArchiveAccountParams: Encodable {
     let id: UUID
     let expectedVersion: Int
@@ -142,6 +160,38 @@ public extension AccountRepository {
     ) async throws -> AccountWriteResult {
         let params = ArchiveAccountParams(id: id, expectedVersion: expectedVersion, archived: archived)
         let rows: [AccountConflictRow] = try await client.rpc("archive_account", params: params).execute().value
+        return rows.first.map(AccountWriteResult.init) ?? .conflict
+    }
+
+    /// The Accounts list's drag-to-reorder write. Takes the full ordered id
+    /// list for ONE kind group and writes each row's position from its place
+    /// in the array — one statement server-side, so a drag is one round trip
+    /// however many rows shifted, not one per row.
+    ///
+    /// Returns nothing, and takes no `expectedVersion`, on purpose: ordering
+    /// is not a value two clients can meaningfully disagree about (last
+    /// arrangement wins), and the RPC deliberately leaves `version` and
+    /// `updated_at` untouched so a drag can never turn a later, genuine edit
+    /// into a phantom conflict. See the migration's own §1b.
+    static func reorder(client: SupabaseClient, accountIds: [UUID]) async throws {
+        let params = ReorderAccountsParams(accountIds: accountIds)
+        try await client.rpc("reorder_accounts", params: params).execute()
+    }
+
+    /// Dragging an account between the Everyday and Investments groups.
+    /// Version-checked and conflict-returning, unlike `reorder` — `kind` IS
+    /// a value two clients can disagree about, so a losing write has to land
+    /// in `sync_conflicts` rather than silently win.
+    ///
+    /// Kind was immutable until migration 20260903100000; nothing downstream
+    /// branches on it (it drives only the Investment badge and which section
+    /// a row sits in), which is what made it safe to open up.
+    @discardableResult
+    static func setKind(
+        client: SupabaseClient, id: UUID, expectedVersion: Int, kind: PublicSchema.AccountKind
+    ) async throws -> AccountWriteResult {
+        let params = SetAccountKindParams(id: id, expectedVersion: expectedVersion, kind: kind)
+        let rows: [AccountConflictRow] = try await client.rpc("set_account_kind", params: params).execute().value
         return rows.first.map(AccountWriteResult.init) ?? .conflict
     }
 

@@ -12,8 +12,22 @@ struct RecurringRuleFormView: View {
 
     enum Mode {
         case create
+        /// "Make recurring", pushed from a transaction the user is already
+        /// looking at. Identical to `.create` in every way that reaches the
+        /// server — it only spares them retyping the account, category and
+        /// amount that are on screen one view back.
+        case createSeeded(
+            accountId: UUID?, categoryId: UUID?, amountText: String, isIncome: Bool, startingOn: Date
+        )
         case edit(PublicSchema.RecurringRulesSelect)
     }
+
+    /// `false` when pushed onto an existing `NavigationStack` (the
+    /// transaction form's "Make recurring") rather than presented as its
+    /// own sheet — nesting a second stack inside one breaks the back button
+    /// and the swipe-to-go-back gesture alike. Same pattern as
+    /// `AccountFormView`.
+    var embedInNavigationStack = true
 
     private enum Kind: String, CaseIterable {
         case expense = "Expense"
@@ -58,7 +72,16 @@ struct RecurringRuleFormView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        if embedInNavigationStack {
+            NavigationStack { formContent }
+        } else {
+            formContent
+        }
+    }
+
+    @ViewBuilder
+    private var formContent: some View {
+        Group {
             Form {
                 if isLoading {
                     ProgressView()
@@ -106,6 +129,7 @@ struct RecurringRuleFormView: View {
 
                     if isEditing {
                         Toggle("Active", isOn: $active)
+                    .tint(.green)
                     }
 
                     if let errorMessage {
@@ -118,8 +142,10 @@ struct RecurringRuleFormView: View {
             .navigationTitle(isEditing ? "Edit Recurring Rule" : "New Recurring Rule")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                if embedInNavigationStack {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button { dismiss() } label: { Image(systemName: "xmark") }
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
@@ -150,8 +176,21 @@ struct RecurringRuleFormView: View {
             categories = loaded?.1 ?? []
         }
 
-        if case .edit(let rule) = mode {
+        switch mode {
+        case .edit(let rule):
             apply(rule)
+        case .createSeeded(let accountId, let categoryId, let amountText, let isIncome, let startingOn):
+            selectedAccountId = accountId
+            selectedCategoryId = categoryId
+            // `minorUnit` reads through `selectedAccount`, so this has to
+            // come after the account is set — the amount is already a
+            // locale-correct editable string from the transaction form, so
+            // it is carried across verbatim rather than re-formatted.
+            self.amountText = amountText
+            kind = isIncome ? .income : .expense
+            nextDueAt = startingOn
+        case .create:
+            break
         }
         isLoading = false
     }
@@ -180,7 +219,7 @@ struct RecurringRuleFormView: View {
         errorMessage = nil
         do {
             switch mode {
-            case .create:
+            case .create, .createSeeded:
                 guard let ownerId = session.profile?.id else { return }
                 try await RecurringRuleRepository.create(
                     client: session.client, ownerId: ownerId, accountId: accountId, categoryId: categoryId,

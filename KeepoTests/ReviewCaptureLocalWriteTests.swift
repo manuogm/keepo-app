@@ -126,32 +126,3 @@ struct ReviewCaptureLocalWriteTests {
         #expect(mappedCategory == newCategoryId.uuidString)
     }
 }
-
-private enum StubError: Error { case alwaysFails }
-
-private final class AlwaysFailingSender: OutboxSending, @unchecked Sendable {
-    func createTransaction(_ payload: CreateTransactionPayload) async throws { throw StubError.alwaysFails }
-    func createTransfer(_ payload: CreateTransferPayload) async throws { throw StubError.alwaysFails }
-    func updateTransaction(_ payload: UpdateTransactionPayload) async throws -> Bool { throw StubError.alwaysFails }
-    func updateTransfer(_ payload: UpdateTransferPayload) async throws -> Bool { throw StubError.alwaysFails }
-    func deleteTransaction(_ payload: DeleteTransactionPayload) async throws -> Bool { throw StubError.alwaysFails }
-    func deleteTransfer(_ payload: DeleteTransferPayload) async throws -> Bool { throw StubError.alwaysFails }
-    func captureTransaction(_ payload: CaptureTransactionPayload) async throws {
-        throw StubError.alwaysFails
-    }
-    func createAccount(_ payload: CreateAccountPayload) async throws { throw StubError.alwaysFails }
-    func updateAccount(_ payload: UpdateAccountPayload) async throws -> Bool { throw StubError.alwaysFails }
-    func archiveAccount(_ payload: ArchiveAccountPayload) async throws -> Bool { throw StubError.alwaysFails }
-    func setAccountBalance(_ payload: SetAccountBalancePayload) async throws -> Bool { throw StubError.alwaysFails }
-    func createCategory(_ payload: CreateCategoryPayload) async throws { throw StubError.alwaysFails }
-    func updateCategory(_ payload: UpdateCategoryPayload) async throws { throw StubError.alwaysFails }
-    func renameCardMapping(_ payload: RenameCardMappingPayload) async throws { throw StubError.alwaysFails }
-    func unmapCard(_ payload: UnmapCardPayload) async throws { throw StubError.alwaysFails }
-    func mapCard(_ payload: MapCardPayload) async throws { throw StubError.alwaysFails }
-    func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload) async throws -> Bool {
-        throw StubError.alwaysFails
-    }
-    func reviewCaptureTransaction(_ payload: ReviewCaptureTransactionPayload) async throws -> Bool {
-        throw StubError.alwaysFails
-    }
-}

@@ -2,9 +2,15 @@ import KeepoCore
 import SwiftUI
 
 /// One component for all three transaction kinds (CLAUDE.md's reuse
-/// principle), for both create and edit. The received-amount field appears
-/// only when the two accounts' currencies differ; inferred and hidden
-/// otherwise.
+/// principle), for both create and edit.
+///
+/// Rebuilt from a labelled `Form` into a kind tab bar over a single card.
+/// The old version had seven `Section` headers ("Account", "Category",
+/// "Amount", "Date", "Notes", ...) for seven controls that each already say
+/// what they are; worse, the two structurally different things on the screen
+/// — what the money did, and everything else about the entry — were shown as
+/// one undifferentiated list of rows. `TransactionDetailCard` now owns the
+/// first, and this view owns the second.
 struct TransactionFormView: View {
     let session: SessionStore
     /// `.create` for a new transaction; `.edit` pre-fills every field from
@@ -19,31 +25,30 @@ struct TransactionFormView: View {
         case edit(PublicSchema.TransactionsWithDetailsSelect, sibling: PublicSchema.TransactionsWithDetailsSelect?)
     }
 
-    private enum Kind: String, CaseIterable {
+    enum Kind: String, CaseIterable, Identifiable {
         case expense = "Expense"
         case income = "Income"
         case transfer = "Transfer"
+
+        var id: String { rawValue }
     }
 
     // Not `private` — read from TransactionFormView+Delete.swift, an
     // extension in a different file (kept there purely for file-length).
     @Environment(\.dismiss) var dismiss
 
-    @State private var kind: Kind = .expense
-    @State private var accounts: [LocalAccountRow] = []
-    @State private var categories: [PublicSchema.CategoriesSelect] = []
+    @State var kind: Kind = .expense
+    @State var accounts: [LocalAccountRow] = []
+    @State var categories: [PublicSchema.CategoriesSelect] = []
 
-    @State private var selectedAccountId: UUID?
-    @State private var selectedCategoryId: UUID?
-    @State private var amountText = ""
-    // Not `private` — read from TransactionFormView+Transfer.swift.
+    @State var selectedAccountId: UUID?
+    @State var selectedCategoryId: UUID?
+    @State var amountText = ""
     @State var occurredAt = Date()
-    @State private var merchantRaw: String?
-    @State private var notes = ""
+    @State var merchantRaw: String?
+    @State var notes = ""
 
-    // Not `private` — read from TransactionFormView+Transfer.swift.
     @State var selectedToAccountId: UUID?
-    // Not `private` — read from TransactionFormView+Transfer.swift.
     @State var receivedAmountText = ""
 
     // Edit-mode versions the save call sends back for lost-update detection.
@@ -51,26 +56,30 @@ struct TransactionFormView: View {
     @State var editingFromVersion: Int?
     @State var editingToVersion: Int?
     @State var editingTransferGroupId: UUID?
+    @State var editingRecurringRuleId: UUID?
     // created_by (who entered it) differs from the viewer on a shared account.
-    @State private var addedByHouseholdMember = false
+    @State var addedByHouseholdMember = false
 
     // Set from the row being reviewed — a pending, captured transaction —
     // so Save both applies any edit and confirms it in one tap, per the
     // Needs Review flow's "review, then it's gone" contract.
-    @State private var isConfirmingCapture = false
+    @State var isConfirmingCapture = false
+    @State var isPendingReview = false
+    @State var isCaptured = false
 
     @State var isSaving = false
     @State var errorMessage: String?
-    // Not `private` — read/written from TransactionFormView+Transfer.swift.
     @State var divergenceWarning: RateDivergence?
     @State var transferDivergenceConfirmed = false
 
-    private var isEditing: Bool {
+    @State private var isPickingDate = false
+    @State private var isCreatingRecurringRule = false
+
+    var isEditing: Bool {
         if case .edit = mode { return true }
         return false
     }
 
-    // Not `private` — read from TransactionFormView+Transfer.swift.
     var fromAccount: LocalAccountRow? {
         accounts.first { $0.id == selectedAccountId }
     }
@@ -79,88 +88,32 @@ struct TransactionFormView: View {
         accounts.first { $0.id == selectedToAccountId }
     }
 
-    // Not `private` — read from TransactionFormView+Transfer.swift.
     var needsReceivedAmount: Bool {
         guard kind == .transfer, let source = fromAccount, let destination = toAccount else { return false }
         return source.currency != destination.currency
     }
 
-    private var categoriesForKind: [PublicSchema.CategoriesSelect] {
+    var categoriesForKind: [PublicSchema.CategoriesSelect] {
         let categoryKind: PublicSchema.CategoryKind = kind == .income ? .income : .expense
         return categories.filter { $0.kind == categoryKind }
     }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Picker("Kind", selection: $kind) {
-                    ForEach(Kind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .disabled(isEditing)
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
 
-                Section(kind == .transfer ? "From" : "Account") {
-                    accountPicker(selection: $selectedAccountId, excluding: nil)
-                }
+                VStack(spacing: 14) {
+                    KindTabBar(selection: $kind, title: \.rawValue, isEnabled: !isEditing)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 4)
 
-                if kind == .transfer {
-                    Section("To") {
-                        accountPicker(selection: $selectedToAccountId, excluding: selectedAccountId)
+                    ScrollView {
+                        detailCard
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 24)
                     }
-                } else {
-                    Section("Category") {
-                        Picker("Category", selection: $selectedCategoryId) {
-                            Text("Select…").tag(UUID?.none)
-                            ForEach(categoriesForKind, id: \.id) { category in
-                                Text(category.name).tag(category.id as UUID?)
-                            }
-                        }
-                    }
-                }
-
-                Section(kind == .transfer ? "Amount sent" : "Amount") {
-                    TextField("0.00", text: $amountText)
-                        .keyboardType(.decimalPad)
-                }
-
-                if needsReceivedAmount {
-                    Section("Amount received") {
-                        TextField("0.00", text: $receivedAmountText)
-                            .keyboardType(.decimalPad)
-                    }
-                }
-
-                Section("Date") {
-                    DatePicker("Date", selection: $occurredAt, displayedComponents: [.date])
-                        .labelsHidden()
-                }
-
-                if kind != .transfer {
-                    Section("Notes") {
-                        TextField("Add a note…", text: $notes, axis: .vertical)
-                    }
-                }
-
-                if addedByHouseholdMember {
-                    Text("Added by your household member").font(.footnote).foregroundStyle(Color.secondary)
-                }
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-
-                // Standard practice whenever a swipe-action exists elsewhere
-                // for the same object (the list's swipe-to-delete) — not
-                // every user discovers the gesture.
-                if isEditing {
-                    Section {
-                        Button("Delete Transaction", role: .destructive) {
-                            Task { await deleteTransaction() }
-                        }
-                        .disabled(isSaving)
-                    }
+                    .scrollDismissesKeyboard(.interactively)
                 }
             }
             .navigationTitle(isEditing ? "Edit \(kind.rawValue)" : "New \(kind.rawValue)")
@@ -178,20 +131,181 @@ struct TransactionFormView: View {
                 transferDivergenceConfirmed = true
                 Task { await save() }
             }
+            .sheet(isPresented: $isPickingDate) { datePickerSheet }
+            .navigationDestination(isPresented: $isCreatingRecurringRule) {
+                RecurringRuleFormView(session: session, mode: recurringSeedMode) {
+                    session.refresh.bump()
+                    dismiss()
+                }
+            }
         }
         .task { await load() }
     }
 
-    private func accountPicker(selection: Binding<UUID?>, excluding: UUID?) -> some View {
-        Picker("Account", selection: selection) {
-            Text("Select…").tag(UUID?.none)
-            ForEach(accounts.filter { $0.id != excluding }) { account in
-                Text(account.name).tag(UUID?.some(account.id))
+    // MARK: - The card
+
+    private var detailCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                datePill
+                Spacer()
+                if isPendingReview {
+                    PendingBadge()
+                }
             }
+
+            TransactionDetailCard(
+                fromAccountId: $selectedAccountId,
+                toAccountId: $selectedToAccountId,
+                categoryId: $selectedCategoryId,
+                amountText: $amountText,
+                receivedAmountText: $receivedAmountText,
+                accounts: accounts,
+                categories: categoriesForKind,
+                isTransfer: kind == .transfer,
+                needsReceivedAmount: needsReceivedAmount
+            )
+
+            // Every kind, including transfers, since migration
+            // 20260904100000 gave `create_transfer`/`update_transfer` a
+            // `p_notes` that writes to both legs.
+            TextField("Add a note…", text: $notes, axis: .vertical)
+                .font(.subheadline)
+                .lineLimit(1...4)
+
+            recurringLine
+
+            if addedByHouseholdMember {
+                Text("Added by your household member")
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            // Standard practice whenever a swipe-action exists elsewhere
+            // for the same object (the list's swipe-to-delete) — not
+            // every user discovers the gesture.
+            if isEditing {
+                DestructiveActionButton(title: "Delete", isEnabled: !isSaving) {
+                    Task { await deleteTransaction() }
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
+    }
+
+    /// Outlined rather than filled: it sits on the card's own surface, and a
+    /// second filled capsule there competed with the amount for weight. The
+    /// two most recent days get their names instead of their dates — "Today"
+    /// is what the user is actually thinking, and it is also the value they
+    /// most need to be able to confirm at a glance.
+    private var datePill: some View {
+        Button {
+            isPickingDate = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.caption)
+                Text(dateLabel)
+                    .font(.subheadline)
+            }
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .overlay {
+                Capsule().strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1)
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.pressableCard)
+    }
+
+    private var dateLabel: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(occurredAt) { return "Today" }
+        if calendar.isDateInYesterday(occurredAt) { return "Yesterday" }
+        return occurredAt.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    /// One grey line that answers "where did this come from, and can it
+    /// happen again on its own?" — three states, never two at once:
+    /// captured rows say so and stop there (a capture cannot be turned into
+    /// a rule, it already happened); a row that is already an instance of a
+    /// rule says so; anything else offers to become one.
+    @ViewBuilder
+    private var recurringLine: some View {
+        if isCaptured {
+            recurringLabel("Automatically captured", icon: "cpu")
+        } else if editingRecurringRuleId != nil {
+            recurringLabel("Recurring", icon: "arrow.trianglehead.2.clockwise.rotate.90")
+        } else if kind != .transfer {
+            // `recurring_rules` has a single account_id/category_id pair
+            // (app-architecture.md §3) — there is no shape in the schema for
+            // a recurring transfer, so offering the button would push to a
+            // form that cannot represent what was asked for.
+            Button {
+                isCreatingRecurringRule = true
+            } label: {
+                // Filled only in this branch. The other two states are
+                // statements of fact, not buttons — giving all three the same
+                // pill would promise a tap that two of them do not honour.
+                recurringLabel("Make recurring", icon: "arrow.trianglehead.2.clockwise.rotate.90")
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Color(.tertiarySystemGroupedBackground), in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.pressableCard)
         }
     }
 
-    private var isSaveDisabled: Bool {
+    private func recurringLabel(_ title: String, icon: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+            Text(title)
+        }
+        .font(.caption)
+        .foregroundStyle(Color.secondary)
+    }
+
+    private var datePickerSheet: some View {
+        NavigationStack {
+            DatePicker("Date", selection: $occurredAt, displayedComponents: [.date])
+                .datePickerStyle(.graphical)
+                .padding()
+                .navigationTitle("Date")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { isPickingDate = false }.fontWeight(.semibold)
+                    }
+                }
+        }
+        .presentationDetents([.medium])
+    }
+
+    /// Seeds the recurring-rule form from what is already on screen, so
+    /// "make this happen every month" does not mean retyping the amount,
+    /// account and category that are right there.
+    private var recurringSeedMode: RecurringRuleFormView.Mode {
+        .createSeeded(
+            accountId: selectedAccountId,
+            categoryId: selectedCategoryId,
+            amountText: amountText,
+            isIncome: kind == .income,
+            startingOn: occurredAt
+        )
+    }
+
+    var isSaveDisabled: Bool {
         if isSaving || selectedAccountId == nil || amountText.isEmpty { return true }
         if kind == .transfer {
             if selectedToAccountId == nil { return true }
@@ -200,187 +314,5 @@ struct TransactionFormView: View {
             return true
         }
         return false
-    }
-
-    /// Reads straight off the local GRDB mirror (Phase L6) — always
-    /// current, never needs a cache-fallback chain the way a network fetch
-    /// used to.
-    private func load() async {
-        if let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency {
-            let loaded = try? await session.dbQueue.read { database in
-                (
-                    try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency),
-                    try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
-                )
-            }
-            accounts = loaded?.0 ?? []
-            categories = loaded?.1 ?? []
-        }
-
-        if case .edit(let transaction, let sibling) = mode {
-            apply(transaction: transaction, sibling: sibling)
-        }
-    }
-
-    /// Populates the form from a server row — the initial edit-mode prefill.
-    private func apply(
-        transaction: PublicSchema.TransactionsWithDetailsSelect,
-        sibling: PublicSchema.TransactionsWithDetailsSelect?
-    ) {
-        kind = {
-            switch transaction.kind {
-            case "income": return .income
-            case "transfer": return .transfer
-            default: return .expense
-            }
-        }()
-
-        if let occurredAtString = transaction.occurredAt,
-           let date = PostgresDate.date(fromTimestamp: occurredAtString) {
-            occurredAt = date
-        }
-
-        addedByHouseholdMember = transaction.createdBy != nil && transaction.createdBy != session.profile?.id
-
-        switch kind {
-        case .expense, .income:
-            editingId = transaction.transactionId
-            editingFromVersion = transaction.version.map(Int.init)
-            selectedAccountId = transaction.accountId
-            selectedCategoryId = transaction.categoryId
-            merchantRaw = transaction.merchantRaw
-            notes = transaction.notes ?? ""
-            isConfirmingCapture = transaction.status == .pending && transaction.source == .capture
-            if let amount = transaction.amountE4 {
-                amountText = AmountFormatter.editableString(amount, minorUnit: Int(transaction.minorUnit ?? 2))
-            }
-        case .transfer:
-            let legs = [transaction, sibling].compactMap { $0 }
-            guard
-                let from = legs.first(where: { ($0.amountE4 ?? 0) < 0 }),
-                let destination = legs.first(where: { ($0.amountE4 ?? 0) > 0 })
-            else { return }
-            editingTransferGroupId = transaction.transferGroupId
-            editingFromVersion = from.version.map(Int.init)
-            editingToVersion = destination.version.map(Int.init)
-            selectedAccountId = from.accountId
-            selectedToAccountId = destination.accountId
-            if let amount = from.amountE4 {
-                amountText = AmountFormatter.editableString(amount, minorUnit: Int(from.minorUnit ?? 2))
-            }
-            if from.currency != destination.currency, let amount = destination.amountE4 {
-                receivedAmountText = AmountFormatter.editableString(amount, minorUnit: Int(destination.minorUnit ?? 2))
-            }
-        }
-    }
-}
-
-extension TransactionFormView {
-    fileprivate func save() async {
-        guard let accountId = selectedAccountId else {
-            errorMessage = "Choose an account."
-            return
-        }
-        guard let magnitude = AmountParser.parse(amountText), magnitude > 0 else {
-            errorMessage = "Enter a valid amount."
-            return
-        }
-
-        isSaving = true
-        errorMessage = nil
-        do {
-            switch (isEditing, kind) {
-            case (false, .expense), (false, .income):
-                try await saveLedgerTransaction(accountId: accountId, magnitude: magnitude)
-            case (false, .transfer):
-                try await saveTransfer(accountId: accountId, magnitude: magnitude)
-            case (true, .expense), (true, .income):
-                if isConfirmingCapture {
-                    try await reviewCaptureTransaction(accountId: accountId, magnitude: magnitude)
-                } else {
-                    try await updateLedgerTransaction(accountId: accountId, magnitude: magnitude)
-                }
-            case (true, .transfer):
-                try await updateTransfer(magnitude: magnitude)
-            }
-            // A: the local write already landed by the time submitX
-            // returns — the network delivery keeps running in the
-            // background. A version conflict, if one happens, surfaces
-            // later via Needs Review, not as a reason to keep this sheet
-            // open; `divergenceWarning` is the one remaining pre-write gate.
-            if divergenceWarning == nil {
-                onSaved()
-                dismiss()
-            }
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
-        isSaving = false
-    }
-
-    /// Every write below goes through `session.outbox` (Phase 11), never
-    /// `TransactionRepository` directly — an offline save queues instead of
-    /// erroring; the app-wide stale-pending banner surfaces that, not this.
-    fileprivate func saveLedgerTransaction(accountId: UUID, magnitude: Int64) async throws {
-        guard let userId = session.profile?.id, let categoryId = selectedCategoryId, let account = fromAccount else {
-            errorMessage = "Choose a category."
-            return
-        }
-        // Sign applied here, once, from the kind the user picked — never
-        // re-derived elsewhere (money rule: never re-sign in application
-        // code beyond this single point; the DB's sign_matches_category_kind
-        // CHECK is the actual backstop).
-        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
-        let payload = CreateTransactionPayload(
-            id: UUID(), ownerId: userId, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            notes: notes.isEmpty ? nil : notes
-        )
-        await session.outbox.submitCreateTransaction(payload)
-    }
-
-    fileprivate func updateLedgerTransaction(accountId: UUID, magnitude: Int64) async throws {
-        guard
-            let categoryId = selectedCategoryId,
-            let account = fromAccount,
-            let id = editingId,
-            let expectedVersion = editingFromVersion
-        else {
-            errorMessage = "Choose a category."
-            return
-        }
-        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
-        let payload = UpdateTransactionPayload(
-            id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes
-        )
-        await session.outbox.submitUpdateTransaction(payload)
-    }
-
-    /// The Needs Review "review, then confirm" path — one write instead of
-    /// `updateLedgerTransaction` followed by a separate confirm. See
-    /// `ReviewCaptureTransactionPayload`'s own header for why sending those
-    /// as two independently-queued outbox writes was a real bug: they could
-    /// race (whichever arrived second sent a now-stale `expectedVersion`),
-    /// and offline, the outbox's own collapse-by-row-id rule could let the
-    /// confirm silently discard the edit outright.
-    fileprivate func reviewCaptureTransaction(accountId: UUID, magnitude: Int64) async throws {
-        guard
-            let categoryId = selectedCategoryId,
-            let account = fromAccount,
-            let id = editingId,
-            let expectedVersion = editingFromVersion
-        else {
-            errorMessage = "Choose a category."
-            return
-        }
-        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
-        let payload = ReviewCaptureTransactionPayload(
-            id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes
-        )
-        await session.outbox.submitReviewCaptureTransaction(payload)
     }
 }
