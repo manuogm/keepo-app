@@ -32,6 +32,25 @@ public enum UserFacingError {
         return "Something went wrong. Please try again."
     }
 
+    /// Whether the work was cancelled rather than failed — a `.task(id:)`
+    /// whose id changed while a load was in flight, which SwiftUI cancels by
+    /// design.
+    ///
+    /// This is routine control flow, not a failure: the id changed because
+    /// something the screen depends on changed, and a fresh load is already
+    /// running. Surfacing it puts a red error under a screen that is about to
+    /// be correct. Home hit this constantly once its task id included the set
+    /// of mounted widgets — adding a widget cancels the in-flight read every
+    /// single time.
+    ///
+    /// A sibling of `isOffline` below, and used the same way: callers that
+    /// know the difference ask first, rather than this function silently
+    /// deciding for every caller (some of which — `SessionStore.phase`,
+    /// capture notifications — need a non-optional message).
+    public static func isCancellation(_ error: Error) -> Bool {
+        error is CancellationError || (error as NSError).code == NSUserCancelledError
+    }
+
     /// Exposed so callers with their own offline affordance (a persistent
     /// status indicator, a cache fallback already on screen) can skip
     /// showing `describe`'s offline sentence as an alarming, one-off red

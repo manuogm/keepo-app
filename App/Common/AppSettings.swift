@@ -21,6 +21,13 @@ enum AppSettingsKeys {
     /// for the same reason the four above are: it is a convenience palette,
     /// not data about their money.
     static let customIconColors = "customIconColors"
+    /// The Home dashboard's own widget arrangement, as JSON (see
+    /// `DashboardStore`). Device-local by decision, not by omission: a grid
+    /// laid out for one screen size is not obviously the right grid for
+    /// another, and nothing in it is data about the user's money — every
+    /// widget renders from the synced local mirror. Promoting it to a synced
+    /// table later means changing `DashboardStore` and nothing above it.
+    static let dashboardArrangement = "dashboardArrangement"
 }
 
 enum AppearanceMode: String, CaseIterable, Hashable {

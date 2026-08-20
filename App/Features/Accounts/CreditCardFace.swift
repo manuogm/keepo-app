@@ -15,14 +15,10 @@ struct CreditCardFace {
 
     init(accountColor: Color, cardIdentifier: String) {
         self.base = accountColor
-        // `hashValue` is seeded per-process in Swift and would give a card a
-        // different face on every launch. A tiny FNV-1a over the bytes is
-        // stable forever, which is what "this card is the green one" needs.
-        var hash = 2_166_136_261
-        for byte in cardIdentifier.utf8 {
-            hash = (hash ^ Int(byte)) &* 16_777_619
-        }
-        self.seed = hash.magnitude.hashValue == 0 ? 0 : Int(hash.magnitude % 997)
+        // `StableSeed` is the shared FNV-1a this used to inline — see its own
+        // header for why `hashValue` can't be used here. Byte-identical to
+        // what shipped, so no existing card changes shade.
+        self.seed = StableSeed.index(cardIdentifier, upperBound: 997)
     }
 
     /// Four bands of shade, walked by the seed. Kept deliberately narrow —

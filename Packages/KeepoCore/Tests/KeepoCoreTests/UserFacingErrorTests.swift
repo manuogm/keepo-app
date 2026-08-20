@@ -37,3 +37,23 @@ struct UserFacingErrorTests {
         #expect(UserFacingError.describe(SomeError()) == "Something went wrong. Please try again.")
     }
 }
+
+/// A cancelled load is routine control flow — `.task(id:)` cancels the
+/// in-flight work whenever its id changes — and must never surface as a red
+/// error under a screen that is about to be correct.
+@Suite("Cancellation is not a failure")
+struct UserFacingErrorCancellationTests {
+    @Test("A cancelled task is recognised as cancellation")
+    func cancellationIsRecognised() {
+        #expect(UserFacingError.isCancellation(CancellationError()))
+    }
+
+    @Test("A real failure is not mistaken for a cancellation")
+    func realFailuresAreNotCancellations() {
+        let offline = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+        #expect(UserFacingError.isCancellation(offline) == false)
+
+        struct Boom: Error {}
+        #expect(UserFacingError.isCancellation(Boom()) == false)
+    }
+}

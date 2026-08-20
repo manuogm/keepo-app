@@ -56,6 +56,28 @@ public enum PostgresDate {
         return formatter.date(from: string)
     }
 
+    /// Renders a `date`-only value for display **in the calendar it was
+    /// decoded with**.
+    ///
+    /// A `date` column has no time of day and no time zone — it is a
+    /// calendar day. `dateOnly(from:calendar:)` above turns it into a `Date`
+    /// at midnight *in that calendar*, so rendering the result with the
+    /// device's default zone shifts it: a value decoded in UTC and displayed
+    /// in any zone west of it comes out a day early. That is not
+    /// hypothetical — it shipped, briefly, on the dashboard's Upcoming Bills
+    /// widget, where every bill showed the day before it was due, because
+    /// the widget decodes in UTC (the zone the local store compares dates in)
+    /// and formatted in local.
+    ///
+    /// Pass the same calendar you decoded with. `template` is a
+    /// `setLocalizedDateFormatFromTemplate` skeleton ("dMMM", "dMMMy"), so
+    /// the field *order* still follows the user's locale.
+    public static func dateOnlyLabel(
+        _ date: Date, calendar: Calendar, template: String = "dMMM", locale: Locale = .current
+    ) -> String {
+        FormatterCache.dateOnly(calendar: calendar, template: template, locale: locale).string(from: date)
+    }
+
     /// Same instant as `timestampString(_:)`, but formatted to match
     /// PostgREST's own `timestamptz` rendering exactly: a fixed 6-digit
     /// fractional-second field and a `+00:00` offset (`2026-08-11T13:38:16.320521+00:00`),

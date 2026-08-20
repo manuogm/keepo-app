@@ -62,6 +62,44 @@ enum FormatterCache {
         }
     }
 
+    // MARK: - Dates
+
+    /// A cached `DateFormatter` for rendering a **date-only** value in a
+    /// given calendar. `DateFormatter` is as expensive to build as
+    /// `NumberFormatter`, and a list of dated rows re-renders just as often,
+    /// so it belongs behind the same cache rather than being constructed per
+    /// row (this file's own header explains what that cost me last time).
+    ///
+    /// The calendar is part of the key and is applied to the formatter's
+    /// time zone as well, which is the whole point: a `date` column has no
+    /// time of day and no zone, so rendering it in the device's zone shifts
+    /// it a day for anyone west of UTC. See `PostgresDate.dateOnlyLabel`.
+    static func dateOnly(calendar: Calendar, template: String, locale: Locale) -> DateFormatter {
+        let key = DateKey(
+            template: template, calendarIdentifier: "\(calendar.identifier)",
+            timeZoneIdentifier: calendar.timeZone.identifier, localeIdentifier: locale.identifier
+        )
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = dateFormatters[key] { return cached }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(template)
+        dateFormatters[key] = formatter
+        return formatter
+    }
+
+    nonisolated(unsafe) private static var dateFormatters: [DateKey: DateFormatter] = [:]
+
+    private struct DateKey: Hashable {
+        let template: String
+        let calendarIdentifier: String
+        let timeZoneIdentifier: String
+        let localeIdentifier: String
+    }
+
     private static func formatter(
         _ style: Style, code: String, minorUnit: Int, locale: Locale, configure: (NumberFormatter) -> Void
     ) -> NumberFormatter {

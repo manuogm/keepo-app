@@ -1,11 +1,18 @@
 import KeepoCore
 import SwiftUI
 
-/// Home — hero net-worth card for the scope the user selected via the
-/// top-left "more options" button, plus a bell that opens the Needs Review
-/// inbox as a floating notifications panel. Scope lives in SessionStore so
-/// it persists across tab switches and drives every financial screen from
-/// the same source of truth.
+/// Home — a widget dashboard the user arranges themselves, plus the screen
+/// chrome that was always here: the top-left "more options" button that
+/// picks the scope every financial screen computes for, and the bell that
+/// opens the Needs Review inbox as a floating notifications panel. Scope
+/// lives in SessionStore so it persists across tab switches and drives every
+/// financial screen from the same source of truth — and, on this screen,
+/// every widget at once.
+///
+/// The dashboard replaced Home's *body*, not Home: the toolbar, the overlay
+/// cards, and the needs-review plumbing below are unchanged. What used to be
+/// a single hard-coded net-worth card is now `DashboardCanvasView`, and the
+/// widgets on it are `DashboardStore`'s business.
 ///
 /// Reads straight off the local GRDB mirror (Phase L6) — no server round
 /// trip, no payload cache, no pending-write overlay. `Outbox`'s optimistic
@@ -15,10 +22,10 @@ import SwiftUI
 struct HomeView: View {
     let session: SessionStore
 
-    @State private var netWorth: Int64?
-    @State private var previousMonthNetWorth: Int64?
-    @State private var seriesPoints: [(date: Date, value: Int64)] = []
-    @State private var baseCurrencyInfo: CurrencyInfo?
+    /// Owned here rather than in `SessionStore`: the arrangement is this
+    /// screen's, it is device-local, and nothing outside Home reads it.
+    @State private var store = DashboardStore()
+    @State private var data = DashboardData()
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var needsReviewCount = 0
@@ -31,8 +38,10 @@ struct HomeView: View {
     @State private var needsReviewCurrencyMinorUnits: [String: Int] = [:]
     @State private var showNotifications = false
     @State private var showScopeMenu = false
-
-    private let rangeDays = 90
+    /// Lifted out of the canvas so the toolbar can offer "Done" — the canvas
+    /// owns entering edit mode (via long press), the toolbar owns the most
+    /// obvious way out of it.
+    @State private var isEditing = false
 
     private var isOverlayPresented: Bool { showNotifications || showScopeMenu }
 
@@ -40,22 +49,18 @@ struct HomeView: View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if isLoading {
-                ProgressView()
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        netWorthCard
+            DashboardCanvasView(
+                session: session, store: store, data: data, isLoading: isLoading, isEditing: $isEditing
+            )
 
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .padding()
+            if let errorMessage {
+                VStack {
+                    Spacer()
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .padding()
                 }
-                .refreshable { await load() }
             }
 
             // Both top-bar buttons present as a plain SwiftUI overlay here —
@@ -105,22 +110,38 @@ struct HomeView: View {
                 ScreenTitleBar(title: "Home", session: session)
             }
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showNotifications = true
-                } label: {
-                    Image(systemName: "bell")
-                }
-                .overlay(alignment: .topTrailing) {
-                    if needsReviewCount > 0 {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 8, height: 8)
-                            .offset(x: 2, y: -2)
+                // Edit mode borrows this slot: while arranging, the bell is
+                // the wrong thing to offer and "Done" is the only thing the
+                // user wants. Tapping the surface around the widgets also
+                // finishes, but that is not discoverable on its own.
+                if isEditing {
+                    Button("Done") {
+                        withAnimation(.snappy(duration: 0.24)) { isEditing = false }
+                    }
+                    .font(.body.weight(.semibold))
+                } else {
+                    Button {
+                        showNotifications = true
+                    } label: {
+                        Image(systemName: "bell")
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if needsReviewCount > 0 {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 8, height: 8)
+                                .offset(x: 2, y: -2)
+                        }
                     }
                 }
             }
         }
-        .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
+        // Keyed on the mounted widget kinds as well as the refresh token and
+        // the scope: adding or removing a widget has to reload, because the
+        // loader deliberately computes nothing for a widget that isn't there.
+        .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope, kinds: store.mountedKinds)) {
+            await load()
+        }
     }
 
     /// Rows keep their identity icon (globe/person/person.2) even when
@@ -176,96 +197,53 @@ struct HomeView: View {
         .foregroundStyle(Color.primary)
     }
 
-    private var netWorthCard: some View {
-        NavigationLink {
-            NetWorthDetailView(session: session)
-        } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Net Worth")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondary)
-                BalanceHeaderView(amount: netWorth, currency: baseCurrencyInfo)
-                TrendBadge(percentChange: monthOverMonthChange, color: trendColor)
-                NetWorthChartView(seriesPoints: seriesPoints, showAxes: false, height: 70, trendColor: trendColor)
-            }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// nil when either side can't be computed (money rule 5 — a missing FX
-    /// rate propagates to "—", never a partial/misleading percentage), or
-    /// when there was nothing a month ago to compare against.
-    private var monthOverMonthChange: Double? {
-        guard let netWorth, let previousMonthNetWorth, previousMonthNetWorth != 0 else { return nil }
-        return Double(netWorth - previousMonthNetWorth) / Double(abs(previousMonthNetWorth)) * 100
-    }
-
-    private var trendColor: Color {
-        guard let monthOverMonthChange else { return .secondary }
-        return monthOverMonthChange >= 0 ? .green : .red
-    }
-
+    /// One read for the whole dashboard, plus the bell's own rows. Widget
+    /// figures come back as a single `DashboardData` value — see
+    /// `DashboardDataLoader` for why this is one query rather than one per
+    /// widget.
     private func load() async {
         errorMessage = nil
         guard let baseCurrency = session.profile?.baseCurrency, let ownerId = session.profile?.id else {
             isLoading = false
             return
         }
-
-        let today = Date()
-        let todayString = PostgresDate.dateOnlyString(today, calendar: utcCalendar)
-        let fromDate = utcCalendar.date(byAdding: .day, value: -(rangeDays - 1), to: today) ?? today
-        let fromString = PostgresDate.dateOnlyString(fromDate, calendar: utcCalendar)
-        let oneMonthAgo = utcCalendar.date(byAdding: .month, value: -1, to: today) ?? today
-        let oneMonthAgoString = PostgresDate.dateOnlyString(oneMonthAgo, calendar: utcCalendar)
-        let moneyScope = LocalMoneyScope(scope: session.scope, baseCurrency: baseCurrency)
-        let dbQueue = session.dbQueue
-
         do {
-            let loaded = try await dbQueue.read { database in
-                (
-                    try LocalMoneyConversion.netWorth(database, moneyScope, asOf: todayString, now: today),
-                    try LocalMoneyConversion.netWorth(database, moneyScope, asOf: oneMonthAgoString, now: today),
-                    try LocalMoneyConversion.netWorthSeries(
-                        database, moneyScope, from: fromString, through: todayString, now: today
-                    ),
-                    try LocalTableQueries.currencies(database),
-                    try LocalMoneyQueries.needsReview(database, ownerId: ownerId.uuidString)
-                )
-            }
-            let (netWorthValue, previousMonthValue, seriesResult, currencies, reviewRows) = loaded
-            netWorth = netWorthValue
-            previousMonthNetWorth = previousMonthValue
-            if let row = currencies.first(where: { $0.code == baseCurrency }) {
-                baseCurrencyInfo = CurrencyInfo(code: row.code, minorUnit: Int(row.minorUnit))
-            }
-            needsReviewItems = try reviewRows.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
-            needsReviewCurrencyMinorUnits = Dictionary(
-                uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) }
+            data = try await DashboardDataLoader.load(
+                dbQueue: session.dbQueue, scope: session.scope, baseCurrency: baseCurrency,
+                kinds: store.mountedKinds
             )
-            needsReviewCount = needsReviewItems.count
-
-            let parsed: [(date: Date, value: Int64)] = seriesResult.compactMap { point in
-                guard
-                    let date = PostgresDate.dateOnly(from: point.asOf, calendar: utcCalendar), let total = point.totalE4
-                else { return nil }
-                return (date: date, value: total)
-            }
-            let granularity = DateBucketing.granularity(from: fromDate, through: today)
-            seriesPoints = DateBucketing.bucket(parsed, granularity: granularity)
+            try await loadNeedsReview(ownerId: ownerId)
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            // A cancelled load is not a failure — the task id changed and a
+            // fresh load is already running. Same shape as `HouseholdView`'s
+            // own `isOffline` check: the caller knows which errors are worth
+            // a red line and which are not.
+            errorMessage = UserFacingError.isCancellation(error) ? nil : UserFacingError.describe(error)
         }
         isLoading = false
     }
+
+    private func loadNeedsReview(ownerId: UUID) async throws {
+        let loaded = try await session.dbQueue.read { database in
+            (
+                try LocalTableQueries.currencies(database),
+                try LocalMoneyQueries.needsReview(database, ownerId: ownerId.uuidString)
+            )
+        }
+        let (currencies, reviewRows) = loaded
+        needsReviewItems = try reviewRows.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
+        needsReviewCurrencyMinorUnits = Dictionary(
+            uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) }
+        )
+        needsReviewCount = needsReviewItems.count
+    }
 }
 
-/// `.task(id:)` needs an `Equatable` id — bundles the refresh token and the
-/// scope so either changing triggers exactly one reload.
+/// `.task(id:)` needs an `Equatable` id — bundles the refresh token, the
+/// scope, and the mounted widget kinds so any of the three changing triggers
+/// exactly one reload.
 private struct HomeLoadKey: Equatable {
     let token: Int
     let scope: PublicSchema.AccountScope
+    let kinds: Set<DashboardWidgetKind>
 }

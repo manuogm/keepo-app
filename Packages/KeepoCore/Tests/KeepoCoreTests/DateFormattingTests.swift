@@ -79,3 +79,44 @@ struct PostgresDateTests {
         #expect(row > boundary)
     }
 }
+
+/// A `date` column is a calendar day, not an instant. Decoding it in one
+/// calendar and rendering it in another shifts it — which shipped briefly on
+/// the dashboard's Upcoming Bills widget, where every bill read a day early.
+@Suite("Date-only display")
+struct DateOnlyLabelTests {
+    private var utc: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        return calendar
+    }
+
+    @Test("A UTC-decoded date renders as the same calendar day it was decoded from")
+    func roundTripsThroughUTC() {
+        let decoded = PostgresDate.dateOnly(from: "2026-08-21", calendar: utc)
+        #expect(decoded != nil)
+        let label = PostgresDate.dateOnlyLabel(
+            decoded ?? Date(), calendar: utc, template: "yMMdd", locale: Locale(identifier: "en_US_POSIX")
+        )
+        #expect(label.contains("21"))
+        #expect(label.contains("08") || label.contains("8"))
+    }
+
+    /// The regression itself: the same instant, rendered in a zone west of
+    /// UTC, is the previous day. Rendering in the decoding calendar is what
+    /// keeps the displayed day equal to the stored one.
+    @Test("Rendering a UTC-decoded date in a western zone would shift it a day")
+    func westernZoneWouldShiftTheDay() {
+        var western = Calendar(identifier: .gregorian)
+        western.timeZone = TimeZone(identifier: "America/Chicago") ?? .gmt
+        let decoded = PostgresDate.dateOnly(from: "2026-08-21", calendar: utc) ?? Date()
+
+        let posix = Locale(identifier: "en_US_POSIX")
+        let shifted = PostgresDate.dateOnlyLabel(decoded, calendar: western, template: "yMMdd", locale: posix)
+        let correct = PostgresDate.dateOnlyLabel(decoded, calendar: utc, template: "yMMdd", locale: posix)
+
+        #expect(shifted.contains("20"))
+        #expect(correct.contains("21"))
+        #expect(shifted != correct)
+    }
+}
