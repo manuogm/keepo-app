@@ -32,9 +32,10 @@ public struct DashboardArrangement: Sendable, Equatable, Codable {
 
     public var isEmpty: Bool { tiles.isEmpty }
 
-    /// Rows occupied at rest. The expanded height is `resolved(...)`'s job —
-    /// only it knows what is currently expanded.
-    public var rowCount: Int { (tiles.map { $0.row }.max()).map { $0 + 1 } ?? 0 }
+    /// Rows occupied at rest — the bottom edge of the lowest tile, not the
+    /// index it starts at, since a widget is two rows tall. The expanded
+    /// height is `resolved(...)`'s job — only it knows what is expanded.
+    public var rowCount: Int { tiles.map { $0.row + $0.size.rows }.max() ?? 0 }
 
     public func tile(id: UUID) -> DashboardTile? { tiles.first { $0.id == id } }
 
@@ -83,7 +84,9 @@ public struct DashboardArrangement: Sendable, Equatable, Codable {
         } else if let sidestepped = Self.steppingAside(for: landing, with: tiles, in: occupied) {
             tiles = Self.normalized(sidestepped)
         } else {
-            tiles = Self.normalized(Self.pushingDown(tiles, fromRow: landing.row) + [landing])
+            tiles = Self.normalized(
+                Self.pushingDown(tiles, fromRow: landing.row, by: landing.size.rows) + [landing]
+            )
         }
         return id
     }
@@ -97,8 +100,8 @@ public struct DashboardArrangement: Sendable, Equatable, Codable {
         guard landing.size == .small,
               let occupantId = occupied[Cell(row: landing.row, column: landing.column)],
               let occupant = tiles.first(where: { $0.id == occupantId }),
-              occupant.size == .small,
-              let freeColumn = freeColumn(inRow: landing.row, besides: landing.column, in: occupied)
+              occupant.size == .small, occupant.row == landing.row,
+              let freeColumn = freeColumn(in: landing.rowRange, besides: landing.column, in: occupied)
         else { return nil }
 
         var moved = occupant
@@ -141,7 +144,9 @@ public struct DashboardArrangement: Sendable, Equatable, Codable {
         } else if let swapped = Self.makingRoom(for: landing, from: origin, with: others, in: occupied) {
             tiles = Self.normalized(swapped)
         } else {
-            tiles = Self.normalized(Self.pushingDown(others, fromRow: landing.row) + [landing])
+            tiles = Self.normalized(
+                Self.pushingDown(others, fromRow: landing.row, by: landing.size.rows) + [landing]
+            )
         }
     }
 
@@ -166,11 +171,11 @@ public struct DashboardArrangement: Sendable, Equatable, Codable {
         guard landing.size == .small,
               let occupantId = occupied[Cell(row: landing.row, column: landing.column)],
               let occupant = others.first(where: { $0.id == occupantId }),
-              occupant.size == .small
+              occupant.size == .small, occupant.row == landing.row
         else { return nil }
 
         var moved = occupant
-        if let freeColumn = freeColumn(inRow: landing.row, besides: landing.column, in: occupied) {
+        if let freeColumn = freeColumn(in: landing.rowRange, besides: landing.column, in: occupied) {
             moved.row = landing.row
             moved.column = freeColumn
         } else {
@@ -180,17 +185,26 @@ public struct DashboardArrangement: Sendable, Equatable, Codable {
         return others.filter { $0.id != occupant.id } + [moved, landing]
     }
 
-    private static func freeColumn(inRow row: Int, besides column: Int, in occupied: [Cell: UUID]) -> Int? {
-        (0 ..< DashboardLayout.columnCount).first {
-            $0 != column && occupied[Cell(row: row, column: $0)] == nil
+    /// A column free for the whole height of the arriving tile — every one
+    /// of its rows, not just the row the finger was over.
+    private static func freeColumn(in rows: Range<Int>, besides column: Int, in occupied: [Cell: UUID]) -> Int? {
+        (0 ..< DashboardLayout.columnCount).first { candidate in
+            candidate != column && rows.allSatisfy { occupied[Cell(row: $0, column: candidate)] == nil }
         }
     }
 
-    private static func pushingDown(_ tiles: [DashboardTile], fromRow row: Int) -> [DashboardTile] {
+    /// Opens `amount` rows at `row` — the arriving tile's own height, so a
+    /// two-row widget gets a two-row gap rather than half of one. A tile
+    /// that merely *straddles* `row` isn't moved: normalization slides the
+    /// newcomer past it instead, which is the same answer without shunting a
+    /// widget the user can see is above the drop.
+    private static func pushingDown(
+        _ tiles: [DashboardTile], fromRow row: Int, by amount: Int
+    ) -> [DashboardTile] {
         tiles.map { tile in
             guard tile.row >= row else { return tile }
             var shifted = tile
-            shifted.row += 1
+            shifted.row += amount
             return shifted
         }
     }

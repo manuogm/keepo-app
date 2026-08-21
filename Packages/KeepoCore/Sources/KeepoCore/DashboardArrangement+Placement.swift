@@ -16,8 +16,8 @@ extension DashboardArrangement {
     static func occupancy(of tiles: [DashboardTile]) -> [Cell: UUID] {
         var occupied: [Cell: UUID] = [:]
         for tile in tiles {
-            for column in tile.columnRange {
-                occupied[Cell(row: tile.row, column: column)] = tile.id
+            for cell in tile.cells {
+                occupied[cell] = tile.id
             }
         }
         return occupied
@@ -27,7 +27,7 @@ extension DashboardArrangement {
         guard tile.row >= 0, tile.column >= 0,
               tile.column + tile.size.columns <= DashboardLayout.columnCount
         else { return false }
-        return tile.columnRange.allSatisfy { occupied[Cell(row: tile.row, column: $0)] == nil }
+        return tile.cells.allSatisfy { occupied[$0] == nil }
     }
 
     /// A wide tile has exactly one legal column, so this collapses to 0 for
@@ -38,7 +38,7 @@ extension DashboardArrangement {
 
     /// The first position at or after `start`, in reading order, where
     /// `tile` fits. Terminates because the scan is allowed to run one row
-    /// past everything occupied, and an empty row always fits anything.
+    /// past the last occupied one, and nothing at all sits below that.
     static func firstFreeSlot(
         for tile: DashboardTile, in occupied: [Cell: UUID], from start: Cell = Cell(row: 0, column: 0)
     ) -> DashboardTile {
@@ -76,8 +76,8 @@ extension DashboardArrangement {
                     for: candidate, in: occupied, from: Cell(row: candidate.row, column: candidate.column)
                 )
             }
-            for column in candidate.columnRange {
-                occupied[Cell(row: candidate.row, column: column)] = candidate.id
+            for cell in candidate.cells {
+                occupied[cell] = candidate.id
             }
             placed.append(candidate)
         }
@@ -88,18 +88,46 @@ extension DashboardArrangement {
     /// touched — preserving those holes is the whole point of absolute
     /// placement. This only closes rows nothing occupies at all, which
     /// otherwise become blank bands no gesture can remove.
+    ///
+    /// "Occupied" means *covered*, not *started in*: a two-row widget owns
+    /// its second row as much as its first, so counting only `tile.row`
+    /// would read every widget's lower half as an empty band and collapse
+    /// the dashboard onto itself. Each tile then slides up by however many
+    /// genuinely empty rows sit above it, which preserves both its height
+    /// and any deliberate half-row gap a spacer is holding open.
     private static func compactingEmptyRows(_ tiles: [DashboardTile]) -> [DashboardTile] {
-        let usedRows = Set(tiles.map(\.row)).sorted()
-        let newRow = Dictionary(uniqueKeysWithValues: usedRows.enumerated().map { ($0.element, $0.offset) })
+        let occupiedRows = Set(tiles.flatMap { $0.rowRange })
+        guard let lastRow = occupiedRows.max() else { return tiles }
+
+        var emptyRowsAbove: [Int: Int] = [:]
+        var empties = 0
+        for row in 0 ... lastRow {
+            if occupiedRows.contains(row) {
+                emptyRowsAbove[row] = empties
+            } else {
+                empties += 1
+            }
+        }
         return tiles.map { tile in
             var compacted = tile
-            compacted.row = newRow[tile.row] ?? tile.row
+            compacted.row -= emptyRowsAbove[tile.row] ?? 0
             return compacted
         }.sorted(by: isBefore)
     }
 
     private static func isBefore(_ lhs: DashboardTile, _ rhs: DashboardTile) -> Bool {
         (lhs.row, lhs.column) < (rhs.row, rhs.column)
+    }
+}
+
+extension DashboardTile {
+    /// Every cell this tile covers. The one place a tile's footprint is
+    /// expanded into cells, so occupancy and collision testing can never
+    /// disagree about how tall a widget is.
+    var cells: [DashboardArrangement.Cell] {
+        rowRange.flatMap { row in
+            columnRange.map { DashboardArrangement.Cell(row: row, column: $0) }
+        }
     }
 }
 
@@ -142,9 +170,9 @@ public extension DashboardArrangement {
     /// restores the previous screen exactly, because the previous screen was
     /// always still the source of truth.
     ///
-    /// An expanded tile is always full width, so at most one other tile can
-    /// share its row, and that one is displaced. Everything below shifts
-    /// down by the rows the expansion added.
+    /// An expanded tile is always full width, so every tile overlapping its
+    /// rows is displaced. Everything below shifts down by the rows the
+    /// expansion added.
     func resolved(expansion: DashboardExpansion? = nil) -> DashboardResolvedLayout {
         guard let expansion, let target = tile(id: expansion.id) else {
             return DashboardResolvedLayout(
@@ -158,7 +186,7 @@ public extension DashboardArrangement {
             )
         }
 
-        let extraRows = max(expansion.size.rows - 1, 0)
+        let extraRows = max(expansion.size.rows - target.size.rows, 0)
         let resolved = tiles.map { tile in
             resolve(tile, target: target, expansion: expansion, extraRows: extraRows)
         }
@@ -175,14 +203,18 @@ public extension DashboardArrangement {
                 size: expansion.size, isDisplaced: false
             )
         }
-        if tile.row == target.row {
+        // Anything sharing a *row* with the expanding tile is in its way,
+        // not just anything starting on the same row — a widget spans two of
+        // them, so a half-row-offset neighbour overlaps just as completely.
+        if tile.rowRange.overlaps(target.rowRange) {
             return DashboardResolvedTile(
                 id: tile.id, kind: tile.kind, row: tile.row, column: tile.column,
                 size: tile.size, isDisplaced: true
             )
         }
+        let isBelow = tile.row >= target.rowRange.upperBound
         return DashboardResolvedTile(
-            id: tile.id, kind: tile.kind, row: tile.row + (tile.row > target.row ? extraRows : 0),
+            id: tile.id, kind: tile.kind, row: tile.row + (isBelow ? extraRows : 0),
             column: tile.column, size: tile.size, isDisplaced: false
         )
     }

@@ -106,6 +106,7 @@
 		A38417E3409C44AC9E74975E /* OutboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A43338D7EE342E9D02ACC23 /* OutboxTests.swift */; };
 		A555CBC0A7E4DF1310CA27F9 /* MetricKitSubscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2304E1D42EB8B69A267C0AC /* MetricKitSubscriber.swift */; };
 		A63FA9C5AD20662984856BAA /* DashboardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349CAF3BCEA4D911AA5E107F /* DashboardData.swift */; };
+		A66A84D1DAEAF5A4F347291C /* DashboardCanvasDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DBDB63AD4D05BD8A1403EA /* DashboardCanvasDrag.swift */; };
 		A86F459104442515605CCF98 /* NetWorthChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01F93D6F883809945825188 /* NetWorthChartView.swift */; };
 		A8C3B22C1F1507158B971007 /* MappedCardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6E6B97FB91FA6725C935483 /* MappedCardSheet.swift */; };
 		AD2A7DB89BBDB050452CA807 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE9D5EF2222D3BBB7A7C333C /* Outbox.swift */; };
@@ -124,6 +125,7 @@
 		B9A1A4D4B42ACEA800227B4C /* InvestmentBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */; };
 		BBE92DC63297AE6FDD9EAE9F /* CardMappingLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */; };
 		BC2164BD9D96F9AB4C55FDDD /* DataPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20EF1D660F02003383C6EDE /* DataPrivacyView.swift */; };
+		BDBD09EE3CF8613353AFF224 /* DashboardHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61E117F7A777571884BB0AA1 /* DashboardHaptics.swift */; };
 		BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */; };
 		BF17C34B30995D6EAFF9C4CA /* CaptureNotificationCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB4D58C60A91E97162570E8 /* CaptureNotificationCopy.swift */; };
 		BF8A3723CCF5DC8095621601 /* DashboardCanvasCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B51809A9E015EC3C4BA079 /* DashboardCanvasCatalog.swift */; };
@@ -261,6 +263,7 @@
 		5B0A8C2BEF10788227677E2A /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardMappingLocalWriteTests.swift; sourceTree = "<group>"; };
 		5FA5C950BCD044A1FAE9B8AF /* CaptureDeepLinkHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureDeepLinkHandler.swift; sourceTree = "<group>"; };
+		61E117F7A777571884BB0AA1 /* DashboardHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHaptics.swift; sourceTree = "<group>"; };
 		6527A3683E8F25003E736747 /* AccountFormView+Dialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountFormView+Dialogs.swift"; sourceTree = "<group>"; };
 		65CA9A35388756C92A2C2D1F /* DashboardGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardGridView.swift; sourceTree = "<group>"; };
 		666660B494D18FFDCFA6D9E9 /* DashboardCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCanvasView.swift; sourceTree = "<group>"; };
@@ -318,7 +321,7 @@
 		BC080B33FA837D6D4D0F61A7 /* DashboardDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardDataLoader.swift; sourceTree = "<group>"; };
 		C01F93D6F883809945825188 /* NetWorthChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthChartView.swift; sourceTree = "<group>"; };
 		C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
-		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2304E1D42EB8B69A267C0AC /* MetricKitSubscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitSubscriber.swift; sourceTree = "<group>"; };
 		C2C989DB9E673F3B36CD29E0 /* TransactionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFormView.swift; sourceTree = "<group>"; };
 		C3AF9A7AEAB1809042F92E29 /* OTPSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPSignInView.swift; sourceTree = "<group>"; };
@@ -344,6 +347,7 @@
 		DFF5FF94A9B92F9C82977605 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		E26113BDE0659689A35B7B28 /* RecurringRuleFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRuleFormView.swift; sourceTree = "<group>"; };
 		E3A3543E6EF9E4AA8A2E59C5 /* CaptureIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureIntent.swift; sourceTree = "<group>"; };
+		E6DBDB63AD4D05BD8A1403EA /* DashboardCanvasDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCanvasDrag.swift; sourceTree = "<group>"; };
 		E82D12D8E224E6F3833EFD78 /* AccountFormView+Data.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountFormView+Data.swift"; sourceTree = "<group>"; };
 		E9CCA2BF8D2E735851609DA9 /* TransferDivergenceAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferDivergenceAlert.swift; sourceTree = "<group>"; };
 		ED50250E263DA762CABB6A0A /* CashflowWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CashflowWidget.swift; sourceTree = "<group>"; };
@@ -760,6 +764,7 @@
 				DC736156629A07A285FE7514 /* DashboardAutoScroll.swift */,
 				4BF714EAD5AE98EB0246165E /* DashboardBlankState.swift */,
 				46B51809A9E015EC3C4BA079 /* DashboardCanvasCatalog.swift */,
+				E6DBDB63AD4D05BD8A1403EA /* DashboardCanvasDrag.swift */,
 				666660B494D18FFDCFA6D9E9 /* DashboardCanvasView.swift */,
 				6B6D9DF881AC96B89492D7C8 /* DashboardCatalogView.swift */,
 				349CAF3BCEA4D911AA5E107F /* DashboardData.swift */,
@@ -767,6 +772,7 @@
 				0CC3F3845C76B4D1137EBDA8 /* DashboardEditMode.swift */,
 				6A03A53383CF460D80E43335 /* DashboardEditModeTimeout.swift */,
 				65CA9A35388756C92A2C2D1F /* DashboardGridView.swift */,
+				61E117F7A777571884BB0AA1 /* DashboardHaptics.swift */,
 				FB5D7423604124262739036E /* DashboardStore.swift */,
 				955D637872C099377B32D867 /* DateRangePickerSheet.swift */,
 				2EEDA735751E009006054A0D /* Widgets */,
@@ -911,7 +917,7 @@
 			mainGroup = 7EFAF88579B01776BD0774BC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */,
 				ADEF292666A264221272220B /* XCLocalSwiftPackageReference "Packages/KeepoCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -1022,6 +1028,7 @@
 				1DADF558B92916D9422C6775 /* DashboardAutoScroll.swift in Sources */,
 				9C7DD97B77F64B45C887BF9D /* DashboardBlankState.swift in Sources */,
 				BF8A3723CCF5DC8095621601 /* DashboardCanvasCatalog.swift in Sources */,
+				A66A84D1DAEAF5A4F347291C /* DashboardCanvasDrag.swift in Sources */,
 				9DB30A8E3FAF547AA25913CB /* DashboardCanvasView.swift in Sources */,
 				F95C149D0E193F83FEE29433 /* DashboardCatalogView.swift in Sources */,
 				A63FA9C5AD20662984856BAA /* DashboardData.swift in Sources */,
@@ -1029,6 +1036,7 @@
 				443177A152F37009434700AC /* DashboardEditMode.swift in Sources */,
 				214221AC1D41C502EA930E04 /* DashboardEditModeTimeout.swift in Sources */,
 				2DD3AAF91598A045DF790FD2 /* DashboardGridView.swift in Sources */,
+				BDBD09EE3CF8613353AFF224 /* DashboardHaptics.swift in Sources */,
 				E207C8EB0EE6AD263601F72A /* DashboardStore.swift in Sources */,
 				04DAB563D2880FF92D7AF874 /* DashboardWidgetView.swift in Sources */,
 				BC2164BD9D96F9AB4C55FDDD /* DataPrivacyView.swift in Sources */,
@@ -1263,6 +1271,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1304,6 +1313,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1420,7 +1430,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -1433,7 +1443,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		0D525863FB5ABAE4C22CDAE5 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 		55A520844CB1127366801CB8 /* KeepoCore */ = {
@@ -1442,7 +1452,7 @@
 		};
 		6CF67C6B40F5CAB317C7F6FC /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */

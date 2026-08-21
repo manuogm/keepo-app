@@ -46,8 +46,11 @@ struct DashboardBlankState: View {
 /// mode, which is a lot of gesture to discover for the most common thing a
 /// user will want to do here.
 ///
-/// Exactly one cell, so it reads as a slot in the same grid rather than as a
-/// button bolted underneath it.
+/// A full-width bar exactly **one row** — half a widget — tall. That shape
+/// is grammar rather than decoration: the half-row grid is what makes a
+/// control shorter than a widget expressible at all, and at this height the
+/// bar reads as a slot in the same grid rather than as a button bolted
+/// underneath it, without claiming the screen a real widget would.
 struct AddWidgetTile: View {
     let action: () -> Void
 

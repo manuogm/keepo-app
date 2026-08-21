@@ -1,39 +1,42 @@
 import KeepoCore
 import SwiftUI
 
-/// What a drag out of the catalogue is doing right now. Locations are in the
-/// grid's coordinate space, so the canvas can convert them to cells with the
-/// same `DashboardGeometry.cell(at:)` a tile drag uses.
-enum DashboardCatalogDrag {
-    case began(DashboardWidgetKind)
-    case moved(CGPoint)
-    case ended(CGPoint)
-    case cancelled
-}
-
 /// The widget catalogue, as a panel **inside the dashboard's own view
 /// hierarchy** rather than a `.sheet`.
 ///
-/// That is not a styling choice. A widget has to be draggable straight out
-/// of here and onto the grid, and a drag cannot survive the sheet being
-/// dismissed underneath it: dismissing destroys the drag's source view and
-/// UIKit cancels the session, so the gesture ended with the sheet gone and
-/// nothing placed. Tested twice before rewriting it this way. Living in the
-/// same hierarchy means the drag is an ordinary `DragGesture` reading the
-/// grid's own coordinate space — the very same mechanism that already moves
-/// a tile already on the dashboard, so arriving and rearranging behave
-/// identically instead of being two different systems.
+/// That is not a styling choice: a `.sheet` cannot host this list's two jobs
+/// at once. It has to scroll, and a widget has to come *out* of it onto the
+/// dashboard underneath — which a sheet cannot show at all.
+///
+/// The drag out is a **system drag session** (`.onDrag`), not a SwiftUI
+/// `DragGesture`, and that is the second load-bearing decision here. Every
+/// gesture-based attempt failed the same way, measured in the simulator: a
+/// `DragGesture` on a scrolling row — sequenced behind a long press, and
+/// even attached with `.simultaneousGesture` — wins arbitration against the
+/// enclosing `ScrollView` from the first touch down, and this list simply
+/// refuses to move, stranding every widget below the fold. Removing that one
+/// modifier restored scrolling instantly; nothing else did. A drag session
+/// is what UIKit built for this shape of interaction (it is how the home
+/// screen's own widget gallery works): the lift coexists with the scroll
+/// pan, the preview is carried by the window rather than by this view, and
+/// so the panel is free to get out of the way the moment the drag begins
+/// without the widget going with it.
 ///
 /// Every entry is the real widget view rendered against `DashboardData
-/// .sample`, not a mock-up. A preview whose only job is to promise what
-/// you're about to get has to be the thing itself.
+/// .sample`, not a mock-up — as the tile on the dashboard, as the picture in
+/// this list, and as the preview under the finger. A preview whose only job
+/// is to promise what you're about to get has to be the thing itself.
 struct DashboardCatalogView: View {
     let geometry: DashboardGeometry
     let maxHeight: CGFloat
     /// Tapping still adds the widget the quick way, at the first free slot.
     let onSelect: (DashboardWidgetKind) -> Void
     let onClose: () -> Void
-    let onDrag: (DashboardCatalogDrag) -> Void
+    /// Which widget is being carried out of the list. Called as the drag
+    /// session begins — and again, later, when the drop resolves the item,
+    /// which is why it must stay a note of *what* rather than an action:
+    /// see the comment on `onDrag` below.
+    let onLift: (DashboardWidgetKind) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -98,42 +101,54 @@ struct DashboardCatalogView: View {
                 .font(.subheadline)
                 .foregroundStyle(Color.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            preview(kind)
+            draggableCard(kind)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture { onSelect(kind) }
-        .gesture(dragOut(kind))
     }
 
-    /// Long press first, for the same reason the grid's own tile drag needs
-    /// one: this list scrolls, and a bare `DragGesture` would take every
-    /// touch away from the scroll view.
-    private func dragOut(_ kind: DashboardWidgetKind) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.3)
-            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named(DashboardGridSpace.name)))
-            .onChanged { value in
-                switch value {
-                case .first:
-                    onDrag(.began(kind))
-                case .second(true, let movement?):
-                    onDrag(.moved(movement.location))
-                default:
-                    break
-                }
-            }
-            .onEnded { value in
-                guard case .second(true, let movement?) = value else {
-                    onDrag(.cancelled)
-                    return
-                }
-                onDrag(.ended(movement.location))
+    /// The widget card, and the only part of the row a drag can start from.
+    ///
+    /// Attached to the whole row instead, the lift highlighted the row — the
+    /// title, the size badge, the description and the card together, in one
+    /// box that looked like a text selection rather than like picking up a
+    /// widget. The lift shape comes from the source view, so the source view
+    /// has to *be* the widget. Tapping anywhere on the row still adds it;
+    /// only the grab moved.
+    private func draggableCard(_ kind: DashboardWidgetKind) -> some View {
+        preview(kind)
+            // Clipped to the card's own corner, so the lift rounds off
+            // exactly where the widget does rather than at a square edge a
+            // few points outside it.
+            .contentShape(
+                .dragPreview,
+                RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous))
+            // SwiftUI calls this closure a second time when the drop
+            // resolves the item — after the widget has already landed. So it
+            // does one idempotent thing, note which kind is in hand, and the
+            // dashboard acts on that note when the drag reaches it. Anything
+            // with a consequence here (dismissing the panel, entering edit
+            // mode, minting the arriving tile) would happen twice, the
+            // second time stranding a widget nobody asked for.
+            //
+            // The payload itself cannot answer the question: a drop session
+            // hands over its item data only in `performDrop`, and the grid
+            // has to reflow around the widget long before then.
+            .onDrag {
+                onLift(kind)
+                return NSItemProvider(object: kind.rawValue as NSString)
+            } preview: {
+                preview(kind)
             }
     }
 
     /// Rendered at exactly the cell size the dashboard would give it, so a
     /// 1×1 reads as half-width beside a 1×2's full width — the size badge and
     /// the picture agree, and the user learns the grid from the catalogue.
+    /// Doubles as the drag preview, for the same reason.
     private func preview(_ kind: DashboardWidgetKind) -> some View {
         let size = geometry.size(rows: kind.baseSize.rows, columns: kind.baseSize.columns)
         return DashboardWidgetView(kind: kind, data: .sample)
@@ -143,10 +158,4 @@ struct DashboardCatalogView: View {
             // interaction that goes nowhere.
             .allowsHitTesting(false)
     }
-}
-
-/// The grid's coordinate-space name, shared so the catalogue's drag and the
-/// canvas's own drop maths are literally reading the same space.
-enum DashboardGridSpace {
-    static let name = "dashboardGrid"
 }

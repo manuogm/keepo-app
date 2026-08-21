@@ -25,7 +25,12 @@ extension DashboardCanvasView {
             // A drag still in progress is activity even though nothing has
             // landed yet — dropping out of edit mode mid-gesture would strand
             // a tile under the finger.
-            guard !Task.isCancelled, isEditing, drag == nil else { return }
+            //
+            // Both kinds of drag count. A widget arriving from the catalogue
+            // is carried by a system drag session and never populates `drag`,
+            // so checking that alone timed edit mode out from under a user
+            // who was still deciding where to put it.
+            guard !Task.isCancelled, isEditing, drag == nil, incoming == nil else { return }
             withAnimation(.snappy(duration: 0.24)) { isEditing = false }
         }
     }

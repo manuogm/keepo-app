@@ -1,6 +1,18 @@
 import KeepoCore
 import SwiftUI
 
+/// The dashboard's two coordinate spaces, named once so nothing has to
+/// guess which one a point is in.
+///
+/// They are genuinely different and both are needed: a tile drag reports its
+/// location inside the **grid**, which scrolls with the content, while a drop
+/// coming in from the catalogue reports its location on the **canvas**, which
+/// does not. `DashboardCanvasView.gridFrame` is the bridge between them.
+enum DashboardSpace {
+    static let grid = "dashboardGrid"
+    static let canvas = "dashboardCanvas"
+}
+
 /// A cell the finger is over. A named `Equatable` type rather than the
 /// `(row:column:)` tuple this used to return: the drag needs to hold "the
 /// cell the preview was last built for" in an `Optional` and compare it
@@ -12,50 +24,71 @@ struct DashboardGridCell: Equatable {
 }
 
 /// Cell arithmetic for the dashboard grid — the only place points and grid
-/// coordinates are converted into one another, in either direction. `cell(at:)`
-/// is the inverse of `origin(row:column:)`, and edit-mode drags depend on
-/// that being literally true rather than approximately true.
+/// coordinates are converted into one another, in either direction.
+/// `cell(originAt:)` is the inverse of `origin(row:column:)`, and edit-mode
+/// drags depend on that being literally true rather than approximately true.
 struct DashboardGeometry: Equatable {
+    /// A column's width.
     let cellSize: CGFloat
+    /// One grid row — **half a widget**, less the gap two of them absorb
+    /// between. Sized this way, `DashboardLayout.rowsPerWidget` rows measure
+    /// exactly `cellSize`, so every widget kept the square it had before the
+    /// row was split and only a one-row tile (a spacer) can be shorter.
+    let rowHeight: CGFloat
     let spacing: CGFloat
 
-    /// A row is exactly as tall as a column is wide — the grid is square
-    /// cells, per the design. Everything else here follows from that.
     init(availableWidth: CGFloat, spacing: CGFloat = 12) {
         self.spacing = spacing
         let columns = CGFloat(DashboardLayout.columnCount)
-        self.cellSize = max((availableWidth - spacing * (columns - 1)) / columns, 1)
+        let width = max((availableWidth - spacing * (columns - 1)) / columns, 1)
+        let rows = CGFloat(DashboardLayout.rowsPerWidget)
+        self.cellSize = width
+        self.rowHeight = max((width - spacing * (rows - 1)) / rows, 1)
     }
 
-    private var stride: CGFloat { cellSize + spacing }
+    private var columnStride: CGFloat { cellSize + spacing }
+    private var rowStride: CGFloat { rowHeight + spacing }
 
     /// Spanning tiles absorb the gaps they cover, so a 2-wide tile is wider
     /// than two cells by exactly one spacing — otherwise a full-width tile
     /// would sit narrower than the two tiles above it.
-    private func extent(_ count: Int) -> CGFloat {
-        CGFloat(count) * cellSize + CGFloat(max(count - 1, 0)) * spacing
+    private func extent(_ count: Int, unit: CGFloat) -> CGFloat {
+        CGFloat(count) * unit + CGFloat(max(count - 1, 0)) * spacing
     }
 
     func size(rows: Int, columns: Int) -> CGSize {
-        CGSize(width: extent(columns), height: extent(rows))
+        CGSize(width: extent(columns, unit: cellSize), height: extent(rows, unit: rowHeight))
     }
 
     func origin(row: Int, column: Int) -> CGPoint {
-        CGPoint(x: CGFloat(column) * stride, y: CGFloat(row) * stride)
+        CGPoint(x: CGFloat(column) * columnStride, y: CGFloat(row) * rowStride)
     }
 
-    func height(rows: Int) -> CGFloat { extent(rows) }
+    func height(rows: Int) -> CGFloat { extent(rows, unit: rowHeight) }
 
-    /// The cell a point falls in, clamped into the grid. Used to turn a
-    /// drag's live location into the drop target `DashboardArrangement.move`
-    /// expects; a point in a gutter resolves to the cell it is nearest,
-    /// which is what keeps a drop between two tiles from doing nothing.
-    func cell(at point: CGPoint) -> DashboardGridCell {
-        let column = Int((point.x / stride).rounded(.down))
-        let row = Int((point.y / stride).rounded(.down))
-        return DashboardGridCell(
-            row: max(row, 0),
-            column: min(max(column, 0), DashboardLayout.columnCount - 1)
+    /// The cell a point falls inside, clamped into the grid. Used to target
+    /// a drop from the finger itself, where a corner cannot be derived —
+    /// see `previewIncoming(at:geometry:)`.
+    func cell(containing point: CGPoint) -> DashboardGridCell {
+        DashboardGridCell(
+            row: max(Int((point.y / rowStride).rounded(.down)), 0),
+            column: min(max(Int((point.x / columnStride).rounded(.down)), 0), DashboardLayout.columnCount - 1)
+        )
+    }
+
+    /// The cell a dragged tile's **top-left corner** snaps to, clamped into
+    /// the grid — the drop target `DashboardArrangement.move` expects.
+    ///
+    /// Deliberately the corner and not the finger. A widget covers two rows
+    /// now, so "the cell the finger is in" answers differently depending on
+    /// which half of the tile the user happened to grab, and a tile picked
+    /// up by its bottom edge would drop a row below where it is plainly
+    /// sitting. Rounding the corner to the nearest cell instead means the
+    /// tile lands where it looks like it will, whatever the grip.
+    func cell(originAt point: CGPoint) -> DashboardGridCell {
+        DashboardGridCell(
+            row: max(Int((point.y / rowStride).rounded()), 0),
+            column: min(max(Int((point.x / columnStride).rounded()), 0), DashboardLayout.columnCount - 1)
         )
     }
 }
@@ -96,7 +129,8 @@ struct DashboardGridView<TileContent: View>: View {
     /// expanding beside it rather than flying across the screen.
     private func displacement(of tile: DashboardResolvedTile) -> CGFloat {
         guard tile.isDisplaced else { return 0 }
-        let travel = geometry.size(rows: 1, columns: DashboardLayout.columnCount).width + geometry.spacing
+        let travel = geometry.size(rows: tile.size.rows, columns: DashboardLayout.columnCount).width
+            + geometry.spacing
         return tile.column == 0 ? -travel : travel
     }
 }

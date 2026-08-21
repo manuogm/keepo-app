@@ -22,6 +22,16 @@ public enum DashboardLayout {
     /// as rules rather than as hardcoded `1`s, not because a third column
     /// is planned — the widget size vocabulary below assumes two.
     public static let columnCount = 2
+
+    /// **A row is half a column.** Every widget is therefore two rows tall,
+    /// and `DashboardGeometry` sizes two rows to exactly one column width —
+    /// so a widget occupies the same square it always did, and nothing on an
+    /// existing dashboard changed size when the row split.
+    ///
+    /// The split exists so a tile *can* be one row tall: a spacer that opens
+    /// half a widget of breathing room, which a full-height row could not
+    /// express without leaving a hole the size of a widget.
+    public static let rowsPerWidget = 2
 }
 
 // MARK: - Size
@@ -38,13 +48,17 @@ public struct DashboardWidgetSize: Sendable, Equatable, Hashable, Codable {
         self.columns = columns
     }
 
-    /// Every *base* size is exactly one row tall — the two shapes a tile can
-    /// rest at. Expanded sizes are always full width (see
-    /// `DashboardWidgetKind.expandedSizes`), which is what keeps the
-    /// resolver below from ever having to pack a multi-row tile except the
-    /// single expanded one.
-    public static let small = DashboardWidgetSize(rows: 1, columns: 1)
-    public static let wide = DashboardWidgetSize(rows: 1, columns: 2)
+    /// The two shapes a tile rests at — both `rowsPerWidget` tall, which is
+    /// what makes them square and full-width-square respectively. Expanded
+    /// sizes are always full width (see `DashboardWidgetKind.expandedSizes`).
+    public static let small = DashboardWidgetSize(rows: DashboardLayout.rowsPerWidget, columns: 1)
+    public static let wide = DashboardWidgetSize(rows: DashboardLayout.rowsPerWidget, columns: 2)
+
+    /// `n` widget-heights, in rows — the unit every widget size is expressed
+    /// in, so no call site has to remember that a row is half a widget.
+    public static func widgets(_ count: Int, columns: Int) -> DashboardWidgetSize {
+        DashboardWidgetSize(rows: count * DashboardLayout.rowsPerWidget, columns: columns)
+    }
 }
 
 // MARK: - Kind
@@ -101,9 +115,12 @@ public enum DashboardWidgetKind: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    /// "1×2" — rows by columns, the same way the design describes sizes.
+    /// "1×2" — widget-heights by columns, the way the design describes
+    /// sizes. Deliberately *not* raw rows: a row is half a widget, and
+    /// telling the user a square tile is "2×1" would describe the grid's
+    /// bookkeeping rather than what they are about to see.
     public var sizeLabel: String {
-        "\(baseSize.rows)×\(baseSize.columns)"
+        "\(baseSize.rows / DashboardLayout.rowsPerWidget)×\(baseSize.columns)"
     }
 
     /// The size the tile rests at, and the size it returns to in edit mode.
@@ -125,9 +142,9 @@ public enum DashboardWidgetKind: String, Sendable, CaseIterable, Codable {
     public var expandedSizes: [DashboardWidgetSize] {
         switch self {
         case .cashflow:
-            return [DashboardWidgetSize(rows: 2, columns: 2), DashboardWidgetSize(rows: 3, columns: 2)]
+            return [DashboardWidgetSize.widgets(2, columns: 2), DashboardWidgetSize.widgets(3, columns: 2)]
         case .netWorth, .investingRatio, .currencyExposure, .upcomingBills:
-            return [DashboardWidgetSize(rows: 2, columns: 2)]
+            return [DashboardWidgetSize.widgets(2, columns: 2)]
         }
     }
 }
@@ -153,7 +170,8 @@ public struct DashboardTile: Sendable, Equatable, Identifiable, Codable {
 
     public var size: DashboardWidgetSize { kind.baseSize }
 
-    /// The columns this tile covers at rest. Every base size is one row
-    /// tall, so a row index plus this range is the whole footprint.
+    /// The cells this tile covers at rest — both axes, since a row is half a
+    /// widget and every base size spans more than one of them.
     var columnRange: Range<Int> { column ..< (column + size.columns) }
+    var rowRange: Range<Int> { row ..< (row + size.rows) }
 }

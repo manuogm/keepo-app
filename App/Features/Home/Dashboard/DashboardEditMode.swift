@@ -1,9 +1,11 @@
 import KeepoCore
 import SwiftUI
 
-/// Edit mode's visual language: the jiggle, and the minus badge that removes
-/// a widget. Both live here rather than inline in the canvas so the canvas
-/// file stays about *arranging*, not about how arranging looks.
+/// Edit mode's visual language: the jiggle, the minus badge that removes a
+/// widget, and the two slots that stand in for one — where an arriving widget
+/// would land, and where it goes instead if the user changes their mind. They
+/// live here rather than inline in the canvas so the canvas file stays about
+/// *arranging*, not about how arranging looks.
 
 /// The iOS home-screen wobble. Two things make it read as the real thing
 /// rather than as a synchronised metronome:
@@ -76,6 +78,73 @@ struct WidgetRemoveBadge: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Remove widget")
+    }
+}
+
+/// Where a widget carried in from the catalogue will land.
+///
+/// Deliberately empty. The finger is already carrying a full rendering of
+/// the widget, so this one's whole job is *where*, not *what* — and the
+/// moment it tried to answer both, by drawing the real widget on real data
+/// beside the sample-data card in hand, the two disagreed on every number
+/// and the pair read as a bug rather than as one widget arriving.
+///
+/// Shares `WidgetStyle`'s corner with the real tile and `AddWidgetTile`'s
+/// dashed edge, so it reads as the same grammar: a slot, not a broken card.
+struct DashboardLandingSlot: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
+            .fill(Color.secondary.opacity(0.18))
+            .overlay(
+                RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        Color.secondary.opacity(0.45),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
+                    )
+            )
+            .accessibilityLabel("Drop here")
+    }
+}
+
+/// Where a widget being carried in goes to *not* be added.
+///
+/// It takes the add button's place rather than appearing next to it, at the
+/// same size, so the one control under the grid always answers the question
+/// the user currently has — see `bottomSlot(_:)` for why sharing the slot is
+/// also the only version that doesn't move the grid mid-drag.
+///
+/// Red, dashed, and empty until targeted: the same grammar as the landing
+/// slot, in the same red as the remove badge, because they are the two ways
+/// a widget can fail to end up on the dashboard. Filling solid on target is
+/// the whole feedback — at that point the label has said what will happen and
+/// the only thing left to show is that letting go now will do it.
+struct DashboardTrashSlot: View {
+    let isTargeted: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
+            .fill(Color.red.opacity(isTargeted ? 1 : 0.12))
+            .overlay(
+                RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        Color.red.opacity(isTargeted ? 0 : 0.5),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
+                    )
+            )
+            .overlay(label)
+            .scaleEffect(isTargeted ? 1.02 : 1)
+            .animation(.snappy(duration: 0.18), value: isTargeted)
+            .accessibilityLabel(isTargeted ? "Release to discard widget" : "Discard widget")
+    }
+
+    private var label: some View {
+        Label(
+            isTargeted ? "Release to discard" : "Drag here to discard",
+            systemImage: isTargeted ? "trash.fill" : "trash"
+        )
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(isTargeted ? Color.white : Color.red)
+        .contentTransition(.opacity)
     }
 }
 

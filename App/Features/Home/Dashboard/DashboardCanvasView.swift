@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The dashboard itself — the grid, what each tile contains, which one is
 /// expanded, and edit mode. Split from `HomeView`, which keeps the screen's
@@ -39,58 +40,100 @@ struct DashboardCanvasView: View {
     // different file.
     @State var scrollPosition = ScrollPosition()
     @State var scrollGeometry = DashboardScrollGeometry()
-    @State var autoScrollDirection: CGFloat = 0
+    @State var autoScrollVelocity: CGFloat = 0
     @State var autoScrollTask: Task<Void, Never>?
     @State var editModeTimeoutTask: Task<Void, Never>?
     /// The widget being dragged out of the catalogue, if any.
     @State var incoming: DashboardIncomingWidget?
+    /// The grid's frame inside the canvas — the one number that turns a
+    /// drop location into a grid location.
+    @State var gridFrame: CGRect = .zero
+    /// Which widget the catalogue last handed to a drag session, waiting to
+    /// be claimed when that drag reaches the dashboard.
+    @State var liftedKind: DashboardWidgetKind?
+    /// Where an arriving widget last was, in canvas space — the one thing
+    /// edge auto-scroll needs to re-resolve its landing cell after moving
+    /// the grid out from under a finger that is holding still.
+    @State var lastDropPoint: CGPoint?
+    /// The trash bar's frame inside the canvas, measured for the same
+    /// reason `gridFrame` is: the drop delegate reports canvas points, and
+    /// "is the finger over the trash" has to be asked in that space.
+    @State var trashFrame: CGRect = .zero
+    /// Whether letting go right now would throw the arriving widget away.
+    @State var isOverTrash = false
 
-    /// The drag reads its location in this space, so a finger position
-    /// converts straight to a grid cell with no offset arithmetic between.
-    /// Shared with the catalogue, whose drag-out reads the identical space.
-    private static let gridSpace = DashboardGridSpace.name
-
+    /// The catalogue is a **sibling** of the dashboard's scroll view, not an
+    /// overlay on it, and that is not a layout preference.
+    ///
+    /// As an overlay the panel sits inside the scroll view's own gesture
+    /// territory: its enclosing `UIScrollView` sees every touch that lands
+    /// on the panel and claims the pan, so the catalogue's list would not
+    /// scroll at all — and worst of all it looked like a gesture-priority
+    /// problem inside the catalogue, which is where the previous two fixes
+    /// went. A `ZStack` puts the panel beside the scroll view instead, out
+    /// of reach of a recognizer that was never meant to see it.
     var body: some View {
         GeometryReader { proxy in
             let geometry = DashboardGeometry(availableWidth: proxy.size.width - horizontalInset * 2)
-            ScrollView {
-                if store.arrangement.isEmpty && !isLoading {
-                    DashboardBlankState { isPickingWidget = true }
-                        .frame(height: max(proxy.size.height - 40, 260))
-                } else {
-                    grid(geometry)
+            ZStack(alignment: .bottom) {
+                ScrollView {
+                    // `incoming`, because a widget on its way in needs the
+                    // grid to reflow around and the trash bar to be thrown
+                    // at — neither of which the blank state has. A first
+                    // widget dragged onto an empty dashboard otherwise
+                    // travelled over a screen with nothing on it.
+                    if store.arrangement.isEmpty && incoming == nil && !isLoading {
+                        DashboardBlankState { isPickingWidget = true }
+                            .frame(height: max(proxy.size.height - 40, 260))
+                    } else {
+                        grid(geometry)
+                    }
                 }
+                // A drag in progress must never also scroll the page under
+                // it. The tile gesture already requires a brief press first
+                // (which a scroll pan can't satisfy); this closes the
+                // remaining case.
+                //
+                // Programmatic scrolling still works while disabled, which is
+                // what edge auto-scroll relies on — the *user* can't pan
+                // mid-drag, but the drag itself can move the view.
+                .scrollDisabled(drag != nil)
+                .scrollPosition($scrollPosition)
+                .onScrollGeometryChange(for: DashboardScrollGeometry.self) { proxy in
+                    DashboardScrollGeometry(
+                        offsetY: proxy.contentOffset.y,
+                        viewportHeight: proxy.containerSize.height,
+                        contentHeight: proxy.contentSize.height
+                    )
+                } action: { _, updated in
+                    scrollGeometry = updated
+                }
+
+                catalogueBackdrop
+                cataloguePanel(geometry, viewportHeight: proxy.size.height)
             }
-            // A drag in progress must never also scroll the page under it.
-            // The gesture below already requires a long press first (which a
-            // scroll pan can't satisfy); this closes the remaining case.
-            //
-            // Programmatic scrolling still works while disabled, which is
-            // what edge auto-scroll relies on — the *user* can't pan mid-drag,
-            // but the drag itself can move the view.
-            .scrollDisabled(drag != nil)
-            .scrollPosition($scrollPosition)
-            .onScrollGeometryChange(for: DashboardScrollGeometry.self) { proxy in
-                DashboardScrollGeometry(
-                    offsetY: proxy.contentOffset.y,
-                    viewportHeight: proxy.containerSize.height,
-                    contentHeight: proxy.contentSize.height
-                )
-            } action: { _, updated in
-                scrollGeometry = updated
-            }
-            .overlay { catalogueBackdrop }
-            .overlay(alignment: .bottom) { cataloguePanel(geometry, viewportHeight: proxy.size.height) }
+            .coordinateSpace(name: DashboardSpace.canvas)
+            .onDrop(of: [.plainText], delegate: widgetDrop(geometry))
             .animation(.snappy(duration: 0.3), value: isPickingWidget)
+            .modifier(DashboardHaptics(
+                isEditing: isEditing, carriedId: incoming?.id, draggedId: drag?.id,
+                targetCell: previewCell, isOverTrash: isOverTrash, arrangement: store.arrangement
+            ))
         }
     }
 
     private var horizontalInset: CGFloat { 16 }
 
     /// A lifted tile grows; every other tile shrinks while editing.
+    ///
+    /// Both numbers are small on purpose. What the eye reads is the
+    /// *difference* between the tile in hand and the ones around it, so a
+    /// 4% lift over a 6% shrink already says "this one is off the surface" —
+    /// anything more and the tile balloons out of its own slot and stops
+    /// looking like the thing about to be dropped into it.
     private func editModeScale(isDragging: Bool) -> CGFloat {
-        if isDragging { return 1.06 }
-        return isEditing ? 0.92 : 1
+        if isDragging { return 1.04 }
+        return isEditing ? 0.94 : 1
     }
 
     private func grid(_ geometry: DashboardGeometry) -> some View {
@@ -98,13 +141,18 @@ struct DashboardCanvasView: View {
             DashboardGridView(layout: layout, geometry: geometry) { resolved in
                 tile(resolved, geometry: geometry)
             }
-            .coordinateSpace(name: Self.gridSpace)
-
-            HStack(spacing: geometry.spacing) {
-                AddWidgetTile { isPickingWidget = true }
-                    .frame(width: geometry.cellSize, height: geometry.cellSize)
-                Spacer(minLength: 0)
+            .coordinateSpace(name: DashboardSpace.grid)
+            // Where the grid sits inside the canvas, which is where the
+            // drop target reports its locations. Measured rather than
+            // derived — see `gridPoint(_:)`.
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .named(DashboardSpace.canvas))
+            } action: { frame in
+                gridFrame = frame
             }
+
+            bottomSlot(geometry)
+                .padding(.top, carriedReserve(geometry))
         }
         .padding(.horizontal, horizontalInset)
         .padding(.top, 4)
@@ -124,7 +172,10 @@ struct DashboardCanvasView: View {
     /// tile itself is drawn under the finger instead (see `tile`), not at its
     /// preview position — otherwise it would fight the finger for the same
     /// pixels.
-    private var layout: DashboardResolvedLayout {
+    ///
+    /// Not `private`, for the same reason the state above isn't: this type's
+    /// extensions live in other files, and `carriedReserve` reads it.
+    var layout: DashboardResolvedLayout {
         (dragPreview ?? store.arrangement).resolved(expansion: expansion)
     }
 
@@ -140,7 +191,26 @@ struct DashboardCanvasView: View {
 
     // MARK: - Tiles
 
+    @ViewBuilder
     private func tile(_ resolved: DashboardResolvedTile, geometry: DashboardGeometry) -> some View {
+        if incoming?.id == resolved.id {
+            // Not a widget yet — the grid has reflowed around where one is
+            // about to go, and the widget itself is in the user's hand.
+            //
+            // Faded rather than removed while the finger is over the trash.
+            // The slot is a promise about where the widget lands, and over
+            // the trash that promise is off — but taking it out of the
+            // layout would shorten the grid and move the trash bar itself
+            // (see `previewIncoming`), so it dims in place instead.
+            DashboardLandingSlot()
+                .opacity(isOverTrash ? 0.3 : 1)
+                .animation(.easeInOut(duration: 0.18), value: isOverTrash)
+        } else {
+            placedTile(resolved, geometry: geometry)
+        }
+    }
+
+    private func placedTile(_ resolved: DashboardResolvedTile, geometry: DashboardGeometry) -> some View {
         let isDragging = drag?.id == resolved.id
         return DashboardWidgetView(
             kind: resolved.kind,
@@ -195,90 +265,20 @@ struct DashboardCanvasView: View {
         // `.onLongPressGesture`, which coexists with the scroll pan the way
         // every context menu in iOS does. The drag is attached only while
         // editing, where taking the touch is exactly what we want.
-        .onLongPressGesture(minimumDuration: 0.45) { beginEditing() }
-        .gesture(isEditing ? pressAndDrag(resolved, geometry: geometry) : nil)
-    }
-
-    // MARK: - Gestures
-
-    /// Edit mode's drag. The short press in front of it is what separates
-    /// "pick this tile up" from "flick the list" once scrolling and dragging
-    /// are both live on the same surface.
-    private func pressAndDrag(_ tile: DashboardResolvedTile, geometry: DashboardGeometry) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.12)
-            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.gridSpace)))
-            .onChanged { value in
-                guard case .second(true, let movement?) = value else { return }
-                // The grab offset is measured once, against the tile's
-                // position before anything reflowed — recomputing it each
-                // frame would chase the preview and drift.
-                let grabOffset = drag?.grabOffset ?? grabOffset(
-                    for: tile, startLocation: movement.startLocation, geometry: geometry
-                )
-                drag = DashboardDragState(
-                    id: tile.id, location: movement.location, grabOffset: grabOffset
-                )
-                updatePreview(for: tile.id, at: movement.location, geometry: geometry)
-                updateAutoScroll(gridY: movement.location.y, geometry: geometry)
+        //
+        // `.simultaneousGesture`, because the card underneath has a tap
+        // gesture of its own (expand/collapse) and a descendant's gesture
+        // otherwise takes the touch outright: attached the ordinary way the
+        // press never completed at all, and a long hold expanded the widget
+        // instead of starting edit mode. Recognising alongside it lets the
+        // press through, and the tap that arrives on release is a no-op
+        // because `setExpansion` refuses to run in edit mode.
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.45).onEnded { _ in
+                if !isEditing { beginEditing() }
             }
-            .onEnded { value in
-                guard case .second(true, let movement?) = value else {
-                    clearDrag()
-                    return
-                }
-                drop(tile.id, at: movement.location, geometry: geometry)
-            }
-    }
-
-    private func grabOffset(
-        for tile: DashboardResolvedTile, startLocation: CGPoint, geometry: DashboardGeometry
-    ) -> CGSize {
-        let origin = geometry.origin(row: tile.row, column: tile.column)
-        return CGSize(width: startLocation.x - origin.x, height: startLocation.y - origin.y)
-    }
-
-    /// How far to shift the dragged tile from wherever the layout has just
-    /// put it, so it stays pinned under the finger.
-    private func dragOffset(for tile: DashboardResolvedTile, geometry: DashboardGeometry) -> CGSize {
-        guard let drag, drag.id == tile.id else { return .zero }
-        let origin = geometry.origin(row: tile.row, column: tile.column)
-        return CGSize(
-            width: drag.location.x - drag.grabOffset.width - origin.x,
-            height: drag.location.y - drag.grabOffset.height - origin.y
         )
-    }
-
-    /// Rebuilds the would-be arrangement as the finger moves, but only when
-    /// the finger crosses into a different cell — rebuilding per frame would
-    /// restart the reflow animation on every touch event and leave the grid
-    /// permanently mid-transition.
-    func updatePreview(for id: UUID, at location: CGPoint, geometry: DashboardGeometry) {
-        let cell = geometry.cell(at: location)
-        guard cell != previewCell else { return }
-        previewCell = cell
-
-        var preview = store.arrangement
-        preview.move(id: id, toRow: cell.row, column: cell.column)
-        withAnimation(.snappy(duration: 0.25)) { dragPreview = preview }
-    }
-
-    private func drop(_ id: UUID, at location: CGPoint, geometry: DashboardGeometry) {
-        let cell = geometry.cell(at: location)
-        // Everything on screen is already in its final position — the preview
-        // put it there while the finger was still down. This only makes it
-        // real and drops the tile back into the grid from under the finger.
-        withAnimation(.snappy(duration: 0.3)) {
-            store.move(id: id, toRow: cell.row, column: cell.column)
-            clearDrag()
-        }
-        bumpEditModeTimeout()
-    }
-
-    private func clearDrag() {
-        stopAutoScroll()
-        drag = nil
-        dragPreview = nil
-        previewCell = nil
+        .gesture(isEditing ? pressAndDrag(resolved, geometry: geometry) : nil)
     }
 
     /// The widget asks for the size it wants — `nil` to collapse, otherwise
