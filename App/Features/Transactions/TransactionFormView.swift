@@ -114,6 +114,10 @@ struct TransactionFormView: View {
                             .padding(.bottom, 24)
                     }
                     .scrollDismissesKeyboard(.interactively)
+                    // basedOnSize: content this short shouldn't rubber-band —
+                    // scrolling only kicks in once it actually overflows
+                    // (long content, larger Dynamic Type, a compact device).
+                    .scrollBounceBehavior(.basedOnSize)
                 }
             }
             .navigationTitle(isEditing ? "Edit \(kind.rawValue)" : "New \(kind.rawValue)")
@@ -191,7 +195,7 @@ struct TransactionFormView: View {
             // for the same object (the list's swipe-to-delete) — not
             // every user discovers the gesture.
             if isEditing {
-                DestructiveActionButton(title: "Delete", isEnabled: !isSaving) {
+                DestructiveActionButton(title: "Delete Transaction", isEnabled: !isSaving) {
                     Task { await deleteTransaction() }
                 }
                 .padding(.top, 4)

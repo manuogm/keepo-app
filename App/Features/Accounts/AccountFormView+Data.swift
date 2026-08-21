@@ -60,11 +60,14 @@ extension AccountFormView {
 
     private func loadSharedState(accountId: UUID) async {
         guard let ownerId = session.profile?.id.uuidString else { return }
-        isShared = (try? await session.dbQueue.read { database in
-            guard let household = try LocalTableQueries.myHousehold(database, userId: ownerId) else { return false }
-            return try LocalTableQueries.sharedAccountIds(database, householdId: household.id.uuidString)
-                .contains(accountId.uuidString)
-        }) ?? false
+        let row = (try? await session.dbQueue.read { database -> PublicSchema.HouseholdAccountsSelect? in
+            guard let household = try LocalTableQueries.myHousehold(database, userId: ownerId) else { return nil }
+            return try LocalTableQueries.sharedAccountRow(
+                database, householdId: household.id.uuidString, accountId: accountId.uuidString
+            )
+        }) ?? nil
+        isShared = row != nil
+        sharedAt = row?.sharedAt
     }
 
     /// Shared by the initial edit-mode prefill and by a post-conflict reload.
@@ -76,6 +79,7 @@ extension AccountFormView {
         editingVersion = Int(account.version)
         editingKind = account.kind
         editingArchivedAt = account.archivedAt
+        createdAt = account.createdAt
         name = account.name
         currency = account.currency
         includeInTotal = account.includeInTotal

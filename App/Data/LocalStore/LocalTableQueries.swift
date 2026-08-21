@@ -155,4 +155,20 @@ enum LocalTableQueries {
         )
         return Set(rows.map { $0["account_id"] as String })
     }
+
+    /// The single `household_accounts` row for one account, `shared_at`
+    /// included — unlike `sharedAccountIds`, which only answers "is this
+    /// shared" for a whole household's worth of accounts at once.
+    static func sharedAccountRow(
+        _ database: Database, householdId: String, accountId: String
+    ) throws -> PublicSchema.HouseholdAccountsSelect? {
+        try PublicSchema.HouseholdAccountsSelect.fetchOne(
+            database,
+            sql: """
+            SELECT * FROM household_accounts
+            WHERE household_id = ? AND account_id = ? AND deleted_at IS NULL
+            """,
+            arguments: [householdId, accountId]
+        )
+    }
 }

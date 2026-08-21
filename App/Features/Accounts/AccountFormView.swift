@@ -70,6 +70,8 @@ struct AccountFormView: View {
     @State var color = Color(hex: CategoryAppearance.randomColor())
     @State var isShared = false
     @State var hasHousehold = false
+    @State var createdAt: String?
+    @State var sharedAt: String?
 
     @State var editingId: UUID?
     @State var editingVersion: Int?
@@ -133,19 +135,27 @@ struct AccountFormView: View {
                     .padding(.bottom, 24)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                // basedOnSize: content this short shouldn't rubber-band —
+                // scrolling only kicks in once it actually overflows (long
+                // content, larger Dynamic Type, a compact device).
+                .scrollBounceBehavior(.basedOnSize)
                 // Pinned rather than the last thing in the scroll view: the
                 // destructive action belongs at the bottom of the SHEET, in
                 // one predictable place, not at the bottom of however much
-                // content this particular account happens to have.
+                // content this particular account happens to have. No
+                // `.background` — it sits directly on the sheet's own
+                // grouped background rather than a separate bar.
                 .safeAreaInset(edge: .bottom) {
                     if isEditing {
-                        DestructiveActionButton(title: "Delete Account", isEnabled: !isSaving) {
-                            showDeleteOptions = true
+                        VStack(spacing: 8) {
+                            metaText
+                            DestructiveActionButton(title: "Delete Account", isEnabled: !isSaving) {
+                                showDeleteOptions = true
+                            }
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
                         .padding(.bottom, 12)
-                        .background(.bar)
                     }
                 }
             }
@@ -287,6 +297,24 @@ struct AccountFormView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    /// Provenance, not a control — grey and out of the way, right above the
+    /// destructive action rather than competing with the identity card for
+    /// attention.
+    @ViewBuilder
+    private var metaText: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let createdAt, let date = PostgresDate.date(fromTimestamp: createdAt) {
+                Text("Created on \(date.formatted(date: .abbreviated, time: .omitted))")
+            }
+            if isShared, let sharedAt, let date = PostgresDate.date(fromTimestamp: sharedAt) {
+                Text("Shared on \(date.formatted(date: .abbreviated, time: .omitted))")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(Color.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var shareBinding: Binding<Bool> {

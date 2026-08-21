@@ -93,9 +93,15 @@ struct CategoryFormView: View {
                     .padding(.bottom, 24)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                // basedOnSize: content this short shouldn't rubber-band —
+                // scrolling only kicks in once it actually overflows (long
+                // content, larger Dynamic Type, a compact device).
+                .scrollBounceBehavior(.basedOnSize)
                 // Same reasoning as `AccountFormView`: the destructive action
                 // belongs at the bottom of the SHEET, one predictable place,
-                // not at the bottom of however much content there happens to be.
+                // not at the bottom of however much content there happens to
+                // be. No `.background` — it sits directly on the sheet's own
+                // grouped background rather than a separate bar.
                 .safeAreaInset(edge: .bottom) {
                     if isEditing && !isDefaultCategory {
                         DestructiveActionButton(
@@ -111,7 +117,6 @@ struct CategoryFormView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
                         .padding(.bottom, 12)
-                        .background(.bar)
                     }
                 }
             }
