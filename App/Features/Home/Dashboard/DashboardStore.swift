@@ -39,12 +39,27 @@ final class DashboardStore {
         self.arrangement = (try? JSONDecoder().decode(DashboardArrangement.self, from: data)) ?? Self.seed
     }
 
+    /// `id` is supplied by the caller when the widget already has an
+    /// identity — a drag out of the catalogue mints one at lift-off so the
+    /// tile previewed under the finger and the tile finally stored are the
+    /// same object, rather than one being swapped for the other on drop.
     @discardableResult
-    func append(kind: DashboardWidgetKind) -> UUID {
+    func append(kind: DashboardWidgetKind, id: UUID = UUID()) -> UUID {
         var updated = arrangement
-        let id = updated.append(kind: kind)
+        let added = updated.append(kind: kind, id: id)
         apply(updated)
-        return id
+        return added
+    }
+
+    /// Places a brand-new widget at a chosen cell — the drop end of a drag
+    /// out of the catalogue. Distinct from `append` + `move` on purpose; see
+    /// `DashboardArrangement.insert`.
+    @discardableResult
+    func insert(kind: DashboardWidgetKind, id: UUID = UUID(), atRow row: Int, column: Int) -> UUID {
+        var updated = arrangement
+        let added = updated.insert(kind: kind, id: id, atRow: row, column: column)
+        apply(updated)
+        return added
     }
 
     func remove(id: UUID) {

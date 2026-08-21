@@ -1,6 +1,16 @@
 import KeepoCore
 import SwiftUI
 
+/// A cell the finger is over. A named `Equatable` type rather than the
+/// `(row:column:)` tuple this used to return: the drag needs to hold "the
+/// cell the preview was last built for" in an `Optional` and compare it
+/// frame to frame, and Swift tuples are not `Equatable`, so they cannot be
+/// compared through an `Optional` at all.
+struct DashboardGridCell: Equatable {
+    let row: Int
+    let column: Int
+}
+
 /// Cell arithmetic for the dashboard grid — the only place points and grid
 /// coordinates are converted into one another, in either direction. `cell(at:)`
 /// is the inverse of `origin(row:column:)`, and edit-mode drags depend on
@@ -40,10 +50,10 @@ struct DashboardGeometry: Equatable {
     /// drag's live location into the drop target `DashboardArrangement.move`
     /// expects; a point in a gutter resolves to the cell it is nearest,
     /// which is what keeps a drop between two tiles from doing nothing.
-    func cell(at point: CGPoint) -> (row: Int, column: Int) {
+    func cell(at point: CGPoint) -> DashboardGridCell {
         let column = Int((point.x / stride).rounded(.down))
         let row = Int((point.y / stride).rounded(.down))
-        return (
+        return DashboardGridCell(
             row: max(row, 0),
             column: min(max(column, 0), DashboardLayout.columnCount - 1)
         )

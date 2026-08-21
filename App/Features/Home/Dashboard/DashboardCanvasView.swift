@@ -22,12 +22,33 @@ struct DashboardCanvasView: View {
     /// Which of the expanded tile's sizes is showing. Only Cashflow has more
     /// than one, but the cycle is uniform: base → first → … → back to base.
     @State private var expansionStep = 0
-    @State private var drag: DashboardDragState?
-    @State private var isPickingWidget = false
+    @State var drag: DashboardDragState?
+    /// The arrangement as it *would* be if the finger let go right now.
+    ///
+    /// Held here rather than written to `DashboardStore` on every frame:
+    /// `DashboardArrangement.move` is pure, so the reflowed layout is free to
+    /// compute and free to throw away, and the store — which persists to disk
+    /// on every mutation — is only touched once, on drop.
+    @State var dragPreview: DashboardArrangement?
+    /// The cell the preview was last built for, so a finger moving *within*
+    /// one cell doesn't rebuild and re-animate the whole grid.
+    @State var previewCell: DashboardGridCell?
+    @State var isPickingWidget = false
+    // Not `private`: `DashboardAutoScroll.swift` extends this type, and a
+    // `private` member is invisible to its own type's extension in a
+    // different file.
+    @State var scrollPosition = ScrollPosition()
+    @State var scrollGeometry = DashboardScrollGeometry()
+    @State var autoScrollDirection: CGFloat = 0
+    @State var autoScrollTask: Task<Void, Never>?
+    @State var editModeTimeoutTask: Task<Void, Never>?
+    /// The widget being dragged out of the catalogue, if any.
+    @State var incoming: DashboardIncomingWidget?
 
     /// The drag reads its location in this space, so a finger position
     /// converts straight to a grid cell with no offset arithmetic between.
-    private static let gridSpace = "dashboardGrid"
+    /// Shared with the catalogue, whose drag-out reads the identical space.
+    private static let gridSpace = DashboardGridSpace.name
 
     var body: some View {
         GeometryReader { proxy in
@@ -43,14 +64,34 @@ struct DashboardCanvasView: View {
             // A drag in progress must never also scroll the page under it.
             // The gesture below already requires a long press first (which a
             // scroll pan can't satisfy); this closes the remaining case.
+            //
+            // Programmatic scrolling still works while disabled, which is
+            // what edge auto-scroll relies on — the *user* can't pan mid-drag,
+            // but the drag itself can move the view.
             .scrollDisabled(drag != nil)
-        }
-        .sheet(isPresented: $isPickingWidget) {
-            DashboardCatalogView { kind in add(kind) }
+            .scrollPosition($scrollPosition)
+            .onScrollGeometryChange(for: DashboardScrollGeometry.self) { proxy in
+                DashboardScrollGeometry(
+                    offsetY: proxy.contentOffset.y,
+                    viewportHeight: proxy.containerSize.height,
+                    contentHeight: proxy.contentSize.height
+                )
+            } action: { _, updated in
+                scrollGeometry = updated
+            }
+            .overlay { catalogueBackdrop }
+            .overlay(alignment: .bottom) { cataloguePanel(geometry, viewportHeight: proxy.size.height) }
+            .animation(.snappy(duration: 0.3), value: isPickingWidget)
         }
     }
 
     private var horizontalInset: CGFloat { 16 }
+
+    /// A lifted tile grows; every other tile shrinks while editing.
+    private func editModeScale(isDragging: Bool) -> CGFloat {
+        if isDragging { return 1.06 }
+        return isEditing ? 0.92 : 1
+    }
 
     private func grid(_ geometry: DashboardGeometry) -> some View {
         VStack(spacing: geometry.spacing) {
@@ -78,8 +119,13 @@ struct DashboardCanvasView: View {
 
     // MARK: - Layout
 
+    /// While a drag is live this resolves the *preview* arrangement, so every
+    /// other tile is already sitting where the drop would put it. The dragged
+    /// tile itself is drawn under the finger instead (see `tile`), not at its
+    /// preview position — otherwise it would fight the finger for the same
+    /// pixels.
     private var layout: DashboardResolvedLayout {
-        store.arrangement.resolved(expansion: expansion)
+        (dragPreview ?? store.arrangement).resolved(expansion: expansion)
     }
 
     /// Edit mode compacts everything, per the design — you arrange tiles at
@@ -107,7 +153,9 @@ struct DashboardCanvasView: View {
             loadRatioHistory: loadRatioHistory
         )
         .redacted(reason: isLoading ? .placeholder : [])
-        .jiggling(isEditing && !isDragging, seed: resolved.id)
+        // The badge is inside `.jiggling`, not layered on after it, so it
+        // rocks with the tile instead of hovering stationary over a moving
+        // card — which read as a bug, not a decoration.
         .overlay(alignment: .topTrailing) {
             if isEditing {
                 WidgetRemoveBadge { remove(resolved.id) }
@@ -115,11 +163,25 @@ struct DashboardCanvasView: View {
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        // A lifted tile floats above its neighbours and follows the finger.
-        .scaleEffect(isDragging ? 1.06 : 1)
+        .jiggling(isEditing && !isDragging, seed: resolved.id)
+        // Edit mode shrinks every tile slightly. Not decoration: it widens
+        // the gutters between tiles and against the screen edge, which are
+        // the only places a finger can start a scroll while the drag gesture
+        // owns the tiles themselves. At full size those gutters are 12pt and
+        // genuinely hard to hit.
+        .scaleEffect(editModeScale(isDragging: isDragging))
         .shadow(color: .black.opacity(isDragging ? 0.22 : 0), radius: 16, y: 8)
-        .offset(isDragging ? (drag?.translation).map { CGSize(width: $0.width, height: $0.height) } ?? .zero : .zero)
+        .offset(isDragging ? dragOffset(for: resolved, geometry: geometry) : .zero)
         .zIndex(isDragging ? 10 : 0)
+        // The lifted tile opts out of the reflow animation the other tiles
+        // are running. Its laid-out origin jumps the instant the preview
+        // moves it, and its offset compensates by exactly that much — but
+        // only one of the two is inside the animation, so animating either
+        // makes it visibly lurch away from the finger and swim back. It has
+        // to track the finger frame-for-frame; everything else animates.
+        .transaction { transaction in
+            if isDragging { transaction.animation = nil }
+        }
         // Two different gestures, deliberately, and this is load-bearing.
         //
         // A `DragGesture` attached with `.gesture` — even sequenced behind a
@@ -147,28 +209,76 @@ struct DashboardCanvasView: View {
             .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.gridSpace)))
             .onChanged { value in
                 guard case .second(true, let movement?) = value else { return }
-                drag = DashboardDragState(
-                    id: tile.id, translation: movement.translation, location: movement.location
+                // The grab offset is measured once, against the tile's
+                // position before anything reflowed — recomputing it each
+                // frame would chase the preview and drift.
+                let grabOffset = drag?.grabOffset ?? grabOffset(
+                    for: tile, startLocation: movement.startLocation, geometry: geometry
                 )
+                drag = DashboardDragState(
+                    id: tile.id, location: movement.location, grabOffset: grabOffset
+                )
+                updatePreview(for: tile.id, at: movement.location, geometry: geometry)
+                updateAutoScroll(gridY: movement.location.y, geometry: geometry)
             }
             .onEnded { value in
                 guard case .second(true, let movement?) = value else {
-                    drag = nil
+                    clearDrag()
                     return
                 }
                 drop(tile.id, at: movement.location, geometry: geometry)
             }
     }
 
+    private func grabOffset(
+        for tile: DashboardResolvedTile, startLocation: CGPoint, geometry: DashboardGeometry
+    ) -> CGSize {
+        let origin = geometry.origin(row: tile.row, column: tile.column)
+        return CGSize(width: startLocation.x - origin.x, height: startLocation.y - origin.y)
+    }
+
+    /// How far to shift the dragged tile from wherever the layout has just
+    /// put it, so it stays pinned under the finger.
+    private func dragOffset(for tile: DashboardResolvedTile, geometry: DashboardGeometry) -> CGSize {
+        guard let drag, drag.id == tile.id else { return .zero }
+        let origin = geometry.origin(row: tile.row, column: tile.column)
+        return CGSize(
+            width: drag.location.x - drag.grabOffset.width - origin.x,
+            height: drag.location.y - drag.grabOffset.height - origin.y
+        )
+    }
+
+    /// Rebuilds the would-be arrangement as the finger moves, but only when
+    /// the finger crosses into a different cell — rebuilding per frame would
+    /// restart the reflow animation on every touch event and leave the grid
+    /// permanently mid-transition.
+    func updatePreview(for id: UUID, at location: CGPoint, geometry: DashboardGeometry) {
+        let cell = geometry.cell(at: location)
+        guard cell != previewCell else { return }
+        previewCell = cell
+
+        var preview = store.arrangement
+        preview.move(id: id, toRow: cell.row, column: cell.column)
+        withAnimation(.snappy(duration: 0.25)) { dragPreview = preview }
+    }
+
     private func drop(_ id: UUID, at location: CGPoint, geometry: DashboardGeometry) {
         let cell = geometry.cell(at: location)
-        // The move lands in the same transaction that releases the lift, so
-        // the tile animates from where the finger left it to where it
-        // belongs, instead of snapping home first and then sliding.
+        // Everything on screen is already in its final position — the preview
+        // put it there while the finger was still down. This only makes it
+        // real and drops the tile back into the grid from under the finger.
         withAnimation(.snappy(duration: 0.3)) {
             store.move(id: id, toRow: cell.row, column: cell.column)
-            drag = nil
+            clearDrag()
         }
+        bumpEditModeTimeout()
+    }
+
+    private func clearDrag() {
+        stopAutoScroll()
+        drag = nil
+        dragPreview = nil
+        previewCell = nil
     }
 
     /// The widget asks for the size it wants — `nil` to collapse, otherwise
@@ -194,7 +304,7 @@ struct DashboardCanvasView: View {
 
     // MARK: - Editing
 
-    private func beginEditing() {
+    func beginEditing() {
         guard !isEditing else { return }
         withAnimation(.snappy(duration: 0.28)) {
             isEditing = true
@@ -203,9 +313,11 @@ struct DashboardCanvasView: View {
             expandedId = nil
             expansionStep = 0
         }
+        bumpEditModeTimeout()
     }
 
     private func endEditing() {
+        cancelEditModeTimeout()
         withAnimation(.snappy(duration: 0.24)) { isEditing = false }
     }
 
@@ -223,19 +335,21 @@ struct DashboardCanvasView: View {
                 isEditing = false
             }
         }
+        bumpEditModeTimeout()
     }
 
     /// A widget picked from the catalogue drops the user straight into edit
     /// mode with it already on the grid — it lands in the first free slot,
     /// which is rarely where they want it, and this is the one moment they
     /// definitely want to move something.
-    private func add(_ kind: DashboardWidgetKind) {
+    func add(_ kind: DashboardWidgetKind) {
         withAnimation(.snappy(duration: 0.3)) {
             store.append(kind: kind)
             isEditing = true
             expandedId = nil
             expansionStep = 0
         }
+        bumpEditModeTimeout()
     }
 
     /// Same window as the collapsed trend lines, so a rate chart and a net

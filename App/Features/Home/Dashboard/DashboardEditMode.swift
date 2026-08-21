@@ -61,10 +61,13 @@ struct WidgetRemoveBadge: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "minus")
-                .font(.system(size: 11, weight: .black))
-                .foregroundStyle(Color(.systemBackground))
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(.white)
+                // Red, because this is the one destructive control on the
+                // dashboard and it sits on a card the user is about to drag
+                // — it has to read as "remove", not as another handle.
                 .frame(width: 22, height: 22)
-                .background(Color.primary.opacity(0.85), in: Circle())
+                .background(Color.red, in: Circle())
                 .overlay(Circle().strokeBorder(Color(.systemBackground), lineWidth: 1.5))
                 // The badge straddles the tile's corner, so the tap target
                 // has to extend past the card's own bounds to feel right.
@@ -81,6 +84,16 @@ struct WidgetRemoveBadge: View {
 /// `DashboardGeometry.cell(at:)` with no offset arithmetic in between.
 struct DashboardDragState: Equatable {
     let id: UUID
-    var translation: CGSize
     var location: CGPoint
+    /// Where inside the tile the finger first landed, measured from the
+    /// tile's own top-left.
+    ///
+    /// Load-bearing once the grid reflows live underneath the drag: the
+    /// dragged tile's *laid-out* position changes the moment the preview
+    /// moves it, so a plain `DragGesture.translation` — which is measured
+    /// from where the tile used to be — would make it lurch away from the
+    /// finger every time the preview updated. Holding the grab point instead
+    /// means the tile is always drawn at `location - grabOffset`, wherever
+    /// the layout currently thinks it lives.
+    var grabOffset: CGSize
 }

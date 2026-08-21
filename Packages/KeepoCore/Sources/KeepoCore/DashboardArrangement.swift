@@ -52,6 +52,60 @@ public struct DashboardArrangement: Sendable, Equatable, Codable {
         return id
     }
 
+    /// Places a **brand-new** widget at a specific cell.
+    ///
+    /// Deliberately not `append` followed by `move`. `move` can resolve a
+    /// collision by trading places, which is right for two tiles that both
+    /// already have somewhere to be — but a widget arriving from the
+    /// catalogue has no meaningful place to trade *into*. Doing it that way
+    /// sent the displaced tile to whatever slot `append` happened to pick
+    /// first, which from the user's side looked like it teleported to the
+    /// bottom of the dashboard for no reason.
+    ///
+    /// So an insert never swaps. The occupant either steps aside into a free
+    /// cell in its own row, or the whole row moves down to make space:
+    ///
+    ///  1. **Target cells free** → place there.
+    ///  2. **A 1×1 landing on a 1×1 with a free cell beside it** → the
+    ///     occupant slides sideways, exactly as it does for a move.
+    ///  3. **Anything else** → open a new row at the target and place into
+    ///     it, pushing the rest down.
+    @discardableResult
+    public mutating func insert(
+        kind: DashboardWidgetKind, id: UUID = UUID(), atRow row: Int, column: Int
+    ) -> UUID {
+        var landing = DashboardTile(id: id, kind: kind, row: max(row, 0), column: 0)
+        landing.column = Self.clampedColumn(column, for: landing.size)
+
+        let occupied = Self.occupancy(of: tiles)
+        if Self.fits(landing, in: occupied) {
+            tiles = Self.normalized(tiles + [landing])
+        } else if let sidestepped = Self.steppingAside(for: landing, with: tiles, in: occupied) {
+            tiles = Self.normalized(sidestepped)
+        } else {
+            tiles = Self.normalized(Self.pushingDown(tiles, fromRow: landing.row) + [landing])
+        }
+        return id
+    }
+
+    /// Rule 2 for an insert: the occupant moves over, and nothing else on
+    /// the dashboard shifts. `nil` when there is nowhere beside it to go —
+    /// the caller then opens a row instead.
+    private static func steppingAside(
+        for landing: DashboardTile, with tiles: [DashboardTile], in occupied: [Cell: UUID]
+    ) -> [DashboardTile]? {
+        guard landing.size == .small,
+              let occupantId = occupied[Cell(row: landing.row, column: landing.column)],
+              let occupant = tiles.first(where: { $0.id == occupantId }),
+              occupant.size == .small,
+              let freeColumn = freeColumn(inRow: landing.row, besides: landing.column, in: occupied)
+        else { return nil }
+
+        var moved = occupant
+        moved.column = freeColumn
+        return tiles.filter { $0.id != occupant.id } + [moved, landing]
+    }
+
     public mutating func remove(id: UUID) {
         tiles = Self.normalized(tiles.filter { $0.id != id })
     }

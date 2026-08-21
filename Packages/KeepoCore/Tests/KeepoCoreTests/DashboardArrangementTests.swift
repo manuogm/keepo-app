@@ -366,3 +366,90 @@ struct DashboardArrangementTests {
         ])
     }
 }
+
+/// Inserting a brand-new widget is not the same operation as moving one that
+/// already has a place. A move may trade places; an insert must never, because
+/// the arriving widget has nowhere to trade *into* — doing so flung the
+/// displaced tile to an arbitrary slot at the bottom of the dashboard.
+@Suite("Dashboard insertion")
+struct DashboardInsertionTests {
+    private let small = DashboardWidgetKind.investingRatio
+    private let wide = DashboardWidgetKind.netWorth
+
+    private func tile(_ kind: DashboardWidgetKind, _ row: Int, _ column: Int, id: UUID = UUID()) -> DashboardTile {
+        DashboardTile(id: id, kind: kind, row: row, column: column)
+    }
+
+    @Test("Inserting onto a free cell lands exactly there")
+    func insertOnFreeCell() {
+        var arrangement = DashboardArrangement(tiles: [tile(small, 0, 0)])
+        let added = arrangement.insert(kind: small, atRow: 0, column: 1)
+        #expect(arrangement.tile(id: added).map { ($0.row, $0.column) }! == (0, 1))
+        #expect(arrangement.rowCount == 1)
+    }
+
+    @Test("An occupant with a free cell beside it steps aside, and nothing else moves")
+    func occupantStepsAside() {
+        let occupant = UUID()
+        let below = UUID()
+        var arrangement = DashboardArrangement(
+            tiles: [tile(small, 0, 0, id: occupant), tile(wide, 1, 0, id: below)]
+        )
+
+        let added = arrangement.insert(kind: small, atRow: 0, column: 0)
+
+        #expect(arrangement.tile(id: added).map { ($0.row, $0.column) }! == (0, 0))
+        #expect(arrangement.tile(id: occupant).map { ($0.row, $0.column) }! == (0, 1))
+        #expect(arrangement.tile(id: below)?.row == 1)
+        #expect(arrangement.rowCount == 2)
+    }
+
+    /// The case that was wrong: a full row. The occupant must go to the *next
+    /// row*, not swap into wherever the newcomer nominally came from.
+    @Test("A full target row is pushed down rather than swapped")
+    func fullRowIsPushedDown() {
+        let first = UUID()
+        let second = UUID()
+        var arrangement = DashboardArrangement(
+            tiles: [tile(small, 0, 0, id: first), tile(small, 0, 1, id: second), tile(wide, 1, 0)]
+        )
+
+        let added = arrangement.insert(kind: small, atRow: 0, column: 0)
+
+        #expect(arrangement.tile(id: added).map { ($0.row, $0.column) }! == (0, 0))
+        // Both former occupants stay together, one row further down.
+        #expect(arrangement.tile(id: first)?.row == 1)
+        #expect(arrangement.tile(id: second)?.row == 1)
+        #expect(arrangement.tile(id: second)?.column == 1)
+        #expect(arrangement.rowCount == 3)
+    }
+
+    @Test("Inserting a wide widget onto an occupied row opens a row for it")
+    func wideInsertOpensARow() {
+        let occupant = UUID()
+        var arrangement = DashboardArrangement(tiles: [tile(small, 0, 0, id: occupant)])
+
+        let added = arrangement.insert(kind: wide, atRow: 0, column: 0)
+
+        #expect(arrangement.tile(id: added).map { ($0.row, $0.column) }! == (0, 0))
+        #expect(arrangement.tile(id: occupant)?.row == 1)
+    }
+
+    @Test("An insert never loses the tile that was there")
+    func insertNeverLosesATile() {
+        let existing = (0 ..< 4).map { _ in UUID() }
+        var arrangement = DashboardArrangement(
+            tiles: [
+                tile(small, 0, 0, id: existing[0]), tile(small, 0, 1, id: existing[1]),
+                tile(wide, 1, 0, id: existing[2]), tile(wide, 2, 0, id: existing[3])
+            ]
+        )
+
+        arrangement.insert(kind: small, atRow: 0, column: 1)
+
+        #expect(arrangement.tiles.count == 5)
+        for id in existing {
+            #expect(arrangement.tile(id: id) != nil)
+        }
+    }
+}
