@@ -31,6 +31,15 @@ enum CaptureEnvironment {
             await OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue)
         }
         let outbox = await Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
+        // This is the call site that actually matters for
+        // `Outbox+CaptureRecovery.swift`'s own header comment: a quick
+        // action attempts its write immediately, with no drain first, so a
+        // capture whose create is still queued elsewhere (device briefly
+        // offline moments earlier) can race ahead of it and hit "not found."
+        // Cheap when there's nothing to repair — one local read, no network
+        // — so it's safe to run before every quick action, not just once
+        // per app launch.
+        await outbox.repairLegacyCaptureQueueIfNeeded()
         return Environment(outbox: outbox, dbQueue: dbQueue, client: client)
     }
 }

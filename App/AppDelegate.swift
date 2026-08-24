@@ -111,7 +111,26 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         nonisolated(unsafe) let completion = completionHandler
         Task {
             await CaptureQuickActionHandler.handle(request)
-            completion()
+            // `await MainActor.run`, never a bare `completion()` — this
+            // method is `nonisolated`, so an unstructured `Task` inherits no
+            // actor and resumes on the global concurrent executor. Calling
+            // the completion handler from there hands control back to UIKit
+            // off the main thread, and UIKit runs its state-restoration
+            // bookkeeping synchronously inside that call: the exact
+            // `NSInternalInconsistencyException: 'Call must be made on main
+            // thread'` this file's own `willPresent` comment above already
+            // documents from an earlier incident, reintroduced from a
+            // different direction. Attached to Xcode it halts the main
+            // thread mid-callback — the app freezes on whatever was last
+            // drawn, taking no touches (device testing: stuck on the
+            // privacy curtain, unrecoverable); detached it is a hard crash.
+            //
+            // The `willPresent` comment's "hopping to main doesn't help"
+            // note is about the *`async` delegate overload*, where the
+            // offending UIKit work runs after the method already returned.
+            // Here the work runs inside our own `completion()` call, so
+            // making that call on the main actor is exactly the fix.
+            await MainActor.run { completion() }
         }
     }
 }

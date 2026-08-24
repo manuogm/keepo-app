@@ -36,6 +36,10 @@ struct MainTabView: View {
         }
         .tint(Color.primary)
         .environment(\.isPrivacyMode, session.isPrivacyMode)
+        // Presented from here rather than `RootView` — see
+        // `CaptureDeepLinkModifier`'s own header for the two device-testing
+        // bugs that presenting it from outside this `TabView` caused.
+        .captureDeepLink(session: session)
         .task(id: session.refresh.token) { await loadNeedsReviewCount() }
         // `.overlay`, not `.safeAreaInset` — iOS 26's floating pill tab
         // bar renders above the safe area it reports, so a view

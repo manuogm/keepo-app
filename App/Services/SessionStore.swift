@@ -156,9 +156,11 @@ public final class SessionStore {
                 userEmail = restored.user.email
                 await ensureLocalDataBelongsTo(restored.user.id)
                 syncEngine = makeSyncEngine(userId: restored.user.id)
-                // X-02: runs once, before the first drain below gets a
-                // chance to fail on a pre-upgrade corrupted outbox item —
-                // see Outbox+CaptureRecovery.swift's own header comment.
+                // X-02: runs on every launch, before the first drain below
+                // gets a chance to fail on a corrupted outbox item — cheap
+                // when there's nothing to repair, so this isn't the cost it
+                // looks like. See Outbox+CaptureRecovery.swift's own header
+                // comment for why "runs once ever" stopped being enough.
                 await outbox.repairLegacyCaptureQueueIfNeeded()
                 try await startWithLocalFirstProfile()
             } else if isLocal {

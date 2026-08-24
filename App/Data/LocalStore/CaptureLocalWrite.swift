@@ -158,8 +158,7 @@ public enum CaptureLocalWrite {
         _ database: Database, ownerId: String, payload: CaptureTransactionPayload, accountId: String?, category: Row
     ) throws -> QuickActionData {
         let (categories, accounts) = try quickActionSuggestions(
-            database, ownerId: ownerId, merchantNormalized: payload.merchantNormalized, accountId: accountId,
-            category: category
+            database, ownerId: ownerId, payload: payload, accountId: accountId, category: category
         )
         let isPossibleDuplicate = try CaptureQuickActionSuggestions.hasPossibleDuplicate(
             database, ownerId: ownerId,
@@ -187,10 +186,15 @@ public enum CaptureLocalWrite {
     /// buttons at all unless `isPossibleDuplicate` overrides it with a bare
     /// Delete, which needs no suggestions either.
     private static func quickActionSuggestions(
-        _ database: Database, ownerId: String, merchantNormalized: String, accountId: String?, category: Row
+        _ database: Database, ownerId: String, payload: CaptureTransactionPayload, accountId: String?, category: Row
     ) throws -> (categories: [Suggestion], accounts: [Suggestion]) {
         guard let accountId else {
-            return ([], try CaptureQuickActionSuggestions.topUnmappedAccounts(database, ownerId: ownerId, limit: 3))
+            return (
+                [],
+                try CaptureQuickActionSuggestions.topUnmappedAccounts(
+                    database, ownerId: ownerId, cardIdentifier: payload.cardIdentifier, limit: 3
+                )
+            )
         }
         let categoryIsDefault: Bool = category["is_default"]
         guard !categoryIsDefault else {
@@ -203,7 +207,8 @@ public enum CaptureLocalWrite {
         }
         let categoryId: String = category["id"]
         let byMerchant = try CaptureQuickActionSuggestions.topCategoriesForMerchant(
-            database, ownerId: ownerId, merchantNormalized: merchantNormalized, excluding: categoryId, limit: 3
+            database, ownerId: ownerId, merchantNormalized: payload.merchantNormalized,
+            excluding: categoryId, limit: 3
         )
         guard byMerchant.isEmpty else { return (byMerchant, []) }
         return (

@@ -4,11 +4,12 @@ import KeepoCore
 import Testing
 @testable import Keepo
 
-/// `Outbox.repairLegacyCaptureQueueIfNeeded` (X-02) — split out of
+/// `Outbox.repairLegacyCaptureQueueIfNeeded` (X-02, reopened by capture
+/// quick actions — see that function's own header) — split out of
 /// `OutboxTests.swift` purely to keep that file under the project's
 /// type-body-length lint threshold, same precedent as
 /// `ReviewCaptureLocalWriteTests.swift`.
-@Suite("Outbox legacy-capture repair sweep")
+@Suite("Outbox capture-repair sweep")
 @MainActor
 struct OutboxCaptureRecoveryTests {
     private func makeOutbox(sender: StubTransactionSender) throws -> Outbox {
@@ -36,21 +37,18 @@ struct OutboxCaptureRecoveryTests {
                 arguments: [
                     id.uuidString, "owner-1", "owner-1", UUID().uuidString, -45000,
                     PostgresDate.sqliteTimestampBoundaryString(Date()), "Blue Bottle", "BLUE BOTTLE", "card-1",
-                    "ext-1", PostgresDate.sqliteTimestampBoundaryString(Date()),
+                    "ext-\(id.uuidString)", PostgresDate.sqliteTimestampBoundaryString(Date()),
                     PostgresDate.sqliteTimestampBoundaryString(Date())
                 ]
             )
         }
     }
 
-    /// Regression: repairs items already corrupted by the pre-fix
-    /// `enqueue` bug — a confirm queued alone (its create lost) would
-    /// otherwise permanently fail "not found." X-02: this is now a
-    /// one-time proactive sweep (`SessionStore.start()` calls it before
-    /// the first drain), not a per-replay reactive fallback — so the test
-    /// calls it explicitly, standing in for that startup call, before
-    /// `drainAll()`.
-    @Test("a legacy-corrupted confirm is repaired by the startup sweep, then drains normally")
+    /// Regression: a confirm/review/delete queued alone, its create lost —
+    /// whether by the closed pre-fix `enqueue` bug or a quick action racing
+    /// a still-queued create — otherwise fails "not found" forever. The
+    /// sweep resends the create so the next drain succeeds normally.
+    @Test("a capture-dependent write with no matching create is repaired, then drains normally")
     func confirmSelfHealsALostCapture() async throws {
         let sender = StubTransactionSender()
         sender.requireCaptureBeforeConfirm = true
@@ -58,9 +56,8 @@ struct OutboxCaptureRecoveryTests {
         let id = UUID()
         try await seedPendingCapture(dbQueue, id: id)
 
-        // Simulates the already-corrupted state: a confirm queued alone,
-        // no create ever queued alongside it, exactly what the old
-        // `enqueue` produced.
+        // Simulates the corrupted state: a confirm queued alone, no create
+        // ever queued alongside it.
         await outbox.enqueue(
             id: id, kind: .confirmCaptureTransaction,
             payload: ConfirmCaptureTransactionPayload(id: id, expectedVersion: 1), expectedVersion: 1,
@@ -70,7 +67,7 @@ struct OutboxCaptureRecoveryTests {
 
         let defaults = try #require(UserDefaults(suiteName: "OutboxTests-\(UUID().uuidString)"))
         await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
-        #expect(defaults.bool(forKey: "app.keepo.legacyCaptureQueueRepair.done"))
+        #expect(defaults.stringArray(forKey: "app.keepo.legacyCaptureQueueRepair.repairedIds") == [id.uuidString])
 
         await outbox.drainAll()
 
@@ -78,7 +75,7 @@ struct OutboxCaptureRecoveryTests {
         #expect(outbox.pendingCount == 0)
     }
 
-    @Test("the legacy-capture sweep is a no-op — and marks itself done — on a queue with nothing to repair")
+    @Test("the sweep is a no-op on a queue with nothing to repair")
     func repairSweepNoopOnHealthyQueue() async throws {
         let sender = StubTransactionSender()
         let outbox = try makeOutbox(sender: sender)
@@ -87,15 +84,10 @@ struct OutboxCaptureRecoveryTests {
         await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
 
         #expect(sender.captureTransactionCallCount == 0)
-        #expect(defaults.bool(forKey: "app.keepo.legacyCaptureQueueRepair.done"))
-
-        // Second call is a true no-op — the flag alone short-circuits it,
-        // no queue scan, no sender calls.
-        await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
-        #expect(sender.captureTransactionCallCount == 0)
+        #expect(defaults.stringArray(forKey: "app.keepo.legacyCaptureQueueRepair.repairedIds") == nil)
     }
 
-    @Test("a repair that fails to reach the network leaves the flag unset for a later retry")
+    @Test("a repair that fails to reach the network is retried on a later call")
     func repairSweepRetriesAfterNetworkFailure() async throws {
         let sender = StubTransactionSender()
         sender.captureTransactionResult = .failure(StubSenderError.network)
@@ -112,6 +104,76 @@ struct OutboxCaptureRecoveryTests {
         let defaults = try #require(UserDefaults(suiteName: "OutboxTests-\(UUID().uuidString)"))
         await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
 
-        #expect(defaults.bool(forKey: "app.keepo.legacyCaptureQueueRepair.done") == false)
+        #expect((defaults.stringArray(forKey: "app.keepo.legacyCaptureQueueRepair.repairedIds") ?? []).isEmpty)
+
+        // The network recovers — a later call (a later app launch, or the
+        // next quick action) picks the same id back up rather than having
+        // given up on it after one transient failure.
+        sender.captureTransactionResult = .success(())
+        await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
+        #expect(sender.captureTransactionCallCount == 2)
+        #expect(defaults.stringArray(forKey: "app.keepo.legacyCaptureQueueRepair.repairedIds") == [id.uuidString])
+    }
+
+    /// The gate this whole file exists to prove: a row repaired once must
+    /// never be resent again, however many times the sweep runs — this is
+    /// what keeps a quick action calling it before every single write from
+    /// burning a `capture_transaction` call (and its rate-limit budget) on
+    /// an already-healthy queue, item after item.
+    @Test("a repaired id is never resent, no matter how many later calls the sweep gets")
+    func repairedIdIsNeverResent() async throws {
+        let sender = StubTransactionSender()
+        sender.requireCaptureBeforeConfirm = true
+        let (outbox, dbQueue) = try makeOutboxWithQueue(sender: sender)
+        let id = UUID()
+        try await seedPendingCapture(dbQueue, id: id)
+        await outbox.enqueue(
+            id: id, kind: .confirmCaptureTransaction,
+            payload: ConfirmCaptureTransactionPayload(id: id, expectedVersion: 1), expectedVersion: 1,
+            lastError: "transaction not found or not accessible"
+        )
+
+        let defaults = try #require(UserDefaults(suiteName: "OutboxTests-\(UUID().uuidString)"))
+        await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
+        await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
+        await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
+
+        #expect(sender.captureTransactionCallCount == 1)
+    }
+
+    /// A second, genuinely new corruption — the exact case the old
+    /// single-flag gate could never recover from once it had already
+    /// tripped `done` on an earlier, unrelated queue.
+    @Test("a new corrupted id is still repaired after an earlier one already was")
+    func newCorruptionIsRepairedAfterAnEarlierOne() async throws {
+        let sender = StubTransactionSender()
+        sender.requireCaptureBeforeConfirm = true
+        let (outbox, dbQueue) = try makeOutboxWithQueue(sender: sender)
+        let firstId = UUID()
+        try await seedPendingCapture(dbQueue, id: firstId)
+        await outbox.enqueue(
+            id: firstId, kind: .confirmCaptureTransaction,
+            payload: ConfirmCaptureTransactionPayload(id: firstId, expectedVersion: 1), expectedVersion: 1,
+            lastError: "transaction not found or not accessible"
+        )
+        let defaults = try #require(UserDefaults(suiteName: "OutboxTests-\(UUID().uuidString)"))
+        await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
+        #expect(sender.captureTransactionCallCount == 1)
+
+        // A second, unrelated row goes bad later — e.g. a quick action
+        // racing a still-queued create on this device's next capture.
+        let secondId = UUID()
+        try await seedPendingCapture(dbQueue, id: secondId)
+        await outbox.enqueue(
+            id: secondId, kind: .reviewCapture,
+            payload: ReviewCaptureTransactionPayload(
+                id: secondId, expectedVersion: 1, accountId: UUID(), categoryId: UUID(), amountE4: -45000,
+                currency: "EUR", occurredAt: Date(), merchantRaw: "Blue Bottle"
+            ),
+            expectedVersion: 1, lastError: "transaction not found or not accessible"
+        )
+
+        await outbox.repairLegacyCaptureQueueIfNeeded(defaults: defaults)
+        #expect(sender.captureTransactionCallCount == 2)
     }
 }

@@ -23,6 +23,33 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
 
+    /// iOS greys every tinted view in a window while a modal is presented
+    /// (`tintAdjustmentMode` flips to `.dimmed`) and is supposed to undo it
+    /// on dismissal. That restore never reaches the tab bar, which stays
+    /// grey until switching tabs forces it to re-render.
+    ///
+    /// Confirmed app-wide in device testing, not specific to any one
+    /// screen: opening a transaction straight from the Transactions list
+    /// and deleting it leaves the tab bar grey exactly the same way, with
+    /// no notification involved. So this predates capture quick actions
+    /// rather than being caused by them.
+    ///
+    /// Opting the window out of automatic dimming *removes the state that
+    /// was failing to be restored*, instead of trying to catch every
+    /// dismissal in the app after the fact and undo it — there is no
+    /// dismissal event to reliably hook, and one missed sheet would bring
+    /// the bug straight back. Nothing here wants the dimming anyway: every
+    /// modal in Keepo is a sheet that already covers what it would dim.
+    @MainActor
+    private func disableAutomaticTintDimming() {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows {
+                window.tintAdjustmentMode = .normal
+            }
+        }
+    }
+
     var body: some View {
         Group {
             switch session.phase {
@@ -45,11 +72,6 @@ struct RootView: View {
         .onOpenURL { url in
             Task { await session.handleMagicLink(url: url) }
         }
-        // Isolated onto its own invisible view, not chained inline here —
-        // adding these three modifiers directly to this already-long chain
-        // pushed the type-checker over its time budget (a real compile
-        // failure, not a style preference).
-        .background(CaptureDeepLinkHandler(session: session))
         // C-09: a capture landing while this RootView is already running
         // (the intent fired from a separate host process) otherwise has no
         // way to reach it — same `syncNow()` every other trigger site uses.
@@ -68,8 +90,40 @@ struct RootView: View {
                 RootPrivacyCurtainView()
             }
         }
+        // Raising the curtain is `willResignActive`'s job alone and must
+        // stay eager — it fires while `applicationState` is still `.active`,
+        // precisely so the overlay is up BEFORE the OS takes its
+        // app-switcher snapshot. Anything that second-guesses it against
+        // `applicationState` would leave the balance visible in the switcher,
+        // which is the whole reason this exists.
+        //
+        // *Lowering* it is what has to be redundant. A quick action without
+        // `.foreground` (Confirm, a category/account pick, Delete) wakes
+        // THIS process in the background — new behavior: `CaptureIntent`
+        // runs in a separate host process, so before quick actions existed
+        // `RootView` never came up in a background app at all. On that path
+        // the curtain goes up correctly (invisibly), and a single missed
+        // "we're back" transition then strands it at `false` forever — a
+        // full-screen overlay swallowing every touch on a perfectly live
+        // app, which is exactly how it was reported from device testing:
+        // frozen on the "Keepo" screen, nothing tappable.
+        //
+        // So three independent signals lower it, and it only takes one:
+        // `.onAppear` reads the authoritative state on insertion,
+        // `willEnterForeground` fires on every background→foreground
+        // transition (the path that broke), and `didBecomeActive` covers
+        // returning from merely `.inactive` without ever backgrounding.
+        // `scenePhase == .active` below is a fourth, from SwiftUI's own
+        // independent signal.
+        .onAppear {
+            isSceneActive = UIApplication.shared.applicationState == .active
+            disableAutomaticTintDimming()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             isSceneActive = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            isSceneActive = true
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             isSceneActive = true

@@ -6,51 +6,62 @@ import KeepoCore
 // file-length lint threshold — same precedent as Outbox+Capture.swift.
 
 extension Outbox {
-    /// One-time repair (X-02 revisited) for outbox rows already corrupted
-    /// by the old `enqueue` behavior its own fix (`Outbox.swift`'s
-    /// `enqueue` header comment) prevents going forward: a review/confirm/
-    /// update/delete whose row was never actually created server-side,
-    /// because the create that belonged under this same id got silently
-    /// overwritten before that fix shipped. Left unrepaired, every replay
-    /// of that item fails with "not found," forever — no amount of
-    /// retrying ever helps, because nothing ever creates the row.
+    /// Repairs a queued review/confirm/update/delete whose row was never
+    /// actually created server-side, by resending its `capture_transaction`
+    /// create — `capture_transaction`'s own `external_id` uniqueness makes a
+    /// redundant resend safe even when the create landed fine. Left
+    /// unrepaired, every replay of that item fails "transaction not found or
+    /// not accessible," forever — no amount of retrying ever helps, because
+    /// nothing ever creates the row.
     ///
-    /// This used to run reactively, wrapping every single replay attempt
-    /// (any kind, not just capture-derived ones) in a catch-and-recover —
-    /// permanent runtime machinery for a bug class that can only exist on
-    /// a device that already had a corrupted item queued *before*
-    /// upgrading to the `enqueue` fix. That design also fired on
-    /// genuinely unrelated failures (offline, a real 5xx, a real
-    /// conflict), burning an extra `capture_transaction` call — and its
-    /// rate-limit budget — on every one of them.
+    /// Originally written (X-02) for one specific, closed bug: an old
+    /// `enqueue` that could silently drop an already-queued create when a
+    /// dependent write collapsed onto it. That bug can no longer occur
+    /// (`enqueue`'s own header explains the fix), which is why this used to
+    /// gate on a single boolean — "done" meant "this device's one possible
+    /// wound has been checked."
     ///
-    /// Converted to a one-time sweep instead: `SessionStore.start()` calls
-    /// this once per launch, before the first drain, so a corrupted
-    /// create is resent before the dependent write ever gets a chance to
-    /// fail on it. Gated by a one-shot flag once every currently-queued
-    /// item has been handled — a device that's never had this bug
-    /// (everyone from here forward, since `enqueue` can no longer produce
-    /// it) pays for one cheap, empty scan and never touches this code
-    /// again. `defaults` is injectable for tests, same pattern as
-    /// `OutboxMigration`.
-    private static let repairDoneKey = "app.keepo.legacyCaptureQueueRepair.done"
+    /// Quick actions (`CaptureQuickActionHandler`) reopened the same failure
+    /// *shape* through a different door: they build a fresh `Outbox` via
+    /// `CaptureEnvironment.makeOutbox()` and attempt their write immediately,
+    /// with no drain first — so a capture whose create is still sitting
+    /// queued (device briefly offline moments earlier, say) races a
+    /// same-second quick action and loses, landing in exactly this "not
+    /// found" state. That's a new row hitting an old symptom, on a device
+    /// where the one-shot flag was long since tripped — which is why a
+    /// device-testing capture kept failing "not found" forever with no
+    /// automatic recovery, even after this repair already existed.
+    ///
+    /// So the gate is per-row now, not per-device: each target id gets at
+    /// most one repair attempt ever (a `.recovered` or `.notApplicable`
+    /// outcome is permanent — resending or re-checking it later can't
+    /// change the answer), tracked as a persisted set rather than a single
+    /// flag. That keeps the cost this was reduced to guard against (an
+    /// unpushed migration or a real 5xx turning into a `capture_transaction`
+    /// call, and its rate-limit budget, on every single replay) while still
+    /// giving a genuinely new corruption a chance to self-heal instead of
+    /// being silently permanent. `defaults` is injectable for tests, same
+    /// pattern as `OutboxMigration`.
+    ///
+    /// Called from both `SessionStore.start()` (before the first drain) and
+    /// `CaptureEnvironment.makeOutbox()` (before a quick action's own write
+    /// attempt) — the second call site is what actually closes the race
+    /// above, since it runs in the same background process that's about to
+    /// need the row to exist.
+    private static let repairedIdsKey = "app.keepo.legacyCaptureQueueRepair.repairedIds"
 
     func repairLegacyCaptureQueueIfNeeded(defaults: UserDefaults = .standard) async {
-        guard !defaults.bool(forKey: Self.repairDoneKey) else { return }
-
         let targetIds = await targetRowIdsOfQueuedItems()
-        guard !targetIds.isEmpty else {
-            defaults.set(true, forKey: Self.repairDoneKey)
-            return
-        }
+        guard !targetIds.isEmpty else { return }
 
-        var everythingHandled = true
-        for id in targetIds where await repairIfLegacyCapture(id: id) == .failed {
-            everythingHandled = false
+        var repairedIds = Set(defaults.stringArray(forKey: Self.repairedIdsKey) ?? [])
+        let unattempted = targetIds.subtracting(repairedIds)
+        guard !unattempted.isEmpty else { return }
+
+        for id in unattempted where await repairIfLegacyCapture(id: id) != .failed {
+            repairedIds.insert(id)
         }
-        if everythingHandled {
-            defaults.set(true, forKey: Self.repairDoneKey)
-        }
+        defaults.set(Array(repairedIds), forKey: Self.repairedIdsKey)
     }
 
     private func targetRowIdsOfQueuedItems() async -> Set<String> {
@@ -77,15 +88,15 @@ extension Outbox {
     private enum RepairOutcome {
         /// Not a legacy-corrupted capture row — either it isn't a
         /// `source = 'capture'` row at all, or it's already gone. Nothing
-        /// to do; counts as handled.
+        /// to do; counts as handled — permanently, since neither fact can
+        /// later become false.
         case notApplicable
         /// The create was resent successfully (or, just as often, the row
         /// already existed server-side and this was a harmless idempotent
-        /// no-op — `capture_transaction`'s own `external_id` uniqueness
-        /// makes a redundant resend safe either way).
+        /// no-op). Permanent — the same id will never need trying again.
         case recovered
-        /// The resend itself failed (offline, a real 5xx) — must retry the
-        /// whole sweep on a later launch, not just this one id.
+        /// The resend itself failed (offline, a real 5xx) — must retry this
+        /// specific id on a later call, not just the whole sweep.
         case failed
     }
 

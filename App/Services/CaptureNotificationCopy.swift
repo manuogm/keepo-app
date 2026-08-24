@@ -9,7 +9,13 @@ import KeepoCore
 /// both known, account unknown, category unknown, both unknown, and the
 /// signed-out/queued case, which has no local resolution at all. `title`
 /// renders as the notification's bold first row, `body` as its second —
-/// see `CaptureIntent.notify(title:body:transactionId:)`.
+/// see `CaptureNotificationScheduler.scheduleAppliedLocally` for the branch
+/// that pairs this copy with quick-action buttons, and `CaptureIntent
+/// .notify(title:body:transactionId:)` for the plain fallback ones.
+///
+/// "Press", never "Swipe" — the swipe-to-reveal gesture is unreliable in
+/// practice on a real device (device-testing feedback), and long-press is
+/// both the gesture that actually works and the one users reach for.
 enum CaptureNotificationCopy {
     struct Content: Equatable {
         let title: String
@@ -31,7 +37,7 @@ enum CaptureNotificationCopy {
         // wins the headline regardless of what else did or didn't resolve.
         guard !resolution.isPossibleDuplicate else {
             return Content(
-                title: "⚠️ \(amount) — Possible duplicate", body: "Swipe for quick actions or tap to open in app"
+                title: "⚠️ \(amount) — Possible duplicate", body: "Press for quick actions or tap to open in app"
             )
         }
 
@@ -40,17 +46,17 @@ enum CaptureNotificationCopy {
             return Content(
                 title: "✅ \(amount) Logged successfully",
                 body: "\(resolution.categoryName) · \(resolution.accountName ?? "") "
-                    + "— Swipe for quick actions or tap to open in app"
+                    + "— Press for quick actions or tap to open in app"
             )
         case (false, true):
             return Content(
                 title: "💳 \(amount) Logged to \(resolution.categoryName)",
-                body: "New card detected. Swipe for quick actions or tap to open in app"
+                body: "New card detected. Press for quick actions or tap to open in app"
             )
         case (true, false):
             return Content(
                 title: "🏷️ \(amount) Logged to \(resolution.accountName ?? "")",
-                body: "What did you buy? Swipe for quick actions or tap to open in app"
+                body: "What did you buy? Press for quick actions or tap to open in app"
             )
         case (false, false):
             return Content(title: "❓ \(amount) Logged automatically", body: "Tap to add missing details")

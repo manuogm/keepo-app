@@ -189,9 +189,38 @@ struct CaptureQuickActionSuggestionsTests {
         )
 
         let results = try await dbQueue.read { database in
-            try CaptureQuickActionSuggestions.topUnmappedAccounts(database, ownerId: ownerId.uuidString, limit: 3)
+            try CaptureQuickActionSuggestions.topUnmappedAccounts(
+                database, ownerId: ownerId.uuidString, cardIdentifier: "no-name-match-here", limit: 3
+            )
         }
         #expect(results.map(\.name) == ["Busy", "Quiet"])
+    }
+
+    /// Device-testing feedback: a card whose name obviously names its
+    /// account ("Revolut Mastercard" → "Revolut") must win over the
+    /// most-used account, which is only the fallback ordering.
+    @Test("top unmapped accounts — a card whose name matches an account outranks the most-used one")
+    func topUnmappedAccountsPrefersNameMatch() async throws {
+        let dbQueue = try makeDatabase()
+        let ownerId = UUID()
+        let busy = UUID()
+        let revolut = UUID()
+        try await seedAccount(dbQueue, id: busy, ownerId: ownerId, name: "Everyday Checking")
+        try await seedAccount(dbQueue, id: revolut, ownerId: ownerId, name: "Revolut")
+        // The non-matching account is used far more, so usage alone would
+        // rank it first — the name match is what has to override that.
+        for _ in 0..<5 {
+            try await seedTransaction(
+                dbQueue, ownerId: ownerId, accountId: busy, merchantNormalized: "M", cardIdentifier: nil
+            )
+        }
+
+        let results = try await dbQueue.read { database in
+            try CaptureQuickActionSuggestions.topUnmappedAccounts(
+                database, ownerId: ownerId.uuidString, cardIdentifier: "Revolut Mastercard", limit: 3
+            )
+        }
+        #expect(results.map(\.name) == ["Revolut", "Everyday Checking"])
     }
 
     @Test("possible duplicate — same card, merchant, and amount within the time window")

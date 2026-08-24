@@ -25,20 +25,23 @@ struct CaptureQuickActionsTests {
         )
     }
 
-    @Test("both known — Confirm plus up to 3 alternate categories")
+    @Test("both known — Confirm, 2 alternate categories, More options")
     func bothKnown() {
         let categories = [suggestion("Groceries"), suggestion("Dining"), suggestion("Transport")]
         let set = CaptureQuickActions.build(
             for: resolution(accountId: UUID().uuidString, categoryIsDefault: false, suggestedCategories: categories)
         )
         #expect(set.actions.map(\.identifier) == [
-            CaptureQuickActions.confirmActionId, "capture.pick.0", "capture.pick.1", "capture.pick.2"
+            CaptureQuickActions.confirmActionId, "capture.pick.0", "capture.pick.1", CaptureQuickActions.moreActionId
         ])
         #expect(set.userInfo[CaptureQuickActions.pickKindKey] as? String == "category")
-        #expect(set.userInfo[CaptureQuickActions.pickIdsKey] as? [String] == categories.map(\.id))
+        // The third, least-used suggestion is the one that gives up its
+        // slot to More — the ids travelling in `userInfo` must match the
+        // two buttons actually shown, or a tap would route to the wrong row.
+        #expect(set.userInfo[CaptureQuickActions.pickIdsKey] as? [String] == categories.prefix(2).map(\.id))
     }
 
-    @Test("both known + possible duplicate — Confirm, 2 alternates, Delete")
+    @Test("both known + possible duplicate — Confirm, 1 alternate, More options, Delete")
     func bothKnownDuplicate() {
         let categories = [suggestion("Groceries"), suggestion("Dining"), suggestion("Transport")]
         let set = CaptureQuickActions.build(
@@ -48,9 +51,27 @@ struct CaptureQuickActionsTests {
             )
         )
         #expect(set.actions.map(\.identifier) == [
-            CaptureQuickActions.confirmActionId, "capture.pick.0", "capture.pick.1", CaptureQuickActions.deleteActionId
+            CaptureQuickActions.confirmActionId, "capture.pick.0", CaptureQuickActions.moreActionId,
+            CaptureQuickActions.deleteActionId
         ])
         #expect(set.actions.last?.options.contains(.destructive) == true)
+    }
+
+    /// Regression (device testing): "More options" did nothing visible
+    /// because it ran in a background-launched process instead of bringing
+    /// Keepo forward. It is also the ONLY action that may foreground —
+    /// every other one must complete its write without interrupting the user.
+    @Test("More options is the only foreground action")
+    func onlyMoreOptionsForegrounds() {
+        let set = CaptureQuickActions.build(
+            for: resolution(
+                accountId: UUID().uuidString, categoryIsDefault: false,
+                suggestedCategories: [suggestion("Groceries"), suggestion("Dining")], isPossibleDuplicate: true
+            )
+        )
+        for action in set.actions {
+            #expect(action.options.contains(.foreground) == (action.identifier == CaptureQuickActions.moreActionId))
+        }
     }
 
     @Test("category unknown — up to 3 category picks plus More options")
@@ -107,12 +128,14 @@ struct CaptureQuickActionsTests {
         #expect(set.userInfo.isEmpty)
     }
 
-    @Test("fewer than 3 suggestions still produces a valid, shorter button set")
+    @Test("fewer suggestions than slots still produces a valid, shorter button set")
     func fewerSuggestionsThanSlots() {
         let categories = [suggestion("Groceries")]
         let set = CaptureQuickActions.build(
             for: resolution(accountId: UUID().uuidString, categoryIsDefault: false, suggestedCategories: categories)
         )
-        #expect(set.actions.map(\.identifier) == [CaptureQuickActions.confirmActionId, "capture.pick.0"])
+        #expect(set.actions.map(\.identifier) == [
+            CaptureQuickActions.confirmActionId, "capture.pick.0", CaptureQuickActions.moreActionId
+        ])
     }
 }

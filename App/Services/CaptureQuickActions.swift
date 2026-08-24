@@ -31,13 +31,17 @@ enum CaptureQuickActions {
 
     /// Mirrors `CaptureNotificationCopy.appliedLocally`'s own four-way split
     /// on `(accountKnown, categoryKnown)`, plus the duplicate override that
-    /// applies across all four. Manu's design (see plan): both known gets
-    /// Confirm + up to 3 category alternates (2 if a duplicate is
-    /// suspected, to make room for Delete); category/account unknown gets
-    /// up to 3 picks + "More options" (2 + Delete if a duplicate); both
-    /// unknown gets no buttons at all, unless a duplicate is suspected, in
-    /// which case it gets a bare Delete — the one case where the duplicate
-    /// flag adds a button set where there normally wouldn't be one.
+    /// applies across all four. Every branch that shows buttons at all also
+    /// offers "More options" (device-testing feedback: a successful capture
+    /// still needs an escape hatch into the full form without hunting for
+    /// the notification body's own tap target), which costs one of the four
+    /// slots: both known gets Confirm + 2 category alternates + More;
+    /// category/account unknown gets up to 3 picks + More; both unknown
+    /// gets no buttons at all. A suspected duplicate spends one more slot
+    /// on Delete in every case — including both-unknown, the one branch
+    /// where the duplicate flag adds a button set where there normally
+    /// wouldn't be one (a bare Delete, nothing else being resolved enough
+    /// to act on).
     static func build(for resolution: CaptureLocalWrite.Resolution) -> ActionSet {
         let accountKnown = resolution.accountId != nil
         let categoryKnown = !resolution.categoryIsDefault
@@ -56,9 +60,13 @@ enum CaptureQuickActions {
         }
     }
 
+    /// Confirm always leads (it's the whole point of this branch — nothing
+    /// is actually missing), then the alternates, then More. The least-used
+    /// alternate is what gives up its slot to More, since the suggestions
+    /// arrive already ranked and `prefix` keeps the strongest.
     private static func bothKnown(_ suggestions: [CaptureLocalWrite.Suggestion], isDuplicate: Bool) -> ActionSet {
-        let chosen = Array(suggestions.prefix(isDuplicate ? 2 : 3))
-        var actions = [confirmAction()] + pickActions(chosen)
+        let chosen = Array(suggestions.prefix(isDuplicate ? 1 : 2))
+        var actions = [confirmAction()] + pickActions(chosen) + [moreAction()]
         if isDuplicate { actions.append(deleteAction()) }
         return ActionSet(actions: actions, userInfo: pickUserInfo(chosen, kind: "category"))
     }
@@ -87,8 +95,14 @@ enum CaptureQuickActions {
         UNNotificationAction(identifier: confirmActionId, title: "✅ Confirm", options: [])
     }
 
+    /// `.foreground` — the only action that opens Keepo. Without it iOS
+    /// delivers the tap to a background-launched process and the app never
+    /// comes forward, so the prefilled form the user asked for silently
+    /// never appeared (device-testing feedback). Every other action here
+    /// deliberately stays background-only: they finish their write without
+    /// interrupting whatever the user is doing.
     private static func moreAction() -> UNNotificationAction {
-        UNNotificationAction(identifier: moreActionId, title: "More options", options: [])
+        UNNotificationAction(identifier: moreActionId, title: "More options", options: [.foreground])
     }
 
     private static func deleteAction() -> UNNotificationAction {

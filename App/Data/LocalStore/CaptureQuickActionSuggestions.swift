@@ -57,14 +57,21 @@ enum CaptureQuickActionSuggestions {
 
     /// Candidates for "which account does this new card belong to" —
     /// `kind = 'regular'` (money rule: display/suggestion classification
-    /// only, never balance computation), never already linked to a card,
-    /// ranked unmapped-first-then-by-usage (Manu's own ordering: every
-    /// candidate here is already unmapped by construction via `NOT EXISTS`,
-    /// so this is really just "most-used everyday account first").
+    /// only, never balance computation), never already linked to a card.
+    ///
+    /// Ranked by name match first, usage second: a card called "Revolut
+    /// Mastercard" almost certainly belongs to the account called
+    /// "Revolut" no matter how little that account has been used, so
+    /// `CardAccountMatcher` gets first say and the most-used ordering is
+    /// only the fallback for cards whose name resembles nothing
+    /// (device-testing feedback). The SQL still returns usage order, which
+    /// is what the index below preserves as the tie-breaker — `sorted(by:)`
+    /// is not documented as stable, so ties are broken explicitly rather
+    /// than by relying on it.
     static func topUnmappedAccounts(
-        _ database: Database, ownerId: String, limit: Int
+        _ database: Database, ownerId: String, cardIdentifier: String, limit: Int
     ) throws -> [CaptureLocalWrite.Suggestion] {
-        try Row.fetchAll(
+        let byUsage = try Row.fetchAll(
             database,
             sql: """
             SELECT a.id AS id, a.name AS name, COUNT(t.id) AS uses
@@ -76,10 +83,30 @@ enum CaptureQuickActionSuggestions {
               )
             GROUP BY a.id, a.name
             ORDER BY uses DESC
-            LIMIT ?
             """,
-            arguments: [ownerId, limit]
+            arguments: [ownerId]
         ).map(CaptureLocalWrite.Suggestion.init(row:))
+
+        // Spelled out rather than chained — the fused
+        // enumerated/map/sorted/prefix/map pipeline this replaced pushed
+        // the type-checker past its budget (a real build failure, same
+        // class of thing `RootView`'s own modifier chain hit).
+        var ranked: [RankedAccount] = []
+        ranked.reserveCapacity(byUsage.count)
+        for (usageRank, suggestion) in byUsage.enumerated() {
+            let score = CardAccountMatcher.matchScore(cardIdentifier: cardIdentifier, accountName: suggestion.name)
+            ranked.append(RankedAccount(suggestion: suggestion, score: score, usageRank: usageRank))
+        }
+        ranked.sort { lhs, rhs in
+            lhs.score == rhs.score ? lhs.usageRank < rhs.usageRank : lhs.score > rhs.score
+        }
+        return ranked.prefix(limit).map(\.suggestion)
+    }
+
+    private struct RankedAccount {
+        let suggestion: CaptureLocalWrite.Suggestion
+        let score: Int
+        let usageRank: Int
     }
 
     /// The match key for `hasPossibleDuplicate` — grouped into its own type

@@ -23,9 +23,14 @@ enum CaptureQuickActionHandler {
 
     static func handle(_ request: Request) async {
         guard let environment = try? await CaptureEnvironment.makeOutbox() else { return }
-        let outbox = environment.outbox
-        let dbQueue = environment.dbQueue
+        await handle(request, outbox: environment.outbox, dbQueue: environment.dbQueue)
+    }
 
+    /// The dependency-injected half, so the routing and `userInfo` parsing
+    /// above `review`/`confirm`/`delete` are reachable from tests — the real
+    /// entry point can't be, since `CaptureEnvironment` needs a Supabase
+    /// config and a Keychain session.
+    static func handle(_ request: Request, outbox: Outbox, dbQueue: DatabaseQueue) async {
         switch request.actionIdentifier {
         case CaptureQuickActions.confirmActionId:
             await confirm(transactionId: request.transactionId, outbox: outbox, dbQueue: dbQueue)
@@ -74,7 +79,10 @@ enum CaptureQuickActionHandler {
     /// account, and an account pick needs the *picked* account's currency,
     /// since the row's own `currency` is still null in that branch (money
     /// rule: currency comes from the account, never guessed).
-    private static func review(
+    /// Not `private` — `CaptureQuickActionPickTests` drives this directly
+    /// against a seeded in-memory database, which is the only way to cover
+    /// the pick path without a Supabase config and a real notification.
+    static func review(
         transactionId: UUID, kind: String, pickedId: UUID, outbox: Outbox, dbQueue: DatabaseQueue
     ) async {
         guard let row = try? await currentRow(transactionId, dbQueue),

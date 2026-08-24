@@ -29,7 +29,7 @@ struct CaptureNotificationCopyTests {
         )
         let content = CaptureNotificationCopy.appliedLocally(known, amountE4: 45000, locale: usLocale)
         #expect(content.title == "✅ €4.50 Logged successfully")
-        #expect(content.body == "Coffee · Revolut — Swipe for quick actions or tap to open in app")
+        #expect(content.body == "Coffee · Revolut — Press for quick actions or tap to open in app")
     }
 
     @Test("account unknown — asks which account, mentions the new card")
@@ -39,7 +39,7 @@ struct CaptureNotificationCopyTests {
         )
         let content = CaptureNotificationCopy.appliedLocally(unmapped, amountE4: 45000, locale: usLocale)
         #expect(content.title == "💳 4.50 Logged to Coffee")
-        #expect(content.body == "New card detected. Swipe for quick actions or tap to open in app")
+        #expect(content.body == "New card detected. Press for quick actions or tap to open in app")
     }
 
     @Test("category unknown — falls back to Other, asks what was bought")
@@ -49,7 +49,7 @@ struct CaptureNotificationCopyTests {
         )
         let content = CaptureNotificationCopy.appliedLocally(defaulted, amountE4: 45000, locale: usLocale)
         #expect(content.title == "🏷️ €4.50 Logged to Revolut")
-        #expect(content.body == "What did you buy? Swipe for quick actions or tap to open in app")
+        #expect(content.body == "What did you buy? Press for quick actions or tap to open in app")
     }
 
     @Test("both unknown — generic logged-automatically copy, no swipe hint")
@@ -73,7 +73,7 @@ struct CaptureNotificationCopyTests {
         )
         let content = CaptureNotificationCopy.appliedLocally(known, amountE4: 45000, locale: usLocale)
         #expect(content.title == "⚠️ €4.50 — Possible duplicate")
-        #expect(content.body == "Swipe for quick actions or tap to open in app")
+        #expect(content.body == "Press for quick actions or tap to open in app")
 
         let unknown = resolution(
             accountName: nil, categoryName: "Other", categoryIsDefault: true, currency: nil, minorUnit: nil,
@@ -81,7 +81,7 @@ struct CaptureNotificationCopyTests {
         )
         let unknownContent = CaptureNotificationCopy.appliedLocally(unknown, amountE4: 45000, locale: usLocale)
         #expect(unknownContent.title == "⚠️ 4.50 — Possible duplicate")
-        #expect(unknownContent.body == "Swipe for quick actions or tap to open in app")
+        #expect(unknownContent.body == "Press for quick actions or tap to open in app")
     }
 
     @Test("the rare RPC-only fallback matches the both-unknown copy")

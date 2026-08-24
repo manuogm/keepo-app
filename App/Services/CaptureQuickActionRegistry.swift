@@ -21,10 +21,19 @@ import UserNotifications
 enum CaptureQuickActionRegistry {
     private static let defaultsKey = "app.keepo.captureQuickActionCategories"
 
+    /// `optionsRawValue`, not a hand-picked flag or two: this record is what
+    /// every registered action is rebuilt from in `push`, so anything it
+    /// fails to carry is silently dropped on the way to
+    /// `UNUserNotificationCenter`. It previously stored only `destructive`,
+    /// which is exactly how "More options" lost its `.foreground` and
+    /// stopped opening the app — the option was set correctly in
+    /// `CaptureQuickActions` and then thrown away here (device testing).
+    /// Round-tripping the whole `UNNotificationActionOptions` bitmask means
+    /// a future option can't regress the same way.
     private struct StoredAction: Codable {
         let identifier: String
         let title: String
-        let destructive: Bool
+        let optionsRawValue: UInt
     }
 
     /// Registers one notification's category (its identifier + action set)
@@ -34,7 +43,7 @@ enum CaptureQuickActionRegistry {
     static func register(identifier: String, actions: [UNNotificationAction], defaults: UserDefaults = .standard) {
         var stored = load(defaults)
         stored[identifier] = actions.map {
-            StoredAction(identifier: $0.identifier, title: $0.title, destructive: $0.options.contains(.destructive))
+            StoredAction(identifier: $0.identifier, title: $0.title, optionsRawValue: $0.options.rawValue)
         }
         save(stored, defaults)
         push(stored)
@@ -76,7 +85,8 @@ enum CaptureQuickActionRegistry {
                 identifier: identifier,
                 actions: actions.map {
                     UNNotificationAction(
-                        identifier: $0.identifier, title: $0.title, options: $0.destructive ? [.destructive] : []
+                        identifier: $0.identifier, title: $0.title,
+                        options: UNNotificationActionOptions(rawValue: $0.optionsRawValue)
                     )
                 },
                 intentIdentifiers: [], options: []
