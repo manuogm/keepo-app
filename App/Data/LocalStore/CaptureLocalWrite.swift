@@ -36,6 +36,25 @@ import Supabase
 /// .appliedLocally` (`Outbox.swift`), itself a `public` type, and a nested
 /// type's effective access can never exceed its container's.
 public enum CaptureLocalWrite {
+    /// One quick-action button candidate — a category or account name paired
+    /// with the id `CaptureQuickActions` needs to route a tap back to. Ids
+    /// stay `String` throughout, same as every other id in this file; only
+    /// the Outbox payload boundary converts to `UUID`.
+    public struct Suggestion: Equatable, Sendable {
+        public let id: String
+        public let name: String
+
+        public init(id: String, name: String) {
+            self.id = id
+            self.name = name
+        }
+
+        init(row: Row) {
+            id = row["id"]
+            name = row["name"]
+        }
+    }
+
     public struct Resolution: Equatable, Sendable {
         public let accountName: String?
         public let categoryName: String
@@ -48,6 +67,22 @@ public enum CaptureLocalWrite {
         public let categoryIsDefault: Bool
         public let currency: String?
         public let minorUnit: Int?
+        /// The resolved ids themselves — `accountName`/`categoryName` alone
+        /// are display-only; `CaptureQuickActions` needs the actual ids to
+        /// build `ReviewCaptureTransactionPayload` and to exclude the
+        /// already-applied category from its own alternates.
+        public let categoryId: String
+        public let accountId: String?
+        /// Up to 3 alternates, ranked — empty whenever a branch doesn't use
+        /// them (e.g. `suggestedAccounts` when the account already
+        /// resolved). See `CaptureQuickActionSuggestions`.
+        public let suggestedCategories: [Suggestion]
+        public let suggestedAccounts: [Suggestion]
+        /// Same card + merchant + amount as another live transaction within
+        /// a 15-minute window — see `CaptureQuickActionSuggestions
+        /// .hasPossibleDuplicate`. Overrides the notification's copy and
+        /// button set with a duplicate warning + Delete action.
+        public let isPossibleDuplicate: Bool
     }
 
     static func resolveAndWrite(
@@ -81,6 +116,10 @@ public enum CaptureLocalWrite {
             try Int.fetchOne(database, sql: "SELECT minor_unit FROM currencies WHERE code = ?", arguments: [$0])
         }
 
+        let quickActions = try quickActionData(
+            database, ownerId: ownerId, payload: payload, accountId: accountId, category: category
+        )
+
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         try SyncApply.upsertRow(
             [
@@ -99,7 +138,79 @@ public enum CaptureLocalWrite {
 
         return Resolution(
             accountName: accountName, categoryName: categoryName, categoryIsDefault: categoryIsDefault,
-            currency: currency, minorUnit: minorUnit
+            currency: currency, minorUnit: minorUnit, categoryId: categoryId, accountId: accountId,
+            suggestedCategories: quickActions.categories, suggestedAccounts: quickActions.accounts,
+            isPossibleDuplicate: quickActions.isPossibleDuplicate
+        )
+    }
+
+    private struct QuickActionData {
+        let categories: [Suggestion]
+        let accounts: [Suggestion]
+        let isPossibleDuplicate: Bool
+    }
+
+    /// Combines the quick-action suggestions and the duplicate check into
+    /// one call, purely so `resolveAndWrite` only has one statement to make
+    /// (parameter- and body-length lint thresholds, same reasoning as every
+    /// other split in this file).
+    private static func quickActionData(
+        _ database: Database, ownerId: String, payload: CaptureTransactionPayload, accountId: String?, category: Row
+    ) throws -> QuickActionData {
+        let (categories, accounts) = try quickActionSuggestions(
+            database, ownerId: ownerId, merchantNormalized: payload.merchantNormalized, accountId: accountId,
+            category: category
+        )
+        let isPossibleDuplicate = try CaptureQuickActionSuggestions.hasPossibleDuplicate(
+            database, ownerId: ownerId,
+            candidate: .init(
+                cardIdentifier: payload.cardIdentifier, merchantNormalized: payload.merchantNormalized,
+                amountE4: -abs(payload.amountE4), occurredAt: payload.occurredAt
+            ),
+            excluding: payload.id.uuidString
+        )
+        return QuickActionData(categories: categories, accounts: accounts, isPossibleDuplicate: isPossibleDuplicate)
+    }
+
+    /// Only fetches what the eventual notification branch can actually use
+    /// (`CaptureNotificationCopy`'s own four-way split). Account unknown:
+    /// candidate accounts. Category unknown (`categoryIsDefault`): straight
+    /// to the account's own history — there's no learned category for this
+    /// merchant to rank alternates against, so a merchant lookup here would
+    /// almost always come back empty anyway (`resolveCategory` already
+    /// checked `merchant_category_map`). Category *known* ("successful
+    /// purchase"): the merchant's own history first, since it's the
+    /// strongest signal for a genuine alternate; only falls back to the
+    /// account's general history when this merchant has none of its own.
+    /// Both known and both unknown branches fetch nothing extra — the first
+    /// needs no account suggestions, the second shows no quick-action
+    /// buttons at all unless `isPossibleDuplicate` overrides it with a bare
+    /// Delete, which needs no suggestions either.
+    private static func quickActionSuggestions(
+        _ database: Database, ownerId: String, merchantNormalized: String, accountId: String?, category: Row
+    ) throws -> (categories: [Suggestion], accounts: [Suggestion]) {
+        guard let accountId else {
+            return ([], try CaptureQuickActionSuggestions.topUnmappedAccounts(database, ownerId: ownerId, limit: 3))
+        }
+        let categoryIsDefault: Bool = category["is_default"]
+        guard !categoryIsDefault else {
+            return (
+                try CaptureQuickActionSuggestions.topCategoriesForAccount(
+                    database, ownerId: ownerId, accountId: accountId, excluding: nil, limit: 3
+                ),
+                []
+            )
+        }
+        let categoryId: String = category["id"]
+        let byMerchant = try CaptureQuickActionSuggestions.topCategoriesForMerchant(
+            database, ownerId: ownerId, merchantNormalized: merchantNormalized, excluding: categoryId, limit: 3
+        )
+        guard byMerchant.isEmpty else { return (byMerchant, []) }
+        return (
+            try CaptureQuickActionSuggestions.topCategoriesForAccount(
+                database, ownerId: ownerId, accountId: accountId, excluding: categoryId, limit: 3
+            ),
+            []
         )
     }
 

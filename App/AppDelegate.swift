@@ -12,6 +12,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // A fresh process starts with nothing registered in
+        // `UNUserNotificationCenter` at all, even for a capture notification
+        // still sitting in Notification Center from before the last
+        // terminate — this re-registers its quick-action buttons and drops
+        // any entry for a notification the user already cleared meanwhile.
+        Task { await CaptureQuickActionRegistry.reconcileWithDelivered() }
         return true
     }
 
@@ -45,24 +51,67 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         completionHandler([.banner, .sound])
     }
 
-    /// Reads the transaction id `CaptureIntent` attached (see
-    /// `NotificationRouter.transactionIdKey`) and hands it to `RootView` via
-    /// `NotificationRouter` — absent for every notification kind that
-    /// doesn't set it (the balance reminder, a queued/fallback capture),
-    /// which just opens the app normally, unchanged from before this file
-    /// existed. `DispatchQueue.main.async` for the state mutation itself —
-    /// this delegate callback isn't guaranteed to arrive on the main thread.
+    /// The default tap and the quick-action "More options" button both mean
+    /// the same thing — deep-link into the full review form — and read the
+    /// transaction id `CaptureIntent` attached the same way
+    /// (`NotificationRouter.transactionIdKey`). Absent for every
+    /// notification kind that doesn't set it (the balance reminder, a
+    /// queued/fallback capture), which just opens the app normally,
+    /// unchanged from before this file existed. `DispatchQueue.main.async`
+    /// for the state mutation itself — this delegate callback isn't
+    /// guaranteed to arrive on the main thread.
+    ///
+    /// Every other action identifier (Confirm, a category/account pick,
+    /// Delete) never opens the app at all — `CaptureQuickActionHandler`
+    /// does the write in the background, and `completionHandler` is only
+    /// called once that finishes, not immediately, so iOS doesn't suspend
+    /// the process mid-write.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let idString = userInfo[NotificationRouter.transactionIdKey] as? String,
-           let id = UUID(uuidString: idString) {
-            DispatchQueue.main.async {
-                NotificationRouter.shared.pendingCaptureId = id
+        let isDeepLink = response.actionIdentifier == UNNotificationDefaultActionIdentifier
+            || response.actionIdentifier == CaptureQuickActions.moreActionId
+        if isDeepLink {
+            if let idString = userInfo[NotificationRouter.transactionIdKey] as? String,
+               let id = UUID(uuidString: idString) {
+                DispatchQueue.main.async {
+                    NotificationRouter.shared.pendingCaptureId = id
+                }
             }
+            completionHandler()
+            return
         }
-        completionHandler()
+
+        // `UNNotificationResponse` isn't `Sendable`, so every plain value
+        // `CaptureQuickActionHandler` needs is pulled out here, before
+        // crossing into the `Task` — only the resulting `Request` value
+        // (and `completionHandler`) gets captured across that boundary.
+        guard let idString = userInfo[NotificationRouter.transactionIdKey] as? String,
+              let transactionId = UUID(uuidString: idString)
+        else {
+            completionHandler()
+            return
+        }
+        let request = CaptureQuickActionHandler.Request(
+            actionIdentifier: response.actionIdentifier,
+            categoryIdentifier: response.notification.request.content.categoryIdentifier,
+            transactionId: transactionId, pickKind: userInfo[CaptureQuickActions.pickKindKey] as? String,
+            pickIds: userInfo[CaptureQuickActions.pickIdsKey] as? [String]
+        )
+        // `completionHandler`'s declared type (`@escaping () -> Void`, from
+        // the `UNUserNotificationCenterDelegate` protocol) isn't marked
+        // `@Sendable`, so the strict-concurrency checker can't verify a
+        // capture into `Task` is safe on its own — it is safe here (called
+        // exactly once, after the write above finishes, never touched
+        // concurrently), the same class of case `Outbox.swift`'s own
+        // `retryTask` already documents this project's use of
+        // `nonisolated(unsafe)` for.
+        nonisolated(unsafe) let completion = completionHandler
+        Task {
+            await CaptureQuickActionHandler.handle(request)
+            completion()
+        }
     }
 }

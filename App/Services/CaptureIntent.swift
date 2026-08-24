@@ -1,12 +1,12 @@
 import AppIntents
 import Foundation
 import KeepoCore
-import SwiftData
 import UserNotifications
 
 /// The Wallet automation's App Intent — declared in the app target (not an
-/// extension), which is why it can reach `OfflineStore.makeContainer()`'s
-/// single, memoized `ModelContainer` directly. Three parameters only — the
+/// extension), which is why `CaptureEnvironment.makeOutbox()` can reach
+/// `OfflineStore.makeContainer()`'s single, memoized `ModelContainer`
+/// directly. Three parameters only — the
 /// minimum a user has to map by hand when wiring the Shortcuts automation;
 /// everything else (date, account via card, category via merchant history)
 /// is derived automatically (app-architecture.md §4).
@@ -45,20 +45,9 @@ struct CaptureIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         do {
-            let config = try SupabaseConfig.fromInfoPlist()
-            let client = makeSupabaseClient(
-                config: config, localStorage: config.isLocal ? nil : KeychainSessionStorage()
-            )
-            let dbQueue = try LocalStore.makeQueue()
-            // X-03: skip opening `OfflineStore`'s `ModelContainer` at all
-            // once the legacy SwiftData outbox is confirmed drained — that
-            // container, not this check, was the real cost of running this
-            // migration on every single capture.
-            if !OutboxMigration.isDone() {
-                let swiftDataContext = ModelContext(try OfflineStore.makeContainer())
-                await OutboxMigration.migrateIfNeeded(swiftDataContext: swiftDataContext, to: dbQueue)
-            }
-            let outbox = await Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
+            let environment = try await CaptureEnvironment.makeOutbox()
+            let outbox = environment.outbox
+            let client = environment.client
 
             guard let parsedAmount = AmountParser.parseFormattedCurrency(amount) else {
                 await notify(title: "Capture failed", body: "Couldn't read the amount \"\(amount)\".")
@@ -102,9 +91,13 @@ struct CaptureIntent: AppIntent {
         case .appliedLocally(let resolution):
             // The row exists locally either way now (account-resolved or
             // not), so this always deep-links — unlike the two fallback
-            // cases below, which have nothing local to open yet.
-            let content = CaptureNotificationCopy.appliedLocally(resolution, amountE4: amountE4)
-            await notify(title: content.title, body: content.body, transactionId: transactionId)
+            // cases below, which have nothing local to open yet. Routed
+            // through `CaptureNotificationScheduler` rather than this
+            // file's own `notify(title:body:transactionId:)` — this is the
+            // one branch that gets quick-action buttons.
+            await CaptureNotificationScheduler.scheduleAppliedLocally(
+                resolution: resolution, amountE4: amountE4, transactionId: transactionId
+            )
         case .applied:
             // Landed server-side; nothing local to deep-link into yet (the
             // next sync pull brings the row down) — same reasoning as the

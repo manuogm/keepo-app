@@ -43,6 +43,7 @@
 		3890CD13DBCAF86536329008 /* BalanceHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */; };
 		39E9A032A4C47DDFD25A6A1C /* LocalDashboardQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3AF792C04D22B7EF9030339 /* LocalDashboardQueries.swift */; };
 		3A9AACA2AC8D02F3ED6645C3 /* OutboxLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A3C001E043B35FE6CF03CC /* OutboxLocalWriteTests.swift */; };
+		3E5A3C213A9C4C24DA0CDAD2 /* CaptureEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC330CD2BD135E7B857838F3 /* CaptureEnvironment.swift */; };
 		417D9CA1DF24EBD69F0A89F4 /* TransactionFormView+Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5623F587B3B8D61238E69B8D /* TransactionFormView+Data.swift */; };
 		41FDD9F61FE0C27BB4C5439B /* PressableRowButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7215DD41F6B092BD6986AD /* PressableRowButtonStyle.swift */; };
 		42CAEC37A85FED9A152E1AA4 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0A8C2BEF10788227677E2A /* SessionStore.swift */; };
@@ -67,10 +68,12 @@
 		59E0529AD0C2C827F4E01BB3 /* SimulateCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4483B90ADDC12EA6923C282A /* SimulateCaptureView.swift */; };
 		5C2EAAD51D82FD4DA43DAC07 /* ReviewCaptureLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983639BA2391235A898AD23F /* ReviewCaptureLocalWriteTests.swift */; };
 		609F9032D22FB12CE197C6B7 /* KindTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3768CA435AE5F391055BEBA2 /* KindTabBar.swift */; };
+		6623338915D4C55BA3E3536A /* CaptureQuickActionSuggestionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB633A420FD5674DE9E465B /* CaptureQuickActionSuggestionsTests.swift */; };
 		6816EB621F86C2FCE0861C70 /* CategoryLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04390E921137B01C4EBB45D2 /* CategoryLocalWrite.swift */; };
 		6823B51CF7AC1FDD1404192D /* RecurringRuleFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26113BDE0659689A35B7B28 /* RecurringRuleFormView.swift */; };
 		6D136EF3E95EB5BD256F22C7 /* KeepoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA14030637CFFD08A547224 /* KeepoUITests.swift */; };
 		6ED447E86A5FFA53C5AC3C60 /* BalanceReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0FAAB5B77568D01ADFCCDA7 /* BalanceReminderScheduler.swift */; };
+		740E6573623946DF9C219E5F /* CaptureQuickActionRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D622D3BC234133CBEBEA83 /* CaptureQuickActionRegistry.swift */; };
 		740F18DE2C4B1A6D52882358 /* NotificationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5597232F1DF84A5AC9F1058F /* NotificationRouter.swift */; };
 		780E6C8FBD039D39D34868B0 /* OutboxCaptureRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */; };
 		7A60206E3F581D18DE9AAAD1 /* OfflineInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03941D7DA3A9DB1450A09F83 /* OfflineInfoSheet.swift */; };
@@ -114,6 +117,7 @@
 		AEDA7863DFF287EA9CB7BE1A /* TransactionsListView+Loading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12323049CBBB834E1978A81E /* TransactionsListView+Loading.swift */; };
 		AF0FC1AC703FF69D92D837B1 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2E1C41DCDF32CA26D9E904 /* OnboardingView.swift */; };
 		B03FB07E318C04AE8F7EC30D /* LocalTransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBF6795112FAE14AF6A9964 /* LocalTransactionRow.swift */; };
+		B16B4BA5F71D91B8E950BF9F /* CaptureQuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DCBD1F245670538FB816D3 /* CaptureQuickActions.swift */; };
 		B18C1FD694FDD097B6344A64 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF71A7732689A19B52D34F44 /* LocalStore.swift */; };
 		B24F5A6145F90E63C15BB3DC /* SyncApplyCardMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01EFD57C883787366864BB5 /* SyncApplyCardMappingTests.swift */; };
 		B286284590780CBB794D4894 /* AddAccountFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1453E697E1B07D74AA03206 /* AddAccountFlowView.swift */; };
@@ -123,13 +127,16 @@
 		B80BB396BF55239CA0E8C0F7 /* OutboxPayloads+Drag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E945E73D13C3D138A04321 /* OutboxPayloads+Drag.swift */; };
 		B822C2B7A0332521D34E4CC8 /* PickerRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2466CDC8B59EB28490597507 /* PickerRows.swift */; };
 		B9A1A4D4B42ACEA800227B4C /* InvestmentBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */; };
+		BAD0D6DD8C6468A30FC90124 /* CaptureNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDE7A41A7D4B5DF222FAD946 /* CaptureNotificationScheduler.swift */; };
 		BBE92DC63297AE6FDD9EAE9F /* CardMappingLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */; };
 		BC2164BD9D96F9AB4C55FDDD /* DataPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20EF1D660F02003383C6EDE /* DataPrivacyView.swift */; };
 		BDBD09EE3CF8613353AFF224 /* DashboardHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61E117F7A777571884BB0AA1 /* DashboardHaptics.swift */; };
 		BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */; };
 		BF17C34B30995D6EAFF9C4CA /* CaptureNotificationCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB4D58C60A91E97162570E8 /* CaptureNotificationCopy.swift */; };
+		BF7B49CC2C0BFEC3722BD092 /* CaptureQuickActionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F517CE621FEFAB857D2BE34F /* CaptureQuickActionHandler.swift */; };
 		BF8A3723CCF5DC8095621601 /* DashboardCanvasCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B51809A9E015EC3C4BA079 /* DashboardCanvasCatalog.swift */; };
 		C2E2ACA78C84119D0568317F /* WalletAutomationGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB16A0FBB8E0356AFBB7D47 /* WalletAutomationGuideView.swift */; };
+		C3DFF332DC9861C02187102D /* CaptureQuickActionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1978AC02A9A187AF7E931051 /* CaptureQuickActionsTests.swift */; };
 		CA90E71209B3E46F64C6F22A /* OfflineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C826F8EB1CECA41DDF5D02A /* OfflineStore.swift */; };
 		CB5A817DE95C48E2E8810977 /* OutboxLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB9C1A1428E63DBE126B9974 /* OutboxLocalWrite.swift */; };
 		CB8A49862EF7A7D661EA7CD2 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF5FF94A9B92F9C82977605 /* HomeView.swift */; };
@@ -161,6 +168,7 @@
 		F1A9DEA3905AA30EC104DC41 /* ConflictDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AEFA81C6488C107F0ED0281 /* ConflictDetailSheet.swift */; };
 		F2876E891DA2B01E838AE887 /* Outbox+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B742559A84DE1F35A4FCDE /* Outbox+Capture.swift */; };
 		F2989BFC0D16188D5FAEAE67 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA7731C75C89208EB0F034 /* PreferencesView.swift */; };
+		F339A03F00065E54EE1EAAE4 /* CaptureQuickActionSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02190F3A60526A587EFCA91 /* CaptureQuickActionSuggestions.swift */; };
 		F4F8903D8AD9B97A34721F0E /* UUID+Identifiable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67F70AFEF9431B8FA8A98F6E /* UUID+Identifiable.swift */; };
 		F6149460C908D5CC42F1B2E1 /* LocalMoneyTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165D0C1A1BF53D4803DE5FBC /* LocalMoneyTypes.swift */; };
 		F621BD7F9360149A762CDA34 /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */; };
@@ -217,6 +225,8 @@
 		1506F139C92C88A14BDEE6BE /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		165D0C1A1BF53D4803DE5FBC /* LocalMoneyTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyTypes.swift; sourceTree = "<group>"; };
 		1907CF10603055CC52ED389C /* NetWorthWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthWidget.swift; sourceTree = "<group>"; };
+		1978AC02A9A187AF7E931051 /* CaptureQuickActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionsTests.swift; sourceTree = "<group>"; };
+		1AB633A420FD5674DE9E465B /* CaptureQuickActionSuggestionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionSuggestionsTests.swift; sourceTree = "<group>"; };
 		2022ED7EAFC392568FE06C52 /* LocalMoneyRefereeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyRefereeTests.swift; sourceTree = "<group>"; };
 		2175B61B78B33F2633D36AE5 /* AutomationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationsView.swift; sourceTree = "<group>"; };
 		21E945E73D13C3D138A04321 /* OutboxPayloads+Drag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OutboxPayloads+Drag.swift"; sourceTree = "<group>"; };
@@ -240,8 +250,10 @@
 		42F7EBD470002A5E5E8FA9F9 /* ConflictDetailSheet+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConflictDetailSheet+Loading.swift"; sourceTree = "<group>"; };
 		4483B90ADDC12EA6923C282A /* SimulateCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulateCaptureView.swift; sourceTree = "<group>"; };
 		46B51809A9E015EC3C4BA079 /* DashboardCanvasCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCanvasCatalog.swift; sourceTree = "<group>"; };
+		46D622D3BC234133CBEBEA83 /* CaptureQuickActionRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionRegistry.swift; sourceTree = "<group>"; };
 		472675CD5ADE433AA4B8E336 /* LocalMoneyRefereeFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyRefereeFixture.swift; sourceTree = "<group>"; };
 		487EAE5A42131446A0EA564D /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
+		49DCBD1F245670538FB816D3 /* CaptureQuickActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActions.swift; sourceTree = "<group>"; };
 		4B2D7B270C69CCF2DD06E2CB /* CaptureLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureLocalWrite.swift; sourceTree = "<group>"; };
 		4BB58A8214ECD93F7BA2BFA3 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		4BF714EAD5AE98EB0246165E /* DashboardBlankState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardBlankState.swift; sourceTree = "<group>"; };
@@ -320,8 +332,9 @@
 		BB0EA44B535AF5D58FEEC1D0 /* AccountsListView+Reorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsListView+Reorder.swift"; sourceTree = "<group>"; };
 		BC080B33FA837D6D4D0F61A7 /* DashboardDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardDataLoader.swift; sourceTree = "<group>"; };
 		C01F93D6F883809945825188 /* NetWorthChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthChartView.swift; sourceTree = "<group>"; };
+		C02190F3A60526A587EFCA91 /* CaptureQuickActionSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionSuggestions.swift; sourceTree = "<group>"; };
 		C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
-		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2304E1D42EB8B69A267C0AC /* MetricKitSubscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitSubscriber.swift; sourceTree = "<group>"; };
 		C2C989DB9E673F3B36CD29E0 /* TransactionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFormView.swift; sourceTree = "<group>"; };
 		C3AF9A7AEAB1809042F92E29 /* OTPSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPSignInView.swift; sourceTree = "<group>"; };
@@ -330,6 +343,7 @@
 		C91440E871E1BD48AB796B63 /* Keepo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Keepo.entitlements; sourceTree = "<group>"; };
 		C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxCaptureRecoveryTests.swift; sourceTree = "<group>"; };
 		CC1030F8FB6C2054143CD703 /* BudgetFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetFormView.swift; sourceTree = "<group>"; };
+		CDE7A41A7D4B5DF222FAD946 /* CaptureNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationScheduler.swift; sourceTree = "<group>"; };
 		D01EFD57C883787366864BB5 /* SyncApplyCardMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncApplyCardMappingTests.swift; sourceTree = "<group>"; };
 		D1453E697E1B07D74AA03206 /* AddAccountFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAccountFlowView.swift; sourceTree = "<group>"; };
 		D152F0778818C2C0DAF37B15 /* OfflineStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStatusBar.swift; sourceTree = "<group>"; };
@@ -350,6 +364,7 @@
 		E6DBDB63AD4D05BD8A1403EA /* DashboardCanvasDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCanvasDrag.swift; sourceTree = "<group>"; };
 		E82D12D8E224E6F3833EFD78 /* AccountFormView+Data.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountFormView+Data.swift"; sourceTree = "<group>"; };
 		E9CCA2BF8D2E735851609DA9 /* TransferDivergenceAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferDivergenceAlert.swift; sourceTree = "<group>"; };
+		EC330CD2BD135E7B857838F3 /* CaptureEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureEnvironment.swift; sourceTree = "<group>"; };
 		ED50250E263DA762CABB6A0A /* CashflowWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CashflowWidget.swift; sourceTree = "<group>"; };
 		EE9D5EF2222D3BBB7A7C333C /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
 		EEFA7731C75C89208EB0F034 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
@@ -358,6 +373,7 @@
 		F36FAE831F3BC6842ECB9167 /* ConflictResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictResolution.swift; sourceTree = "<group>"; };
 		F3D1996C00A3B200872FFDA8 /* LocalTableQueriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTableQueriesTests.swift; sourceTree = "<group>"; };
 		F450AAFA803FEA51265A620A /* LocalMoneyConversionBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversionBudget.swift; sourceTree = "<group>"; };
+		F517CE621FEFAB857D2BE34F /* CaptureQuickActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionHandler.swift; sourceTree = "<group>"; };
 		F6A807A14819B379116D51C1 /* ArchiveAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveAccountsView.swift; sourceTree = "<group>"; };
 		F82A6B086F193EDA03980932 /* LocalMoneyConversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversion.swift; sourceTree = "<group>"; };
 		F981199D936E39231F1E7D6E /* OutboxPayloads+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OutboxPayloads+Capture.swift"; sourceTree = "<group>"; };
@@ -535,6 +551,7 @@
 			children = (
 				03E47695783E639B37462948 /* AccountLocalWrite.swift */,
 				4B2D7B270C69CCF2DD06E2CB /* CaptureLocalWrite.swift */,
+				C02190F3A60526A587EFCA91 /* CaptureQuickActionSuggestions.swift */,
 				04390E921137B01C4EBB45D2 /* CategoryLocalWrite.swift */,
 				A23166A8674504049A46489F /* LocalAccountRow.swift */,
 				A3AF792C04D22B7EF9030339 /* LocalDashboardQueries.swift */,
@@ -731,6 +748,8 @@
 			children = (
 				A82B551364B6EDE8D6F79CFC /* AlwaysFailingSender.swift */,
 				30FBEDFDA4FF666C8FA61FF8 /* CaptureNotificationCopyTests.swift */,
+				1978AC02A9A187AF7E931051 /* CaptureQuickActionsTests.swift */,
+				1AB633A420FD5674DE9E465B /* CaptureQuickActionSuggestionsTests.swift */,
 				5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */,
 				36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */,
 				7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */,
@@ -792,9 +811,14 @@
 			isa = PBXGroup;
 			children = (
 				B0FAAB5B77568D01ADFCCDA7 /* BalanceReminderScheduler.swift */,
+				EC330CD2BD135E7B857838F3 /* CaptureEnvironment.swift */,
 				E3A3543E6EF9E4AA8A2E59C5 /* CaptureIntent.swift */,
 				ADB4D58C60A91E97162570E8 /* CaptureNotificationCopy.swift */,
+				CDE7A41A7D4B5DF222FAD946 /* CaptureNotificationScheduler.swift */,
 				5128E2B3C07029D4C8598446 /* CaptureNotify.swift */,
+				F517CE621FEFAB857D2BE34F /* CaptureQuickActionHandler.swift */,
+				46D622D3BC234133CBEBEA83 /* CaptureQuickActionRegistry.swift */,
+				49DCBD1F245670538FB816D3 /* CaptureQuickActions.swift */,
 				C2304E1D42EB8B69A267C0AC /* MetricKitSubscriber.swift */,
 				5597232F1DF84A5AC9F1058F /* NotificationRouter.swift */,
 				5B0A8C2BEF10788227677E2A /* SessionStore.swift */,
@@ -917,7 +941,7 @@
 			mainGroup = 7EFAF88579B01776BD0774BC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */,
+				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				ADEF292666A264221272220B /* XCLocalSwiftPackageReference "Packages/KeepoCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -950,6 +974,8 @@
 			files = (
 				8211BBB44578D76679772CAD /* AlwaysFailingSender.swift in Sources */,
 				88B799939E6B0E53900D0DC9 /* CaptureNotificationCopyTests.swift in Sources */,
+				6623338915D4C55BA3E3536A /* CaptureQuickActionSuggestionsTests.swift in Sources */,
+				C3DFF332DC9861C02187102D /* CaptureQuickActionsTests.swift in Sources */,
 				BBE92DC63297AE6FDD9EAE9F /* CardMappingLocalWriteTests.swift in Sources */,
 				E43BEBD85BAD11CDD781A200 /* CategoryLocalWriteTests.swift in Sources */,
 				1979678A5304703AB79F5093 /* ConfirmCaptureLocalWriteTests.swift in Sources */,
@@ -1008,10 +1034,16 @@
 				E3AF2002494202132F4D4819 /* BudgetsView.swift in Sources */,
 				A2AF27325342AF25B3BF4160 /* CSVImportView.swift in Sources */,
 				85244C8F050B324E4D342EBD /* CaptureDeepLinkHandler.swift in Sources */,
+				3E5A3C213A9C4C24DA0CDAD2 /* CaptureEnvironment.swift in Sources */,
 				B56CD7104491C9185E447004 /* CaptureIntent.swift in Sources */,
 				FB5B290D1F0B9D5F03EFA89A /* CaptureLocalWrite.swift in Sources */,
 				BF17C34B30995D6EAFF9C4CA /* CaptureNotificationCopy.swift in Sources */,
+				BAD0D6DD8C6468A30FC90124 /* CaptureNotificationScheduler.swift in Sources */,
 				4BD95C79F8BB1817A98FC35C /* CaptureNotify.swift in Sources */,
+				BF7B49CC2C0BFEC3722BD092 /* CaptureQuickActionHandler.swift in Sources */,
+				740E6573623946DF9C219E5F /* CaptureQuickActionRegistry.swift in Sources */,
+				F339A03F00065E54EE1EAAE4 /* CaptureQuickActionSuggestions.swift in Sources */,
+				B16B4BA5F71D91B8E950BF9F /* CaptureQuickActions.swift in Sources */,
 				1B63ACEEE01F0CCB514750A2 /* CashflowBreakdownView.swift in Sources */,
 				90FF33B71653ADA5950E163F /* CashflowWidget.swift in Sources */,
 				54DA8D524216581B7256B87E /* CategoriesView.swift in Sources */,
@@ -1271,7 +1303,6 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1313,7 +1344,6 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1430,7 +1460,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */ = {
+		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -1443,7 +1473,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		0D525863FB5ABAE4C22CDAE5 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
 		};
 		55A520844CB1127366801CB8 /* KeepoCore */ = {
@@ -1452,7 +1482,7 @@
 		};
 		6CF67C6B40F5CAB317C7F6FC /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */

@@ -11,11 +11,14 @@ struct CaptureNotificationCopyTests {
     let usLocale = Locale(identifier: "en_US")
 
     private func resolution(
-        accountName: String?, categoryName: String, categoryIsDefault: Bool, currency: String?, minorUnit: Int?
+        accountName: String?, categoryName: String, categoryIsDefault: Bool, currency: String?, minorUnit: Int?,
+        isPossibleDuplicate: Bool = false
     ) -> CaptureLocalWrite.Resolution {
         CaptureLocalWrite.Resolution(
             accountName: accountName, categoryName: categoryName, categoryIsDefault: categoryIsDefault,
-            currency: currency, minorUnit: minorUnit
+            currency: currency, minorUnit: minorUnit, categoryId: UUID().uuidString,
+            accountId: accountName != nil ? UUID().uuidString : nil, suggestedCategories: [], suggestedAccounts: [],
+            isPossibleDuplicate: isPossibleDuplicate
         )
     }
 
@@ -26,7 +29,7 @@ struct CaptureNotificationCopyTests {
         )
         let content = CaptureNotificationCopy.appliedLocally(known, amountE4: 45000, locale: usLocale)
         #expect(content.title == "✅ €4.50 Logged successfully")
-        #expect(content.body == "Coffee · Revolut — Tap to confirm")
+        #expect(content.body == "Coffee · Revolut — Swipe for quick actions or tap to open in app")
     }
 
     @Test("account unknown — asks which account, mentions the new card")
@@ -36,7 +39,7 @@ struct CaptureNotificationCopyTests {
         )
         let content = CaptureNotificationCopy.appliedLocally(unmapped, amountE4: 45000, locale: usLocale)
         #expect(content.title == "💳 4.50 Logged to Coffee")
-        #expect(content.body == "New card detected. Tap to select which account should be linked to")
+        #expect(content.body == "New card detected. Swipe for quick actions or tap to open in app")
     }
 
     @Test("category unknown — falls back to Other, asks what was bought")
@@ -46,10 +49,10 @@ struct CaptureNotificationCopyTests {
         )
         let content = CaptureNotificationCopy.appliedLocally(defaulted, amountE4: 45000, locale: usLocale)
         #expect(content.title == "🏷️ €4.50 Logged to Revolut")
-        #expect(content.body == "What did you buy? Tap to choose")
+        #expect(content.body == "What did you buy? Swipe for quick actions or tap to open in app")
     }
 
-    @Test("both unknown — generic logged-automatically copy")
+    @Test("both unknown — generic logged-automatically copy, no swipe hint")
     func bothUnknown() {
         let unknown = resolution(
             accountName: nil, categoryName: "Other", categoryIsDefault: true, currency: nil, minorUnit: nil
@@ -57,6 +60,28 @@ struct CaptureNotificationCopyTests {
         let content = CaptureNotificationCopy.appliedLocally(unknown, amountE4: 45000, locale: usLocale)
         #expect(content.title == "❓ 4.50 Logged automatically")
         #expect(content.body == "Tap to add missing details")
+    }
+
+    /// The duplicate flag overrides every branch's copy, including "both
+    /// unknown" — a suspected duplicate is more urgent than the usual
+    /// missing-details prompt.
+    @Test("possible duplicate overrides the branch copy, regardless of what else resolved")
+    func possibleDuplicate() {
+        let known = resolution(
+            accountName: "Revolut", categoryName: "Coffee", categoryIsDefault: false, currency: "EUR", minorUnit: 2,
+            isPossibleDuplicate: true
+        )
+        let content = CaptureNotificationCopy.appliedLocally(known, amountE4: 45000, locale: usLocale)
+        #expect(content.title == "⚠️ €4.50 — Possible duplicate")
+        #expect(content.body == "Swipe for quick actions or tap to open in app")
+
+        let unknown = resolution(
+            accountName: nil, categoryName: "Other", categoryIsDefault: true, currency: nil, minorUnit: nil,
+            isPossibleDuplicate: true
+        )
+        let unknownContent = CaptureNotificationCopy.appliedLocally(unknown, amountE4: 45000, locale: usLocale)
+        #expect(unknownContent.title == "⚠️ 4.50 — Possible duplicate")
+        #expect(unknownContent.body == "Swipe for quick actions or tap to open in app")
     }
 
     @Test("the rare RPC-only fallback matches the both-unknown copy")

@@ -25,21 +25,32 @@ enum CaptureNotificationCopy {
             currency: resolution.currency, minorUnit: resolution.minorUnit, amountE4: amountE4, locale: locale
         )
 
+        // Overrides every branch below, including "both unknown" (which
+        // otherwise shows no quick-action buttons at all) — a suspected
+        // duplicate is more urgent than "tap to pick a category," so it
+        // wins the headline regardless of what else did or didn't resolve.
+        guard !resolution.isPossibleDuplicate else {
+            return Content(
+                title: "⚠️ \(amount) — Possible duplicate", body: "Swipe for quick actions or tap to open in app"
+            )
+        }
+
         switch (accountKnown, categoryKnown) {
         case (true, true):
             return Content(
                 title: "✅ \(amount) Logged successfully",
-                body: "\(resolution.categoryName) · \(resolution.accountName ?? "") — Tap to confirm"
+                body: "\(resolution.categoryName) · \(resolution.accountName ?? "") "
+                    + "— Swipe for quick actions or tap to open in app"
             )
         case (false, true):
             return Content(
                 title: "💳 \(amount) Logged to \(resolution.categoryName)",
-                body: "New card detected. Tap to select which account should be linked to"
+                body: "New card detected. Swipe for quick actions or tap to open in app"
             )
         case (true, false):
             return Content(
                 title: "🏷️ \(amount) Logged to \(resolution.accountName ?? "")",
-                body: "What did you buy? Tap to choose"
+                body: "What did you buy? Swipe for quick actions or tap to open in app"
             )
         case (false, false):
             return Content(title: "❓ \(amount) Logged automatically", body: "Tap to add missing details")
