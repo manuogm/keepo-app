@@ -79,14 +79,20 @@ public enum DashboardWidgetKind: String, Sendable, CaseIterable, Codable {
     case currencyExposure = "currency_exposure"
     case upcomingBills = "upcoming_bills"
     case cashflow
+    case fxRate = "fx_rate"
 
+    /// The title in the tile's header and in the catalogue. Free to change —
+    /// unlike `rawValue`, which is a storage format (see above), the title
+    /// is never written to disk. `upcomingBills` reads "Transactions Next 2
+    /// Weeks" while still storing `upcoming_bills` for exactly that reason.
     public var title: String {
         switch self {
-        case .netWorth: return "Net Worth"
+        case .netWorth: return "Networth Analysis"
         case .investingRatio: return "Investing Ratio"
         case .currencyExposure: return "Currency Exposure"
-        case .upcomingBills: return "Upcoming Bills"
-        case .cashflow: return "Cashflow"
+        case .upcomingBills: return "Transactions Next 2 Weeks"
+        case .cashflow: return "Cashflow Breakdown"
+        case .fxRate: return "FX Rate"
         }
     }
 
@@ -99,7 +105,8 @@ public enum DashboardWidgetKind: String, Sendable, CaseIterable, Codable {
         case .investingRatio: return "chart.pie"
         case .currencyExposure: return "globe"
         case .upcomingBills: return "calendar"
-        case .cashflow: return "arrow.left.arrow.right"
+        case .cashflow: return "arrow.up.arrow.down"
+        case .fxRate: return "arrow.left.arrow.right"
         }
     }
 
@@ -110,43 +117,119 @@ public enum DashboardWidgetKind: String, Sendable, CaseIterable, Codable {
         case .netWorth: return "Everything you own, minus what you owe, over time."
         case .investingRatio: return "How much of your net worth is invested."
         case .currencyExposure: return "Which currencies your money sits in."
-        case .upcomingBills: return "What's due over the next two weeks."
-        case .cashflow: return "What came in against what went out."
+        case .upcomingBills: return "What's coming in and going out over the next two weeks."
+        case .cashflow: return "What came in against what went out, and where it went."
+        case .fxRate: return "What one currency is worth in yours, over time."
         }
-    }
-
-    /// "1×2" — widget-heights by columns, the way the design describes
-    /// sizes. Deliberately *not* raw rows: a row is half a widget, and
-    /// telling the user a square tile is "2×1" would describe the grid's
-    /// bookkeeping rather than what they are about to see.
-    public var sizeLabel: String {
-        "\(baseSize.rows / DashboardLayout.rowsPerWidget)×\(baseSize.columns)"
     }
 
     /// The size the tile rests at, and the size it returns to in edit mode.
+    ///
+    /// Sizes are raw grid `rows × columns`, and a row is **half** a column's
+    /// width — so 2×1 is a square and 2×2 a full-width band. That is the
+    /// vocabulary the design is written in, so it is the vocabulary here;
+    /// converting between two conventions on the way in is how a widget ends
+    /// up the wrong shape.
+    ///
+    /// Every collapsed tile is `rowsPerWidget` tall. The half-row grid still
+    /// exists — the add/trash bar needs it — but no widget rests at an odd
+    /// row count any more; see the note in `.upcomingBills` below.
     public var baseSize: DashboardWidgetSize {
         switch self {
-        case .investingRatio, .currencyExposure: return .small
-        case .netWorth, .upcomingBills, .cashflow: return .wide
+        case .investingRatio, .currencyExposure, .fxRate:
+            return .small
+        case .netWorth, .cashflow, .upcomingBills:
+            // Upcoming was the one half-height tile (1×2). At a large text
+            // size its content no longer fitted the ~27pt a single row leaves
+            // once the card's padding and header are taken out, so it drew
+            // through the gutter and made the grid's spacing — which is a
+            // uniform 12pt by construction — look tighter around this one
+            // widget. Full height instead: every collapsed tile is now the
+            // same height, so nothing about the spacing can depend on which
+            // widget is next to it.
+            return .wide
         }
     }
 
-    /// The successive sizes a tap cycles through, in order, after the base
-    /// size. **Every expanded size is full width** — a 1×1 growing to 2×1
-    /// would leave its neighbour stranded beside a tall tile, which reads as
-    /// a rendering bug rather than a deliberate expansion.
+    /// The sizes expansion steps through, in order, after the base size.
+    /// **Every expanded size is full width** — a square growing sideways
+    /// only would leave its neighbour stranded beside a tall tile, which
+    /// reads as a rendering bug rather than as a deliberate expansion.
     ///
-    /// Cashflow is the only kind with two of them: 2×2 for the in/out donut,
-    /// then 3×2 when one of the two series is tapped and the category
-    /// breakdown appears under it.
+    /// Every widget has exactly one. Cashflow used to have two (in/out,
+    /// then a taller step for one side's categories); its 6×2 now carries
+    /// the category breakdown at all times, so the intermediate step has
+    /// nothing left to mean.
     public var expandedSizes: [DashboardWidgetSize] {
         switch self {
         case .cashflow:
-            return [DashboardWidgetSize.widgets(2, columns: 2), DashboardWidgetSize.widgets(3, columns: 2)]
-        case .netWorth, .investingRatio, .currencyExposure, .upcomingBills:
+            return [DashboardWidgetSize.widgets(3, columns: 2)]
+        case .netWorth, .investingRatio, .currencyExposure, .fxRate, .upcomingBills:
+            // Upcoming grew with its base size: expanding has to *add* room,
+            // and one widget-height is now what it rests at.
             return [DashboardWidgetSize.widgets(2, columns: 2)]
         }
     }
+
+    // MARK: - Configuration
+
+    /// The resolutions this widget's timeframe filter offers, finest first.
+    ///
+    /// FX is the only one that goes below a month, and that is a data
+    /// property rather than a design preference: a rate has a value every
+    /// day, whereas a net worth or a cashflow bucketed weekly is dominated
+    /// by whichever week salary landed in.
+    public var allowedGranularities: [MetricGranularity] {
+        switch self {
+        case .fxRate: return [.week, .month, .year]
+        case .netWorth, .investingRatio, .cashflow: return [.month, .year]
+        case .currencyExposure, .upcomingBills: return []
+        }
+    }
+
+    /// What this widget is set to when it opens — and, since nothing
+    /// persists a config, every time it opens.
+    public var defaultConfig: WidgetConfig {
+        switch self {
+        case .netWorth:
+            return WidgetConfig(metric: .netWorth)
+        case .investingRatio:
+            return WidgetConfig(metric: .investingRatio, visualization: .bar)
+        case .cashflow:
+            return WidgetConfig(metric: .cashflowNet, visualization: .bar)
+        case .fxRate:
+            return WidgetConfig(metric: .fxRate)
+        case .currencyExposure, .upcomingBills:
+            // Neither charts a time series. They carry a config so that
+            // every widget is constructed the same way, not because either
+            // has anything to vary yet.
+            return WidgetConfig(metric: .netWorth)
+        }
+    }
+
+    /// Extra metrics this widget plots on the same axis as its own.
+    ///
+    /// Part of the widget's *definition* rather than something the view wires
+    /// up on appear, and that distinction was a real bug: set from
+    /// `.onAppear`, Cashflow's first load could run before the companions
+    /// existed, and the widget opened showing its net line with both bar
+    /// series silently missing.
+    ///
+    /// Cashflow's three come out of one query per bucket (see
+    /// `DashboardMetricSeries.flows`), so asking for all three costs what
+    /// asking for one does.
+    public var companionMetrics: [MetricKind] {
+        switch self {
+        case .cashflow:
+            return [.moneyIn, .moneyOut]
+        case .netWorth, .investingRatio, .fxRate, .currencyExposure, .upcomingBills:
+            return []
+        }
+    }
+
+    /// Whether this widget charts a series at all — which is what decides
+    /// if it gets a timeframe filter in its expanded header.
+    public var hasTimeframeFilter: Bool { !allowedGranularities.isEmpty }
 }
 
 // MARK: - Tile

@@ -12,12 +12,17 @@ extension LocalDashboardQueries {
     /// Money in and money out over a period, plus the same figures split by
     /// category.
     ///
-    /// Transfers are excluded structurally rather than by a filter of their
-    /// own: a transfer has `category_id IS NULL` (the schema's "exactly one
-    /// of transfer_group_id/category_id" CHECK), so joining `categories`
-    /// drops every transfer leg. That matters — moving money into savings is
-    /// not income and not an expense, and counting it as either would make
-    /// the headline figure meaningless.
+    /// **Transfers count only when they cross the scope's boundary.** A
+    /// transfer has `category_id IS NULL` (the schema's "exactly one of
+    /// transfer_group_id/category_id" CHECK), so the categorised query below
+    /// drops every leg structurally — which is right whenever both legs are
+    /// inside the scope being viewed, because the two cancel and moving money
+    /// into savings is neither earning nor spending. But narrow the scope to
+    /// Personal and a household→personal transfer has only *one* leg inside
+    /// it: that is real money arriving, and a cashflow that ignored it would
+    /// under-report the month. Those legs are picked up by a second query and
+    /// rolled up under a "Transfers" pseudo-category, so the breakdown says
+    /// where the money came from rather than burying it in the total.
     ///
     /// Conversion is **row by row**, at each transaction's own date, before
     /// summing — matching Postgres's `sum(fx_convert(...))`, which rounds
@@ -27,8 +32,14 @@ extension LocalDashboardQueries {
     static func cashflow(
         _ database: Database, _ moneyScope: LocalMoneyScope, period: ClosedRange<Date>
     ) throws -> CashflowTotalsLocal {
+        var accumulator = FlowAccumulator(baseCurrency: moneyScope.baseCurrency)
+        let bounds = [
+            PostgresDate.dateOnlyString(period.lowerBound, calendar: utcCalendar),
+            PostgresDate.dateOnlyString(period.upperBound, calendar: utcCalendar)
+        ]
+
         let scopeClause = LocalMoneyQueries.scopeFilterSQL(moneyScope.scope, accountIdColumn: "t.account_id")
-        let rows = try Row.fetchAll(
+        let categorised = try Row.fetchAll(
             database,
             sql: """
             SELECT t.amount_e4, t.currency, substr(t.occurred_at, 1, 10) AS occurred_date,
@@ -40,71 +51,151 @@ extension LocalDashboardQueries {
               AND substr(t.occurred_at, 1, 10) BETWEEN ? AND ?
               AND (\(scopeClause))
             """,
-            arguments: [
-                PostgresDate.dateOnlyString(period.lowerBound, calendar: utcCalendar),
-                PostgresDate.dateOnlyString(period.upperBound, calendar: utcCalendar)
-            ]
+            arguments: StatementArguments(bounds)
         )
+        for row in categorised {
+            let kind = PublicSchema.CategoryKind(rawValue: row["category_kind"]) ?? .expense
+            try accumulator.add(database, row: row, bucket: CategoryBucket(row: row, kind: kind))
+        }
 
+        for row in try crossingTransfers(database, moneyScope, bounds: bounds) {
+            let amountE4: Int64 = row["amount_e4"]
+            try accumulator.add(database, row: row, bucket: .transfers(inbound: amountE4 > 0))
+        }
+
+        return accumulator.resolved()
+    }
+
+    /// Transfer legs whose counterparty account sits **outside** the current
+    /// scope.
+    ///
+    /// The `NOT EXISTS` is the whole rule. At Total scope the scope predicate
+    /// is `1 = 1`, so the sibling leg always matches and nothing qualifies —
+    /// which is correct, since inside one scope a transfer is money changing
+    /// pockets. At Personal or Household scope it qualifies exactly when the
+    /// other side is somewhere this view can't see.
+    private static func crossingTransfers(
+        _ database: Database, _ moneyScope: LocalMoneyScope, bounds: [String]
+    ) throws -> [Row] {
+        let legInScope = LocalMoneyQueries.scopeFilterSQL(moneyScope.scope, accountIdColumn: "t.account_id")
+        let siblingInScope = LocalMoneyQueries.scopeFilterSQL(moneyScope.scope, accountIdColumn: "o.account_id")
+        return try Row.fetchAll(
+            database,
+            sql: """
+            SELECT t.amount_e4, t.currency, substr(t.occurred_at, 1, 10) AS occurred_date
+            FROM transactions t
+            WHERE t.deleted_at IS NULL AND t.status = 'confirmed'
+              AND t.transfer_group_id IS NOT NULL
+              AND substr(t.occurred_at, 1, 10) BETWEEN ? AND ?
+              AND (\(legInScope))
+              AND NOT EXISTS (
+                  SELECT 1 FROM transactions o
+                  WHERE o.transfer_group_id = t.transfer_group_id AND o.id <> t.id
+                    AND o.deleted_at IS NULL AND (\(siblingInScope))
+              )
+            """,
+            arguments: StatementArguments(bounds)
+        )
+    }
+
+    /// Running totals for one period: the two directions, and the split by
+    /// whatever bucket each row belongs to.
+    ///
+    /// A type rather than three locals because both row sources feed the same
+    /// three things, and the direction rule — a row's **sign** decides which
+    /// side it lands on — has to be identical for a categorised row and a
+    /// transfer leg. Money rule 1: nothing re-signs anything on the way in.
+    private struct FlowAccumulator {
+        let baseCurrency: String
         var moneyIn = RunningTotal()
         var moneyOut = RunningTotal()
-        var byCategory: [String: CategoryAccumulator] = [:]
+        var buckets: [String: CategoryBucket] = [:]
 
-        for row in rows {
+        mutating func add(_ database: Database, row: Row, bucket: CategoryBucket) throws {
             let amountE4: Int64 = row["amount_e4"]
             let currency: String = row["currency"]
             let occurredDate: String = row["occurred_date"]
-            let kind = PublicSchema.CategoryKind(rawValue: row["category_kind"]) ?? .expense
+            let base = baseCurrency
             let convert: (Int64, String, String) throws -> Int64? = {
                 try LocalMoneyConversion.convert(
-                    database, amountE4: $0, from: $1, toCurrency: moneyScope.baseCurrency, date: $2
+                    database, amountE4: $0, from: $1, toCurrency: base, date: $2
                 )
             }
-
-            if kind == .income {
+            if bucket.isInbound {
                 try moneyIn.add(amountE4, from: currency, at: occurredDate, convert: convert)
             } else {
                 try moneyOut.add(amountE4, from: currency, at: occurredDate, convert: convert)
             }
-
-            let categoryId: String = row["category_id"]
-            var accumulator = byCategory[categoryId] ?? CategoryAccumulator(row: row, kind: kind)
-            try accumulator.total.add(amountE4, from: currency, at: occurredDate, convert: convert)
-            byCategory[categoryId] = accumulator
+            var existing = buckets[bucket.id] ?? bucket
+            try existing.total.add(amountE4, from: currency, at: occurredDate, convert: convert)
+            buckets[bucket.id] = existing
         }
 
-        return CashflowTotalsLocal(
-            moneyInE4: moneyIn.result,
-            moneyOutE4: moneyOut.result,
-            byCategory: byCategory
-                .map { $0.value.resolved(categoryId: $0.key) }
-                // Largest magnitude first — income is positive and expense
-                // negative, so sorting on the raw value would interleave them.
-                .sorted { abs($0.amountE4 ?? 0) > abs($1.amountE4 ?? 0) }
-        )
+        func resolved() -> CashflowTotalsLocal {
+            CashflowTotalsLocal(
+                moneyInE4: moneyIn.result,
+                moneyOutE4: moneyOut.result,
+                byCategory: buckets.values
+                    .map { $0.resolved() }
+                    // Largest magnitude first — income is positive and expense
+                    // negative, so sorting on the raw value would interleave
+                    // them.
+                    .sorted { abs($0.amountE4 ?? 0) > abs($1.amountE4 ?? 0) }
+            )
+        }
     }
 
-    /// One category's running total plus the presentation columns that come
-    /// along with it, so the group-by doesn't need a second lookup per
-    /// category to find its own icon.
-    private struct CategoryAccumulator {
+    /// One line of the breakdown: a real category, or the transfers roll-up.
+    ///
+    /// Carries the presentation columns along with the total so the group-by
+    /// doesn't need a second lookup per category to find its own icon.
+    private struct CategoryBucket {
+        let id: String
         let name: String
         let icon: String
         let color: String
         let kind: PublicSchema.CategoryKind
         var total = RunningTotal()
 
+        var isInbound: Bool { kind == .income }
+
         init(row: Row, kind: PublicSchema.CategoryKind) {
+            self.id = row["category_id"]
             self.name = row["category_name"]
             self.icon = row["category_icon"]
             self.color = row["category_color"]
             self.kind = kind
         }
 
-        func resolved(categoryId: String) -> CashflowCategoryLocal {
+        private init(id: String, name: String, icon: String, color: String, kind: PublicSchema.CategoryKind) {
+            self.id = id
+            self.name = name
+            self.icon = icon
+            self.color = color
+            self.kind = kind
+        }
+
+        /// The transfers roll-up, one per direction. Its id is deliberately
+        /// **not** a UUID: it has no category to open in Transactions, and
+        /// `UUID(uuidString:)` failing is what tells the widget to filter by
+        /// kind instead of by category.
+        static func transfers(inbound: Bool) -> CategoryBucket {
+            CategoryBucket(
+                id: inbound ? CashflowCategoryLocal.transfersInId : CashflowCategoryLocal.transfersOutId,
+                name: "Transfers",
+                icon: "arrow.left.arrow.right",
+                // The neutral chart colour, as a hex string because that is
+                // what every other row on this screen carries. Transfers are
+                // movement rather than earning or spending, so they take the
+                // colour that means neither.
+                color: "#8E8E93",
+                kind: inbound ? .income : .expense
+            )
+        }
+
+        func resolved() -> CashflowCategoryLocal {
             CashflowCategoryLocal(
-                categoryId: categoryId, name: name, icon: icon, color: color,
-                kind: kind, amountE4: total.result
+                categoryId: id, name: name, icon: icon, color: color, kind: kind, amountE4: total.result
             )
         }
     }
@@ -195,6 +286,7 @@ struct CashflowTotalsLocal: Equatable {
 }
 
 struct CashflowCategoryLocal: Equatable, Identifiable {
+    /// A real category's UUID, or one of the two transfer sentinels below.
     let categoryId: String
     let name: String
     let icon: String
@@ -204,4 +296,14 @@ struct CashflowCategoryLocal: Equatable, Identifiable {
     let amountE4: Int64?
 
     var id: String { categoryId }
+
+    static let transfersInId = "transfers-in"
+    static let transfersOutId = "transfers-out"
+
+    /// Whether this row is the transfers roll-up rather than a category the
+    /// user created. Asked by sentinel rather than by name, so a category
+    /// someone actually called "Transfers" is not mistaken for it.
+    var isTransfers: Bool {
+        categoryId == Self.transfersInId || categoryId == Self.transfersOutId
+    }
 }

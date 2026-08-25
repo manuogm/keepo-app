@@ -94,6 +94,102 @@ struct LocalAccountRowTests {
         #expect(rows.first?.balanceBaseE4 == nil)
     }
 
+    @Test("hasMappedCard reflects the viewer's own card_mappings row, not a household co-owner's")
+    func hasMappedCardIsOwnerScoped() async throws {
+        let dbQueue = try makeDatabase()
+        let viewerId = UUID().uuidString
+        let partnerId = UUID().uuidString
+        let householdId = UUID().uuidString
+        let sharedAccountId = UUID().uuidString
+
+        try await dbQueue.write { database in
+            try insertAccount(
+                database, id: sharedAccountId, ownerId: partnerId, currency: "EUR", openingBalanceE4: 0
+            )
+            try database.execute(
+                sql: """
+                INSERT INTO households (id, created_at, sync_seq) VALUES (?, '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [householdId]
+            )
+            try database.execute(
+                sql: """
+                INSERT INTO household_members (household_id, user_id, joined_at, sync_seq)
+                VALUES (?, ?, '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [householdId, viewerId]
+            )
+            try database.execute(
+                sql: """
+                INSERT INTO household_accounts (household_id, account_id, shared_at, sync_seq)
+                VALUES (?, ?, '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [householdId, sharedAccountId]
+            )
+            // The partner mapped a card to the shared account — the viewer
+            // should not see that as "their" mapped card.
+            try database.execute(
+                sql: """
+                INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, source,
+                    created_at, updated_at, sync_seq)
+                VALUES (?, ?, 'Partner Visa', ?, 'manual',
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [UUID().uuidString, partnerId, sharedAccountId]
+            )
+        }
+
+        let unmapped = try await dbQueue.read { database in
+            try LocalAccountRow.fetchAll(database, ownerId: viewerId, baseCurrency: "EUR")
+        }
+        #expect(unmapped.first?.hasMappedCard == false)
+
+        try await dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, source,
+                    created_at, updated_at, sync_seq)
+                VALUES (?, ?, 'My Visa', ?, 'manual',
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [UUID().uuidString, viewerId, sharedAccountId]
+            )
+        }
+
+        let mapped = try await dbQueue.read { database in
+            try LocalAccountRow.fetchAll(database, ownerId: viewerId, baseCurrency: "EUR")
+        }
+        #expect(mapped.first?.hasMappedCard == true)
+    }
+
+    @Test("an unmapped card's placeholder row (account_id IS NULL) never crashes fetchAll")
+    func unmappedCardPlaceholderDoesNotCrash() async throws {
+        let dbQueue = try makeDatabase()
+        let ownerId = UUID().uuidString
+        let accountId = UUID().uuidString
+        try await dbQueue.write { database in
+            try insertAccount(database, id: accountId, ownerId: ownerId, currency: "EUR", openingBalanceE4: 0)
+            // Mirrors the placeholder row `CaptureLocalWrite` creates for a
+            // card the capture pipeline has seen but nobody has mapped yet —
+            // `account_id` is genuinely NULL, not just absent.
+            try database.execute(
+                sql: """
+                INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, source,
+                    created_at, updated_at, sync_seq)
+                VALUES (?, ?, 'Unrecognised Card', NULL, 'automatic',
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [UUID().uuidString, ownerId]
+            )
+        }
+
+        let rows = try await dbQueue.read { database in
+            try LocalAccountRow.fetchAll(database, ownerId: ownerId, baseCurrency: "EUR")
+        }
+
+        #expect(rows.first?.hasMappedCard == false)
+    }
+
     @Test("a private (unshared) account owned by someone else never appears")
     func unrelatedAccountInvisible() async throws {
         let dbQueue = try makeDatabase()

@@ -29,6 +29,16 @@ import SwiftUI
 struct DashboardCatalogView: View {
     let geometry: DashboardGeometry
     let maxHeight: CGFloat
+    /// Why a widget can't be added right now, keyed by kind — absent means
+    /// it can. Passed in rather than worked out here: whether a widget is
+    /// already placed is the arrangement's business, and whether it has
+    /// anything to show is the data's, and this view has neither.
+    ///
+    /// Disabled entries stay **visible**, greyed, with the reason under
+    /// them. Hiding them would answer "where is the FX widget?" with
+    /// silence; showing it disabled answers it with "add a second
+    /// currency".
+    var unavailable: [DashboardWidgetKind: String] = [:]
     /// Tapping still adds the widget the quick way, at the first free slot.
     let onSelect: (DashboardWidgetKind) -> Void
     let onClose: () -> Void
@@ -83,29 +93,36 @@ struct DashboardCatalogView: View {
         .padding(.bottom, 4)
     }
 
+    /// No size badge. The preview underneath is rendered at the exact cell
+    /// size the dashboard would give it, so the footprint is already on
+    /// screen — a "2×1" beside it describes the grid's bookkeeping rather
+    /// than anything the user needs to read.
     private func entry(_ kind: DashboardWidgetKind) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(kind.title)
-                    .font(.headline)
-                    .foregroundStyle(Color.primary)
-                Text(kind.sizeLabel)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(Color.secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Color.secondary.opacity(0.12), in: Capsule())
-                Spacer(minLength: 4)
-            }
-            Text(kind.summary)
+        let reason = unavailable[kind]
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(kind.title)
+                .font(.headline)
+                .foregroundStyle(Color.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(reason ?? kind.summary)
                 .font(.subheadline)
-                .foregroundStyle(Color.secondary)
+                .foregroundStyle(reason == nil ? Color.secondary : Color.orange)
                 .fixedSize(horizontal: false, vertical: true)
-            draggableCard(kind)
+            if reason == nil {
+                draggableCard(kind)
+            } else {
+                // Still the real widget, still at its real size — the user
+                // is being shown what they would get, and told what it
+                // needs. It simply can't be picked up.
+                preview(kind)
+                    .opacity(0.4)
+                    .saturation(0)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .onTapGesture { onSelect(kind) }
+        .onTapGesture { if reason == nil { onSelect(kind) } }
+        .accessibilityHint(reason ?? "")
     }
 
     /// The widget card, and the only part of the row a drag can start from.

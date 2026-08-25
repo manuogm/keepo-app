@@ -27,7 +27,15 @@ targets:
     type: application
     platform: iOS
     sources:
+      # The vendored third-party licences ship as a *folder reference* so the
+      # directory structure survives into the bundle. Copied as ordinary
+      # resources they would be flattened to the bundle root, where a second
+      # dependency's LICENSE.md would silently collide with the first.
       - path: App
+        excludes:
+          - "Resources/ThirdPartyLicenses/**"
+      - path: App/Resources/ThirdPartyLicenses
+        type: folder
     configFiles:
       Debug: Config/Debug.xcconfig
       Release: Config/Release.xcconfig

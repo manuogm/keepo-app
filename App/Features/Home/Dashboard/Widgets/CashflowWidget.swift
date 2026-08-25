@@ -1,231 +1,257 @@
 import KeepoCore
 import SwiftUI
 
-/// Which side of the ledger the user tapped into.
-enum CashflowDirection: String, Identifiable, Equatable {
+/// Which side of the ledger the breakdown is about.
+enum CashflowDirection: String, Identifiable, Equatable, CaseIterable {
     case moneyIn
     case moneyOut
 
     var id: String { rawValue }
     var title: String { self == .moneyIn ? "Money In" : "Money Out" }
+    var shortTitle: String { self == .moneyIn ? "In" : "Out" }
     var color: Color { self == .moneyIn ? CashflowPalette.income : CashflowPalette.expense }
     var categoryKind: PublicSchema.CategoryKind { self == .moneyIn ? .income : .expense }
+    var metric: MetricKind { self == .moneyIn ? .moneyIn : .moneyOut }
 }
 
-/// Cashflow — 1×2 collapsed, 2×2 for the in/out split, 3×2 for one side's
-/// categories.
+/// Cashflow Breakdown — 2×2 collapsed, 6×2 expanded.
 ///
-/// The three sizes are not a cycle. A plain tap on the card opens or closes
-/// the in/out view; tapping one of the two bars goes straight to that
-/// direction's breakdown. Cycling blindly into the third size would open a
-/// state with no direction selected and nothing to draw.
+/// Collapsed: what was left over last period, and the two directions that
+/// produced it. Expanded: the same figures as a history — money in and money
+/// out as bars either side of zero with the net running across them as a
+/// line — and, under it, where the selected side's money actually went.
 ///
-/// The window is always a **complete** month or year — see `CashflowPeriod`
-/// for why a partial period would make the trend badge lie every time the
-/// month rolled over.
+/// **One toggle drives both.** Picking In or Out brings that side's bars to
+/// full strength *and* is what the donut and the list below are breaking
+/// down. Two controls would have let the chart and the list disagree about
+/// which question was being asked.
+///
+/// The net line is always drawn and always neutral, whichever side is
+/// selected: it is the answer the widget's headline is reading, so it can
+/// never be the thing that gets dimmed away.
 struct CashflowWidget: View {
+    /// The preloaded last-complete period, which is what the collapsed tile
+    /// shows. Arrives with the dashboard's own refresh, so a collapsed
+    /// Cashflow costs no read of its own.
     let metrics: CashflowMetrics?
     let currency: CurrencyInfo?
-    let expansionStep: Int?
-    /// Loads a different window. The default window arrives preloaded in
-    /// `metrics`, so switching to Year is the only thing that costs a read.
-    let load: (CashflowPeriod) async -> CashflowMetrics?
-    let onExpand: (Int?) -> Void
+    let isExpanded: Bool
+    let context: SeriesWidgetState.Context?
+    /// One period's categories. Called only while expanded, and only when the
+    /// highlighted bucket changes — the breakdown follows the bar the user
+    /// tapped, so it has to be read for that bucket rather than for whichever
+    /// window happened to be preloaded.
+    let loadBreakdown: (ClosedRange<Date>) async -> CashflowTotalsLocal?
+    let onTap: () -> Void
 
-    @State private var period: CashflowPeriod = .month
-    @State private var loaded: CashflowMetrics?
-    @State private var direction: CashflowDirection?
-
-    private var isExpanded: Bool { expansionStep != nil }
-    private var isShowingBreakdown: Bool { expansionStep == 1 }
-
-    /// The preloaded window unless the user picked another one.
-    private var current: CashflowMetrics? {
-        period == .month ? (loaded ?? metrics) : loaded
-    }
+    @State private var series = SeriesWidgetState(kind: .cashflow)
+    @State private var direction: CashflowDirection = .moneyOut
+    @State private var breakdown: CashflowTotalsLocal?
 
     var body: some View {
-        WidgetChrome(
-            title: DashboardWidgetKind.cashflow.title,
-            systemImage: DashboardWidgetKind.cashflow.systemImage,
-            accessory: { AnyView(periodPicker) },
-            onTap: cardTapped,
-            content: { content }
-        )
-        .task(id: period) {
-            guard period != .month else { return }
-            loaded = await load(period)
+        SeriesWidgetChrome(
+            kind: .cashflow, series: series, isExpanded: isExpanded, context: context, onTap: onTap
+        ) {
+            content
         }
-        // Edit mode collapses every tile, and a stale direction would then
-        // reopen straight into a breakdown the user never asked for.
         .onChange(of: isExpanded) { _, expanded in
-            if !expanded { direction = nil }
+            if !expanded {
+                direction = .moneyOut
+                breakdown = nil
+            }
         }
+        .task(id: breakdownKey) { await refreshBreakdown() }
     }
 
     @ViewBuilder
     private var content: some View {
-        if let current, current.totals.moneyInE4 != nil || current.totals.moneyOutE4 != nil {
-            if isShowingBreakdown, let direction {
-                CashflowBreakdownView(metrics: current, direction: direction, currency: currency) {
-                    self.direction = nil
-                    onExpand(0)
-                }
-            } else if isExpanded {
-                expanded(current)
-            } else {
-                collapsed(current)
-            }
+        if isExpanded {
+            expanded
+        } else if let metrics, metrics.totals.moneyInE4 != nil || metrics.totals.moneyOutE4 != nil {
+            collapsed(metrics)
         } else {
             WidgetEmptyState(
-                systemImage: "arrow.left.arrow.right",
+                systemImage: "arrow.up.arrow.down",
                 message: "Nothing moved in \(metrics?.periodLabel ?? "this period")."
             )
         }
     }
 
-    /// A plain tap opens or closes the in/out view. It never reaches the
-    /// breakdown — only a bar does.
-    private func cardTapped() {
-        direction = nil
-        onExpand(isExpanded ? nil : 0)
-    }
-
-    // MARK: - Header
-
-    private var periodPicker: some View {
-        HStack(spacing: 2) {
-            ForEach(CashflowPeriod.allCases) { option in
-                Button {
-                    period = option
-                } label: {
-                    Text(option.label)
-                        .font(.caption2.weight(period == option ? .bold : .regular))
-                        .foregroundStyle(period == option ? Color.primary : Color.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            period == option ? Color.secondary.opacity(0.15) : Color.clear,
-                            in: Capsule()
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .sensoryFeedback(.selection, trigger: period)
-    }
-
-    private func summary(_ metrics: CashflowMetrics, size: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            BalanceHeaderView(amount: metrics.totals.netE4, currency: currency, size: size)
-            HStack(spacing: 6) {
-                Text(rateLabel(metrics.totals.savingsRate))
-                    .font(.caption2)
-                    .foregroundStyle(Color.secondary)
-                    .monospacedDigit()
-                WidgetTrendBadge(percentChange: metrics.percentChange, caption: "vs. previous")
-            }
-        }
-    }
-
-    /// "kept 32% of income". `nil` — no income in the window — renders as
-    /// the period's name instead of a 0% that would read as a real result.
-    private func rateLabel(_ rate: Double?) -> String {
-        guard let rate else { return "in \(current?.periodLabel ?? "")" }
-        return "\(rate.formatted(.percent.precision(.fractionLength(0)))) of income"
-    }
-
     // MARK: - Collapsed
 
     private func collapsed(_ metrics: CashflowMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            summary(metrics, size: 26)
+        VStack(alignment: .leading, spacing: 6) {
+            MetricHeadlineBlock(
+                value: .money(metrics.totals.netE4, currency), size: 30,
+                percentChange: metrics.percentChange, caption: "vs. previous"
+            ) {
+                Text(metrics.periodLabel)
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
+                    .lineLimit(1)
+            }
+            Text(rateLabel(metrics.totals.savingsRate, period: metrics.periodLabel))
+                .font(.caption)
+                .foregroundStyle(Color.secondary)
+                .monospacedDigit()
             Spacer(minLength: 0)
-            bars(metrics)
+            ForEach(CashflowDirection.allCases) { side in
+                directionRow(side, amountE4: amount(metrics.totals, side), fill: metrics.fill(of: amount(
+                    metrics.totals, side
+                )))
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private func bars(_ metrics: CashflowMetrics) -> some View {
-        VStack(spacing: 6) {
-            bar(metrics, .moneyIn, amountE4: metrics.totals.moneyInE4)
-            bar(metrics, .moneyOut, amountE4: metrics.totals.moneyOutE4)
+    /// "kept 32% of what came in". Not "of income": once a transfer crossing
+    /// the scope boundary counts as an inflow, the denominator is money that
+    /// arrived rather than money that was earned, and the label has to say
+    /// which. `nil` — nothing came in — names the period instead of a 0% that
+    /// would read as a real result.
+    private func rateLabel(_ rate: Double?, period: String) -> String {
+        guard let rate else { return "in \(period)" }
+        return "kept \(rate.formatted(.percent.precision(.fractionLength(0)))) of what came in"
+    }
+
+    private func directionRow(_ side: CashflowDirection, amountE4: Int64?, fill: Double) -> some View {
+        HStack(spacing: 8) {
+            Text(side.title)
+                .font(.caption)
+                .foregroundStyle(Color.secondary)
+                .frame(width: 74, alignment: .leading)
+            WidgetFillBar(share: fill, color: side.color, thickness: 8)
+            Text(amountLabel(amountE4))
+                .font(.caption.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(Color.primary)
+                .lineLimit(1)
         }
     }
 
-    /// Each bar is its own tap target — that is the gesture the design calls
-    /// for, and it is why the card's own tap can't cycle into the breakdown:
-    /// the bar is what says *which* breakdown.
-    private func bar(
-        _ metrics: CashflowMetrics, _ barDirection: CashflowDirection, amountE4: Int64?
-    ) -> some View {
-        Button {
-            direction = barDirection
-            onExpand(1)
-        } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 4) {
-                    Text(barDirection.title)
-                        .font(.caption2)
-                        .foregroundStyle(Color.secondary)
-                    Spacer(minLength: 4)
-                    Text(amountLabel(amountE4))
-                        .font(.caption2.weight(.medium))
-                        .monospacedDigit()
-                        .foregroundStyle(Color.primary)
-                }
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(barDirection.color.opacity(0.15))
-                        Capsule()
-                            .fill(barDirection.color)
-                            .frame(width: proxy.size.width * metrics.fill(of: amountE4))
-                    }
-                }
-                .frame(height: 5)
+    private func amount(_ totals: CashflowTotalsLocal, _ side: CashflowDirection) -> Int64? {
+        side == .moneyIn ? totals.moneyInE4 : totals.moneyOutE4
+    }
+
+    // MARK: - Expanded
+
+    private var expanded: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            MetricHeadlineBlock(
+                value: .money(series.highlightedPoint?.amountE4, currency), size: 28,
+                percentChange: series.percentChange, caption: badgeCaption
+            ) {
+                Text(bucketLabel)
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
+                    .lineLimit(1)
             }
-            .contentShape(Rectangle())
+            toggle
+            SeriesChartOrMessage(series: series, color: WidgetPalette.neutral, charted: chartSeries)
+                .frame(minHeight: 130)
+            Divider()
+            CashflowBreakdownView(
+                totals: breakdown, direction: direction, currency: currency,
+                period: highlightedRange, isLoading: breakdown == nil
+            )
         }
-        .buttonStyle(.pressableRow)
     }
 
-    // MARK: - Expanded (in vs. out)
-
-    private func expanded(_ metrics: CashflowMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            summary(metrics, size: 26)
-            HStack(alignment: .center, spacing: 14) {
-                DonutChartView(slices: inOutSlices(metrics)) {
-                    Text(metrics.periodLabel)
-                        .font(.caption2)
-                        .foregroundStyle(Color.secondary)
-                }
-                .frame(width: 112, height: 112)
-                bars(metrics)
+    /// In and Out keep their own colours here rather than taking the neutral
+    /// selected-state treatment: those two words are blue and coral everywhere
+    /// else on this dashboard, and a toggle is the last place they should stop
+    /// being.
+    private var toggle: some View {
+        HStack(spacing: 4) {
+            ForEach(CashflowDirection.allCases) { side in
+                WidgetSegment(isSelected: direction == side, tint: side.color, action: {
+                    withAnimation(.snappy(duration: 0.2)) { direction = side }
+                }, label: {
+                    Text(side.title).font(.caption)
+                })
             }
             Spacer(minLength: 0)
+            Text(directionTotalLabel)
+                .font(.subheadline.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(direction.color)
         }
+        .sensoryFeedback(.selection, trigger: direction)
     }
 
-    /// Magnitudes, not signed values — a donut cannot draw a negative wedge,
-    /// and "how big was the outflow against the inflow" is the question this
-    /// chart answers.
-    private func inOutSlices(_ metrics: CashflowMetrics) -> [DonutSlice] {
-        [
-            DonutSlice(
-                id: "in", label: CashflowDirection.moneyIn.title,
-                value: Double(abs(metrics.totals.moneyInE4 ?? 0)), color: CashflowPalette.income
-            ),
-            DonutSlice(
-                id: "out", label: CashflowDirection.moneyOut.title,
-                value: Double(abs(metrics.totals.moneyOutE4 ?? 0)), color: CashflowPalette.expense
+    /// Three series on one axis: the two directions as bars either side of
+    /// zero, the net as a line across them. The unselected direction is
+    /// muted at source rather than by the chart, which dims by *highlight* —
+    /// the two are different questions and stacking them would leave the
+    /// selected side's un-highlighted bars almost invisible.
+    private var chartSeries: [ChartSeries] {
+        CashflowDirection.allCases.map { side in
+            ChartSeries(
+                id: side.rawValue,
+                points: series.series(side.metric),
+                visualization: .bar,
+                color: side == direction ? side.color : side.color.opacity(0.3)
+            )
+        } + [
+            ChartSeries(
+                id: "net", points: series.points, visualization: .line, color: WidgetPalette.neutral
             )
         ]
-        .filter { $0.value > 0 }
+    }
+
+    private var directionTotalLabel: String {
+        amountLabel(series.series(direction.metric).first { $0.bucket == series.highlighted }?.amountE4)
+    }
+
+    private var bucketLabel: String {
+        guard let bucket = series.highlighted else { return "" }
+        return series.granularity.fullLabel(for: bucket, calendar: utcCalendar)
+    }
+
+    private var badgeCaption: String {
+        series.isHighlightingPast
+            ? TrendCaption.expanded(series.granularity)
+            : TrendCaption.collapsed(series.granularity)
+    }
+
+    // MARK: - Breakdown loading
+
+    /// The days the highlighted bucket covers — the window the breakdown is
+    /// read over, and the period the Transactions screen is handed when a
+    /// category's chevron is tapped.
+    private var highlightedRange: ClosedRange<Date>? {
+        guard let bucket = series.highlighted else { return nil }
+        let granularity = series.granularity
+        let start = granularity.bucketStart(for: bucket, calendar: utcCalendar)
+        let end = granularity.evaluationDate(forBucket: bucket, now: Date(), calendar: utcCalendar)
+        return start ... max(start, end)
+    }
+
+    private func refreshBreakdown() async {
+        guard isExpanded, let range = highlightedRange else {
+            breakdown = nil
+            return
+        }
+        breakdown = await loadBreakdown(range)
+    }
+
+    private var breakdownKey: CashflowBreakdownKey {
+        CashflowBreakdownKey(
+            isExpanded: isExpanded, bucket: series.highlighted, granularity: series.granularity,
+            token: context?.token ?? 0, scope: context?.scope ?? .total
+        )
     }
 
     private func amountLabel(_ amountE4: Int64?) -> String {
         guard let currency else { return "—" }
         return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger)
     }
+}
+
+private struct CashflowBreakdownKey: Equatable {
+    let isExpanded: Bool
+    let bucket: Date?
+    let granularity: MetricGranularity
+    let token: Int
+    let scope: PublicSchema.AccountScope
 }

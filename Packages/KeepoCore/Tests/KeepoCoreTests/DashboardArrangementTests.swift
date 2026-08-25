@@ -406,13 +406,34 @@ struct DashboardArrangementTests {
 
     // MARK: - Widget vocabulary
 
-    @Test("Every widget's expanded sizes are full width and taller than its base")
-    func expandedSizesAreAlwaysFullWidthAndTaller() {
+    /// Every collapsed tile is exactly one widget tall.
+    ///
+    /// Upcoming used to be half that — the one widget on the half-row grid.
+    /// It is back to full height because a half-height card could not hold
+    /// its own content at a large Dynamic Type setting: the overflow drew
+    /// through the gutter, so the grid's uniform 12pt gap *looked* smaller
+    /// around that one tile. Keeping every base size equal is what makes the
+    /// spacing independent of which widget it is next to, which is the
+    /// property this pins.
+    @Test("Every collapsed tile is one widget tall")
+    func everyBaseSizeIsOneWidgetTall() {
         for kind in DashboardWidgetKind.allCases {
             #expect(
                 kind.baseSize.rows == DashboardLayout.rowsPerWidget,
-                "\(kind) base size must be exactly one widget tall"
+                "\(kind) must rest at the same height as every other tile"
             )
+        }
+    }
+
+    @Test("Every widget's expanded sizes are full width and taller than its base")
+    func expandedSizesAreAlwaysFullWidthAndTaller() {
+        for kind in DashboardWidgetKind.allCases {
+            #expect(kind.baseSize.rows >= 1, "\(kind) base size must occupy at least one row")
+            #expect(
+                kind.baseSize.columns <= DashboardLayout.columnCount,
+                "\(kind) base size must fit the grid's width"
+            )
+            #expect(!kind.expandedSizes.isEmpty, "\(kind) must have somewhere to expand to")
             for size in kind.expandedSizes {
                 #expect(size.columns == DashboardLayout.columnCount, "\(kind) must expand to full width")
                 #expect(size.rows > kind.baseSize.rows, "\(kind) must gain height when expanded")
@@ -420,13 +441,66 @@ struct DashboardArrangementTests {
         }
     }
 
+    /// Every widget that charts a series needs a resolution to draw it at,
+    /// and every widget's default config has to be one its own filter can
+    /// actually offer — otherwise the filter opens with nothing selected.
+    @Test("A charting widget's default granularity is one it allows")
+    func defaultConfigMatchesAllowedGranularities() {
+        for kind in DashboardWidgetKind.allCases where kind.hasTimeframeFilter {
+            guard case .rolling(let granularity) = kind.defaultConfig.timeframe else {
+                Issue.record("\(kind) must default to a rolling timeframe")
+                continue
+            }
+            #expect(
+                kind.allowedGranularities.contains(granularity),
+                "\(kind) defaults to \(granularity), which its filter does not offer"
+            )
+        }
+    }
+
+    /// A companion is an *extra* series drawn beside the widget's own. Listing
+    /// the primary metric among them would load and draw it twice.
+    @Test("No widget lists its own metric as a companion")
+    func companionsExcludeThePrimaryMetric() {
+        for kind in DashboardWidgetKind.allCases {
+            #expect(
+                !kind.companionMetrics.contains(kind.defaultConfig.metric),
+                "\(kind) lists its own metric as a companion"
+            )
+            #expect(
+                Set(kind.companionMetrics).count == kind.companionMetrics.count,
+                "\(kind) lists a companion twice"
+            )
+        }
+    }
+
+    /// Only a widget that charts something can plot a companion on its axis.
+    @Test("Companions only belong to widgets that chart a series")
+    func onlyChartingWidgetsHaveCompanions() {
+        for kind in DashboardWidgetKind.allCases where !kind.hasTimeframeFilter {
+            #expect(kind.companionMetrics.isEmpty, "\(kind) has companions but charts nothing")
+        }
+    }
+
     /// The raw values are a storage format written into `UserDefaults`;
     /// renaming one silently drops that widget off every existing dashboard.
+    /// Adding one is always safe — which is why `fx_rate` could join without
+    /// touching the five that were already on people's dashboards.
     @Test("Persisted widget identifiers are stable")
     func widgetRawValuesAreStable() {
         #expect(Set(DashboardWidgetKind.allCases.map(\.rawValue)) == [
-            "net_worth", "investing_ratio", "currency_exposure", "upcoming_bills", "cashflow"
+            "net_worth", "investing_ratio", "currency_exposure", "upcoming_bills", "cashflow", "fx_rate"
         ])
+    }
+
+    @Test("A kind already on the dashboard is reported as present")
+    func containsKind() {
+        let arrangement = DashboardArrangement(tiles: [
+            DashboardTile(kind: .netWorth, row: 0, column: 0)
+        ])
+
+        #expect(arrangement.contains(kind: .netWorth))
+        #expect(!arrangement.contains(kind: .fxRate))
     }
 }
 

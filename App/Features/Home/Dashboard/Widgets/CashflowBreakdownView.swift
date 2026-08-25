@@ -1,75 +1,57 @@
 import KeepoCore
 import SwiftUI
 
-/// Cashflow's 3×2 state: one direction's categories, as a donut and a list.
+/// The lower half of the expanded Cashflow widget: where one direction's
+/// money came from or went, as a donut and a list.
 ///
-/// Split from `CashflowWidget` because it is a genuinely separate screen's
-/// worth of content, not because of a line count — the widget owns the
-/// period, the totals and the two bars; this owns everything that only
-/// exists once a direction has been picked.
+/// Split from `CashflowWidget` because it is a genuinely separate question —
+/// the widget owns the period, the totals and the history; this owns
+/// everything that only exists once a direction and a bucket have been
+/// picked.
 ///
-/// Categories carry their own icon and colour throughout, in the donut and
-/// in the rows, because the user chose them precisely so their own spending
-/// is recognisable at a glance.
+/// Categories carry their own icon and colour throughout, in the donut and in
+/// the rows, because the user chose them precisely so their own spending is
+/// recognisable at a glance.
 struct CashflowBreakdownView: View {
-    let metrics: CashflowMetrics
+    let totals: CashflowTotalsLocal?
     let direction: CashflowDirection
     let currency: CurrencyInfo?
-    /// Back to the in/out view. The breakdown needs its own way out — the
-    /// card's tap is what got the user here.
-    let onBack: () -> Void
+    /// The days behind these figures, handed to the Transactions screen when
+    /// a row's chevron is tapped so it opens on the same window.
+    let period: ClosedRange<Date>?
+    let isLoading: Bool
+
+    @Environment(AppNavigation.self) private var navigation: AppNavigation?
 
     private var categories: [CashflowCategoryLocal] {
-        metrics.totals.categories(direction.categoryKind)
+        (totals?.byCategory ?? []).filter { $0.kind == direction.categoryKind }
     }
 
     private var totalE4: Int64? {
-        direction == .moneyIn ? metrics.totals.moneyInE4 : metrics.totals.moneyOutE4
+        direction == .moneyIn ? totals?.moneyInE4 : totals?.moneyOutE4
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            header
-            if categories.isEmpty {
-                WidgetEmptyState(
-                    systemImage: "tray",
-                    message: "No \(direction.title.lowercased()) in \(metrics.periodLabel)."
-                )
-            } else {
-                // Top-aligned, not centred: the list is a `ScrollView`, which
-                // takes every point of height offered, so a centred row puts
-                // the donut halfway down a tall tile with a dead band above
-                // it. Both start at the top and the list grows downward.
-                HStack(alignment: .top, spacing: 14) {
-                    donut
-                        .frame(width: 124, height: 124)
-                    list
-                }
-                .frame(maxHeight: .infinity, alignment: .top)
+        if isLoading {
+            Text("Working this out…")
+                .font(.subheadline)
+                .foregroundStyle(Color.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if categories.isEmpty {
+            WidgetEmptyState(
+                systemImage: "tray",
+                message: "No \(direction.title.lowercased()) in this period."
+            )
+        } else {
+            // Top-aligned, not centred: the list is a `ScrollView`, which
+            // takes every point of height offered, so a centred row puts the
+            // donut halfway down with a dead band above it.
+            HStack(alignment: .top, spacing: 12) {
+                donut
+                    .frame(width: 116, height: 116)
+                list
             }
-        }
-    }
-
-    private var header: some View {
-        HStack(spacing: 6) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(Color.secondary)
-                    .frame(width: 20, height: 20)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back to money in and out")
-
-            Text(direction.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(direction.color)
-            Spacer(minLength: 4)
-            Text(amountLabel(totalE4))
-                .font(.subheadline.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color.primary)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 
@@ -77,10 +59,10 @@ struct CashflowBreakdownView: View {
         DonutChartView(slices: slices) {
             VStack(spacing: 0) {
                 Text("\(categories.count)")
-                    .font(.footnote.weight(.semibold))
+                    .font(.headline)
                     .foregroundStyle(Color.primary)
                 Text(categories.count == 1 ? "category" : "categories")
-                    .font(.system(size: 9))
+                    .font(.caption2)
                     .foregroundStyle(Color.secondary)
             }
         }
@@ -89,8 +71,8 @@ struct CashflowBreakdownView: View {
     /// Magnitudes — a share of a total is what a donut says, and expense
     /// amounts are negative. A category whose own total is unresolvable
     /// (money rule 5) is dropped from the chart rather than drawn as a zero
-    /// wedge; it still appears in the list below, showing "—", so it is
-    /// never silently disappeared.
+    /// wedge; it still appears in the list below, showing "—", so it is never
+    /// silently disappeared.
     private var slices: [DonutSlice] {
         categories.compactMap { category in
             guard let amountE4 = category.amountE4, amountE4 != 0 else { return nil }
@@ -107,7 +89,7 @@ struct CashflowBreakdownView: View {
                 ForEach(categories) { category in
                     row(category)
                     if category.id != categories.last?.id {
-                        Divider().padding(.leading, 28)
+                        Divider().padding(.leading, 38)
                     }
                 }
             }
@@ -115,26 +97,58 @@ struct CashflowBreakdownView: View {
         .scrollIndicators(.hidden)
     }
 
+    /// The whole row is the button, not just the chevron — a 12pt glyph is a
+    /// poor target, and there is nothing else in the row to tap.
     private func row(_ category: CashflowCategoryLocal) -> some View {
-        HStack(spacing: 8) {
-            CategoryIconView(icon: category.icon, color: Color(hex: category.color), diameter: 20)
-            Text(category.name)
-                .font(.caption)
-                .foregroundStyle(Color.primary)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            VStack(alignment: .trailing, spacing: 0) {
-                Text(amountLabel(category.amountE4))
-                    .font(.caption.weight(.medium))
-                    .monospacedDigit()
+        Button {
+            open(category)
+        } label: {
+            HStack(spacing: 10) {
+                CategoryIconView(icon: category.icon, color: Color(hex: category.color), diameter: 28)
+                Text(category.name)
+                    .font(.subheadline)
                     .foregroundStyle(Color.primary)
-                Text(shareLabel(category.amountE4))
-                    .font(.system(size: 9))
-                    .monospacedDigit()
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(amountLabel(category.amountE4))
+                        .font(.subheadline.weight(.medium))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.primary)
+                    Text(shareLabel(category.amountE4))
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .foregroundStyle(Color.secondary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Color.secondary)
             }
+            // The whole row is the target, at HIG's 44pt minimum — this one
+            // navigates to another tab, so a miss is expensive.
+            .padding(.vertical, 6)
+            .frame(minHeight: WidgetStyle.minimumTarget)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 5)
+        .buttonStyle(.pressableRow)
+        .accessibilityHint("Opens these transactions")
+    }
+
+    /// Switches to the Transactions tab showing exactly these transactions.
+    ///
+    /// The transfers roll-up has no category to filter by — it is several
+    /// transfers from several accounts — so it asks for the kind instead.
+    /// `UUID(uuidString:)` failing on its sentinel id is what distinguishes
+    /// the two; see `CashflowCategoryLocal.transfersInId`.
+    private func open(_ category: CashflowCategoryLocal) {
+        guard let period else { return }
+        navigation?.openTransactions(
+            TransactionsRequest(
+                categoryId: category.isTransfers ? nil : UUID(uuidString: category.categoryId),
+                kind: category.isTransfers ? "transfer" : nil,
+                utcDays: period
+            )
+        )
     }
 
     private func shareLabel(_ amountE4: Int64?) -> String {

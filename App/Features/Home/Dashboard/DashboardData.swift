@@ -22,16 +22,49 @@ struct DashboardSeriesPoint: Equatable, Sendable {
 struct DashboardData: Equatable {
     var baseCurrency: CurrencyInfo?
     var netWorth: NetWorthMetrics?
-    var upcomingBills: UpcomingBillsMetrics?
+    var upcomingBills: UpcomingTransactionsMetrics?
     var currencyExposure: CurrencyExposureMetrics?
     var cashflow: CashflowMetrics?
     var investingRatio: InvestingRatioMetrics?
+    /// What the user's accounts make possible, regardless of which widgets
+    /// are mounted. Always loaded — unlike every field above, which is
+    /// skipped when its widget isn't on the dashboard — because the
+    /// catalogue has to say why a widget can't be added *before* it is
+    /// added.
+    var capabilities: DashboardCapabilities?
+}
+
+/// The two facts the catalogue needs about a user's accounts to know which
+/// widgets have anything to say to them.
+///
+/// Both are cheap: one `COUNT` and one `DISTINCT` over `accounts`, no
+/// balances and no FX. That is what makes it reasonable to load them on
+/// every refresh rather than only when the catalogue opens.
+struct DashboardCapabilities: Equatable {
+    let hasInvestmentAccounts: Bool
+    /// Currencies the user holds an account in, other than their base one —
+    /// which is exactly what the FX widget can quote. Empty means that
+    /// widget has nothing to price.
+    let foreignCurrencies: [String]
+
+    /// Why each widget can't be added, or nothing if it can. Absent from
+    /// the dictionary means available; `alreadyPlaced` is folded in by the
+    /// caller, which is the only one that knows the arrangement.
+    func unavailability(for kind: DashboardWidgetKind) -> String? {
+        switch kind {
+        case .investingRatio:
+            return hasInvestmentAccounts ? nil : "Mark an account as an investment to use this."
+        case .fxRate:
+            return foreignCurrencies.isEmpty ? "Add an account in another currency to use this." : nil
+        case .netWorth, .currencyExposure, .upcomingBills, .cashflow:
+            return nil
+        }
+    }
 }
 
 /// One complete period's money in and out, and the period before it for the
 /// trend badge.
 struct CashflowMetrics: Equatable {
-    let period: CashflowPeriod
     /// "July", "2025" — the tile always names the window, so a figure is
     /// never left to be guessed at.
     let periodLabel: String
@@ -100,24 +133,40 @@ struct InvestingRatioPoint: Equatable, Identifiable {
     var id: Date { month }
 }
 
-/// Every expense occurrence falling inside the widget's window, already
-/// scope-filtered and converted.
-struct UpcomingBillsMetrics: Equatable {
-    let bills: [UpcomingBillLocal]
+/// Every recurring occurrence falling inside the widget's window, already
+/// scope-filtered and converted — money going out and money coming in.
+struct UpcomingTransactionsMetrics: Equatable {
+    let items: [UpcomingTransactionLocal]
     let windowDays: Int
 
-    /// Signed, like every amount it sums — negative, because these are
-    /// outflows, and `MoneySignStyle.ledger` drops the minus at the display
-    /// boundary where the label already says "due". `nil` if any single bill
+    /// The **net** of the window: what the fortnight is actually going to do
+    /// to the balance. Signed, like every amount it sums — a fortnight with a
+    /// salary in it can legitimately be positive. `nil` if any single item
     /// couldn't be converted: a total that quietly omits one line is worse
     /// than no total (money rule 5).
     var totalE4: Int64? {
         var total: Int64 = 0
-        for bill in bills {
-            guard let amount = bill.amountBaseE4 else { return nil }
+        for item in items {
+            guard let amount = item.amountBaseE4 else { return nil }
             total += amount
         }
         return total
+    }
+
+    var inboundCount: Int { items.count { $0.isInbound } }
+    var outboundCount: Int { items.count { !$0.isInbound } }
+
+    /// The window's days in order, starting today — every one of them, not
+    /// just the ones with something on them. The carousel is a **calendar**:
+    /// a fortnight with two payments in it should read as mostly empty, which
+    /// it can't if the empty days aren't drawn.
+    func days(from today: Date, calendar: Calendar) -> [Date] {
+        let start = calendar.startOfDay(for: today)
+        return (0 ..< windowDays).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    func items(on day: Date, calendar: Calendar) -> [UpcomingTransactionLocal] {
+        items.filter { calendar.isDate($0.dueOn, inSameDayAs: day) }
     }
 }
 
@@ -141,13 +190,28 @@ struct CurrencyExposureMetrics: Equatable {
         positiveSlices.reduce(0) { $0 + $1.amountBaseE4 }
     }
 
+    /// Currencies the user owes more of than they hold — a card with no
+    /// assets behind it in that currency. They get their own section in the
+    /// expanded widget, below a divider, with the amount and no share: a
+    /// share of a positive total is undefined for a negative position, and
+    /// showing "−4%" would invite reading it as a small slice rather than as
+    /// a debt.
+    var netShortSlices: [CurrencyExposureLocal] {
+        (slices ?? []).filter { $0.amountBaseE4 <= 0 }
+    }
+
     var largest: CurrencyExposureLocal? { positiveSlices.first }
 
     /// The headline share, 0–1. `nil` when there is nothing to take a share
     /// of, rather than a 0% that looks like a real answer.
-    var largestShare: Double? {
-        guard let largest, positiveTotalE4 > 0 else { return nil }
-        return Double(largest.amountBaseE4) / Double(positiveTotalE4)
+    var largestShare: Double? { share(of: largest) }
+
+    /// One currency's share of everything held, 0–1. `nil` for a net-short
+    /// currency and when there is no positive total — money rule 5's shape
+    /// applied to a ratio.
+    func share(of slice: CurrencyExposureLocal?) -> Double? {
+        guard let slice, slice.amountBaseE4 > 0, positiveTotalE4 > 0 else { return nil }
+        return Double(slice.amountBaseE4) / Double(positiveTotalE4)
     }
 }
 
@@ -177,100 +241,5 @@ struct NetWorthMetrics: Equatable {
     /// few plottable days.
     var hasTrajectory: Bool {
         series.count >= 3 && Set(series.map(\.value)).count > 1
-    }
-}
-
-// MARK: - Catalogue preview data
-
-extension DashboardData {
-    /// The figures the catalogue's previews render. Not test data and not
-    /// `#if DEBUG` — the catalogue ships, and a preview has to show a widget
-    /// carrying plausible numbers or it tells the user nothing about what
-    /// they are choosing.
-    ///
-    /// Deliberately generic and obviously round: a preview that looked like
-    /// the user's own money would be worse than one that clearly doesn't,
-    /// because on an empty dashboard they could not tell the two apart.
-    static let sample = DashboardData(
-        baseCurrency: CurrencyInfo(code: "EUR", minorUnit: 2),
-        netWorth: NetWorthMetrics(
-            current: 481_200_000,
-            previousMonth: 456_000_000,
-            series: sampleSeries
-        ),
-        upcomingBills: UpcomingBillsMetrics(bills: sampleBills, windowDays: 14),
-        currencyExposure: CurrencyExposureMetrics(slices: [
-            CurrencyExposureLocal(currency: "EUR", amountBaseE4: 312_000_000),
-            CurrencyExposureLocal(currency: "USD", amountBaseE4: 121_000_000),
-            CurrencyExposureLocal(currency: "GBP", amountBaseE4: 48_200_000)
-        ]),
-        cashflow: CashflowMetrics(
-            period: .month, periodLabel: "Last month",
-            totals: CashflowTotalsLocal(
-                moneyInE4: 38_400_000, moneyOutE4: -26_150_000, byCategory: sampleCashflowCategories
-            ),
-            previousNetE4: 10_800_000
-        ),
-        investingRatio: InvestingRatioMetrics(
-            investedE4: 173_000_000, netWorthE4: 481_200_000,
-            previousInvestedE4: 158_000_000, previousNetWorthE4: 456_000_000,
-            hasInvestmentAccounts: true
-        )
-    )
-
-    private static var sampleCashflowCategories: [CashflowCategoryLocal] {
-        [
-            category("Salary", "banknote.fill", "#34C759", .income, 38_400_000),
-            category("Rent", "house.fill", "#007AFF", .expense, -12_000_000),
-            category("Groceries", "cart.fill", "#FF9500", .expense, -6_400_000),
-            category("Dining", "fork.knife", "#FF2D55", .expense, -4_250_000),
-            category("Transport", "car.fill", "#5856D6", .expense, -3_500_000)
-        ]
-    }
-
-    private static func category(
-        _ name: String, _ icon: String, _ color: String,
-        _ kind: PublicSchema.CategoryKind, _ amountE4: Int64
-    ) -> CashflowCategoryLocal {
-        CashflowCategoryLocal(
-            categoryId: name, name: name, icon: icon, color: color, kind: kind, amountE4: amountE4
-        )
-    }
-
-    private static var sampleBills: [UpcomingBillLocal] {
-        let today = Date()
-        return [
-            bill(inDays: 2, "Rent", "house.fill", "#007AFF", "Current Account", -120_000_000, from: today),
-            bill(inDays: 5, "Internet", "bolt.fill", "#FF9500", "Current Account", -4_500_000, from: today),
-            bill(inDays: 9, "Gym", "figure.run", "#34C759", "Current Account", -3_900_000, from: today),
-            bill(inDays: 12, "Streaming", "gamecontroller.fill", "#AF52DE", "Credit Card", -1_599_000, from: today)
-        ]
-    }
-
-    // swiftlint:disable:next function_parameter_count
-    private static func bill(
-        inDays days: Int, _ name: String, _ icon: String, _ color: String, _ account: String,
-        _ amountE4: Int64, from today: Date
-    ) -> UpcomingBillLocal {
-        UpcomingBillLocal(
-            ruleId: name, dueOn: today.addingTimeInterval(Double(days) * 86_400),
-            categoryName: name, categoryIcon: icon, categoryColor: color, accountName: account,
-            amountBaseE4: amountE4, nativeAmountE4: amountE4, nativeCurrency: "EUR"
-        )
-    }
-
-    /// Twelve weeks climbing with a dip in the middle — a shape, rather than
-    /// a straight line, so the preview shows what the chart actually does.
-    private static var sampleSeries: [DashboardSeriesPoint] {
-        let values: [Int64] = [
-            412_000_000, 419_500_000, 427_000_000, 424_000_000, 433_500_000, 441_000_000,
-            438_000_000, 449_000_000, 457_500_000, 462_000_000, 471_000_000, 481_200_000
-        ]
-        let start = Date().addingTimeInterval(-Double(values.count - 1) * 7 * 86_400)
-        return values.enumerated().map {
-            DashboardSeriesPoint(
-                date: start.addingTimeInterval(Double($0.offset) * 7 * 86_400), value: $0.element
-            )
-        }
     }
 }

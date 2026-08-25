@@ -35,6 +35,7 @@ extension DashboardCanvasView {
             DashboardCatalogView(
                 geometry: geometry,
                 maxHeight: max(viewportHeight * 0.72, 280),
+                unavailable: unavailableWidgets,
                 onSelect: { kind in
                     isPickingWidget = false
                     add(kind)
@@ -45,6 +46,26 @@ extension DashboardCanvasView {
             .ignoresSafeArea(edges: .bottom)
             .transition(.move(edge: .bottom))
         }
+    }
+
+    /// Why each widget can't be added right now.
+    ///
+    /// Two reasons, and they are deliberately different sentences. "Already
+    /// on your dashboard" is a rule — one of each, until user-built template
+    /// widgets make each configuration its own kind and the rule stops
+    /// applying. The others are missing *data*, and each says what to do
+    /// about it, because "FX Rate is unavailable" tells a user nothing they
+    /// can act on.
+    var unavailableWidgets: [DashboardWidgetKind: String] {
+        var reasons: [DashboardWidgetKind: String] = [:]
+        for kind in DashboardWidgetKind.allCases {
+            if store.arrangement.contains(kind: kind) {
+                reasons[kind] = "Already on your dashboard."
+            } else if let reason = data.capabilities?.unavailability(for: kind) {
+                reasons[kind] = reason
+            }
+        }
+        return reasons
     }
 
     // MARK: - The bar under the grid

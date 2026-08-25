@@ -36,7 +36,32 @@ final class DashboardStore {
             self.arrangement = Self.seed
             return
         }
-        self.arrangement = (try? JSONDecoder().decode(DashboardArrangement.self, from: data)) ?? Self.seed
+        let stored = (try? JSONDecoder().decode(DashboardArrangement.self, from: data)) ?? Self.seed
+        self.arrangement = Self.deduplicated(stored)
+    }
+
+    /// One widget of each kind, keeping the first in reading order.
+    ///
+    /// The rule is enforced in the catalogue — a kind already placed can't be
+    /// picked again — but dashboards built before the rule existed can hold
+    /// several of one kind, and those are still on disk. Repairing on decode
+    /// rather than migrating: the arrangement is device-local presentation
+    /// state, so there is nothing to migrate *to*, and a decode-time repair
+    /// also covers a hand-edited or partially-restored `UserDefaults`
+    /// payload the same way `DashboardArrangement.init` already repairs
+    /// overlapping tiles.
+    ///
+    /// This stops being right the moment user-built template widgets exist:
+    /// each will be its own kind carrying its own config, and two of them
+    /// side by side is the whole point. Delete this then — don't generalise
+    /// it.
+    private static func deduplicated(_ arrangement: DashboardArrangement) -> DashboardArrangement {
+        var seen: Set<DashboardWidgetKind> = []
+        let unique = arrangement.tiles
+            .sorted { ($0.row, $0.column) < ($1.row, $1.column) }
+            .filter { seen.insert($0.kind).inserted }
+        guard unique.count != arrangement.tiles.count else { return arrangement }
+        return DashboardArrangement(tiles: unique)
     }
 
     /// `id` is supplied by the caller when the widget already has an

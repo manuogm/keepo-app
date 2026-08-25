@@ -240,6 +240,60 @@ Everything that genuinely requires the paid Apple Developer membership. **Assume
 5. `NOTIFY pgrst, 'reload schema';` if a freshly-added RPC comes back "could not find the function."
 6. Edge Functions: the local edge runtime is currently **stopped** and **Deno is not installed** — both needed to serve or typecheck `sync-fx-rates` and the Phase 13 `alert-operator`.
 
+## Widget redesign workstream (started 2026-08-25)
+
+User-driven, not a numbered phase. Redesigns all six dashboard widgets and — more importantly — replaces "a widget is a SwiftUI view" with **"a widget is a definition plus a config"**, so the user's long-term goal (blank *template* widgets a Keepo user configures themselves — e.g. one Hero Trendline that can plot net worth, income, expense, or invested, as a line or bars, compared against last month or last year) is a config editor over the same pipeline rather than a second system. Full spec in the session transcript; decisions locked with the user below.
+
+**Widget sizes are raw grid `rows×columns`** (a row is half a column's width, per `DashboardLayout.rowsPerWidget`):
+
+| Widget | Title | Compact | Expanded |
+|---|---|---|---|
+| Net Worth | Networth Analysis | 2×2 | 4×2 |
+| Currency Exposure | Currency Exposure | 2×1 | 4×2 |
+| FX Rate *(new)* | FX Rate | 2×1 | 4×2 |
+| Investing Ratio | Investing Ratio | 2×1 | 4×2 |
+| Cashflow | Cashflow Breakdown | 2×2 | 6×2 |
+| Upcoming | Transactions Next 2 Weeks | ~~1×2~~ → **2×2** | ~~2×2~~ → **4×2** |
+
+Cashflow drops from two expansion steps to one — the category breakdown is always present in the 6×2.
+
+**Amended 2026-08-25 (polish pass): Upcoming is no longer half-height.** Its 1×2 was the first half-height widget ever placed, and it did not survive contact with a device: a single grid row leaves ~27pt of content once the card's padding and header are taken out, which is enough at the default text size and nothing above it. At a larger Dynamic Type setting the content overflowed the card and drew through the grid gutter, so the spacing — a uniform 12pt by construction — *looked* tighter around that one widget. Both sizes doubled, `WidgetChrome` now clips to its card, and `DashboardGeometryTests` pins the gap for every row span. The half-row grid still exists for the add/trash bar; no widget rests on an odd row count any more. See `version-logs/dashboard-widgets-log.md`.
+
+**Locked decisions** (each was an explicit user answer; do not re-litigate):
+
+1. **Income stays blue (`#2A78D6`), not green.** The spec asked for green; `app-architecture.md` §5's CVD validation wins (coral-vs-green ΔE 7.6 fails, coral-vs-blue ΔE 19.5 clears). Green/red remain for **trend badges only**, where up/down is a verdict rather than a direction.
+2. **`Neutral chart color`** ships as the first real color set in `Assets.xcassets` — `#262626` light, `#D9D9D9` dark (a flat `#262626` is invisible on the dark card surface `#1E293B`). Deliberately **only** this one: migrating the rest of `keepo-brand-identity.md` §1's palette would touch every screen in the app for no benefit to this workstream, so the doc-vs-code disagreement recorded in the 2026-08-19 session-4 entry stays open and stays recorded there.
+3. **Granularity becomes a user control**, overriding `app-architecture.md:344` ("derived from the span, never a user control") — amend that line. The M/Y/W segments and pinch-zoom are *the same control*: zooming past a threshold flips granularity and moves the selected segment. Starting thresholds, to tune on device: monthly holds ~4–18 months in view, past 18 switches to yearly, pinching back below 15 returns to monthly (deliberate hysteresis); FX adds weekly below ~2 months.
+4. **Windowed loading.** Never load a whole timeline — load the visible bucket range plus one window either side, re-windowing as the user scrolls or zooms out.
+5. **Expansion is scroll-to-fit, not a lifted overlay.** The tile grows in place and the grid reflows around it (today's behaviour); the canvas then auto-scrolls so the whole expanded tile fits on screen with one grid row of margin below. One widget expanded at a time. Collapse by tapping the card background or outside the widget — never by tapping the chart, which now means "highlight".
+6. **No config persistence.** A widget resets to its default config on collapse *and* on relaunch. `WidgetConfig` exists as a type from day one (it is the template hook) but is in-memory only. Corollary the user added: **no two identical widgets on one dashboard** — the catalogue disables a kind that is already placed. Once user-created template widgets exist, each is its own kind and they coexist freely.
+7. **Highlight** changes the headline metric and the badge caption; it reverts only when another point is selected or the widget collapses.
+8. **Currency flags** are Unicode regional-indicator emoji derived from the code (`EUR`→🇪🇺) clipped into a circle, needing a currency→region map in `KeepoCore`. A real flag image set replaces them later.
+9. **Net-short currencies** (owing more than held, e.g. a USD card with no USD assets) get amount only and "—" for share, below a divider — a share of a positive total is undefined for them. Same for a negative account inside a positive currency: outlined segment, never stacked.
+10. **Transfers in Cashflow.** A transfer leg counts only when its **counterparty account is outside the current scope**. Both legs in scope ⇒ excluded (it cancels — today's `JOIN categories` drops it structurally, which is right). One leg in scope ⇒ real in/outflow under a **"Transfers"** pseudo-category. So Total shows nothing and Personal shows a household→personal move as inflow.
+11. **FX granularity floor is weekly.** Daily is not to be implemented even if it turns out cheap — report where it *would* be cheap at the end of the build, in code never.
+12. **Unavailable widgets are disabled in the catalogue**, not hidden: Investing Ratio with no investment accounts, FX Rate when the user owns no currency other than their base.
+13. Widget size labels are **removed from the catalogue** — the preview already shows the footprint.
+
+**Stages** (test after each; no human-review stop until the end, per the user):
+
+1. Shared kit + `WidgetConfig` + `MetricTimeframe`/zoom + color assets + the windowed series pipeline + canvas changes (scroll-to-fit, catalogue disabling).
+2. Net Worth + FX Rate — the two trendline widgets, which prove the shared highlightable chart.
+3. Investing Ratio + Currency Exposure.
+4. Cashflow + Upcoming.
+
+**Status: complete (2026-08-25).** All four stages shipped; see `version-logs/dashboard-widgets-log.md` § "Widget redesign" for the delivery notes, nine findings, and the daily-granularity report the user asked for. Three amendments to the decisions above, each made while building and each recorded rather than silently applied:
+
+- **Decision 9's "outlined segment" for a negative account inside a positive currency is a labelled swatch, not a scaled bar.** A credit card offsetting 2% of a currency's holdings renders as a three-point dash — too short to show a dash pattern, so it read as a rendering fault. The swatch keeps the outline meaning "owed" and states the figure beside it.
+- **The Upcoming widget's split ring has two colours, not three.** `recurring_rules.category_id` is `not null` and a transfer leg has no category, so a recurring transfer cannot exist and the neutral "transfer" ring is structurally unreachable. Nothing filters it out because nothing can produce one.
+- **Tapping an upcoming occurrence opens the recurring *rule*, not the this-instance/whole-series dialog.** Nothing in that widget has happened yet — `materialize_recurring()` is the only thing that turns a due occurrence into a real row, and only up to today — so "edit this one" would have had nothing to edit.
+
+**Cashflow lost its Month/Year preload switch.** `DashboardDataLoader.cashflow(dbQueue:...)` is gone: the expanded widget charts a scrollable series through `DashboardMetricSeries` and breaks down whichever bucket is highlighted, so there is no second preloaded window to choose between. The collapsed tile still reads the preloaded last-complete month.
+
+**Open engineering risk — series cost.** A month-end net-worth point recomputes every account's balance and FX-converts it; `DashboardDataLoader.investingRatioHistory`'s own header already calls the 12-month version "the most expensive thing on the dashboard". Scrollable + zoomable + ALL TIME multiplies that across four widgets. Stage 1 builds the provider with **windowed loading plus an in-memory memo cache** keyed on `(metric, granularity, bucket, scope, baseCurrency)` and invalidated by the existing refresh token — the simplest thing that can work, and correct by construction. A **persistent month-end rollup table** in the GRDB store is the fallback if measurement says so; the provider is shaped so it drops in behind the same interface. Whichever ships, say which in the version log rather than leaving it inferred.
+
+*Resolved for now:* the in-memory cache shipped and **nobody has measured**. It felt fine on the simulator across every widget, which is not the same thing. One further saving landed along the way — `DashboardMetricSeries.flows` computes money in, money out and the net in a single pass and files all three under their own cache keys, so Cashflow's three-series chart costs one query per bucket rather than three. Measure before building the rollup table.
+
 ## Known gaps this plan does not close
 
 - iOS 18.0 remains the declared minimum but is never executed (user's call). Surfaces at TestFlight if it bites.

@@ -39,6 +39,19 @@ public struct DashboardArrangement: Sendable, Equatable, Codable {
 
     public func tile(id: UUID) -> DashboardTile? { tiles.first { $0.id == id } }
 
+    /// Whether this kind is already on the dashboard.
+    ///
+    /// Today one of each is the rule, and the catalogue disables a kind that
+    /// is already placed. It is enforced there rather than here on purpose:
+    /// `id` is per-instance precisely so that two tiles of one kind *can*
+    /// coexist, which is what user-built template widgets will need — each
+    /// will be its own kind carrying its own config, and this restriction
+    /// will simply stop applying to them. Making the arrangement itself
+    /// refuse duplicates would have to be undone to get there.
+    public func contains(kind: DashboardWidgetKind) -> Bool {
+        tiles.contains { $0.kind == kind }
+    }
+
     // MARK: - Mutations
 
     /// Adds a widget at the first free slot in reading order, appending a

@@ -74,6 +74,18 @@ struct SharedWithHouseholdIcon: View {
     }
 }
 
+/// The "has a card mapped" marker for the Accounts list — a glance at
+/// whether Apple Pay purchases can auto-capture into this account, without
+/// opening the account form to check.
+struct MappedCardIcon: View {
+    var body: some View {
+        Image(systemName: "creditcard.fill")
+            .font(.caption)
+            .foregroundStyle(Color.secondary)
+            .accessibilityLabel("Has a linked card")
+    }
+}
+
 /// A labelled row whose control sits on the trailing edge, on the form's
 /// own card surface. The redesigned forms are not `Form`s any more, so the
 /// inset-grouped row look has to be built rather than inherited.

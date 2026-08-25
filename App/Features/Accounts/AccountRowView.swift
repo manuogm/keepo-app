@@ -4,10 +4,12 @@ import SwiftUI
 /// One account in the Accounts list. Split out of `AccountsListView` so that
 /// screen can stay focused on the drag/drop model.
 ///
-/// The `Investment` badge sits under the name rather than beside it: inline,
-/// it competed with the name and the balance for the same horizontal band,
-/// which made every investment row read as three headlines. Under the name
-/// it reads as what it is — a note about the row above it.
+/// The `Investment` badge sits beside the name, compacted to "Inv." — this
+/// row is the tightest space it appears in, sharing the line with the name
+/// and racing the balance on the trailing edge. Shared/mapped-card status
+/// moves to its own row underneath instead, appearing only when applicable,
+/// so a plain unshared account with no card contributes no second line at
+/// all.
 struct AccountRowView: View {
     let row: LocalAccountRow
 
@@ -23,12 +25,19 @@ struct AccountRowView: View {
                         .font(.body)
                         .foregroundStyle(row.archivedAt == nil ? Color.primary : Color.secondary)
                         .lineLimit(1)
-                    if row.isShared {
-                        SharedWithHouseholdIcon()
+                    if row.kind == .investment {
+                        InvestmentBadge(compact: true)
                     }
                 }
-                if row.kind == .investment {
-                    InvestmentBadge()
+                if row.hasMappedCard || row.isShared {
+                    HStack(spacing: 6) {
+                        if row.hasMappedCard {
+                            MappedCardIcon()
+                        }
+                        if row.isShared {
+                            SharedWithHouseholdIcon()
+                        }
+                    }
                 }
             }
 

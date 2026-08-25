@@ -10,31 +10,41 @@ struct MainTabView: View {
     let network: NetworkMonitor
 
     @State private var needsReviewCount = 0
+    /// Owned here because this is the only view that can act on it — the tab
+    /// bar is the thing being driven. Handed down through the environment so
+    /// a widget four layers into Home can ask for a tab switch without every
+    /// signature between here and it carrying a navigation parameter.
+    @State private var navigation = AppNavigation()
 
     var body: some View {
-        TabView {
+        TabView(selection: $navigation.tab) {
             NavigationStack {
                 HomeView(session: session)
             }
             .tabItem { Label("Home", systemImage: "globe") }
             .badge(needsReviewCount > 0 ? needsReviewCount : 0)
+            .tag(AppNavigation.Tab.home)
 
             NavigationStack {
                 AccountsListView(session: session)
             }
             .tabItem { Label("Accounts", systemImage: "creditcard") }
+            .tag(AppNavigation.Tab.accounts)
 
             NavigationStack {
                 TransactionsListView(session: session)
             }
             .tabItem { Label("Transactions", systemImage: "list.bullet") }
+            .tag(AppNavigation.Tab.transactions)
 
             NavigationStack {
                 ProfileView(session: session)
             }
             .tabItem { Label("My Profile", systemImage: "person.circle") }
+            .tag(AppNavigation.Tab.profile)
         }
         .tint(Color.primary)
+        .environment(navigation)
         .environment(\.isPrivacyMode, session.isPrivacyMode)
         // Presented from here rather than `RootView` — see
         // `CaptureDeepLinkModifier`'s own header for the two device-testing

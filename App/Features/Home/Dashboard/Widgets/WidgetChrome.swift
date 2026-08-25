@@ -18,6 +18,11 @@ import SwiftUI
 enum WidgetStyle {
     static let cornerRadius: CGFloat = 22
     static let padding: CGFloat = 14
+    /// The smallest a control on this dashboard may be, per Apple's HIG.
+    /// Applied as a *hit* area rather than as visible furniture — a 44pt
+    /// capsule around every W/M/Y segment would swamp a widget header — so
+    /// the control keeps its drawn size and grows its `contentShape`.
+    static let minimumTarget: CGFloat = 44
 }
 
 struct WidgetChrome<Content: View>: View {
@@ -47,6 +52,15 @@ struct WidgetChrome<Content: View>: View {
             Color(.secondarySystemGroupedBackground),
             in: RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
         )
+        // Nothing may draw outside the card. The tile's frame is a fixed size
+        // handed down by the grid, but the background is only *painted* at
+        // that size — content that overflows it (a tile whose text grew under
+        // a large Dynamic Type setting) kept drawing straight through the
+        // gutter, so the 12pt gap the grid computes correctly still looked
+        // smaller around the shortest tile. This makes the card's bounds the
+        // tile's bounds, so grid spacing can never depend on what a widget
+        // happens to contain.
+        .clipShape(RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous))
         // The tile is one object, so it lifts as one during a drag — without
         // this, a drag preview snapshots the full-bleed cell instead of the
         // rounded card the user can see.
@@ -56,13 +70,14 @@ struct WidgetChrome<Content: View>: View {
     }
 
     private var header: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .font(.caption2)
-            Text(title)
                 .font(.caption)
+            Text(title)
+                .font(.subheadline)
                 .fontWeight(.medium)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Spacer(minLength: 4)
             accessory?()
         }
@@ -83,18 +98,21 @@ struct WidgetEmptyState: View {
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: systemImage)
-                .font(.title3)
+                .font(.title2)
                 .foregroundStyle(Color.secondary.opacity(0.7))
             Text(message)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accentColor)
+                    // HIG minimum target: the label alone is ~20pt tall.
+                    .frame(minWidth: WidgetStyle.minimumTarget, minHeight: WidgetStyle.minimumTarget)
+                    .contentShape(Rectangle())
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -116,7 +134,7 @@ struct WidgetTrendBadge: View {
     var caption: String?
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 3) {
             if let percentChange {
                 Image(systemName: percentChange >= 0 ? "arrow.up.right" : "arrow.down.right")
                     .font(.caption2.weight(.bold))
@@ -130,10 +148,18 @@ struct WidgetTrendBadge: View {
                 Text("—")
             }
         }
-        .font(.caption2.weight(.semibold))
+        .font(.caption.weight(.semibold))
         .foregroundStyle(DashboardTrend.color(for: percentChange))
         .monospacedDigit()
         .lineLimit(1)
+        // The pill is tinted by the trend rather than a flat grey, so the
+        // badge still reads as up/down/unknown at a glance without the
+        // caption having to be read. Kept faint — it is a backing for the
+        // number, not a second coloured object competing with the figure
+        // above it.
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(DashboardTrend.color(for: percentChange).opacity(0.14), in: Capsule())
     }
 }
 

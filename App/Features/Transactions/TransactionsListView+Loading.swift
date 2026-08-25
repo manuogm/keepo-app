@@ -37,7 +37,15 @@ extension TransactionsListView {
             // comment on why that mattered.
             regroup()
         } catch {
-            loadErrorMessage = UserFacingError.describe(error)
+            // A cancelled load is not a failure the user needs told about —
+            // it means the task id changed and a newer load is already in
+            // flight. That happens routinely here now that another screen can
+            // hand this one a filter *and* a period in the same turn: the
+            // first load was cancelled mid-flight and surfaced "Something went
+            // wrong" under a list that had loaded perfectly.
+            if !UserFacingError.isCancellation(error) {
+                loadErrorMessage = UserFacingError.describe(error)
+            }
         }
         isLoading = false
     }

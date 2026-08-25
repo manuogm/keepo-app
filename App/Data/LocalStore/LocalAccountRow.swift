@@ -34,6 +34,7 @@ struct LocalAccountRow: Identifiable {
     let sortOrder: Int
     let version: Int
     let isShared: Bool
+    let hasMappedCard: Bool
     let balanceE4: Int64?
     let balanceBaseE4: Int64?
     let baseCurrencyInfo: CurrencyInfo?
@@ -55,6 +56,7 @@ struct LocalAccountRow: Identifiable {
             arguments: [ownerId, ownerId]
         )
         let sharedIds = try sharedAccountIds(database, ownerId: ownerId)
+        let cardMappedIds = try cardMappedAccountIds(database, ownerId: ownerId)
         let currencies = Dictionary(
             uniqueKeysWithValues: try LocalTableQueries.currencies(database).map { ($0.code, Int($0.minorUnit)) }
         )
@@ -78,8 +80,8 @@ struct LocalAccountRow: Identifiable {
                 kind: PublicSchema.AccountKind(rawValue: kindRaw) ?? .regular,
                 icon: row["icon"], color: row["color"], archivedAt: row["archived_at"],
                 sortOrder: row["sort_order"], version: row["version"],
-                isShared: sharedIds.contains(accountId), balanceE4: balance,
-                balanceBaseE4: balanceBase,
+                isShared: sharedIds.contains(accountId), hasMappedCard: cardMappedIds.contains(accountId),
+                balanceE4: balance, balanceBaseE4: balanceBase,
                 baseCurrencyInfo: baseMinorUnit.map { CurrencyInfo(code: baseCurrency, minorUnit: $0) }
             )
         }
@@ -92,6 +94,23 @@ struct LocalAccountRow: Identifiable {
             SELECT ha.account_id FROM household_accounts ha
             JOIN household_members hm ON hm.household_id = ha.household_id
             WHERE hm.user_id = ? AND hm.deleted_at IS NULL AND ha.deleted_at IS NULL
+            """,
+            arguments: [ownerId]
+        )
+        return Set(rows.map { $0["account_id"] as String })
+    }
+
+    /// Scoped to `ownerId`, not the account's full visibility set — matching
+    /// `card_mappings`' own RLS (`owner_id = auth.uid()`, no household
+    /// clause; see `LocalMoneyQueries.needsReview`'s note on the same
+    /// table). A household member's own mapped card is what this flags,
+    /// never a co-owner's.
+    private static func cardMappedAccountIds(_ database: Database, ownerId: String) throws -> Set<String> {
+        let rows = try Row.fetchAll(
+            database,
+            sql: """
+            SELECT DISTINCT account_id FROM card_mappings
+            WHERE owner_id = ? AND account_id IS NOT NULL AND deleted_at IS NULL
             """,
             arguments: [ownerId]
         )

@@ -6,15 +6,18 @@ import SwiftUI
 /// `kind` is purely presentational). Shown wherever an account's identity
 /// is displayed, never conditional on anything but `kind == .investment`.
 ///
-/// Deliberately quiet. It used to be an accent-tinted pill sitting inline
-/// with the account name, where it competed with the name and the balance —
-/// the three loudest things in the row were a label, a label, and a number.
-/// It is metadata, so it now reads as metadata: secondary text weight, on
-/// the row's own fill rather than a colour of its own, and placed under the
-/// name rather than beside it (that placement is the caller's job).
+/// Deliberately quiet: secondary text weight, on the row's own fill rather
+/// than a colour of its own. Placement (under the name, or beside it) is the
+/// caller's job.
+///
+/// `compact` shortens the label to "Inv." for the Accounts list, where the
+/// row is tight on horizontal space beside the name; every other caller
+/// keeps the spelled-out "Investment" the accessibility label always uses.
 struct InvestmentBadge: View {
+    var compact: Bool = false
+
     var body: some View {
-        Text("Investment")
+        Text(compact ? "Inv." : "Investment")
             .font(.caption2)
             .foregroundStyle(Color.secondary)
             .padding(.horizontal, 6)

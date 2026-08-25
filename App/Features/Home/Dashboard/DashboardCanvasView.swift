@@ -61,6 +61,10 @@ struct DashboardCanvasView: View {
     @State var trashFrame: CGRect = .zero
     /// Whether letting go right now would throw the arriving widget away.
     @State var isOverTrash = false
+    /// The recurring rule the Upcoming widget asked to open. Not `private`:
+    /// `DashboardCanvasLoading.swift` extends this type, and a `private`
+    /// member is invisible to its own type's extension in a different file.
+    @State var editingRule: PublicSchema.RecurringRulesSelect?
 
     /// The catalogue is a **sibling** of the dashboard's scroll view, not an
     /// overlay on it, and that is not a layout preference.
@@ -113,6 +117,11 @@ struct DashboardCanvasView: View {
                 cataloguePanel(geometry, viewportHeight: proxy.size.height)
             }
             .coordinateSpace(name: DashboardSpace.canvas)
+            .sheet(item: $editingRule) { rule in
+                RecurringRuleFormView(session: session, mode: .edit(rule)) {
+                    session.refresh.bump()
+                }
+            }
             .onDrop(of: [.plainText], delegate: widgetDrop(geometry))
             .animation(.snappy(duration: 0.3), value: isPickingWidget)
             .modifier(DashboardHaptics(
@@ -160,9 +169,17 @@ struct DashboardCanvasView: View {
         .animation(.snappy(duration: 0.32), value: layout)
         // Tapping the surface around the widgets leaves edit mode — the same
         // "tap the wallpaper to finish" the home screen offers, so Done in
-        // the toolbar isn't the only way out.
+        // the toolbar isn't the only way out — and closes an expanded
+        // widget, which is the "or outside it" half of how a widget
+        // collapses.
         .contentShape(Rectangle())
-        .onTapGesture { if isEditing { endEditing() } }
+        .onTapGesture {
+            if isEditing {
+                endEditing()
+            } else {
+                collapseExpanded()
+            }
+        }
     }
 
     // MARK: - Layout
@@ -216,11 +233,10 @@ struct DashboardCanvasView: View {
             kind: resolved.kind,
             data: data,
             expansionStep: expandedId == resolved.id && !isEditing ? expansionStep : nil,
-            onExpand: { step in setExpansion(resolved, step: step) },
-            loadSeries: loadNetWorthSeries,
-            loadFxTrend: loadFxTrend,
-            loadCashflow: loadCashflow,
-            loadRatioHistory: loadRatioHistory
+            onExpand: { step in setExpansion(resolved, step: step, geometry: geometry) },
+            seriesContext: seriesContext,
+            loadBreakdown: loadBreakdown,
+            openRule: openRule
         )
         .redacted(reason: isLoading ? .placeholder : [])
         // The badge is inside `.jiggling`, not layered on after it, so it
@@ -289,16 +305,42 @@ struct DashboardCanvasView: View {
     /// own steps; the canvas only enforces that one tile is open at a time.
     ///
     /// In edit mode this does nothing — the tile is being arranged, not read.
-    private func setExpansion(_ tile: DashboardResolvedTile, step: Int?) {
+    private func setExpansion(_ tile: DashboardResolvedTile, step: Int?, geometry: DashboardGeometry) {
         guard !isEditing else { return }
-        withAnimation(.snappy(duration: 0.32)) {
-            guard let step, step >= 0, step < tile.kind.expandedSizes.count else {
+        guard let step, step >= 0, step < tile.kind.expandedSizes.count else {
+            withAnimation(.snappy(duration: 0.32)) {
                 expandedId = nil
                 expansionStep = 0
-                return
             }
+            return
+        }
+        let size = tile.kind.expandedSizes[step]
+        // Expanding in place can push the tile's bottom past the fold, so the
+        // canvas scrolls to it — **in the completion, not in the body**.
+        // `scrollTo(y:)` is clamped by the system to the content height as it
+        // stands when called, and the tile only makes the content taller as
+        // this animation runs; issued in the same turn, the scroll was
+        // swallowed exactly where it was needed most — on a dashboard already
+        // scrolled near its end.
+        withAnimation(.snappy(duration: 0.32)) {
             expandedId = tile.id
             expansionStep = step
+        } completion: {
+            withAnimation(.snappy(duration: 0.3)) {
+                scrollToFit(row: tile.row, size: size, geometry: geometry)
+            }
+        }
+    }
+
+    /// Collapses whatever is expanded. The counterpart to the card's own tap:
+    /// the design says a widget closes by tapping its background **or**
+    /// outside it, and "outside" is this — the padding around the grid, and
+    /// the empty canvas under it.
+    private func collapseExpanded() {
+        guard expandedId != nil else { return }
+        withAnimation(.snappy(duration: 0.32)) {
+            expandedId = nil
+            expansionStep = 0
         }
     }
 
@@ -352,39 +394,4 @@ struct DashboardCanvasView: View {
         bumpEditModeTimeout()
     }
 
-    /// Same window as the collapsed trend lines, so a rate chart and a net
-    /// worth chart opened side by side cover the same stretch of time.
-    private func loadFxTrend(_ currency: String) async -> [DashboardSeriesPoint]? {
-        guard let baseCurrency = session.profile?.baseCurrency else { return nil }
-        let today = Date()
-        let from = utcCalendar.date(
-            byAdding: .day, value: -(DashboardDataLoader.trendRangeDays - 1), to: today
-        ) ?? today
-        return try? await DashboardDataLoader.fxTrend(
-            dbQueue: session.dbQueue, currency: currency, baseCurrency: baseCurrency,
-            from: from, through: today
-        )
-    }
-
-    private func loadCashflow(_ period: CashflowPeriod) async -> CashflowMetrics? {
-        guard let baseCurrency = session.profile?.baseCurrency else { return nil }
-        return try? await DashboardDataLoader.cashflow(
-            dbQueue: session.dbQueue, scope: session.scope, baseCurrency: baseCurrency, period: period
-        )
-    }
-
-    private func loadRatioHistory() async -> [InvestingRatioPoint]? {
-        guard let baseCurrency = session.profile?.baseCurrency else { return nil }
-        return try? await DashboardDataLoader.investingRatioHistory(
-            dbQueue: session.dbQueue, scope: session.scope, baseCurrency: baseCurrency
-        )
-    }
-
-    private func loadNetWorthSeries(from: Date, through: Date) async -> [DashboardSeriesPoint]? {
-        guard let baseCurrency = session.profile?.baseCurrency else { return nil }
-        return try? await DashboardDataLoader.netWorthSeries(
-            dbQueue: session.dbQueue, scope: session.scope, baseCurrency: baseCurrency,
-            from: from, through: through
-        )
-    }
 }

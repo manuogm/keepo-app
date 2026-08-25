@@ -54,6 +54,12 @@ struct TransactionsListView: View {
     // Not `private` — read from TransactionsListView+Period.swift.
     let calendar = Calendar.current
 
+    /// Optional on purpose: this screen has to keep working anywhere the tab
+    /// shell isn't above it (a preview, a future standalone presentation),
+    /// and a non-optional `@Environment(AppNavigation.self)` would trap
+    /// instead. Not `private` — read from TransactionsListView+Period.swift.
+    @Environment(AppNavigation.self) var navigation: AppNavigation?
+
     var range: DateInterval {
         guard let component = period.component else {
             return DateInterval(start: calendar.startOfDay(for: customFrom), end: customThrough)
@@ -149,6 +155,13 @@ struct TransactionsListView: View {
                 customRangeSheet
             }
             .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter, range: range)) { await load() }
+            // Another screen asking for a specific slice of the ledger — the
+            // Cashflow widget's category chevron. `onAppear` as well as
+            // `onChange` because the request is set in the same turn as the
+            // tab switch, and this screen may not have been on screen to
+            // observe the change.
+            .onAppear { applyPendingRequest() }
+            .onChange(of: navigation?.transactionsRequest) { _, _ in applyPendingRequest() }
     }
 
     // MARK: - Content
@@ -237,51 +250,6 @@ struct TransactionsListView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Account filter
-
-    private var accountFilterMenu: some View {
-        Menu {
-            Button {
-                filter.accountId = nil
-            } label: {
-                if filter.accountId == nil {
-                    Label("All Accounts", systemImage: "checkmark")
-                } else {
-                    Text("All Accounts")
-                }
-            }
-            ForEach(filterAccounts) { account in
-                Button {
-                    filter.accountId = account.id
-                } label: {
-                    if filter.accountId == account.id {
-                        Label(account.name, systemImage: "checkmark")
-                    } else {
-                        Text(account.name)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Text(selectedAccountName)
-                Image(systemName: "chevron.down")
-                    .font(.caption2)
-            }
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color(.secondarySystemGroupedBackground), in: Capsule())
-        }
-        .padding(.horizontal)
-        .padding(.top, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var selectedAccountName: String {
-        guard let accountId = filter.accountId else { return "All Accounts" }
-        return filterAccounts.first { $0.id == accountId }?.name ?? "All Accounts"
     }
 
     // MARK: - Transaction helpers

@@ -32,11 +32,21 @@ enum DashboardDataLoader {
             if let row = currencies.first(where: { $0.code == baseCurrency }) {
                 data.baseCurrency = CurrencyInfo(code: row.code, minorUnit: Int(row.minorUnit))
             }
+            // Always, not gated on `kinds`: the catalogue needs these to
+            // explain why a widget the user does not yet have is disabled.
+            data.capabilities = DashboardCapabilities(
+                hasInvestmentAccounts: try LocalDashboardQueries.hasInvestmentAccounts(
+                    database, scope: moneyScope.scope
+                ),
+                foreignCurrencies: try LocalDashboardQueries.heldCurrencies(
+                    database, scope: moneyScope.scope, excluding: baseCurrency
+                )
+            )
             if kinds.contains(.netWorth) {
                 data.netWorth = try netWorthMetrics(database, moneyScope, now: now)
             }
             if kinds.contains(.upcomingBills) {
-                data.upcomingBills = try billsMetrics(database, moneyScope, now: now)
+                data.upcomingBills = try upcomingMetrics(database, moneyScope, now: now)
             }
             if kinds.contains(.cashflow) {
                 data.cashflow = try cashflowMetrics(database, moneyScope, period: .month, now: now)
@@ -69,47 +79,46 @@ enum DashboardDataLoader {
         )
     }
 
-    private static func billsMetrics(
+    private static func upcomingMetrics(
         _ database: Database, _ moneyScope: LocalMoneyScope, now: Date
-    ) throws -> UpcomingBillsMetrics {
+    ) throws -> UpcomingTransactionsMetrics {
         // The window opens *today*, not at this instant: a bill due today is
         // still due today at 11pm. Both bounds are calendar days in UTC, the
         // same zone every other date comparison in this app works in.
+        //
+        // `billsWindowDays - 1` because both bounds are inclusive: fourteen
+        // days counting today is today plus thirteen. The old bound was one
+        // day wider than the "next 14 days" the widget's title promises, and
+        // the carousel — which draws exactly `windowDays` circles — would
+        // have had an occurrence with no circle to land on.
         let start = utcCalendar.startOfDay(for: now)
-        let end = utcCalendar.date(byAdding: .day, value: billsWindowDays, to: start) ?? start
-        return UpcomingBillsMetrics(
-            bills: try LocalDashboardQueries.upcomingBills(database, moneyScope, window: start ... end, now: now),
+        let end = utcCalendar.date(byAdding: .day, value: billsWindowDays - 1, to: start) ?? start
+        return UpcomingTransactionsMetrics(
+            items: try LocalDashboardQueries.upcomingTransactions(
+                database, moneyScope, window: start ... end, now: now
+            ),
             windowDays: billsWindowDays
         )
     }
 
-    /// One period's figures plus the period before it. Used both inline
-    /// above (for the widget's default window) and on demand below when the
-    /// user switches Month/Year — one implementation, so the two windows
-    /// cannot disagree about what "money in" means.
+    /// The last complete period's figures plus the period before it — what
+    /// the collapsed Cashflow tile reads.
+    ///
+    /// Only ever the *default* window now. The Month/Year switch this used to
+    /// serve on demand is gone: the expanded widget charts a scrollable
+    /// series through `DashboardMetricSeries` and breaks down whichever
+    /// bucket is highlighted, so there is no second preloaded window to
+    /// choose between.
     static func cashflowMetrics(
         _ database: Database, _ moneyScope: LocalMoneyScope, period: CashflowPeriod, now: Date
     ) throws -> CashflowMetrics {
         let bounds = period.bounds(now: now, calendar: utcCalendar)
         let previous = period.previousBounds(now: now, calendar: utcCalendar)
         return CashflowMetrics(
-            period: period,
             periodLabel: period.label(now: now, calendar: utcCalendar),
             totals: try LocalDashboardQueries.cashflow(database, moneyScope, period: bounds),
             previousNetE4: try LocalDashboardQueries.cashflow(database, moneyScope, period: previous).netE4
         )
-    }
-
-    /// The Cashflow widget's Month/Year switch — its own read, so a window
-    /// the user never opens is never scanned.
-    static func cashflow(
-        dbQueue: DatabaseQueue, scope: PublicSchema.AccountScope, baseCurrency: String,
-        period: CashflowPeriod, now: Date = Date()
-    ) async throws -> CashflowMetrics {
-        let moneyScope = LocalMoneyScope(scope: scope, baseCurrency: baseCurrency)
-        return try await dbQueue.read { database in
-            try cashflowMetrics(database, moneyScope, period: period, now: now)
-        }
     }
 
     private static func investingRatioMetrics(

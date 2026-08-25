@@ -14,21 +14,30 @@ import KeepoCore
 /// functions — they are client-side derivations of already-refereed
 /// primitives, so their correctness rests on those plus their own tests.
 enum LocalDashboardQueries {
-    // MARK: - Upcoming bills
+    // MARK: - Upcoming transactions
 
-    /// Every occurrence of an active *expense* rule falling inside `window`.
+    /// Every occurrence of an active recurring rule falling inside `window` —
+    /// money going out **and** money coming in.
     ///
-    /// "Expense" is `amount_e4 < 0` — the sign, not the category's kind.
-    /// That's not a shortcut: `validate_recurring_rule_sign` enforces the
-    /// two to agree on every insert and update, and the sign is the value
-    /// money rule 1 makes authoritative.
+    /// The expense-only filter this used to carry is gone: the widget above
+    /// it is "Transactions Next 2 Weeks", and a fortnight that contains a
+    /// salary as well as a rent payment is a different fortnight from one
+    /// that contains only the rent. Direction is read from the **sign**, not
+    /// from the category's kind — not a shortcut, since
+    /// `validate_recurring_rule_sign` enforces the two to agree on every
+    /// insert and update, and the sign is the value money rule 1 makes
+    /// authoritative.
+    ///
+    /// Transfers can never appear here: `recurring_rules.category_id` is
+    /// `not null`, and a transfer leg has no category. Nothing filters them
+    /// out because nothing can produce one.
     ///
     /// Archived and deleted accounts are excluded, matching `net_worth`'s own
     /// exclusion — a bill on an account you've archived is not a bill you're
     /// still being asked about.
-    static func upcomingBills(
+    static func upcomingTransactions(
         _ database: Database, _ moneyScope: LocalMoneyScope, window: ClosedRange<Date>, now: Date
-    ) throws -> [UpcomingBillLocal] {
+    ) throws -> [UpcomingTransactionLocal] {
         let scopeClause = LocalMoneyQueries.scopeFilterSQL(moneyScope.scope, accountIdColumn: "r.account_id")
         let rows = try Row.fetchAll(
             database,
@@ -39,7 +48,7 @@ enum LocalDashboardQueries {
             FROM recurring_rules r
             JOIN categories c ON c.id = r.category_id
             JOIN accounts a ON a.id = r.account_id
-            WHERE r.active = 1 AND r.amount_e4 < 0
+            WHERE r.active = 1
               AND a.deleted_at IS NULL AND a.archived_at IS NULL AND c.deleted_at IS NULL
               AND (\(scopeClause))
             """
@@ -51,14 +60,14 @@ enum LocalDashboardQueries {
         // would cost at today's rate) instead of implying a forecast.
         let today = PostgresDate.dateOnlyString(now, calendar: utcCalendar)
         return try rows.flatMap { row in
-            try bills(database, row: row, window: window, baseCurrency: moneyScope.baseCurrency, today: today)
+            try occurrences(database, row: row, window: window, baseCurrency: moneyScope.baseCurrency, today: today)
         }
         .sorted { $0.dueOn < $1.dueOn }
     }
 
-    private static func bills(
+    private static func occurrences(
         _ database: Database, row: Row, window: ClosedRange<Date>, baseCurrency: String, today: String
-    ) throws -> [UpcomingBillLocal] {
+    ) throws -> [UpcomingTransactionLocal] {
         guard let anchor = PostgresDate.dateOnly(from: row["next_due_at"], calendar: utcCalendar),
               let frequency = PublicSchema.RecurringFrequency(rawValue: row["frequency"])
         else { return [] }
@@ -72,7 +81,7 @@ enum LocalDashboardQueries {
             anchoredAt: anchor, frequency: frequency, in: window, calendar: utcCalendar
         )
         return dates.map { dueOn in
-            UpcomingBillLocal(
+            UpcomingTransactionLocal(
                 ruleId: row["id"], dueOn: dueOn, categoryName: row["category_name"],
                 categoryIcon: row["category_icon"], categoryColor: row["category_color"],
                 accountName: row["account_name"], amountBaseE4: converted, nativeAmountE4: amountE4,
@@ -84,7 +93,15 @@ enum LocalDashboardQueries {
     // MARK: - Currency exposure
 
     /// What every account is worth, in base currency, grouped by the currency
-    /// it is actually held in.
+    /// it is actually held in — and, inside each currency, the accounts that
+    /// make it up.
+    ///
+    /// The per-account detail is loaded here rather than by a second read the
+    /// expanded widget fires when it opens, because it is a by-product of the
+    /// work this already does: the currency totals *are* these balances
+    /// summed. A separate "accounts in this currency" query would recompute
+    /// every balance a second time, and could disagree with the total it sits
+    /// under if a write landed between the two.
     ///
     /// Returns `nil` — the whole result, not one slice — if any account's
     /// balance or conversion is unresolvable. That is deliberate and stricter
@@ -96,24 +113,105 @@ enum LocalDashboardQueries {
         _ database: Database, _ moneyScope: LocalMoneyScope, now: Date
     ) throws -> [CurrencyExposureLocal]? {
         let today = PostgresDate.dateOnlyString(now, calendar: utcCalendar)
-        let accountIds = try LocalMoneyConversion.scopedAccountIds(database, scope: moneyScope.scope)
-        var totals: [String: Int64] = [:]
+        // The same account predicate `net_worth` uses (not deleted, not
+        // archived, in scope), fetched in one go with the presentation
+        // columns rather than one `SELECT currency` per id — the accounts are
+        // the rows now, not just a list of ids.
+        let scopeClause = LocalMoneyQueries.scopeFilterSQL(moneyScope.scope, accountIdColumn: "a.id")
+        let rows = try Row.fetchAll(
+            database,
+            sql: """
+            SELECT a.id, a.name, a.currency, a.icon, a.color, cur.minor_unit
+            FROM accounts a
+            LEFT JOIN currencies cur ON cur.code = a.currency
+            WHERE a.deleted_at IS NULL AND a.archived_at IS NULL AND (\(scopeClause))
+            ORDER BY a.sort_order, a.name
+            """
+        )
 
-        for accountId in accountIds {
-            guard let currency = try String.fetchOne(
-                database, sql: "SELECT currency FROM accounts WHERE id = ?", arguments: [accountId]
-            ) else { continue }
+        var byCurrency: [String: [CurrencyAccountLocal]] = [:]
+        for row in rows {
+            let accountId: String = row["id"]
+            let currency: String = row["currency"]
             guard let native = try LocalMoneyQueries.accountBalance(
                 database, accountId: accountId, asOf: today, now: now
             ), let converted = try LocalMoneyConversion.convert(
                 database, amountE4: native, from: currency, toCurrency: moneyScope.baseCurrency, date: today
             ) else { return nil }
-            totals[currency, default: 0] += converted
+            byCurrency[currency, default: []].append(
+                CurrencyAccountLocal(
+                    accountId: accountId, name: row["name"], icon: row["icon"], color: row["color"],
+                    // Its own minor unit, read rather than assumed — JPY has
+                    // none, and a hardcoded 2 would render ¥1,200 as ¥12.00
+                    // (money rule 2).
+                    currencyInfo: CurrencyInfo(code: currency, minorUnit: row["minor_unit"] ?? 2),
+                    amountBaseE4: converted, nativeAmountE4: native
+                )
+            )
         }
 
-        return totals
-            .map { CurrencyExposureLocal(currency: $0.key, amountBaseE4: $0.value) }
+        return byCurrency
+            .map { currency, accounts in
+                CurrencyExposureLocal(
+                    currency: currency,
+                    amountBaseE4: accounts.reduce(0) { $0 + $1.amountBaseE4 },
+                    accounts: accounts.sorted { $0.amountBaseE4 > $1.amountBaseE4 }
+                )
+            }
             .sorted { $0.amountBaseE4 > $1.amountBaseE4 }
+    }
+
+    /// Every currency the user holds an account in, other than the one
+    /// given. Names only — no balances, no conversion — because the one
+    /// question it answers is "is there anything to price against the base
+    /// currency", which a balance would not make more true.
+    ///
+    /// Mirrors `net_worth`'s account predicate (not deleted, not archived,
+    /// in scope) so the FX widget offers exactly the currencies the
+    /// Currency Exposure widget breaks down.
+    static func heldCurrencies(
+        _ database: Database, scope: PublicSchema.AccountScope, excluding baseCurrency: String
+    ) throws -> [String] {
+        let scopeClause = LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "id")
+        return try String.fetchAll(
+            database,
+            sql: """
+            SELECT DISTINCT currency FROM accounts
+            WHERE deleted_at IS NULL AND archived_at IS NULL AND currency <> ? AND (\(scopeClause))
+            ORDER BY currency
+            """,
+            arguments: [baseCurrency]
+        )
+    }
+
+    /// The oldest date this user's money exists on — the earliest
+    /// transaction, or the earliest account's opening balance date.
+    ///
+    /// This is what "all time" means, and what stops a chart's window
+    /// padding wandering into years that were never going to have anything
+    /// in them. An account with no transactions still counts, and
+    /// `opening_balance_at` rather than `created_at` is why: the opening
+    /// balance is real money from the date it is effective, which is
+    /// routinely long before the day the account was typed into the app.
+    static func earliestActivity(_ database: Database, scope: PublicSchema.AccountScope) throws -> Date? {
+        let accountClause = LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "id")
+        let transactionClause = LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "t.account_id")
+        let earliest = try String.fetchOne(
+            database,
+            sql: """
+            SELECT MIN(day) FROM (
+                SELECT MIN(substr(t.occurred_at, 1, 10)) AS day
+                FROM transactions t
+                WHERE t.deleted_at IS NULL AND (\(transactionClause))
+                UNION ALL
+                SELECT MIN(substr(opening_balance_at, 1, 10)) AS day
+                FROM accounts
+                WHERE deleted_at IS NULL AND archived_at IS NULL AND (\(accountClause))
+            )
+            """
+        )
+        guard let earliest else { return nil }
+        return PostgresDate.dateOnly(from: earliest, calendar: utcCalendar)
     }
 
     // MARK: - FX trend
@@ -155,7 +253,7 @@ enum LocalDashboardQueries {
 
 // MARK: - Row types
 
-struct UpcomingBillLocal: Equatable, Identifiable {
+struct UpcomingTransactionLocal: Equatable, Identifiable {
     let ruleId: String
     let dueOn: Date
     let categoryName: String
@@ -170,6 +268,13 @@ struct UpcomingBillLocal: Equatable, Identifiable {
     let nativeAmountE4: Int64
     let nativeCurrency: String
 
+    /// Which way the money goes, from the sign of the rule's own amount —
+    /// which the server's `validate_recurring_rule_sign` keeps in agreement
+    /// with the category's kind. Read from `nativeAmountE4` rather than the
+    /// converted figure so an unresolvable rate leaves the direction known
+    /// even when the amount isn't.
+    var isInbound: Bool { nativeAmountE4 > 0 }
+
     /// One rule can occur several times inside a two-week window, so the
     /// rule's own id is not unique in this list — the occurrence date is what
     /// distinguishes them.
@@ -181,6 +286,47 @@ struct CurrencyExposureLocal: Equatable, Identifiable {
     /// Signed: a currency you are net short in (a credit card, an overdraft)
     /// is negative, and the widget says so rather than hiding it.
     let amountBaseE4: Int64
+    /// What the total is made of, largest first. Always present — the
+    /// expanded widget breaks a currency down without a second read.
+    let accounts: [CurrencyAccountLocal]
 
     var id: String { currency }
+
+    /// Accounts the user is net *long* in. These are the ones that can be
+    /// drawn as a share of the currency's total; a negative account is an
+    /// offset against them, not a slice of them.
+    var positiveAccounts: [CurrencyAccountLocal] {
+        accounts.filter { $0.amountBaseE4 > 0 }
+    }
+
+    /// The denominator for an account's share. The sum of the *positive*
+    /// accounts, not the currency's net total: a currency holding €1,000 in
+    /// savings against a −€900 card has a net of €100, and calling the
+    /// savings account "1,000% of EUR" would be arithmetically true and
+    /// useless. Shares are read against what is actually held.
+    var positiveTotalE4: Int64 {
+        positiveAccounts.reduce(0) { $0 + $1.amountBaseE4 }
+    }
+}
+
+/// One account's contribution to a currency's exposure.
+struct CurrencyAccountLocal: Equatable, Identifiable {
+    let accountId: String
+    let name: String
+    let icon: String
+    let color: String
+    /// The currency the account is held in, with its own minor unit — the
+    /// same for every account in one `CurrencyExposureLocal`, carried along
+    /// so a row can format its own native figure without reaching back up to
+    /// its parent or assuming two decimals.
+    let currencyInfo: CurrencyInfo
+    /// Signed, in base currency.
+    let amountBaseE4: Int64
+    /// Signed, in the account's own currency. What the user recognises when
+    /// the account isn't in their base currency — the base figure is the one
+    /// that makes accounts comparable, this is the one they'd see in their
+    /// bank app.
+    let nativeAmountE4: Int64
+
+    var id: String { accountId }
 }
