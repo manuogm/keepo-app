@@ -34,6 +34,48 @@ struct LocalAccountRowTests {
         )
     }
 
+    /// Puts `accountId` into a fresh household with `viewerId` as a member —
+    /// the shared-account setup every test below that needs one repeats
+    /// identically otherwise.
+    private func shareAccount(
+        _ database: Database, householdId: String, accountId: String, viewerId: String
+    ) throws {
+        try database.execute(
+            sql: """
+            INSERT INTO households (id, created_at, sync_seq) VALUES (?, '2026-01-01T00:00:00.000000+00:00', 1)
+            """,
+            arguments: [householdId]
+        )
+        try database.execute(
+            sql: """
+            INSERT INTO household_members (household_id, user_id, joined_at, sync_seq)
+            VALUES (?, ?, '2026-01-01T00:00:00.000000+00:00', 1)
+            """,
+            arguments: [householdId, viewerId]
+        )
+        try database.execute(
+            sql: """
+            INSERT INTO household_accounts (household_id, account_id, shared_at, sync_seq)
+            VALUES (?, ?, '2026-01-01T00:00:00.000000+00:00', 1)
+            """,
+            arguments: [householdId, accountId]
+        )
+    }
+
+    private func insertCardMapping(
+        _ database: Database, ownerId: String, cardIdentifier: String, accountId: String?
+    ) throws {
+        try database.execute(
+            sql: """
+            INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, source,
+                created_at, updated_at, sync_seq)
+            VALUES (?, ?, ?, ?, 'manual',
+                '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+            """,
+            arguments: [UUID().uuidString, ownerId, cardIdentifier, accountId]
+        )
+    }
+
     @Test("an account shared into the viewer's household is visible and marked shared")
     func sharedAccountVisible() async throws {
         let dbQueue = try makeDatabase()
@@ -46,26 +88,7 @@ struct LocalAccountRowTests {
             try insertAccount(
                 database, id: sharedAccountId, ownerId: partnerId, currency: "EUR", openingBalanceE4: 500000
             )
-            try database.execute(
-                sql: """
-                INSERT INTO households (id, created_at, sync_seq) VALUES (?, '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [householdId]
-            )
-            try database.execute(
-                sql: """
-                INSERT INTO household_members (household_id, user_id, joined_at, sync_seq)
-                VALUES (?, ?, '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [householdId, viewerId]
-            )
-            try database.execute(
-                sql: """
-                INSERT INTO household_accounts (household_id, account_id, shared_at, sync_seq)
-                VALUES (?, ?, '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [householdId, sharedAccountId]
-            )
+            try shareAccount(database, householdId: householdId, accountId: sharedAccountId, viewerId: viewerId)
         }
 
         let rows = try await dbQueue.read { database in
@@ -106,36 +129,11 @@ struct LocalAccountRowTests {
             try insertAccount(
                 database, id: sharedAccountId, ownerId: partnerId, currency: "EUR", openingBalanceE4: 0
             )
-            try database.execute(
-                sql: """
-                INSERT INTO households (id, created_at, sync_seq) VALUES (?, '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [householdId]
-            )
-            try database.execute(
-                sql: """
-                INSERT INTO household_members (household_id, user_id, joined_at, sync_seq)
-                VALUES (?, ?, '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [householdId, viewerId]
-            )
-            try database.execute(
-                sql: """
-                INSERT INTO household_accounts (household_id, account_id, shared_at, sync_seq)
-                VALUES (?, ?, '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [householdId, sharedAccountId]
-            )
+            try shareAccount(database, householdId: householdId, accountId: sharedAccountId, viewerId: viewerId)
             // The partner mapped a card to the shared account — the viewer
             // should not see that as "their" mapped card.
-            try database.execute(
-                sql: """
-                INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, source,
-                    created_at, updated_at, sync_seq)
-                VALUES (?, ?, 'Partner Visa', ?, 'manual',
-                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [UUID().uuidString, partnerId, sharedAccountId]
+            try insertCardMapping(
+                database, ownerId: partnerId, cardIdentifier: "Partner Visa", accountId: sharedAccountId
             )
         }
 
@@ -145,15 +143,7 @@ struct LocalAccountRowTests {
         #expect(unmapped.first?.hasMappedCard == false)
 
         try await dbQueue.write { database in
-            try database.execute(
-                sql: """
-                INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, source,
-                    created_at, updated_at, sync_seq)
-                VALUES (?, ?, 'My Visa', ?, 'manual',
-                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [UUID().uuidString, viewerId, sharedAccountId]
-            )
+            try insertCardMapping(database, ownerId: viewerId, cardIdentifier: "My Visa", accountId: sharedAccountId)
         }
 
         let mapped = try await dbQueue.read { database in
@@ -172,15 +162,7 @@ struct LocalAccountRowTests {
             // Mirrors the placeholder row `CaptureLocalWrite` creates for a
             // card the capture pipeline has seen but nobody has mapped yet —
             // `account_id` is genuinely NULL, not just absent.
-            try database.execute(
-                sql: """
-                INSERT INTO card_mappings (id, owner_id, card_identifier, account_id, source,
-                    created_at, updated_at, sync_seq)
-                VALUES (?, ?, 'Unrecognised Card', NULL, 'automatic',
-                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
-                """,
-                arguments: [UUID().uuidString, ownerId]
-            )
+            try insertCardMapping(database, ownerId: ownerId, cardIdentifier: "Unrecognised Card", accountId: nil)
         }
 
         let rows = try await dbQueue.read { database in
