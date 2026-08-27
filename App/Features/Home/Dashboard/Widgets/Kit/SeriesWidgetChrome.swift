@@ -18,12 +18,25 @@ struct SeriesWidgetChrome<Content: View>: View {
     /// `DashboardData.sample`.
     let context: SeriesWidgetState.Context?
     let onTap: () -> Void
+    /// What stands in the header's trailing slot while the widget is
+    /// **closed**, where the timeframe filter sits once it opens.
+    ///
+    /// The two are mutually exclusive by construction — this is only read
+    /// when `isExpanded` is false — because they answer the same question.
+    /// Cashflow is the widget that needs it: closed, it shows one finished
+    /// month and has to name it; open, the filter names the window instead
+    /// and a second period label beside it would be a contradiction waiting
+    /// to happen.
+    var collapsedAccessory: (() -> AnyView)?
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         WidgetChrome(
             title: kind.title,
-            systemImage: kind.systemImage,
+            // Only once it is open. A collapsed tile is a figure, and an ⓘ
+            // on it would be a control competing with the tap that opens
+            // the widget the explanation is about.
+            guide: isExpanded ? kind.guide : nil,
             accessory: accessory,
             onTap: onTap,
             content: content
@@ -52,7 +65,8 @@ struct SeriesWidgetChrome<Content: View>: View {
     }
 
     private var accessory: (() -> AnyView)? {
-        guard isExpanded, kind.hasTimeframeFilter else { return nil }
+        guard isExpanded else { return collapsedAccessory }
+        guard kind.hasTimeframeFilter else { return nil }
         return {
             AnyView(
                 TimeframeFilterView(
@@ -143,9 +157,7 @@ struct SeriesChartOrMessage: View {
                 series: drawn,
                 granularity: series.granularity,
                 highlighted: Binding(get: { series.highlighted }, set: { series.highlighted = $0 }),
-                // Through `zoom`, so the chart's pinch is the only thing that
-                // can move the granularity — see `SeriesWidgetState.didPinch`.
-                visibleBuckets: Binding(get: { series.visibleBuckets }, set: { series.zoom(to: $0) }),
+                visibleBuckets: series.visibleBuckets,
                 // Swift Charts owns the writes to this one, and a chart whose
                 // plot has not been measured yet can hand back a non-finite
                 // position. It is read back as `Int(_:)` in `loadKey`, where

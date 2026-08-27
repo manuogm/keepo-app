@@ -33,13 +33,18 @@ public enum CashflowPeriod: String, CaseIterable, Identifiable, Sendable {
         bounds(now: now, calendar: calendar, stepsBack: 2)
     }
 
-    /// A name for the window the user is looking at ("July", "2025"), so the
-    /// tile never leaves them guessing which period a figure describes.
+    /// A name for the window the user is looking at ("July 26", "2025"), so
+    /// the tile never leaves them guessing which period a figure describes.
+    ///
+    /// The month carries its year. It reads as redundant in August and is
+    /// the whole point in January, when the last finished month belongs to
+    /// the year before — and a tile that only said "December" would be
+    /// ambiguous for the eleven months after it.
     public func label(now: Date, calendar: Calendar, locale: Locale = .current) -> String {
         let start = bounds(now: now, calendar: calendar).lowerBound
         switch self {
         case .month:
-            return FormatterCache.dateOnly(calendar: calendar, template: "MMMM", locale: locale)
+            return FormatterCache.dateOnly(calendar: calendar, template: "MMMMyy", locale: locale)
                 .string(from: start)
         case .year:
             return FormatterCache.dateOnly(calendar: calendar, template: "y", locale: locale)

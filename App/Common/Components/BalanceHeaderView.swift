@@ -22,7 +22,7 @@ struct BalanceHeaderView: View {
     @Environment(\.isPrivacyMode) private var isPrivacyMode
 
     var body: some View {
-        (isPrivacyMode ? Text("••••").font(.system(size: size, weight: .bold)) : styledAmount)
+        (isPrivacyMode ? Text(PrivacyMask.hidden).font(.system(size: size, weight: .bold)) : styledAmount)
             .monospacedDigit()
             .foregroundStyle(Color.primary)
             .contentTransition(.numericText())

@@ -44,7 +44,7 @@ struct AccountRowView: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(isPrivacyMode ? "••••" : formattedBalance)
+                PrivateText(formattedBalance)
                     .font(.body.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(Color.primary)
@@ -89,7 +89,7 @@ struct AccountGroupHeaderRow: View {
                 Text(title)
                     .font(.headline)
                 Spacer()
-                Text(isPrivacyMode ? "••••" : subtitle)
+                PrivateText(subtitle)
                     .font(.subheadline)
                     .monospacedDigit()
                     .foregroundStyle(Color.secondary)

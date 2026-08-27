@@ -16,7 +16,7 @@ public enum FxRateRepository {
         return PostgresDate.date(fromTimestamp: raw)
     }
 
-    /// The most recent `rate_to_eur` per currency — enough to convert a
+    /// The most recent `units_per_eur` per currency — enough to convert a
     /// *pending* (not-yet-synced) transaction's amount into base currency
     /// for an offline net-worth estimate. Not a substitute for `fx_convert`
     /// (which resolves the rate at a specific historical date, with
@@ -29,14 +29,14 @@ public enum FxRateRepository {
     /// keeps only the first (freshest) row per currency.
     public static func fetchLatestRates(client: SupabaseClient) async throws -> [String: Decimal] {
         let rows: [RateRow] = try await client.from("fx_rates")
-            .select("currency, rate_to_eur")
+            .select("currency, units_per_eur")
             .order("rate_date", ascending: false)
             .limit(200)
             .execute()
             .value
         var result: [String: Decimal] = [:]
         for row in rows where result[row.currency] == nil {
-            result[row.currency] = row.rateToEur
+            result[row.currency] = row.unitsPerEur
         }
         return result
     }
@@ -44,10 +44,13 @@ public enum FxRateRepository {
 
 private struct RateRow: Decodable {
     let currency: String
-    let rateToEur: Decimal
+    /// Units of `currency` per one euro — 1.1669 means a euro buys 1.1669
+    /// dollars. The EUR pivot every conversion in this app divides out of and
+    /// multiplies into; see `LocalFxConvert`.
+    let unitsPerEur: Decimal
     enum CodingKeys: String, CodingKey {
         case currency
-        case rateToEur = "rate_to_eur"
+        case unitsPerEur = "units_per_eur"
     }
 }
 

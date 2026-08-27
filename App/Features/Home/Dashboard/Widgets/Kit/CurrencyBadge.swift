@@ -18,7 +18,7 @@ struct CurrencyBadge: View {
     var label: String?
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             disc
             if showsCode {
                 Text(label ?? code ?? "—")

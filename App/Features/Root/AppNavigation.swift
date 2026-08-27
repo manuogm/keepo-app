@@ -24,7 +24,24 @@ final class AppNavigation {
         case profile
     }
 
+    /// A screen inside the Profile tab that some other screen has asked to
+    /// be pushed. Value-typed rather than a view, because the stack that has
+    /// to push it lives in `MainTabView` and a widget four layers into Home
+    /// has no business constructing one.
+    enum ProfileDestination: Hashable {
+        case household
+        case automations
+        case preferences
+        case dataPrivacy
+    }
+
     var tab: Tab = .home
+
+    /// The Profile tab's navigation stack. Driven by a path so a push can
+    /// come from somewhere other than a tap on the row itself — the FX
+    /// widget's "this is your base currency" note links straight to
+    /// Preferences.
+    var profilePath: [ProfileDestination] = []
 
     /// A slice of the ledger some other screen has asked to be shown, waiting
     /// for the Transactions screen to pick it up. Cleared once applied, so
@@ -35,6 +52,15 @@ final class AppNavigation {
     func openTransactions(_ request: TransactionsRequest) {
         transactionsRequest = request
         tab = .transactions
+    }
+
+    /// Switches to Profile and pushes one screen. The path is **replaced**,
+    /// not appended to: the ask is "show me this setting", and landing on it
+    /// underneath whatever the user had left open would be a different
+    /// screen with a wrong back button.
+    func openProfile(_ destination: ProfileDestination) {
+        profilePath = [destination]
+        tab = .profile
     }
 }
 

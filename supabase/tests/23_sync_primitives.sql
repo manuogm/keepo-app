@@ -363,22 +363,22 @@ select ok(
 -- into a JSON number — the client would decode it through a binary
 -- floating-point type before re-encoding it as the local TEXT decimal
 -- string, silently reintroducing the imprecision L1 eliminated.
--- rate_to_eur/withdrawal_rate/real_return_rate are the only three numeric
+-- units_per_eur/withdrawal_rate/real_return_rate are the only three numeric
 -- columns left in the syncable set.
 -- ----------------------------------------------------------------------------
 
-insert into fx_rates (currency, rate_date, rate_to_eur, source)
+insert into fx_rates (currency, rate_date, units_per_eur, source)
 values ('ZZZ', current_date, 0.9000, 'ecb')
-on conflict (currency, rate_date) do update set rate_to_eur = excluded.rate_to_eur;
+on conflict (currency, rate_date) do update set units_per_eur = excluded.units_per_eur;
 
 select is(
   (
-    select jsonb_typeof(row -> 'rate_to_eur') from jsonb_array_elements(
+    select jsonb_typeof(row -> 'units_per_eur') from jsonb_array_elements(
       (select payload -> 'fx_rates' from pull_changes(0, 0))
     ) row where row ->> 'currency' = 'ZZZ'
   ),
   'string',
-  'pull_changes renders fx_rates.rate_to_eur as a JSON string, never a JSON number'
+  'pull_changes renders fx_rates.units_per_eur as a JSON string, never a JSON number'
 );
 
 select * from finish();

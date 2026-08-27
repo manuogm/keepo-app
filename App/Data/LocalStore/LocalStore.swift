@@ -13,7 +13,7 @@ import GRDB
 /// arithmetic of its own yet). Dates/timestamps stay `TEXT` — the exact
 /// ISO 8601 string Postgres/PostgREST already produced, decoded with
 /// `KeepoCore`'s `DateFormatting` at the read boundary, never reparsed here.
-/// `fx_rates.rate_to_eur` stays `TEXT` too: a decimal string, not a REAL —
+/// `fx_rates.units_per_eur` stays `TEXT` too: a decimal string, not a REAL —
 /// this store does no FX arithmetic (that's the referee in L4), so nothing
 /// here needs it as anything but an opaque value to carry until the day it
 /// does.
@@ -176,7 +176,9 @@ public enum LocalSchemaV1 {
         try database.create(table: "fx_rates") { table in
             table.column("currency", .text).notNull()
             table.column("rate_date", .text).notNull()
-            table.column("rate_to_eur", .text).notNull()
+            // Units of this currency per one euro (1.1669 = a euro buys
+            // 1.1669 dollars), mirroring the server column of the same name.
+            table.column("units_per_eur", .text).notNull()
             table.column("source", .text).notNull()
             table.column("fetched_at", .text).notNull()
             table.column("sync_seq", .integer).notNull()
@@ -341,6 +343,13 @@ public enum LocalStore {
         // Accounts list unable to remember its own order. Same rebuild, same
         // self-heal.
         migrator.registerMigration("v6_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260905100000 renames
+        // fx_rates.rate_to_eur to units_per_eur server-side. A stale device
+        // keeps the old column, so every pulled fx row loses its rate to
+        // `SyncApply`'s whitelist-intersected-with-local-schema step and
+        // lands with a NOT NULL violation. The rename carries no data change,
+        // so a drop-and-repull costs nothing but the pull itself.
+        migrator.registerMigration("v7_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)

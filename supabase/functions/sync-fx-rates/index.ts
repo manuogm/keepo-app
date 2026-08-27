@@ -4,6 +4,16 @@
 // upsert_fx_rate(), which owns the "later fetched_at wins" rule. A 5-day
 // trailing window means one missed run self-heals on the next.
 //
+// **Direction, stated once so nobody has to re-derive it.** The request below
+// passes `?base=EUR`, and the response is shaped
+// `{"amount":1.0,"base":"EUR","rates":{"2026-08-26":{"USD":1.1669}}}` — that
+// is *units of the currency per one euro*, so 1 EUR buys 1.1669 USD. It is
+// stored verbatim in `fx_rates.units_per_eur` and read back by fx_convert as
+// `amount / rate(from) * rate(to)`, which divides out of the source currency
+// into euros and multiplies into the target. Nothing anywhere inverts it.
+// The column used to be called `rate_to_eur`, which said the opposite and
+// cost two readers an hour each; see migration 20260905100000.
+//
 // Gated by an X-Fx-Sync-Secret header, not a user JWT — the caller is a
 // cron job or the Phase 13 FX-backfill triggers, not a signed-in user
 // (app-architecture.md §4). Scheduled daily by pg_cron as of Phase 13
@@ -132,7 +142,7 @@ Deno.serve(async (req) => {
         supabase.rpc("upsert_fx_rate", {
           p_currency: currency,
           p_rate_date: rateDate,
-          p_rate_to_eur: rate,
+          p_units_per_eur: rate,
           p_source: "ecb",
           p_fetched_at: fetchedAt,
         }).then(({ error }) => {

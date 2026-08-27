@@ -33,34 +33,24 @@ enum WidgetPalette {
     static func mark(_ color: Color, isHighlighted: Bool) -> Color {
         isHighlighted ? color : color.opacity(dimmedOpacity)
     }
-}
 
-/// A currency's colour, everywhere it appears. Keyed on the code through
-/// `StableSeed`, never on its position in a sorted list — a currency whose
-/// balance grows past another's must not swap colours with it.
-///
-/// Reuses `CategoryAppearance.palette` rather than introducing a second set
-/// of chart colours: those values were already chosen to read clearly against
-/// both light and dark surfaces, and nothing about them is category-specific.
-///
-/// The palette's neutral grey is dropped here, and only here. It is a fine
-/// default for a category tile, where it reads as "unremarkable", but as a
-/// wedge in a chart it reads as "missing" — and the dashboard already uses
-/// grey for the one thing that genuinely is missing. Filtering by value
-/// rather than by index keeps this correct if the palette is ever reordered.
-enum CurrencyColor {
-    private static let palette = CategoryAppearance.palette.filter { $0 != neutral }
-    private static let neutral = "#8E8E93"
-
-    static func color(for code: String) -> Color {
-        guard !palette.isEmpty else { return Color(hex: neutral) }
-        return Color(hex: palette[StableSeed.index(code, upperBound: palette.count)])
+    /// One step of a ranked ramp of `neutral` — darkest for the largest
+    /// share, lighter for each one after it.
+    ///
+    /// Currency Exposure's bar used to be a different hue per currency,
+    /// derived from the code so a currency could never swap colours with
+    /// another as balances moved. That guarantee is not worth what it cost:
+    /// four unrelated hues on a 2×1 tile read as four *categories*, when the
+    /// only thing the bar says is "this one is bigger than that one". A
+    /// single-hue ramp says exactly that and nothing more — the ordering is
+    /// the information, so the ordering is what the colour encodes.
+    ///
+    /// The floor matters. Past the fifth currency the shares are slivers a
+    /// few points wide, and a ramp that kept lightening would run them into
+    /// the card's own fill and lose them entirely.
+    static func shade(rank: Int) -> Color {
+        neutral.opacity(max(1 - Double(max(rank, 0)) * 0.18, 0.25))
     }
-
-    /// What "everything else" is drawn in — the rolled-up remainder in
-    /// Currency Exposure, and anything else that stands for a group rather
-    /// than for one currency.
-    static var rest: Color { Color(hex: neutral) }
 }
 
 /// Income and expense, everywhere either appears on the dashboard.

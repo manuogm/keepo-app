@@ -94,9 +94,14 @@ struct InvestingRatioMetrics: Equatable {
     let netWorthE4: Int64?
     let previousInvestedE4: Int64?
     let previousNetWorthE4: Int64?
+    /// How many accounts the user has marked as investments. The collapsed
+    /// tile names it under the figure — a ratio is a share of something, and
+    /// "48% across 3 accounts" is a different picture from "48%" in one.
+    let investmentAccountCount: Int
+
     /// Distinguishes "your investments are 0% of net worth" from "you have no
     /// investment accounts", which need different blank states.
-    let hasInvestmentAccounts: Bool
+    var hasInvestmentAccounts: Bool { investmentAccountCount > 0 }
 
     /// Invested over net worth — assets minus liabilities, per the widget's
     /// own definition.
@@ -212,6 +217,17 @@ struct CurrencyExposureMetrics: Equatable {
     func share(of slice: CurrencyExposureLocal?) -> Double? {
         guard let slice, slice.amountBaseE4 > 0, positiveTotalE4 > 0 else { return nil }
         return Double(slice.amountBaseE4) / Double(positiveTotalE4)
+    }
+
+    /// Several currencies' share, taken together — what the collapsed tile's
+    /// "REST" roll-up stands for once there are more of them than the row can
+    /// name. Net-short currencies are excluded for the same reason they are
+    /// excluded from `share(of:)`: they are not part of what is held.
+    func share(ofCombined slices: [CurrencyExposureLocal]) -> Double? {
+        guard positiveTotalE4 > 0 else { return nil }
+        let held = slices.filter { $0.amountBaseE4 > 0 }.reduce(0) { $0 + $1.amountBaseE4 }
+        guard held > 0 else { return nil }
+        return Double(held) / Double(positiveTotalE4)
     }
 }
 

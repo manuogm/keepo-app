@@ -80,6 +80,59 @@ struct MetricGranularityTests {
         #expect(straddling.contains("May"))
     }
 
+    @Test("Every granularity offers a ladder that gets strictly shorter")
+    func labelLaddersNarrow() {
+        let en = Locale(identifier: "en_GB")
+        for granularity in MetricGranularity.allCases {
+            let ladder = granularity.axisLabelCandidates(
+                for: date(2026, 4, 30), calendar: calendar, locale: en
+            )
+            #expect(ladder.count >= 2, "\(granularity) has no shorter form to fall back to")
+            #expect(ladder.first == granularity.axisLabel(
+                for: date(2026, 4, 30), calendar: calendar, locale: en
+            ), "the longest rung must be the label the axis used before")
+            // Strictly shorter, rung by rung. A ladder with two rungs the
+            // same width is a rung the fitting pass can never gain anything
+            // by taking, and would make it look as though a narrower form
+            // had been tried when none had.
+            for (longer, shorter) in zip(ladder, ladder.dropFirst()) {
+                #expect(shorter.count < longer.count, "\(granularity): '\(shorter)' is no shorter than '\(longer)'")
+            }
+        }
+    }
+
+    @Test("A month falls back to its initial, not to a truncation")
+    func monthLadder() {
+        let ladder = MetricGranularity.month.axisLabelCandidates(
+            for: date(2026, 1, 15), calendar: calendar, locale: Locale(identifier: "en_GB")
+        )
+        #expect(ladder == ["Jan", "J"])
+    }
+
+    @Test("A year keeps its century until it can't")
+    func yearLadder() {
+        let ladder = MetricGranularity.year.axisLabelCandidates(
+            for: date(2026, 1, 15), calendar: calendar, locale: Locale(identifier: "en_GB")
+        )
+        #expect(ladder.first == "2026")
+        #expect(ladder.last?.hasSuffix("26") == true)
+    }
+
+    @Test("A week drops detail rather than characters")
+    func weekLadder() {
+        let ladder = MetricGranularity.week.axisLabelCandidates(
+            for: date(2026, 4, 30), calendar: calendar, locale: Locale(identifier: "en_GB")
+        )
+        // Both ends, then the start alone, then its day — every rung still
+        // names a real date rather than half of one. The week containing
+        // 30 April 2026 starts on Sunday the 26th: `.weekOfYear` follows the
+        // calendar's own `firstWeekday`, which is Sunday for gregorian.
+        #expect(ladder.count == 3)
+        #expect(ladder[0].contains("Apr") && ladder[0].contains("May"))
+        #expect(ladder[1] == "26 Apr")
+        #expect(ladder[2] == "26")
+    }
+
     @Test("isCurrent is true only for the bucket containing now")
     func isCurrent() {
         let now = date(2026, 8, 25)

@@ -35,6 +35,7 @@ extension DashboardCanvasView {
             DashboardCatalogView(
                 geometry: geometry,
                 maxHeight: max(viewportHeight * 0.72, 280),
+                placed: placedWidgets,
                 unavailable: unavailableWidgets,
                 onSelect: { kind in
                     isPickingWidget = false
@@ -48,20 +49,28 @@ extension DashboardCanvasView {
         }
     }
 
-    /// Why each widget can't be added right now.
+    /// Which widgets are already out on the dashboard.
     ///
-    /// Two reasons, and they are deliberately different sentences. "Already
-    /// on your dashboard" is a rule — one of each, until user-built template
-    /// widgets make each configuration its own kind and the rule stops
-    /// applying. The others are missing *data*, and each says what to do
-    /// about it, because "FX Rate is unavailable" tells a user nothing they
-    /// can act on.
+    /// One of each, until user-built template widgets make each
+    /// configuration its own kind and the rule stops applying. This used to
+    /// be folded into `unavailableWidgets` as the sentence "Already on your
+    /// dashboard" — but it is not the same kind of fact as a missing
+    /// currency, and the catalogue now files the two differently: a placed
+    /// widget goes to its own group, a widget short of data stays where you
+    /// would look for it with a note saying what it needs.
+    var placedWidgets: Set<DashboardWidgetKind> {
+        Set(DashboardWidgetKind.allCases.filter { store.arrangement.contains(kind: $0) })
+    }
+
+    /// Why a widget that isn't placed still can't be added.
+    ///
+    /// Missing *data*, every time — and each reason says what to do about
+    /// it, because "FX Rate is unavailable" tells a user nothing they can
+    /// act on.
     var unavailableWidgets: [DashboardWidgetKind: String] {
         var reasons: [DashboardWidgetKind: String] = [:]
-        for kind in DashboardWidgetKind.allCases {
-            if store.arrangement.contains(kind: kind) {
-                reasons[kind] = "Already on your dashboard."
-            } else if let reason = data.capabilities?.unavailability(for: kind) {
+        for kind in DashboardWidgetKind.allCases where !store.arrangement.contains(kind: kind) {
+            if let reason = data.capabilities?.unavailability(for: kind) {
                 reasons[kind] = reason
             }
         }

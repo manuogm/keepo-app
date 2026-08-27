@@ -27,10 +27,8 @@ enum MetricValue: Equatable {
 /// the smooth transition the design asks for.
 struct MetricHeadline: View {
     let value: MetricValue
-    var size: CGFloat = 30
+    var size: CGFloat = WidgetStyle.metric
     var signStyle: MoneySignStyle = .standard
-
-    @Environment(\.isPrivacyMode) private var isPrivacyMode
 
     var body: some View {
         content
@@ -57,9 +55,8 @@ struct MetricHeadline: View {
     /// a balance, but an investing ratio next to a hidden net worth would
     /// leak the shape of it.
     private func text(_ string: String?) -> some View {
-        Text(isPrivacyMode ? "••••" : (string ?? "—"))
+        PrivateText(string ?? "—")
             .font(.system(size: size, weight: .bold))
-            .monospacedDigit()
             .foregroundStyle(Color.primary)
     }
 }
@@ -73,35 +70,39 @@ struct MetricHeadline: View {
 /// number it had been reading. Below the figure, always — collapsed,
 /// expanded, every widget.
 ///
-/// `trailing` is for what legitimately belongs on the figure's own line and
-/// is not the trend: the highlighted bucket's name, Investing Ratio's drivers
-/// chevron. It sits after a `Spacer`, so it can never push the badge out of
-/// place.
-struct MetricHeadlineBlock<Trailing: View>: View {
+/// `adjacent` is for what legitimately belongs on the figure's own line and
+/// is not the trend: Investing Ratio's drivers chevron and the figures it
+/// opens. It is drawn **immediately after the figure**, before the `Spacer`,
+/// because a control that acts on the number has to look attached to it — at
+/// the far end of a full-width tile the chevron sat 200 points from the
+/// percentage it belonged to and read as part of the card's chrome. It still
+/// cannot push the badge anywhere: the badge is on the next row of the
+/// `VStack`, not in this `HStack`.
+struct MetricHeadlineBlock<Adjacent: View>: View {
     let value: MetricValue
-    var size: CGFloat = 34
+    var size: CGFloat = WidgetStyle.metric
     var signStyle: MoneySignStyle = .standard
     var percentChange: Double?
     var unit: String = "%"
     var caption: String?
-    @ViewBuilder var trailing: () -> Trailing
+    @ViewBuilder var adjacent: () -> Adjacent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 MetricHeadline(value: value, size: size, signStyle: signStyle)
+                adjacent()
                 Spacer(minLength: 0)
-                trailing()
             }
             WidgetTrendBadge(percentChange: percentChange, unit: unit, caption: caption)
         }
     }
 }
 
-extension MetricHeadlineBlock where Trailing == EmptyView {
+extension MetricHeadlineBlock where Adjacent == EmptyView {
     init(
         value: MetricValue,
-        size: CGFloat = 34,
+        size: CGFloat = WidgetStyle.metric,
         signStyle: MoneySignStyle = .standard,
         percentChange: Double?,
         unit: String = "%",

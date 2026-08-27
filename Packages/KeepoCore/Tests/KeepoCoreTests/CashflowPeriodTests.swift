@@ -78,7 +78,8 @@ struct CashflowPeriodTests {
     func labelsNameTheWindow() {
         let posix = Locale(identifier: "en_US_POSIX")
         let now = date(2026, 8, 20)
-        #expect(CashflowPeriod.month.label(now: now, calendar: calendar, locale: posix) == "July")
+        // The year is part of the month's name — see `label`.
+        #expect(CashflowPeriod.month.label(now: now, calendar: calendar, locale: posix) == "July 26")
         #expect(CashflowPeriod.year.label(now: now, calendar: calendar, locale: posix) == "2025")
     }
 }

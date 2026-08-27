@@ -32,7 +32,7 @@ extension DashboardData {
         investingRatio: InvestingRatioMetrics(
             investedE4: 173_000_000, netWorthE4: 481_200_000,
             previousInvestedE4: 158_000_000, previousNetWorthE4: 456_000_000,
-            hasInvestmentAccounts: true
+            investmentAccountCount: 3
         ),
         capabilities: DashboardCapabilities(
             hasInvestmentAccounts: true, foreignCurrencies: ["USD", "GBP"]
@@ -93,41 +93,59 @@ extension DashboardData {
         let name: String
         let icon: String
         let color: String
+        /// Converted into the sample's base currency, EUR.
         let amountE4: Int64
+        /// In the account's own currency. `nil` means "the same figure",
+        /// which is true of every EUR account and of nothing else — the
+        /// foreign ones state theirs, so the preview shows the two-figure
+        /// row the real widget draws rather than the same number twice.
+        var nativeE4: Int64?
+        var kind: PublicSchema.AccountKind = .regular
     }
 
     private static var sampleCurrencies: [CurrencyExposureLocal] {
         [
-            currency("EUR", 312_000_000, [
+            currency("EUR", [
                 SampleAccount(name: "Current Account", icon: "banknote.fill", color: "#007AFF", amountE4: 84_000_000),
                 SampleAccount(
                     name: "Savings", icon: "building.columns.fill", color: "#34C759", amountE4: 240_000_000
                 ),
                 SampleAccount(name: "Credit Card", icon: "creditcard.fill", color: "#FF2D55", amountE4: -12_000_000)
             ]),
-            currency("USD", 121_000_000, [
+            currency("USD", [
                 SampleAccount(
-                    name: "Brokerage", icon: "chart.line.uptrend.xyaxis", color: "#5856D6", amountE4: 121_000_000
+                    name: "Brokerage", icon: "chart.line.uptrend.xyaxis", color: "#5856D6",
+                    amountE4: 121_000_000, nativeE4: 132_000_000, kind: .investment
                 )
             ]),
-            currency("GBP", 48_200_000, [
-                SampleAccount(name: "Travel Account", icon: "airplane", color: "#FF9500", amountE4: 48_200_000)
+            currency("GBP", [
+                SampleAccount(
+                    name: "Travel Account", icon: "airplane", color: "#FF9500",
+                    amountE4: 48_200_000, nativeE4: 41_500_000
+                )
             ])
         ]
     }
 
-    private static func currency(
-        _ code: String, _ totalE4: Int64, _ accounts: [SampleAccount]
-    ) -> CurrencyExposureLocal {
-        CurrencyExposureLocal(
-            currency: code, amountBaseE4: totalE4,
-            accounts: accounts.map {
-                CurrencyAccountLocal(
-                    accountId: "\(code)-\($0.name)", name: $0.name, icon: $0.icon, color: $0.color,
-                    currencyInfo: CurrencyInfo(code: code, minorUnit: 2),
-                    amountBaseE4: $0.amountE4, nativeAmountE4: $0.amountE4
-                )
-            }
+    /// Both of a slice's totals are summed from its accounts rather than
+    /// stated beside them. The old shape took the total as its own argument,
+    /// which meant a sample could disagree with itself — and a preview whose
+    /// bar does not match its own figures teaches the reader to distrust the
+    /// widget before they have added it.
+    private static func currency(_ code: String, _ accounts: [SampleAccount]) -> CurrencyExposureLocal {
+        let currencyInfo = CurrencyInfo(code: code, minorUnit: 2)
+        let rows = accounts.map { sample in
+            CurrencyAccountLocal(
+                accountId: "\(code)-\(sample.name)", name: sample.name, icon: sample.icon, color: sample.color,
+                kind: sample.kind, currencyInfo: currencyInfo,
+                amountBaseE4: sample.amountE4, nativeAmountE4: sample.nativeE4 ?? sample.amountE4
+            )
+        }
+        return CurrencyExposureLocal(
+            currencyInfo: currencyInfo,
+            amountBaseE4: rows.reduce(0) { $0 + $1.amountBaseE4 },
+            nativeAmountE4: rows.reduce(0) { $0 + $1.nativeAmountE4 },
+            accounts: rows
         )
     }
 

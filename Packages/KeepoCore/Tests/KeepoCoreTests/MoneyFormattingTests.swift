@@ -23,6 +23,37 @@ struct MoneyFormatterTests {
     let jpy = CurrencyInfo(code: "JPY", minorUnit: 0)
     let usLocale = Locale(identifier: "en_US")
 
+    @Test("compact drops the cents below a thousand")
+    func compactRoundsToWholeUnits() {
+        #expect(MoneyFormatter.compact(8_423_700, currency: usd, locale: usLocale) == "$842")
+    }
+
+    @Test("compact abbreviates past a thousand")
+    func compactAbbreviates() {
+        // 4,231.87 — a tile has no room for the exact figure, and rounding
+        // it is better than shrinking the type until it fits.
+        #expect(MoneyFormatter.compact(42_318_700, currency: usd, locale: usLocale) == "$4.2K")
+        #expect(MoneyFormatter.compact(13_000_000_000, currency: usd, locale: usLocale) == "$1.3M")
+    }
+
+    @Test("compact keeps money rule 5")
+    func compactMissingValueRendersDash() {
+        #expect(MoneyFormatter.compact(nil, currency: usd, locale: usLocale) == "—")
+    }
+
+    /// The direction is named by a label beside the figure, so neither a
+    /// minus nor a `+` belongs on it — that is the whole difference between
+    /// `magnitude` and `ledger`.
+    @Test("magnitude draws neither sign")
+    func magnitudeIsUnsigned() {
+        #expect(MoneyFormatter.compact(-42_318_700, currency: usd, locale: usLocale, signStyle: .magnitude)
+            == "$4.2K")
+        #expect(MoneyFormatter.compact(42_318_700, currency: usd, locale: usLocale, signStyle: .magnitude)
+            == "$4.2K")
+        #expect(MoneyFormatter.format(-123_450, currency: usd, locale: usLocale, signStyle: .magnitude)
+            == "$12.35")
+    }
+
     @Test("a missing value renders as em dash, never zero")
     func missingValueRendersDash() {
         #expect(MoneyFormatter.format(nil, currency: usd, locale: usLocale) == "—")

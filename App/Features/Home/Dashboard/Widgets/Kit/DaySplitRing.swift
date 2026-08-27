@@ -16,7 +16,7 @@ struct DaySplitRing: View {
     let segments: [FillSegment]
     let isSelected: Bool
     let isToday: Bool
-    var diameter: CGFloat = 38
+    var diameter: CGFloat = 40
     /// The calendar the day was decoded in — UTC everywhere in this app, so
     /// a date-only value renders as the day it actually is rather than
     /// shifting for anyone west of it.
@@ -43,7 +43,7 @@ struct DaySplitRing: View {
                         .rotationEffect(.degrees(-90))
                 }
             }
-            VStack(spacing: -1) {
+            VStack(spacing: 0) {
                 Text(dayNumber)
                     .font(.system(size: diameter * 0.37, weight: isToday ? .bold : .regular))
                     .foregroundStyle(Color.primary)

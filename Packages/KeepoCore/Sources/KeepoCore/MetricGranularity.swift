@@ -11,11 +11,13 @@ import Foundation
 /// re-derivations of that would drift, and the drift would be invisible —
 /// two widgets side by side quietly bucketing differently.
 ///
-/// **This is deliberately a user control**, which reverses
-/// `DateBucketing`'s rule ("derived from the span, never a user control",
-/// app-architecture.md §5). That rule still holds for the collapsed
-/// trajectories `DateBucketing` serves; it does not hold for the expanded
-/// widgets, where picking the granularity *is* the interaction.
+/// **This is deliberately a user control**, which reverses the older rule
+/// that granularity is "derived from the span, never a user control"
+/// (app-architecture.md §5). That rule was written for the collapsed
+/// trajectories, and it lived in a `DateBucketing` type this replaced — the
+/// collapsed Net Worth line is built from these buckets too now, so there is
+/// one granularity model rather than two with opposite rules. Picking the
+/// resolution *is* the interaction on an expanded widget.
 public enum MetricGranularity: String, Sendable, Codable, CaseIterable, Identifiable {
     case week
     case month
@@ -149,6 +151,44 @@ public enum MetricGranularity: String, Sendable, Codable, CaseIterable, Identifi
             return FormatterCache.dateOnly(calendar: calendar, template: "y", locale: locale).string(from: start)
         case .week:
             return weekLabel(start: start, calendar: calendar, locale: locale)
+        }
+    }
+
+    /// The x-axis label at every width it can be written in, longest first.
+    ///
+    /// The chart picks the longest form that fits inside one bucket's slot,
+    /// so a month is "Jan" where there is room and "J" where there isn't.
+    /// That replaces the axis's previous answer to a crowded scale, which
+    /// was to **drop** labels until the survivors fitted — and a reader
+    /// looking at five bars with two labels under them cannot tell which
+    /// bar "Mar" belongs to. A label under every bar, shortened, says more
+    /// than a full label under one bar in three.
+    ///
+    /// Always non-empty; the last element is the shortest form this
+    /// granularity has, so a caller that runs out of room still draws
+    /// something rather than nothing.
+    public func axisLabelCandidates(
+        for bucket: Date, calendar: Calendar, locale: Locale = .current
+    ) -> [String] {
+        let start = bucketStart(for: bucket, calendar: calendar)
+        let full = axisLabel(for: start, calendar: calendar, locale: locale)
+        switch self {
+        case .month:
+            // "MMMMM" is the *narrow* month, which is exactly the "J, F, M"
+            // form asked for — and it is localised, unlike taking the first
+            // character of "Jan" (which is wrong in any language whose
+            // month names share initials by a different rule).
+            return [full, FormatterCache.dateOnly(
+                calendar: calendar, template: "MMMMM", locale: locale
+            ).string(from: start)]
+        case .year:
+            return [full, "’" + String(full.suffix(2))]
+        case .week:
+            // A week has no name, so its ladder drops detail rather than
+            // characters: both ends, then just the start, then its day.
+            let dayMonth = FormatterCache.dateOnly(calendar: calendar, template: "d MMM", locale: locale)
+            let day = FormatterCache.dateOnly(calendar: calendar, template: "d", locale: locale)
+            return [full, dayMonth.string(from: start), day.string(from: start)]
         }
     }
 

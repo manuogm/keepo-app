@@ -17,7 +17,8 @@ struct MainTabView: View {
     @State private var navigation = AppNavigation()
 
     var body: some View {
-        TabView(selection: $navigation.tab) {
+        @Bindable var navigation = navigation
+        return TabView(selection: $navigation.tab) {
             NavigationStack {
                 HomeView(session: session)
             }
@@ -37,8 +38,11 @@ struct MainTabView: View {
             .tabItem { Label("Transactions", systemImage: "list.bullet") }
             .tag(AppNavigation.Tab.transactions)
 
-            NavigationStack {
+            NavigationStack(path: $navigation.profilePath) {
                 ProfileView(session: session)
+                    .navigationDestination(for: AppNavigation.ProfileDestination.self) { destination in
+                        profileDestination(destination)
+                    }
             }
             .tabItem { Label("My Profile", systemImage: "person.circle") }
             .tag(AppNavigation.Tab.profile)
@@ -72,6 +76,19 @@ struct MainTabView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 60)
             }
+        }
+    }
+
+    /// The Profile tab's pushable screens, in one place. `ProfileView`'s own
+    /// rows are value links into this same table, so a row tap and a
+    /// programmatic `openProfile` land on exactly the same view.
+    @ViewBuilder
+    private func profileDestination(_ destination: AppNavigation.ProfileDestination) -> some View {
+        switch destination {
+        case .household: HouseholdView(session: session)
+        case .automations: AutomationsView(session: session)
+        case .preferences: PreferencesView(session: session)
+        case .dataPrivacy: DataPrivacyView(session: session)
         }
     }
 

@@ -1,7 +1,7 @@
 -- fx_rate_on / fx_convert / upsert_fx_rate / account_balances_base.
 -- Fixture A (base EUR) = 11111111-..., fixture B (base USD) = 22222222-...
 --
--- fx_rates.rate_to_eur is NOT part of the L1 integer migration (it's a
+-- fx_rates.units_per_eur is NOT part of the L1 integer migration (it's a
 -- conversion factor, not an amount) and stays numeric(20,4). fx_convert's
 -- own bigint amount is where L1's one rounding step happens.
 
@@ -73,7 +73,7 @@ select is(
 -- upsert_fx_rate: "later fetched_at wins," both directions.
 select upsert_fx_rate('USD', current_date, 0.91, 'ecb', now());
 select is(
-  (select rate_to_eur from fx_rates where currency = 'USD' and rate_date = current_date),
+  (select units_per_eur from fx_rates where currency = 'USD' and rate_date = current_date),
   0.9100,
   'a later fetched_at overwrites an earlier one for the same (currency, rate_date)'
 );
@@ -81,7 +81,7 @@ select is(
 -- An earlier fetched_at than what's stored is a no-op, not "last call wins."
 select upsert_fx_rate('USD', current_date, 0.50, 'ecb', now() - interval '1 hour');
 select is(
-  (select rate_to_eur from fx_rates where currency = 'USD' and rate_date = current_date),
+  (select units_per_eur from fx_rates where currency = 'USD' and rate_date = current_date),
   0.9100,
   'an earlier fetched_at than what''s already stored is a silent no-op'
 );

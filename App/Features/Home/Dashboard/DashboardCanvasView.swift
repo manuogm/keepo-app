@@ -107,7 +107,8 @@ struct DashboardCanvasView: View {
                     DashboardScrollGeometry(
                         offsetY: proxy.contentOffset.y,
                         viewportHeight: proxy.containerSize.height,
-                        contentHeight: proxy.contentSize.height
+                        contentHeight: proxy.contentSize.height,
+                        insetTop: proxy.contentInsets.top
                     )
                 } action: { _, updated in
                     scrollGeometry = updated

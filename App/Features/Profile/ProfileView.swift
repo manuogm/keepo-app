@@ -36,23 +36,21 @@ struct ProfileView: View {
                 }
 
                 Section {
-                    NavigationLink("My Household") {
-                        HouseholdView(session: session)
-                    }
+                    NavigationLink("My Household", value: AppNavigation.ProfileDestination.household)
                 } footer: {
                     Text("Invite a partner, share accounts, or leave — your data is always yours.")
                 }
 
+                // Value links, not destination links: the Profile stack is
+                // driven by `AppNavigation.profilePath` so that another screen
+                // can push one of these (the FX widget's base-currency note
+                // links to Preferences). A destination link inside a
+                // path-driven stack pushes without the path knowing, which is
+                // how a back button and a programmatic push get out of step.
                 Section {
-                    NavigationLink("Automations") {
-                        AutomationsView(session: session)
-                    }
-                    NavigationLink("Preferences") {
-                        PreferencesView(session: session)
-                    }
-                    NavigationLink("Data & Privacy") {
-                        DataPrivacyView(session: session)
-                    }
+                    NavigationLink("Automations", value: AppNavigation.ProfileDestination.automations)
+                    NavigationLink("Preferences", value: AppNavigation.ProfileDestination.preferences)
+                    NavigationLink("Data & Privacy", value: AppNavigation.ProfileDestination.dataPrivacy)
                 }
 
                 Section {

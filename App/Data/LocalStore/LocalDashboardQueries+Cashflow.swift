@@ -240,10 +240,15 @@ extension LocalDashboardQueries {
         return total
     }
 
-    /// Whether the user has any investment accounts at all — the difference
-    /// between "your ratio is 0%" and "this widget has nothing to say to
-    /// you yet", which want different blank states.
-    static func hasInvestmentAccounts(_ database: Database, scope: PublicSchema.AccountScope) throws -> Bool {
+    /// How many accounts the user has declared as investments.
+    ///
+    /// The count rather than a boolean, because two callers want different
+    /// things from the same `COUNT(*)`: the catalogue only needs to know
+    /// whether the widget has anything to say (0 is the difference between
+    /// "your ratio is 0%" and "this widget is not for you yet"), while the
+    /// collapsed tile names the number underneath its figure. Asking twice
+    /// for a number we already had would be two queries for one fact.
+    static func investmentAccountCount(_ database: Database, scope: PublicSchema.AccountScope) throws -> Int {
         let scopeClause = LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "id")
         return try Int.fetchOne(
             database,
@@ -251,7 +256,7 @@ extension LocalDashboardQueries {
             SELECT COUNT(*) FROM accounts
             WHERE deleted_at IS NULL AND archived_at IS NULL AND kind = 'investment' AND (\(scopeClause))
             """
-        ) ?? 0 > 0
+        ) ?? 0
     }
 }
 

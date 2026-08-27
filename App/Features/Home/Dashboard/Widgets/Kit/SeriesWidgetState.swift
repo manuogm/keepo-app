@@ -49,21 +49,16 @@ final class SeriesWidgetState {
 
     /// The bucket the headline is reading. `nil` only before the first load.
     var highlighted: Date?
-    /// How many buckets fit on screen. Write through `zoom(to:)` rather than
-    /// directly — the distinction between "the user pinched" and "the count
-    /// changed for some other reason" is what keeps the filter and the
-    /// gesture from undoing each other.
-    var visibleBuckets: Int = 12
-    /// Whether the last change to `visibleBuckets` came from a pinch.
+    /// How many buckets fit on screen. Set by the timeframe segments and by
+    /// nothing else — the chart only reads it.
     ///
-    /// Load-bearing. The pinch and the W/M/Y segments write to the same
-    /// state on purpose — they are one control — but only the pinch may
-    /// *derive* a granularity from a bucket count. Without this flag,
-    /// tapping "W" while twelve buckets were on screen set weekly and then
-    /// immediately coarsened straight back to monthly, because twelve weeks
-    /// is 2.8 months and weekly's ceiling is 2. The segment appeared not to
-    /// respond at all.
-    private var didPinch = false
+    /// It used to be shared with a pinch gesture that could *derive* a
+    /// granularity from the count, which needed a flag to stop the two
+    /// undoing each other: tapping "W" set weekly and the derivation
+    /// immediately coarsened it straight back to monthly, so the segment
+    /// looked dead. With the pinch gone the granularity has exactly one
+    /// source, and the flag has nothing left to arbitrate.
+    var visibleBuckets: Int = 12
     /// Leading edge of the visible window, in bucket indices.
     var scrollIndex: Double = 0
 
@@ -168,16 +163,12 @@ final class SeriesWidgetState {
                 dbQueue: context.dbQueue, scope: context.scope, now: context.now
             )
         }
-        applyZoom()
         rebuildBuckets(now: context.now)
         guard !buckets.isEmpty else {
             points = []
             return
         }
         await loadVisibleWindow(context)
-        if highlighted == nil || !buckets.contains(highlighted ?? .distantPast) {
-            highlighted = defaultHighlight
-        }
     }
 
     /// Fills the state from fixed sample data, for the catalogue.
@@ -194,7 +185,6 @@ final class SeriesWidgetState {
         highlighted = buckets.last
         visibleBuckets = min(12, max(buckets.count, 1))
         scrollIndex = max(Double(buckets.count - visibleBuckets), 0)
-        didPinch = false
     }
 
     /// Collapsing throws away everything the user chose. Deliberate, and the
@@ -223,47 +213,20 @@ final class SeriesWidgetState {
     /// it would mean a completely different span of time.
     func select(_ timeframe: MetricTimeframe) {
         config.timeframe = timeframe
-        didPinch = false
         if case .rolling(let granularity) = timeframe {
             visibleBuckets = Self.defaultVisibleBuckets(for: granularity)
         }
     }
 
-    /// The user pinched. Only this may move the granularity.
-    func zoom(to buckets: Int) {
-        guard buckets != visibleBuckets else { return }
-        visibleBuckets = buckets
-        didPinch = true
-    }
-
-    /// Comfortable defaults, chosen to sit inside each resolution's own zoom
-    /// band so that selecting a segment doesn't land on a boundary: eight
-    /// weeks is 1.8 months, under weekly's ceiling of 2.
+    /// How much history a resolution opens on: two months of weeks, a year
+    /// of months, half a decade of years. Enough of each to have a shape
+    /// without the bars getting too thin to aim at.
     private static func defaultVisibleBuckets(for granularity: MetricGranularity) -> Int {
         switch granularity {
         case .week: return 8
         case .month: return 12
         case .year: return 6
         }
-    }
-
-    /// A pinch that crossed a resolution boundary rewrites the timeframe, so
-    /// the M/Y segments and the gesture stay one control. Only meaningful
-    /// for a rolling timeframe — a custom period's resolution comes from its
-    /// own width — and only in response to an actual pinch, per `didPinch`.
-    private func applyZoom() {
-        guard didPinch, case .rolling(let current) = config.timeframe else { return }
-        let months = Double(visibleBuckets) * current.months
-        let zoomed = MetricZoom.granularity(
-            forVisibleMonths: months, current: current, allowed: kind.allowedGranularities
-        )
-        guard zoomed != current else { return }
-        config.timeframe = .rolling(zoomed)
-        // Keep roughly the same stretch of time on screen across the switch,
-        // rather than snapping to a default count — the user pinched to a
-        // span, not to a bucket count.
-        visibleBuckets = max(Int((months / zoomed.months).rounded()), 4)
-        didPinch = false
     }
 
     /// The x domain: every bucket the current timeframe covers. Rebuilt from
@@ -285,6 +248,14 @@ final class SeriesWidgetState {
         if loadedGranularity != granularity {
             loadedWindow = nil
             loadedGranularity = granularity
+        }
+        // Settled here, beside the domain it is an index into, rather than
+        // after the load it does not depend on. It reads `buckets` and
+        // nothing else, and running it afterwards made it a *separate*
+        // publish landing in its own render — so the chart drew once with
+        // every bar dimmed and again with one of them lit.
+        if highlighted == nil || !buckets.contains(highlighted ?? .distantPast) {
+            highlighted = defaultHighlight
         }
     }
 
@@ -326,16 +297,30 @@ final class SeriesWidgetState {
         guard let loaded = try? await DashboardMetricSeries.load(
             dbQueue: context.dbQueue, request: request, window: window, now: context.now
         ) else { return }
-        points = loaded
-        // After the primary load these are cache hits: the pass that produced
-        // it computed them too. Loaded through the same path anyway rather
-        // than reached for out of the cache directly, so a metric that is
-        // *not* a by-product still works without a special case.
+        // Gathered into locals, **assigned in one go below**.
+        //
+        // These are cache hits after the primary load — the pass that
+        // produced it computed them too — but they are still `await`ed, and
+        // an `await` is a suspension point. Assigning each one as it arrived
+        // published it on its own, and Cashflow drew three times on every
+        // load: the net line alone, then one bar series, then both. That is
+        // the flicker on expanding the widget.
+        //
+        // Loaded through the same path rather than reached for out of the
+        // cache directly, so a metric that is *not* a by-product of the
+        // primary read still works without a special case.
+        var loadedCompanions: [MetricKind: [MetricPoint]] = [:]
         for metric in companions {
-            companionPoints[metric] = (try? await DashboardMetricSeries.load(
+            loadedCompanions[metric] = (try? await DashboardMetricSeries.load(
                 dbQueue: context.dbQueue, request: request.asking(metric), window: window, now: context.now
             )) ?? []
         }
+        // No `await` between these, so SwiftUI sees one complete set and
+        // renders once. Replacing `companionPoints` wholesale rather than
+        // keying into it also drops anything left over from a previous
+        // granularity, which keying could not.
+        points = loaded
+        companionPoints = loadedCompanions
         loadedWindow = window
     }
 

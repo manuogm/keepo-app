@@ -157,5 +157,18 @@ where c.owner_id = '88888888-8888-8888-8888-888888888888' and c.kind = 'expense'
 -- real number instead of "—" when a screen renders them. Deliberately
 -- routes through the same upsert_fx_rate() every real write uses, not a
 -- direct insert — fx_rates has no INSERT grant at all, seed included.
-select upsert_fx_rate('USD', current_date - n, 0.92, 'ecb', now())
+--
+-- **units_per_eur is units of the currency per 1 EUR** — the direction
+-- Frankfurter returns for ?base=EUR, which sync-fx-rates stores verbatim, and
+-- the direction fx_convert() divides and multiplies by. So 1.1669 means one
+-- euro buys 1.1669 dollars (the real close for 2026-08-26, checked against
+-- the API rather than invented, so a dev dashboard shows a number a human
+-- would recognise).
+--
+-- It was 0.92 here — that figure roughly the wrong way round. Read against
+-- the column it says a euro buys 92 cents, so every dev dashboard quoted
+-- EUR/USD about 20% low while the arithmetic around it was perfectly
+-- correct. The seed had followed the old column name (`rate_to_eur`) instead
+-- of the data; see migration 20260905100000.
+select upsert_fx_rate('USD', current_date - n, 1.1669, 'ecb', now())
 from generate_series(0, 5) as n;

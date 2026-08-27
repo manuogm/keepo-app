@@ -12,11 +12,15 @@ enum TimeframePrecision {
 /// The W/M/Y/📅 control in an expanded widget's header — one component, used
 /// by every widget that charts a series.
 ///
-/// It is deliberately the *same* control as the pinch gesture rather than a
-/// parallel one: zooming past a threshold writes back through this binding,
-/// so the highlighted segment always describes what the chart is actually
-/// drawing. A filter that kept saying "M" while the chart had zoomed out to
-/// years would be worse than no filter.
+/// Since the pinch gesture went, this is the **only** thing that moves a
+/// chart's resolution, which is what it should have been all along: two
+/// controls writing the same state needed a flag to stop them undoing each
+/// other, and the symptom was a segment that looked dead when tapped.
+///
+/// Drawn as a tab bar rather than as an outlined row of letters: a filled
+/// track with the selected segment sitting in a capsule on it, tight
+/// vertically so it fits inside the header's fixed height instead of setting
+/// it.
 struct TimeframeFilterView: View {
     let granularities: [MetricGranularity]
     var precision: TimeframePrecision = .monthYear
@@ -25,7 +29,7 @@ struct TimeframeFilterView: View {
     @State private var isPickingPeriod = false
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
             ForEach(granularities) { granularity in
                 segment(
                     label: { Text(granularity.label) },
@@ -41,13 +45,7 @@ struct TimeframeFilterView: View {
             .accessibilityLabel("Custom period")
         }
         .font(.caption)
-        // The border is what makes this read as *one control* rather than as
-        // four loose letters floating in the header. Without it the segments
-        // had no edge to aim at, so the only thing that looked tappable was
-        // the glyph itself — which is exactly the target HIG says is too
-        // small.
-        .padding(.horizontal, 3)
-        .overlay(Capsule().stroke(Color.secondary.opacity(0.35), lineWidth: 1))
+        .widgetHeaderTrack()
         .sensoryFeedback(.selection, trigger: timeframe)
         .sheet(isPresented: $isPickingPeriod) {
             TimeframePeriodSheet(timeframe: $timeframe, precision: precision)
@@ -59,6 +57,59 @@ struct TimeframeFilterView: View {
         @ViewBuilder label: @escaping () -> some View, isSelected: Bool, action: @escaping () -> Void
     ) -> some View {
         WidgetSegment(isSelected: isSelected, action: action, label: label)
+    }
+}
+
+/// The capsule the widget header's trailing slot is drawn on.
+///
+/// Shared because **two different controls occupy that one slot** and swap
+/// with the widget's state: the timeframe filter when a widget is open, and
+/// Cashflow's period pill when it is closed. They are mutually exclusive, so
+/// the only way the swap doesn't read as the header changing shape is for
+/// both to be the same capsule at the same height — which they cannot be if
+/// each carries its own copy of these four numbers.
+///
+/// Kept faint. The track is a surface for its contents to sit on, not an
+/// object in its own right — at a heavier grey the unselected letters lost
+/// their contrast against it and the whole control read as disabled. The
+/// border stays as a hairline on top, so it still has a defined edge on a
+/// card whose fill is close to the track's.
+private struct WidgetHeaderTrack: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.08), in: Capsule())
+            .overlay(Capsule().stroke(Color.secondary.opacity(0.22), lineWidth: 1))
+    }
+}
+
+private extension View {
+    func widgetHeaderTrack() -> some View { modifier(WidgetHeaderTrack()) }
+}
+
+/// A label in the header's trailing slot, where a control would otherwise
+/// be.
+///
+/// Cashflow's collapsed tile is the case this exists for. It shows the last
+/// finished month, which the tile has to name — and the name belongs in the
+/// same place the timeframe filter appears once the widget opens, because
+/// the two answer the same question ("which period is this?") and only one
+/// of them is ever on screen.
+///
+/// Its insets match a `WidgetSegment`'s, so pill and filter come out exactly
+/// the same height and the header does not resize on expand.
+struct WidgetHeaderPill: View {
+    let label: String
+
+    var body: some View {
+        Text(label)
+            .font(.caption)
+            .foregroundStyle(Color.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .widgetHeaderTrack()
     }
 }
 

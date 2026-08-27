@@ -172,3 +172,630 @@ swap ("a real flag image set replaces this later — every caller goes through
   missing flag.
 - On device simulator: EUR and USD render as crisp circles at 22pt (FX Rate
   pair) and 24pt (expanded Currency Exposure rows).
+
+---
+
+# Dashboard polish pass 2 — 2026-08-26
+
+Second round of user-driven refinement on the widget redesign, plus the
+resolution of the `EXC_BREAKPOINT` crash that had been open since 2026-08-25.
+
+## The crash (was "still open")
+
+**Root cause: a donut with exactly one slice.** `SectorMark` given a single
+value spans the whole circle, so its start and end angles are the same angle.
+`angularInset: 1.2` then has to cut a gap out of a shape with no gap, and
+`cornerRadius` has to round a corner between an edge and itself. Swift Charts
+resolves that to a non-finite number and converts it to `Int` — a hard trap:
+
+```
+Swift/IntegerTypes.swift:8835: Fatal error: Double value cannot be converted
+to Int because it is either infinite or NaN
+```
+
+The whole stack is inside `Charts` under `CanvasDisplayList.updateValue()`;
+no frame of ours appears, and the `.ips` carries no message. It reproduced as
+"tapping a bar in Cashflow kills the app" because tapping a bar reloads the
+breakdown, and a period with one category reduces the donut to one slice. The
+user's original report — "tapping on this month's bar" — was that exact case.
+
+Fixed in `DonutChartView`: one slice is drawn as a stroked `Circle`, not as a
+sector. A full circle has no neighbour to be separated from, so an angular
+inset has nothing to mean; the ring is the honest shape and cannot go
+non-finite.
+
+**How it was found**, since none of it was visible from the crash report:
+`xcrun simctl launch --console-pty` prints the Swift runtime's fatal-error
+message, which the `.ips` does not carry. Then bisect by widget — Net Worth
+(line) fine, Investing Ratio (bars) fine, Cashflow only — then instrument the
+two `Chart`s on screen with `print` in the body. The donut's slice count going
+2 → 1 immediately before the trap was the whole answer.
+
+## Programmatic scrolling was landing an inset short
+
+`ScrollGeometry.contentOffset` and `ScrollPosition.scrollTo(y:)` are **not the
+same coordinate space**: the former is measured inside the content insets, the
+latter from the top of the content. On Home they differ by 116pt (status bar +
+header). Reading an offset and writing it back therefore moved the dashboard
+116pt too far up, every time.
+
+It never looked like a coordinate bug — the expansion scroll moved, and moved
+roughly the right way, it just always stopped one header short. The symptom was
+"an expanded widget sits too close to the tab bar", which reads as a margin
+problem, and increasing the margin changed nothing (see below). Measured by
+asking for 652 and watching `contentOffset` settle at 536.
+
+`DashboardScrollGeometry` now carries `insetTop` and owns the conversion
+(`scrollTarget(for:)`); both call sites — expansion scroll and drag
+auto-scroll — go through it.
+
+## Expansion scroll: centre when the margin can't fit
+
+The clearance below an expanded tile is three grid rows. The tallest widget is
+six rows, and 6 + 3 rows exceeds the viewport, so `clearingBottom` always won
+and resolved to the cap — pinning the tile's top to the top of the screen with
+all the slack dumped underneath. `scrollToFit` now checks whether the margin
+*fits* first, and centres the tile when it doesn't. Raising the margin 2 → 3
+rows on its own did nothing at all, for this reason.
+
+## Charts
+
+- **Pinch-zoom removed.** Two-finger gesture inside a card inside a scrolling,
+  reorderable grid: fussy to start, easy to trigger by accident, competing with
+  the horizontal scroll for the same touches. W/M/Y says the same thing in one
+  tap. `SeriesWidgetState.didPinch`/`zoom(to:)`/`applyZoom()` went with it —
+  the granularity now has exactly one source, so the flag that stopped the two
+  controls undoing each other has nothing left to arbitrate.
+- **Tap to select.** `chartXSelection` alone gates selection behind a long
+  press on a scrollable chart (it must, or scrubbing would fight the pan).
+  `.chartGesture { proxy in SpatialTapGesture().onEnded { proxy.selectXValue(at:
+  $0.location.x) } }` adds a plain tap *alongside* the scroll, which the
+  `chartOverlay` plate that was removed last round could never do.
+- **Axis labels are centred on their ticks** via `AxisValueLabel(anchor: .top)`.
+  With custom content the default anchor puts the label's *leading* edge on the
+  tick, so every label sat half its own width right of the bar it named —
+  confirmed with a temporary `AxisGridLine`: gridlines landed exactly on the
+  marks, labels landed 14pt right of the gridlines.
+- **Every bucket gets a label**, written at whichever form fits its slot:
+  `MetricGranularity.axisLabelCandidates` returns a ladder (`["Jan", "J"]`,
+  `["2026", "'26"]`, week → both ends → start → day) and `ChartAxisLabels.fitted`
+  measures against `UIFont.preferredFont` and picks one tier for the whole
+  axis. Replaces thinning labels + insetting them off their own buckets.
+- **Half a bucket of peek** past the visible window (`chartXVisibleDomain(length:
+  visibleLength + 0.5)`) whenever there is more data, so the scroll is visible.
+- **Bars**: capped-proportional width (58% of slot, max 16pt) with fully rounded
+  ends (`cornerRadius(barWidth / 2)`).
+- **Dotted gridlines on line charts only.** A bar is already a vertical mark
+  standing on its own label; a rule through it takes contrast away. Every
+  bucket where the slot is ≥ 24pt, every other below that.
+
+## Chrome
+
+- Title: `.caption`, no glyph, and the header is **exactly as tall as its
+  title** in both states. Pinned to a constant instead, the title stopped
+  moving but sat centred in a taller row, which put visible dead space above
+  it. The timeframe filter overflows the row rather than setting it, and still
+  sits in the `HStack` so it reserves its width.
+- `View.hitTarget(_:)` — grows a touch area to 44pt via an overlay, so HIG's
+  minimum no longer drives layout height. This is what let the filter become a
+  tab bar.
+- Trend badge: caption never dropped or abbreviated; `ViewThatFits` wraps it to
+  two lines on a 2×1 rather than truncating. FX Rate's collapsed tile carries
+  no badge at all (user's call — the pair badges plus a pill made three stacked
+  objects on one column); it returns when expanded.
+- Legibility scrim behind figures drawn over a chart: a gradient **in the
+  card's own fill**, not a material. A material lightens what it covers, so the
+  top of the card came out a different tone from the bottom and looked like a
+  panel. Never bleeds upwards — it is a background of the *content*, which is
+  laid out after the header, so anything above the content's top paints over
+  the title (it did).
+- One type scale: `WidgetStyle.metric` / `.metricExpanded` for every headline.
+  The six had drifted to 36/34/30/28. All spacing is on a 4pt grid; card
+  padding is 16.
+
+## Widget guide (ⓘ)
+
+New `WidgetGuide` in KeepoCore: one-line summary, a **visual key** (marks drawn
+again with two or three words each), and one-line notes with SF Symbols. First
+version was three paragraphs of prose and the user rejected it as too much to
+read mid-task — the tests now cap summary/key/note lengths so it cannot drift
+back. Reached from the widget's header **and** from the catalogue, which
+dropped its per-row description line in favour of the same button.
+
+## Catalogue
+
+Three collapsible groups — Keepo Widgets (addable), Your Widgets (empty,
+future), Used Widgets (already placed, shut by default) — each with its own
+blank state. "Already on your dashboard" stopped being an unavailability
+*reason* and became a group; `unavailableWidgets` now carries missing-data
+reasons only, and `placedWidgets` is separate.
+
+## Verification
+
+- KeepoCore 183/183, KeepoTests pass, `swiftlint --strict` clean bar the same
+  pre-existing violation in uncommitted work in `LocalAccountRowTests`.
+- On device simulator: tap-to-select on line and bar charts, horizontal scroll
+  (labels shift a week), peek at both edges, expansion centring, catalogue
+  groups, both ⓘ entry points, and the previously-crashing June bar.
+
+# Cashflow Breakdown redesign — 2026-08-26
+
+Second pass on this one widget only, to the user's spec.
+
+## Collapsed
+
+- The period moved **into the header**, as a bordered pill in the exact slot
+  the timeframe filter takes when the widget opens. The two are mutually
+  exclusive by construction (`SeriesWidgetChrome.collapsedAccessory`, read only
+  while closed) because they answer the same question. Both draw on the shared
+  `WidgetHeaderTrack` so the header does not change shape on expand.
+- That is also what fixed the headline size. It was already
+  `WidgetStyle.metric`, but it shared its line with the period label, so
+  `minimumScaleFactor` shrank it — Cashflow's net was visibly smaller than
+  every other tile's headline while nominally being the same number.
+- `CashflowPeriod.label` for a month now carries the year ("July 26"). Reads as
+  redundant in August and is the whole point in January.
+- "kept x% of what came in" is gone, and its guide note with it.
+- Money In / Money Out are now a **bar diverging from the tile's centre**:
+  in grows leftward, out rightward, both scaled against the larger of the two
+  (`CashflowMetrics.fill`, unchanged), each with its direction over its own
+  total at the outer end. The left half is the shared `WidgetFillBar`
+  mirrored with `scaleEffect(x: -1)` — not a second bar type, so track weight,
+  corner and the leftover-track rule cannot drift between the halves.
+- Those totals use the new `MoneyFormatter.compact`: no cents under a
+  thousand, ICU compact notation past it ("$4.2K"). New `MoneySignStyle
+  .magnitude` — the word directly above already names the direction, so
+  `.ledger`'s `+` would be a third statement of it.
+
+## Expanded
+
+- The highlighted bucket's name is gone from the headline row; the timeframe
+  filter governs.
+- The donut is gone, replaced by **one full-width bar** under the divider,
+  segmented per category in the category's own colour, largest first. Shares
+  are taken against the direction's SQL-computed total (money rule 3), never a
+  client-side sum — which is also what makes the honest case right: a category
+  with no rate contributes no segment while the denominator still counts it,
+  so the bar stops short of the end by exactly the unresolvable share.
+- The In/Out toggle moved below the divider and became a **nav row** directly
+  on top of that bar: In far left, Out far right, the selected side's total
+  centred. Centring is two equal flexible frames rather than an overlay, so a
+  long figure pushes the buttons instead of drawing over them.
+- The list gets the full width back, which is what stops long category names
+  and amounts wrapping.
+- `DonutChartView` deleted — nothing else drew one. (Its single-slice crash fix
+  is recorded in lessons-learned; the failure mode outlived the file.)
+
+## Verification
+
+- KeepoCore 187/187 (four new `MoneyFormatter.compact`/`.magnitude` cases),
+  build clean, `swiftlint --strict` clean.
+- On device simulator: collapsed pill and diverging bar, expand, nav row
+  centring, In/Out switch, and the one-category case that used to be the
+  donut's crash — now just a single full-width segment.
+- `Package.swift` macOS floor 13 → 15: `FormatStyle.notation` is macOS 15 /
+  iOS 18. Host-only concern; the app has always been iOS 18.
+
+# Cashflow flicker, privacy mode, Currency Exposure — 2026-08-26 (later)
+
+## The In/Out toggle's "flicker"
+
+Diagnosed rather than guessed at: prints on the load key, the scroll-position
+binding, the load path and the chart body showed **no reload and no data gap**
+on a direction change — one re-render, all three series present. So it was not
+the staged companion load (which *is* visible on first expand: net, then money
+in, then money out, three renders).
+
+It was the animation. The toggle ran inside `withAnimation(.snappy)`, `.snappy`
+is a spring, and what was being sprung is a **colour** — the two bar series
+trade full strength for `opacity(0.3)`. A spring overshoots; an overshoot on an
+interpolated colour clamps at each end and comes back, so both series bounced
+past their target and settled. Confirmed by slowing the animation to 4s and
+capturing frames through `simctl io … screenshot` in a loop: mid-animation the
+bars sit at intermediate tones and the breakdown's text is cross-fading against
+itself, two amounts stacked on the same line.
+
+Fixed by not animating the change at all. Consistent, too: the W/M/Y segments
+in the same card's header have never animated, and these are the same control.
+
+## Privacy mode
+
+Only the *headline* on each tile honoured it. Everything smaller stayed
+readable, so switching privacy on blanked one number per widget and left the
+breakdown fully legible — a larger font, not privacy.
+
+New `PrivateText` (+ `PrivacyMask.hidden`) in `App/Common/Components`. It
+replaced the four inline `isPrivacyMode ? "••••" : …` ternaries that were
+already there (`TransactionRow`, `AccountRowView` ×2, `MetricHeadline`) and now
+carries every money figure on the dashboard: Cashflow's Money In/Out, the
+expanded direction total, category amounts, upcoming rows, currency totals and
+account balances. **Shares are not masked** — a percentage says how the money
+splits, not how much there is, and blanking it would leave a bar explaining a
+breakdown whose rows had all become bullets.
+
+## Currency Exposure
+
+- **One hue, ranked.** `CurrencyColor` (a per-code hue via `StableSeed`) is
+  gone, replaced by `WidgetPalette.shade(rank:)` — a ramp of the neutral chart
+  colour, darkest for the largest share, floored at 0.25 so the fifth currency
+  and beyond stay visible. Four unrelated hues on a 2×1 read as four
+  categories; the bar only ever claimed "this one is bigger than that one".
+- Collapsed: bar moved to the bottom edge, and the caption above it became a
+  row of flag + code + share. One currency shows nothing; two or three show
+  themselves; more than three show the second plus a globe-badged "REST"
+  carrying the **combined** share of the remainder, so the row's percentages
+  still add up with the headline's.
+- Expanded: a closed currency's bar is **its share of everything held**, in
+  its shade from the collapsed tile — the length matches the percentage
+  printed beside it and the shade is what lets someone recognise the band
+  they tapped. It filled the whole track at first, which said nothing and
+  contradicted that figure. Opening it switches the denominator: the bar
+  fills the track and subdivides by account in the user's own colours,
+  matching the per-account percentages in the list, which are shares of that
+  currency.
+- The dashed "owed" swatch and its caption are gone, and with them
+  `FillSegment.isNegative`. A card offsets holdings rather than being a slice
+  of them, so it had no honest length, and at a realistic magnitude it drew as
+  a three-point dash too short to show a dash pattern. Those accounts are in
+  the list with a red figure and a "—" share, which says it without a key.
+- Investment accounts wear their badge **under** the name; beside it, it
+  pushed long names into an ellipsis.
+- `CurrencyAccountLocal` gained `kind` (query, sample data and tests updated) —
+  presentational only, never near a balance (money rule 1).
+- The guide's donut vocabulary went with the donut: `.slice`/`.restSlice` are
+  removed from `WidgetGuideMark`, and the key now explains the ramp.
+
+## Verification
+
+Build clean, `swiftlint --strict` clean, KeepoCore 187/187, KeepoTests pass. On
+device: collapsed ramp and minority row, expanded shades, opening a currency
+swapping to account colours, the investment badge, the red net-short row, and
+privacy mode blanking every figure while leaving shares.
+
+## Staged load (the second flicker)
+
+Cashflow's chart is three series from one read, and `loadVisibleWindow`
+assigned each as it arrived. Every `await` is a suspension point, so each
+assignment published on its own and the chart drew three times per load — net
+line alone, then one bar series, then both. Instrumented before and after:
+
+```
+before   net:3 → moneyIn:3,net:3 → moneyIn:3,moneyOut:3,net:3
+after    (nothing) → moneyIn:3,moneyOut:3,net:3
+```
+
+Fixed by gathering the companions into a local and assigning `points`,
+`companionPoints` and `loadedWindow` with no `await` between them, so SwiftUI
+sees one complete set. Replacing `companionPoints` wholesale rather than keying
+into it also drops entries left over from a previous granularity.
+
+A fourth publish went with it: the default highlight was settled *after* the
+load, in its own render, so the chart drew once with every bar dimmed and again
+with one lit. It only reads `buckets`, so it now happens in `rebuildBuckets`
+beside the domain it indexes into.
+
+**Note for whoever reads the diff:** `SeriesWidgetState.swift` briefly lost the
+pinch-zoom removal from the earlier polish pass — a `git checkout` used to strip
+debug prints reverted the whole file to HEAD. Restored by hand (`didPinch`,
+`zoom(to:)`, `applyZoom()` and their doc comments are gone again). `MetricZoom`
+in KeepoCore stays: `MetricTimeframe` still uses it to derive a granularity for
+custom and all-time ranges.
+
+## Per-widget polish pass 3
+
+Three widgets, all layout and formatting — no new queries except one that got
+narrower rather than wider.
+
+### Investing Ratio
+
+- The collapsed bar rotated into a **vertical bar up the right-hand edge**,
+  full content height. A ratio is a height, not a distance, and it rhymes with
+  the run of columns the widget becomes when it opens.
+- Added "Across N accounts" under the trend badge, collapsed only. Expanded it
+  would look like a property of the highlighted bar rather than of today.
+- `LocalDashboardQueries.hasInvestmentAccounts` → `investmentAccountCount`, and
+  `InvestingRatioMetrics.hasInvestmentAccounts` is now derived from it. It was
+  already a `COUNT(*)` folded to a `Bool`; two callers now want different
+  things from the same number, and asking twice would have been two queries for
+  one fact. `DashboardCapabilities` still stores the `Bool` — it has no use for
+  the count.
+- Wording: "Across 3 accounts", not "3 investment accounts". The tile leaves
+  ~145pt once the bar takes its column and the longer form only fits by
+  shrinking the type; the widget's title already says "investment".
+
+### Transactions Next 2 Weeks
+
+- The in/out counts moved onto the headline's own line, at the far end, and the
+  day rings grew 40 → 46pt. The counts had a line to themselves and it cost the
+  rings ~20pt of height for two short labels that fit in space the figure was
+  already leaving empty.
+- Collapsed and expanded now share one `header(_:size:)`, so the only thing
+  that changes on expand is the figure's size.
+
+### Currency Exposure
+
+- Collapsed: headline badge 22 → 26, minority row 18 → 24 with `.caption`
+  shares, and 6pt of extra air above the bar so the row stops reading as a
+  label *on* it.
+- The minority row **sizes itself to its entry count** (24pt disc/`.caption` for
+  one, 18pt/`.caption2` for two, with tighter spacing). Two entries plus their
+  percentages do not fit 144pt at the larger size — and could not before this
+  pass either: the catalogue's three-currency preview had been rendering
+  "USD 2…". The disc is what steps down rather than the type, because it is the
+  one element `minimumScaleFactor` cannot shrink, so at a fixed diameter every
+  point it takes comes out of the numbers.
+- Expanded: the bar moved **inline**, between the currency badge and its
+  figures. It used to sit on its own line under the row, which made a currency
+  two lines tall and put its bar nearer the *next* currency's badge than its
+  own. A net-short currency draws a `Spacer` in the bar's place so its figures
+  still line up with everyone else's.
+- **Native figure leads, converted figure follows**, for slices and accounts
+  alike — the one place on the dashboard where that order is inverted, because
+  it is the one widget whose whole subject is that the money isn't in the base
+  currency. Both are `MoneyFormatter.compact` ("$49.1K"): two money figures, a
+  percentage and a bar share one row. VoiceOver reads the unabbreviated figure.
+  A slice already in the base currency shows one figure, not the same number
+  twice.
+- A guide note says shares are worked out on the converted values.
+- `CurrencyExposureLocal` gained `currencyInfo` (replacing the bare `currency`
+  string, which is now computed from it) and `nativeAmountE4`. The slice must
+  be able to round itself by its own `minor_unit` (money rule 2) rather than
+  reaching into its first account.
+- `DashboardSampleData.currency(_:_:)` no longer takes a stated total — both
+  totals are summed from the accounts it is given, so a preview can no longer
+  disagree with itself. The foreign samples now carry distinct native amounts,
+  so the catalogue shows the two-figure row the real widget draws.
+- Split into `CurrencyExposureWidget+Expanded.swift`; the file went past
+  SwiftLint's 400-line `file_length` and the seam was already there (`the
+  collapsed tile is one figure with a bar; the expanded one is a list`).
+  `openCurrencies` and the formatting helpers became internal for it.
+
+**Carried, not fixed:** `LocalDashboardQueries.currencyExposure` sums its
+per-account balances in Swift to build each slice's totals. That predates this
+pass — `amountBaseE4` was already built that way — and `nativeAmountE4` follows
+the same mechanism in the same place rather than adding a second pattern. It is
+still a soft spot against money rule 3; moving the grouping into SQL means
+restructuring `accountBalance`, which is a change of its own.
+
+### Verification
+
+Build clean, `swiftlint --strict` clean, KeepoCore 187/187, KeepoTests pass. On
+device: all three collapsed tiles, Investing Ratio and Transactions expanded,
+Currency Exposure expanded with a currency opened (account colours, investment
+badge, the red net-short row with its "—" share), privacy mode blanking both
+figures in every row while leaving shares, the guide sheet, and the catalogue
+previews for all six widgets.
+
+## Per-widget polish pass 4
+
+### Charts — the highlight flicker, fixed once
+
+`HighlightableChart.select` sprang the highlight change with
+`withAnimation(.snappy)`. Almost everything a highlight changes is a
+**colour** — every mark moves between dimmed and lit through
+`WidgetPalette.mark` — and a spring overshoots by design. An overshoot on an
+interpolated colour has nowhere to go: it clamps at the end of the ramp and
+comes back, which reads as the mark flashing. Same root cause as the Cashflow
+direction toggle.
+
+Now one `easeInOut(duration: 0.2)` constant, in `select`, which is the only
+place any dashboard chart's highlight is set — so Net Worth, Investing Ratio,
+Cashflow and FX all got the fix at once. Deliberately still *animated*, unlike
+the Cashflow toggle: the headline rolls its digits through
+`contentTransition(.numericText())`, which needs a transaction, and a line
+chart's point mark really does change size. Both want a curve; neither wants
+bounce.
+
+Verified by slowing the constant to 3s and capturing 60 simulator frames while
+tapping a bar: the tapped bar darkens and the previous one lightens
+monotonically across the whole transition, with no reversal at any frame.
+
+### Investing Ratio
+
+- Collapsed: "N Accounts" at `.subheadline`, on the tile's own baseline beside
+  the bar. Under the trend badge it was a third line in a stack already two
+  deep and read as part of the badge's caption.
+- Expanded: the drivers chevron sat at the far end of a full-width tile,
+  200 points from the percentage it belongs to. `MetricHeadlineBlock`'s extra
+  slot moved **before** the `Spacer` (and is now called `adjacent`), so it is
+  drawn against the figure. It cannot push the badge anywhere — the badge is
+  on the next row of the `VStack`, not in that `HStack`.
+- The chevron's 44pt `frame` became `hitTarget()`. A real frame made the
+  headline's row 44 points tall, so the expanded trend badge sat visibly lower
+  than the collapsed one — a gap that appeared on expand and belonged to
+  nothing on screen. (Same lesson the W/M/Y segments already carry.)
+- The drivers open **along the figure's line**, to the right of the chevron,
+  instead of below the badge. Below, they cost the chart a row of height every
+  time they were shown: asking why the ratio moved changed the picture of how
+  it moved.
+
+### Networth Analysis — one definition, two states
+
+The figure, the badge and the trajectory were computed three different ways:
+today's balance, the balance on this day last month, and ninety *daily* points
+bucketed after the fact. So the collapsed badge compared today against the same
+day last month while the expanded one compared this month-end against last
+month-end, and the two could disagree about which way net worth had gone — and
+the collapsed sparkline was a jagged three-month line under a smooth
+twelve-month chart.
+
+`netWorthMetrics` now takes **twelve month-end readings** via
+`MetricGranularity.month` + `evaluationDate`, the same rule
+`DashboardMetricSeries` uses for the expanded chart, and answers all three
+questions out of that one array. The states cannot drift, because there is one
+definition. It is also cheaper: 12 net-worth computations per refresh instead
+of 90.
+
+Confirmed on device: collapsed and expanded both read `$66,513.56 · ↗1.5% vs
+last month` with August highlighted, and the two curves are the same shape.
+
+Dead code removed with it: `DashboardDataLoader.netWorthSeries`,
+`DashboardDataLoader.fxTrend` (nothing called either — leftovers from before
+`DashboardMetricSeries`), the private daily-`series` helper, and
+`LocalMoneyConversion.netWorthSeries`. **`DateBucketing` in KeepoCore now has
+no app callers** — it keeps its own tests and public API; deleting it is a
+separate call.
+
+### Transactions Next 2 Weeks
+
+Rings moved directly under the figure with the slack below them. Pinned to the
+bottom they sat about forty points lower than the same rings expanded, so
+expanding slid the whole fortnight upwards past the figure — the one thing on
+screen that had not changed appeared to move the most. The in/out counts read
+**under** the rings when collapsed (they summarise the strip above them);
+expanded they stay on the headline's line, where the rings are followed
+immediately by a list that needs the width.
+
+### FX Rate
+
+- **The pill could end up empty.** The default pick was keyed on the currency
+  list alone, so it fired once at launch and never again — and collapsing calls
+  `reset()`, which restores the kind's default config, and that has no currency
+  in it. The tile came back from its first expansion showing a globe and a
+  dash with nothing that could ever put a currency back. Keyed on the *choice*
+  as well now, so the reset is a change it can see.
+- The base currency is drawn as a pill too, at a lighter weight and dimmed —
+  a bare badge beside a bordered one read as an oversight. Tapping it opens a
+  popover: "USD is your default currency" and "Go to settings ›".
+- That link needed somewhere to go, so the Profile tab's `NavigationStack` is
+  now driven by `AppNavigation.profilePath` and `ProfileView`'s rows are value
+  links into one `navigationDestination` table. A row tap and a programmatic
+  `openProfile(.preferences)` land on exactly the same view.
+- The slash is `.title3` with 8pt either side. It is the only thing saying the
+  two currencies are a *ratio* rather than a list.
+- Both pills share one `CurrencyPill` modifier, and the quote pill opts out of
+  animation (`.transaction { $0.animation = nil }`) and uses `hitTarget()`
+  rather than a 44pt frame — the two structural reasons a label swapping three
+  letters could re-lay-out over a visible interval. **Not reproduced on this
+  data**: the dev account holds one non-base currency, so the picker has a
+  single option and the switch can't be exercised. Worth re-checking on an
+  account with three or more currencies.
+
+### The FX rate is not inverted — the seed was
+
+Reported as "the rate calculation is wrong". It isn't, and the evidence is
+worth keeping:
+
+- `sync-fx-rates` fetches Frankfurter `?base=EUR`, which returns **units of the
+  currency per 1 EUR**, and stores it verbatim in `rate_to_eur`.
+- `fx_convert` / `LocalFxConvert` compute `amount / rate(from) * rate(to)`,
+  which is correct for that direction and is exactly the EUR-pivot the report
+  described (`GBP/USD = GBP/EUR × EUR/USD`).
+- On device: Pension €18,900 renders as $17,500, which is ×0.9255 — the stored
+  rate used as USD-per-EUR. Inverted it would have shown $20,421.
+- `version-logs/phase-18-log.md` §5 states the same convention, pinned by a
+  pgTAP test.
+
+The number on the dev device is a **placeholder**, and provably so: `fx_rates`
+held 75 rows over 75 consecutive calendar days — eleven Saturdays and eleven
+Sundays among them — all tagged `source = 'ecb'`. The ECB publishes on business
+days only, so a gapless daily series cannot have come from it. The widget's
+`0.9485` is the honest August mean of that series once `fx_rate_on` carries the
+last row (19 Aug, `0.9255`) forward over the seven days to the 26th:
+`(0.957 × 19 + 0.9255 × 7) / 26 = 0.9485`. Every step checks out; the input
+does not. Settings → Data & Privacy → sync exchange rates replaces it with a
+400-day Frankfurter pull.
+
+What *is* wrong is that the column is named for the opposite direction, and
+that the seeds state their numbers in that opposite sense. `supabase/seed.sql`
+had USD at `0.92` — read correctly, "a euro buys 92 cents" — so every dev
+dashboard has been quoting EUR/USD about 20% low. Fixed to `1.1654`, with the
+direction spelled out. `LocalMoneyRefereeFixture`'s JPY `0.0060` is the same
+mistake but is pinned to a captured Postgres run and asserts nothing, so it
+carries a comment rather than a new value.
+
+**Still open:** renaming `fx_rates.rate_to_eur`. It is a migration plus
+`supabase gen types swift` plus the local schema and the sync column list, and
+it is the root cause of everyone reading this backwards — twice now.
+
+### Verification
+
+Build clean, `swiftlint --strict` clean, KeepoCore 187/187, KeepoTests pass. On
+device: all six collapsed tiles, Net Worth and Investing Ratio expanded with
+matching badges, bar highlighting frame-by-frame, the FX popover and its push
+into Preferences with a working back button.
+
+## `fx_rates.rate_to_eur` → `units_per_eur`
+
+The rename the previous entry left open, done. **No values change** — every
+stored number already meant what the new name says.
+
+Settled first, against the live API rather than from memory. The exact
+endpoint `sync-fx-rates` calls answers:
+
+```
+GET api.frankfurter.dev/v1/2026-08-24..2026-08-26?base=EUR&symbols=USD,GBP
+{"amount":1.0,"base":"EUR","rates":{"2026-08-26":{"GBP":0.85613,"USD":1.1669}}}
+```
+
+`amount: 1.0, base: "EUR"` — units of the currency **per one euro**. GBP
+lands at 0.856, which is why a sub-1 value reads like an inverse and isn't.
+That is what `fx_convert`'s `amount / rate(from) * rate(to)` requires, and
+what the column has always held.
+
+Migration `20260905100000_fx_rate_units_per_eur.sql`:
+
+- `alter table fx_rates rename column`.
+- `upsert_fx_rate` **dropped and recreated** — Postgres cannot rename an input
+  parameter through `CREATE OR REPLACE` ("cannot change name of input
+  parameter"), and the Edge Function calls it with named arguments.
+- `fx_rate_on` and `pull_changes` restated in full (their bodies name the
+  column, and a function body resolves at run time). `pull_changes` keeps its
+  `::text` override — `to_jsonb` renders `numeric` as a JSON *number*, which
+  supabase-swift would decode through `Double`.
+- `fx_convert` untouched: it only calls `fx_rate_on`.
+
+Client: `LocalSchemaV1`, `SyncApply`'s column whitelist,
+`LocalMoneyConversion.fxRateOn`, `FxRateRepository`, the referee fixture, and
+`Generated/SupabaseSchema.swift` — **actually regenerated**
+(`supabase gen types --lang swift --local`, then `internal` → `public`, which
+is the only post-processing this project applies; confirmed by diffing a fresh
+generation against the checked-in file). The generator sorts fields
+alphabetically, so `unitsPerEur` moves to the end of `FxRates*` — a hand-edit
+in place would have drifted from the next regeneration.
+
+Local devices upgrade through `v7_rebuild_syncable_tables`, the existing
+drop-and-repull. A stale device would otherwise keep `rate_to_eur`, lose every
+pulled rate to `SyncApply`'s whitelist∩local-schema step, and hit a NOT NULL
+violation.
+
+### Verified
+
+Applied to the local stack (`supabase migration up --local`) after a
+rollback-wrapped dry run, and the direction checked in SQL:
+
+```
+fx_convert(10000,  'EUR','USD') = 11669    -- 1 EUR = 1.1669 USD
+fx_convert(1000000,'USD','EUR') = 856971   -- 100 USD = 85.6971 EUR
+```
+
+Both match the live API. `pull_changes` mentions the new key and not the old.
+pgTAP: `05_fx` and `23_sync_primitives` pass. Upgrade path exercised on device
+— the simulator's store rebuilt to `units_per_eur` and re-pulled 75 rates, 5
+accounts and 18 transactions, dashboard unchanged.
+
+**One pgTAP failure, pre-existing and environmental:**
+`13_ops_platform.sql` test 9, "fx_freshness_check is healthy immediately after
+a fresh seed". The local dev database's newest rate is 2026-08-19 and today is
+2026-08-26, so the staleness check is correctly unhealthy. That file never
+mentions the column, and its own comment says the test assumes a fresh
+reset+seed. **Not run: `supabase db reset`** — the local database holds
+hand-made dev accounts and 21 transactions that a reset would destroy.
+
+### Deploy order
+
+`supabase db push`, redeploy `sync-fx-rates` (its named argument changed), then
+ship the app build. An older client talking to the new schema loses fx rows;
+an undeployed Edge Function calling `p_rate_to_eur` gets "function does not
+exist".
+
+### Also in this pass
+
+- The FX popover says "base currency", matching the Preferences row it links
+  to. One name for one thing.
+- **`DateBucketing` deleted**, with its five tests. It derived a weekly/monthly
+  granularity from a span, and `MetricGranularity` has replaced every use —
+  the last two callers went with the Net Worth month-end change above.
+  `app-architecture.md` §5 updated: the "derived from the span, never a user
+  control" rule is now stated as history, since the expanded widgets' W/M/Y
+  filter reverses it and the collapsed trajectories share those same buckets.

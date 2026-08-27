@@ -112,11 +112,22 @@ enum RefereeFixture {
         }
     }
 
+    /// **`units_per_eur` is units of the currency per 1 EUR**, not euros per
+    /// unit — see `sync-fx-rates` (`?base=EUR`, which answers
+    /// `{"amount":1.0,"base":"EUR","rates":{"USD":1.1669}}`) and
+    /// `fx_convert`'s own arithmetic. Read that way, JPY's `0.0060` below is
+    /// not a real-world rate — a euro buys about 160 yen, not six
+    /// thousandths of one. It is whatever the Postgres capture was taken
+    /// with, and these values are pinned to that capture rather than chosen,
+    /// so it stays. Nothing here asserts a converted JPY figure —
+    /// `net_worth` is `nil` on the missing GBP rate long before yen matter —
+    /// so it changes no expectation. Worth regenerating the capture with a
+    /// realistic yen rate the next time this fixture is touched.
     private static func seedFxRates(_ database: Database) throws {
         for (currency, rate) in [("USD", "0.9000"), ("JPY", "0.0060")] {
             try database.execute(
                 sql: """
-                INSERT INTO fx_rates (currency, rate_date, rate_to_eur, source, fetched_at, sync_seq)
+                INSERT INTO fx_rates (currency, rate_date, units_per_eur, source, fetched_at, sync_seq)
                 VALUES (?, '2026-07-01', ?, 'ecb', '2026-07-01T00:00:00.000000+00:00', 1)
                 """,
                 arguments: [currency, rate]

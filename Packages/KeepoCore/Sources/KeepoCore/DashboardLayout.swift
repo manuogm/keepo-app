@@ -73,13 +73,15 @@ public struct DashboardWidgetSize: Sendable, Equatable, Hashable, Codable {
 /// `UserDefaults` and read back on the next launch, so renaming one
 /// silently drops that widget off every existing dashboard. Add cases
 /// freely; never rename one.
-public enum DashboardWidgetKind: String, Sendable, CaseIterable, Codable {
+public enum DashboardWidgetKind: String, Sendable, CaseIterable, Codable, Identifiable {
     case netWorth = "net_worth"
     case investingRatio = "investing_ratio"
     case currencyExposure = "currency_exposure"
     case upcomingBills = "upcoming_bills"
     case cashflow
     case fxRate = "fx_rate"
+
+    public var id: String { rawValue }
 
     /// The title in the tile's header and in the catalogue. Free to change —
     /// unlike `rawValue`, which is a storage format (see above), the title
@@ -93,33 +95,6 @@ public enum DashboardWidgetKind: String, Sendable, CaseIterable, Codable {
         case .upcomingBills: return "Transactions Next 2 Weeks"
         case .cashflow: return "Cashflow Breakdown"
         case .fxRate: return "FX Rate"
-        }
-    }
-
-    /// The glyph in the tile's header and beside its catalogue entry — one
-    /// value, so a widget can't be one thing on the dashboard and another in
-    /// the picker the user chose it from.
-    public var systemImage: String {
-        switch self {
-        case .netWorth: return "chart.line.uptrend.xyaxis"
-        case .investingRatio: return "chart.pie"
-        case .currencyExposure: return "globe"
-        case .upcomingBills: return "calendar"
-        case .cashflow: return "arrow.up.arrow.down"
-        case .fxRate: return "arrow.left.arrow.right"
-        }
-    }
-
-    /// One line for the catalogue — what this widget answers, not what it
-    /// looks like; the preview beside it already shows that.
-    public var summary: String {
-        switch self {
-        case .netWorth: return "Everything you own, minus what you owe, over time."
-        case .investingRatio: return "How much of your net worth is invested."
-        case .currencyExposure: return "Which currencies your money sits in."
-        case .upcomingBills: return "What's coming in and going out over the next two weeks."
-        case .cashflow: return "What came in against what went out, and where it went."
-        case .fxRate: return "What one currency is worth in yours, over time."
         }
     }
 

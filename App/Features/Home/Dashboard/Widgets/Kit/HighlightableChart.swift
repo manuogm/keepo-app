@@ -2,64 +2,6 @@ import Charts
 import KeepoCore
 import SwiftUI
 
-/// One bucket of a charted metric.
-///
-/// `value` is `nil` for a bucket that could not be computed — a month with
-/// no resolvable FX rate, a ratio against a zero net worth. The chart draws
-/// **nothing** there rather than a zero, which is money rule 5 expressed as
-/// a gap in a line instead of a dip to the axis.
-struct MetricPoint: Identifiable, Equatable, Sendable {
-    let bucket: Date
-    let value: Double?
-    /// The same figure as signed minor-unit money, when the metric is money
-    /// at all. `nil` for ratios, and for a bucket with no value. Kept
-    /// alongside rather than derived, so the headline can format money
-    /// through `MoneyFormatter` while the chart plots a `Double` — no
-    /// rounding happens twice, and nothing sums the `Double`s (money rule 3).
-    let amountE4: Int64?
-    /// For a ratio metric, what the value is a share **of** — net worth, for
-    /// the investing ratio. Carried alongside rather than loaded as a second
-    /// series because it is computed in the same pass anyway, and because it
-    /// is the only way to draw a bar proportional to the whole *and* filled
-    /// to the share: reading magnitude and ratio off one mark.
-    let denominatorE4: Int64?
-
-    var id: Date { bucket }
-
-    init(bucket: Date, value: Double?, amountE4: Int64? = nil, denominatorE4: Int64? = nil) {
-        self.bucket = bucket
-        self.value = value
-        self.amountE4 = amountE4
-        self.denominatorE4 = denominatorE4
-    }
-
-    /// A money bucket, where the charted value is just the amount at display
-    /// scale.
-    init(bucket: Date, amountE4: Int64?) {
-        self.bucket = bucket
-        self.value = amountE4.map { Double($0) / 10_000 }
-        self.amountE4 = amountE4
-        self.denominatorE4 = nil
-    }
-}
-
-/// One drawable series. A chart takes several because Cashflow needs three
-/// at once (money in, money out, and the net line over them) — every other
-/// widget passes one, and passing one is not a special case.
-struct ChartSeries: Identifiable, Equatable {
-    let id: String
-    let points: [MetricPoint]
-    let visualization: MetricVisualization
-    /// The series' full-strength colour. What actually gets drawn is this
-    /// dimmed everywhere except the highlighted bucket — see
-    /// `WidgetPalette.mark`.
-    let color: Color
-    /// Bars whose height should be read against the *series'* own maximum
-    /// rather than the chart's. Investing Ratio uses it: its bars are
-    /// proportional to net worth, with the invested share filled inside.
-    var backdrop: [MetricPoint]?
-}
-
 /// One mark, ready to draw: which slot on the x axis it occupies, which
 /// bucket that is (for the highlight test), and what to plot.
 ///
@@ -85,7 +27,7 @@ private struct PlottedMark: Identifiable {
     let value: Double
 }
 
-/// The expanded widgets' chart: scrollable, zoomable, and highlightable.
+/// The expanded widgets' chart: scrollable and highlightable.
 ///
 /// **The x axis is a bucket index, not a date.** Two reasons, both of which
 /// bit the earlier version: with real dates, monthly bars come out visibly
@@ -110,20 +52,25 @@ struct HighlightableChart: View {
     /// practice — a widget picks a default (the latest bucket, or the last
     /// closed one for a flow) before it draws.
     @Binding var highlighted: Date?
-    /// How many buckets fit on screen. The pinch gesture writes here, and
-    /// the owning widget watches it to decide whether the granularity should
-    /// change (`MetricZoom`).
-    @Binding var visibleBuckets: Int
+    /// How many buckets fit on screen. Read-only now: the timeframe
+    /// segments are the only thing that changes it.
+    ///
+    /// It used to be a binding, written by a pinch gesture that also moved
+    /// the granularity under the user. Pinching a chart this size — a
+    /// two-finger gesture inside a card that is itself inside a scrolling,
+    /// reorderable grid — was fussy to start and easy to trigger by
+    /// accident, and it competed with the horizontal scroll for the same
+    /// touches. W/M/Y says the same thing in one tap.
+    let visibleBuckets: Int
     /// The leading edge of the visible window, in bucket indices. Owned
     /// outside so the widget can start scrolled to "now" and can re-window
     /// its data as this moves.
     @Binding var scrollIndex: Double
 
-    /// Fewest buckets a pinch can zoom into. Below about four, a line has no
+    /// Fewest buckets a chart is drawn at. Below about four, a line has no
     /// shape left and a bar chart is a row of blocks.
     private let minimumVisible = 4
 
-    @State private var zoomAnchor: Int?
     /// What `chartXSelection` last reported, in x-scale units. Mapped onto a
     /// bucket by `select(_:)` rather than used directly — the scale is
     /// continuous, so a tap between two bars lands on a fraction.
@@ -136,6 +83,26 @@ struct HighlightableChart: View {
     /// account.
     private var visibleLength: Int {
         max(min(visibleBuckets, buckets.count), min(minimumVisible, max(buckets.count, 1)))
+    }
+
+    /// Half a bucket of the *next* one, shown past the right-hand edge.
+    ///
+    /// The scroll was invisible. A chart that fits its window exactly and a
+    /// chart with two more years hidden behind it look identical, so the
+    /// only way to find out there was more was to try dragging one — and a
+    /// user who doesn't know a view scrolls doesn't try. Half a bar at the
+    /// edge is the same promise a `LazyHStack` of cards makes, and it costs
+    /// half a slot of width.
+    ///
+    /// Zero when everything already fits, because there is nothing to hint
+    /// at and the dead half-slot would just make the last bar look adrift.
+    private var peek: Double { visibleLength < buckets.count ? 0.5 : 0 }
+
+    /// One bucket's share of the plot. The unit both the bar width and the
+    /// axis labels are sized against, so a bar and its label can't disagree
+    /// about how much room a bucket has.
+    private func slotWidth(plotWidth: CGFloat) -> CGFloat {
+        plotWidth / CGFloat(max(Double(visibleLength) + peek, 1))
     }
 
     /// The band the y axis covers.
@@ -170,15 +137,16 @@ struct HighlightableChart: View {
         // bar chart on the dashboard drew a single bar. Nothing was wrong
         // with the data; the y axis even scaled to include it.
         GeometryReader { geometry in
-            chart(barWidth: barWidth(plotWidth: geometry.size.width))
+            let slot = slotWidth(plotWidth: geometry.size.width)
+            chart(barWidth: barWidth(slot: slot))
                 .chartLegend(.hidden)
             .chartYAxis(.hidden)
             .chartXScale(domain: -0.5 ... Double(max(buckets.count, 1)) - 0.5)
             .chartYScale(domain: yDomain)
             .chartScrollableAxes(.horizontal)
-            .chartXVisibleDomain(length: Double(visibleLength))
+            .chartXVisibleDomain(length: Double(visibleLength) + peek)
             .chartScrollPosition(x: $scrollIndex)
-            .chartXAxis { xAxis }
+            .chartXAxis { xAxis(slot: slot) }
             // Selection through the chart's own API, not a transparent plate
             // in `chartOverlay`.
             //
@@ -192,24 +160,38 @@ struct HighlightableChart: View {
             // chart sat still. Nothing about the overlay says "this disables
             // scrolling", which is why it read as a Swift Charts bug.
             .chartXSelection(value: $selectedPosition)
+            // A plain tap, on top of the press-and-hold scrub
+            // `chartXSelection` gives on its own.
+            //
+            // Held alone, selection on a *scrollable* chart is gated behind
+            // a long press — it has to be, or every scrub would fight the
+            // pan for the same drag. But nothing about a bar says "hold
+            // me", so the chart read as unresponsive to anyone who tapped
+            // one and waited. `chartGesture` hands the gesture the chart's
+            // own proxy and lets it live alongside the scroll view's pan
+            // rather than in front of it, which is exactly what the
+            // `chartOverlay` plate this replaced could not do.
+            .chartGesture { proxy in
+                SpatialTapGesture()
+                    .onEnded { value in proxy.selectXValue(at: value.location.x) }
+            }
             .onChange(of: selectedPosition) { _, position in
                 select(position)
             }
-            // Pinch coexists with the chart's own horizontal scroll rather
-            // than replacing it: `.simultaneousGesture` lets the scroll view
-            // keep the pan while the magnification is recognised alongside.
-            // Attached with `.gesture` instead, a two-finger touch cancelled
-            // the scroll outright and the chart felt stuck.
-                .simultaneousGesture(zoomGesture)
                 .sensoryFeedback(.selection, trigger: highlighted)
         }
     }
 
-    /// One bucket's slot, less the gutter that keeps neighbouring bars apart.
-    /// Floored at two points so a chart zoomed all the way out still draws
-    /// something rather than nothing.
-    private func barWidth(plotWidth: CGFloat) -> CGFloat {
-        max(plotWidth / CGFloat(max(visibleLength, 1)) * 0.62, 2)
+    /// How wide a bar is drawn: its share of the slot, **capped**.
+    ///
+    /// Proportional alone is right at twelve buckets and wrong at four —
+    /// each bar becomes a broad slab, and a chart of five months looked
+    /// like a different component from the same chart showing twelve. The
+    /// cap holds the bar at a width chosen to look right and lets the *gaps*
+    /// grow instead, so the bars stay recognisably the same object at every
+    /// resolution. Floored so a crowded chart still draws something.
+    private func barWidth(slot: CGFloat) -> CGFloat {
+        max(min(slot * 0.58, 16), 4)
     }
 
     private func chart(barWidth: CGFloat) -> some View {
@@ -259,7 +241,15 @@ struct HighlightableChart: View {
                     width: .fixed(barWidth)
                 )
                     .foregroundStyle(colour(series, bucket: entry.bucket, isBackdrop: isBackdrop))
-                    .cornerRadius(3)
+                    // Fully rounded ends rather than a fixed 3pt softening.
+                    // Half the bar's own width makes the cap a semicircle at
+                    // every width the cap above can produce, so the shape is
+                    // one decision rather than a radius that reads as barely
+                    // rounded on a wide bar and almost circular on a narrow
+                    // one. Swift Charts clamps the radius against the bar's
+                    // short side, so a near-zero bar stays a sliver rather
+                    // than becoming a dot.
+                    .cornerRadius(barWidth / 2, style: .continuous)
             }
         }
     }
@@ -290,47 +280,87 @@ struct HighlightableChart: View {
 
     // MARK: - Axis
 
-    /// Labels thinned so they never collide: at twelve visible buckets every
-    /// one is labelled, at forty every fourth is. Derived from what is on
-    /// screen rather than from the total, so zooming out thins the labels
-    /// instead of overprinting them.
-    private var xAxis: AxisMarks<some AxisMark> {
-        AxisMarks(values: labelIndices) { value in
-            AxisValueLabel {
-                if let index = value.as(Double.self).map({ Int($0.rounded()) }),
-                   buckets.indices.contains(index) {
-                    Text(granularity.axisLabel(for: buckets[index], calendar: utcCalendar))
+    /// Every bucket gets a label, written at whichever form fits.
+    ///
+    /// The previous version thinned the labels instead — one every second
+    /// or fourth bucket — and inset the first one so it wouldn't be clipped
+    /// by the plot edge. Both were wrong for a chart this short: the
+    /// thinning left the reader counting bars to find March, and the inset
+    /// moved labels off the buckets they named, which is the misalignment
+    /// that was visible on the device. A label centred on its own bucket
+    /// and narrow enough to fit that bucket's slot needs neither trick —
+    /// the domain already runs half a slot past each end, so a label that
+    /// fits one slot cannot hang off the plot.
+    private func xAxis(slot: CGFloat) -> AxisMarks<some AxisMark> {
+        let labels = ChartAxisLabels.fitted(buckets: buckets, granularity: granularity, slotWidth: slot)
+        let gridStride = gridStride(slot: slot)
+        return AxisMarks(values: buckets.indices.map(Double.init)) { value in
+            let index = value.as(Double.self).map { Int($0.rounded()) }
+            if showsGridLines, let index, index.isMultiple(of: gridStride) {
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+                    .foregroundStyle(Color.secondary.opacity(0.28))
+            }
+            // `anchor: .top` — UnitPoint(0.5, 0) — is what actually centres
+            // the label on its tick.
+            //
+            // Given custom content, `AxisValueLabel`'s default anchor puts
+            // the label's *leading* edge at the tick, so every label sat
+            // half its own width to the right of the bar it named. Measured
+            // with a temporary `AxisGridLine`: the gridlines landed exactly
+            // on the marks, and the labels landed 14pt to the right of the
+            // gridlines. Naming the anchor puts the label's horizontal
+            // centre on the tick and its top edge on the axis, which is
+            // where a bottom-axis label belongs.
+            //
+            // Not `centered: true`, which is a different thing — that
+            // centres a label within the *step* after its tick, which is
+            // right for categorical bars and would move ours half a bucket
+            // further right still.
+            AxisValueLabel(anchor: .top) {
+                if let index, labels.indices.contains(index) {
+                    Text(labels[index])
                         .font(.caption)
                         .foregroundStyle(Color.secondary)
-                        // Without this a week label ("28 Apr–4 May") is
-                        // truncated to an ellipsis by the tick's own width
-                        // allowance, which reads as a rendering fault.
                         .lineLimit(1)
-                        .fixedSize()
+                        // **No `fixedSize()`.** It is what put every label
+                        // half its own width to the right of the bar it
+                        // names — measured on device: three points at
+                        // x = 0, 1, 2 carried labels sitting at 0.12, 1.11
+                        // and 2.15. A fixed-size label reports a width
+                        // larger than the slot Swift Charts allotted it, and
+                        // the overflow spills to one side instead of being
+                        // centred on the tick. It was there to stop a long
+                        // label being truncated; the fitting pass above now
+                        // guarantees the label is narrow enough, so the
+                        // workaround has nothing left to protect and was
+                        // costing the alignment it was hiding behind.
                 }
             }
         }
     }
 
-    /// Which buckets get a label.
+    /// Whether to rule the plot.
     ///
-    /// Two rules, both learned by looking at it. **Density** comes from
-    /// what is on screen rather than from the total, so zooming out thins
-    /// the labels instead of overprinting them — and a week ("Jul 26–Aug
-    /// 1") gets more room than a month ("Jul"). **Position** starts half a
-    /// stride in rather than at bucket zero: a label is centred on its
-    /// bucket, so one on the very first bucket hangs half its width off the
-    /// left edge of the plot and is clipped. Insetting costs nothing — the
-    /// axis is a scale, not a list, and the reader takes the interval from
-    /// any two labels.
-    private var labelIndices: [Double] {
-        let perScreen: Double = granularity == .week ? 3 : 5
-        let stride = max(Int((Double(visibleLength) / perScreen).rounded(.up)), 1)
-        // A week's label is about twice a month's, so it needs twice the
-        // inset to clear the plot edge — "Jun 28–Jul 4" starting one bucket
-        // in still hung off the left.
-        let inset = granularity == .week ? stride : max(stride / 2, 1)
-        return Swift.stride(from: inset, to: buckets.count, by: stride).map(Double.init)
+    /// **Line charts only.** A dotted rule is what lets a reader carry a
+    /// point on the line down to the month underneath it — without one, a
+    /// value halfway along a smooth curve has nothing to be measured
+    /// against. A bar does that job itself: it *is* a vertical mark standing
+    /// on its own label, so a dotted line drawn through it adds nothing and
+    /// takes contrast away from the bar.
+    private var showsGridLines: Bool {
+        !series.contains { $0.visualization == .bar }
+    }
+
+    /// Every bucket where there is room, every other where there isn't.
+    ///
+    /// Ruled at every bucket a wide chart is legible and a crowded one turns
+    /// into hatching — the rules stop reading as reference lines and start
+    /// reading as a texture over the data. The threshold is a slot width
+    /// rather than a bucket count so it answers the real question (how close
+    /// together would these actually be drawn) on any tile size and at any
+    /// Dynamic Type setting.
+    private func gridStride(slot: CGFloat) -> Int {
+        slot >= 24 ? 1 : 2
     }
 
     // MARK: - Highlighting
@@ -351,23 +381,20 @@ struct HighlightableChart: View {
         guard let position, position.isFinite, !buckets.isEmpty else { return }
         let bucket = buckets[min(max(Int(position.rounded()), 0), buckets.count - 1)]
         guard bucket != highlighted else { return }
-        withAnimation(.snappy(duration: 0.2)) { highlighted = bucket }
+        withAnimation(Self.highlightAnimation) { highlighted = bucket }
     }
 
-    // MARK: - Zoom
-
-    /// Pinch changes how many buckets are on screen. The owning widget
-    /// decides whether that has crossed a resolution boundary — this
-    /// gesture only ever reports a count, so the M/Y segments and the pinch
-    /// stay one control rather than two that have to agree.
-    private var zoomGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let anchor = zoomAnchor ?? visibleBuckets
-                if zoomAnchor == nil { zoomAnchor = anchor }
-                let scaled = Double(anchor) / max(value.magnification, 0.1)
-                visibleBuckets = min(max(Int(scaled.rounded()), minimumVisible), max(buckets.count, minimumVisible))
-            }
-            .onEnded { _ in zoomAnchor = nil }
-    }
+    /// **A curve, not a spring** — what stopped bars and points flashing
+    /// when tapped. Almost everything a highlight changes is a *colour*:
+    /// every mark moves between dimmed and lit (`WidgetPalette.mark`). A
+    /// spring overshoots by design, and an overshoot on an interpolated
+    /// colour has nowhere to go — it clamps at the end of the ramp and comes
+    /// back, which reads as the mark flashing rather than as bounce. The
+    /// same `.snappy` was behind the Cashflow toggle's flicker.
+    ///
+    /// Still animated rather than instant, unlike that toggle: the headline
+    /// rolls its digits through `contentTransition(.numericText())`, which
+    /// needs a transaction, and a line's point mark really does change size
+    /// here. Both want a curve; neither wants bounce.
+    private static let highlightAnimation: Animation = .easeInOut(duration: 0.2)
 }

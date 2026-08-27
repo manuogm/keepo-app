@@ -641,48 +641,48 @@ public enum PublicSchema {
     public let currency: String
     public let fetchedAt: String
     public let rateDate: String
-    public let rateToEur: Decimal
     public let source: FxSource
     public let syncSeq: Int64
+    public let unitsPerEur: Decimal
     public enum CodingKeys: String, CodingKey {
       case currency = "currency"
       case fetchedAt = "fetched_at"
       case rateDate = "rate_date"
-      case rateToEur = "rate_to_eur"
       case source = "source"
       case syncSeq = "sync_seq"
+      case unitsPerEur = "units_per_eur"
     }
   }
   public struct FxRatesInsert: Codable, Hashable, Sendable {
     public let currency: String
     public let fetchedAt: String?
     public let rateDate: String
-    public let rateToEur: Decimal
     public let source: FxSource
     public let syncSeq: Int64?
+    public let unitsPerEur: Decimal
     public enum CodingKeys: String, CodingKey {
       case currency = "currency"
       case fetchedAt = "fetched_at"
       case rateDate = "rate_date"
-      case rateToEur = "rate_to_eur"
       case source = "source"
       case syncSeq = "sync_seq"
+      case unitsPerEur = "units_per_eur"
     }
   }
   public struct FxRatesUpdate: Codable, Hashable, Sendable {
     public let currency: String?
     public let fetchedAt: String?
     public let rateDate: String?
-    public let rateToEur: Decimal?
     public let source: FxSource?
     public let syncSeq: Int64?
+    public let unitsPerEur: Decimal?
     public enum CodingKeys: String, CodingKey {
       case currency = "currency"
       case fetchedAt = "fetched_at"
       case rateDate = "rate_date"
-      case rateToEur = "rate_to_eur"
       case source = "source"
       case syncSeq = "sync_seq"
+      case unitsPerEur = "units_per_eur"
     }
   }
   public struct HouseholdAccountsSelect: Codable, Hashable, Sendable {

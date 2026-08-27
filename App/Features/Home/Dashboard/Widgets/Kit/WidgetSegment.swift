@@ -25,15 +25,16 @@ struct WidgetSegment<Label: View>: View {
                 .fontWeight(isSelected ? .bold : .regular)
                 .foregroundStyle(foreground)
                 .frame(minWidth: 24)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                // Tight, like the tab bar this is meant to read as. It used
+                // to be 6pt of padding inside a 44pt frame, and the frame —
+                // not the padding — is what made every expanded widget's
+                // header 44pt tall and pushed its title and headline down.
+                .padding(.vertical, 4)
                 .background(background, in: Capsule())
-                // The capsule stays the size the design wants; the *touch*
-                // area is grown to Apple's 44pt minimum around it. Drawing
-                // the segment itself at 44pt would put a control taller than
-                // the widget's own title in every expanded header.
-                .frame(minHeight: WidgetStyle.minimumTarget)
-                .contentShape(Rectangle())
+                // The 44pt target comes back as an *overlay*, so the finger
+                // gets HIG's area without the layout getting its height.
+                .hitTarget()
         }
         // `.plain`, not `.pressableRow`: this sits inside a card that has its
         // own tap gesture, and a button style that redraws on press competes
@@ -46,8 +47,21 @@ struct WidgetSegment<Label: View>: View {
         return isSelected ? tint : Color.secondary
     }
 
+    /// The selected segment's capsule.
+    ///
+    /// Untinted, it is the **card's own colour** rather than a darker grey —
+    /// the same trick `UISegmentedControl` uses. The segment sits on a faint
+    /// track, so punching back to the surface behind it reads as raised, and
+    /// the selected label gets the card's full contrast instead of dark grey
+    /// text on mid grey. A darker selected capsule did the opposite: it was
+    /// nearly the track's own tone, so the selection was hard to find and
+    /// the letter on it was hard to read.
+    ///
+    /// Tinted, it stays a wash of the tint — Cashflow's In/Out toggle has no
+    /// track behind it, so a card-coloured capsule there would be invisible.
     private var background: Color {
         guard isSelected else { return .clear }
-        return (tint ?? Color.secondary).opacity(0.16)
+        guard let tint else { return Color(.secondarySystemGroupedBackground) }
+        return tint.opacity(0.16)
     }
 }

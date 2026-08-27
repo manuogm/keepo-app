@@ -23,6 +23,10 @@ struct FxRateWidget: View {
     let onTap: () -> Void
 
     @State private var series = SeriesWidgetState(kind: .fxRate)
+    /// The base-currency note. Optional so the catalogue — which draws this
+    /// widget with no tab bar above it — renders rather than traps.
+    @Environment(AppNavigation.self) private var navigation: AppNavigation?
+    @State private var isShowingBaseNote = false
 
     /// Only currencies the user actually holds, never the base currency
     /// itself — a rate of one against one is not information.
@@ -45,30 +49,43 @@ struct FxRateWidget: View {
                 collapsed
             }
         }
-        // Picked once, when the widget first has something to pick from.
+        // **Re-picked whenever the current choice stops being valid**, which
+        // includes having no choice at all.
+        //
+        // Keyed on the list alone, this fired once at launch and never again
+        // — and collapsing the widget calls `reset()`, which restores the
+        // kind's default config, and that config has no currency in it. So
+        // the tile came back from its first expansion showing a globe and a
+        // dash, with nothing left that could ever put a currency back.
+        // Keying on the choice as well means the reset is a change this can
+        // see. Assigning here re-fires it once more, and the guard then
+        // passes, so there is no loop.
+        //
         // The largest holding would be a better default but costs a
         // conversion the collapsed tile hasn't paid for; alphabetical-first
         // is honest, stable, and one tap from anything else.
-        .onChange(of: quotable, initial: true) { _, currencies in
-            guard series.config.quoteCurrency == nil || !currencies.contains(series.config.quoteCurrency ?? "") else {
-                return
-            }
-            series.config.quoteCurrency = currencies.first
+        .onChange(of: quoteSelection, initial: true) { _, selection in
+            guard selection.picked == nil || !selection.available.contains(selection.picked ?? "") else { return }
+            series.config.quoteCurrency = selection.available.first
         }
     }
 
     // MARK: - Collapsed
 
+    /// **No trend badge here**, unlike every other collapsed tile.
+    ///
+    /// This one carries a pair of currency badges above the figure already,
+    /// and a pill under it made three stacked objects in a 2×1 — the tile
+    /// stopped reading as "a rate" and started reading as a list. The rate
+    /// is also the one figure on the dashboard whose period-over-period
+    /// move is the least interesting thing about it: what a user opens this
+    /// tile for is the number itself. The badge returns the moment the
+    /// widget is expanded, where there is room for it and a chart for it to
+    /// describe.
     private var collapsed: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             pair
-            // Captionless on the collapsed 2×1, for the same reason
-            // `InvestingRatioWidget.collapsed` is: one grid column cannot
-            // hold the pill and "vs last month avg" without truncating it.
-            MetricHeadlineBlock(
-                value: .rate(series.highlightedPoint?.value), size: 30,
-                percentChange: series.percentChange
-            )
+            MetricHeadline(value: .rate(series.highlightedPoint?.value), size: WidgetStyle.metric)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -77,6 +94,10 @@ struct FxRateWidget: View {
                 .opacity(0.5)
                 .padding(.horizontal, -WidgetStyle.padding)
         }
+        // The rate has four decimal places and the trajectory runs under all
+        // of them; without the wash a line crossing "1.0847" at the wrong
+        // angle costs the reader a digit.
+        .metricLegibilityScrim()
         // The collapsed tile still needs one window of data to draw its
         // rate and its trend. Loading it here rather than in the chrome —
         // which only loads while expanded — is the one place a collapsed
@@ -88,13 +109,21 @@ struct FxRateWidget: View {
         }
     }
 
+    /// Quote, slash, base — the order the number is read in. `EUR / USD` at
+    /// 1.1654 means one euro buys 1.1654 dollars, so the pair has to be
+    /// written the same way round as the figure under it.
+    ///
+    /// The slash is `.title3` rather than `.caption`, with real air either
+    /// side. It is the only thing on the row saying these two currencies are
+    /// a *ratio* and not a list, and at caption size between two 22pt discs
+    /// it read as a stray mark.
     private var pair: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 8) {
             quotePicker
             Text("/")
-                .font(.caption)
+                .font(.title3)
                 .foregroundStyle(Color.secondary)
-            CurrencyBadge(code: currency?.code, diameter: 22)
+            basePill
         }
     }
 
@@ -117,14 +146,87 @@ struct FxRateWidget: View {
             }
         } label: {
             CurrencyBadge(code: series.config.quoteCurrency, diameter: 22)
-                .padding(.leading, 3)
-                .padding(.trailing, 8)
-                .padding(.vertical, 4)
-                .overlay(Capsule().stroke(Color.secondary.opacity(0.4), lineWidth: 1))
-                .frame(minHeight: WidgetStyle.minimumTarget)
-                .contentShape(Rectangle())
+                .currencyPill(stroke: Color.secondary.opacity(0.4))
+                .hitTarget()
         }
         .buttonStyle(.plain)
+        // **The pill must not animate.** Picking a currency changes the
+        // config, which re-keys the collapsed load — and that load runs
+        // inside whatever transaction the dashboard has open, so the pill
+        // was being carried along by it: it re-laid out over about a second,
+        // clipped at both ends while it went. Nothing about a label swapping
+        // three letters for three others should move, so this pill opts out
+        // of every animation around it.
+        .transaction { $0.animation = nil }
+    }
+
+    /// The base currency, drawn as a pill that is deliberately **not** a
+    /// choice.
+    ///
+    /// A bare badge beside a bordered one read as an oversight — two
+    /// currencies, one of them apparently tappable for no stated reason. The
+    /// same capsule at a lighter weight says "same kind of thing, fixed",
+    /// and it still answers a tap, because the question a fixed control
+    /// invites is "why can't I change this?".
+    private var basePill: some View {
+        Button {
+            isShowingBaseNote = true
+        } label: {
+            CurrencyBadge(code: currency?.code, diameter: 22)
+                .opacity(0.6)
+                .currencyPill(stroke: Color.secondary.opacity(0.18))
+                .hitTarget()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(currency?.code ?? "Base currency"), your base currency")
+        .popover(isPresented: $isShowingBaseNote) { baseNote }
+    }
+
+    /// Why the base currency can't be picked here, and where it can.
+    ///
+    /// A popover rather than a sheet: the answer is one line about the pill
+    /// that was just tapped, and it belongs beside it.
+    /// `presentationCompactAdaptation(.popover)` is what stops iPhone
+    /// promoting it into a half-height sheet, which would cover the widget
+    /// the question is about.
+    ///
+    /// Deliberately two lines and no prose. The first draft explained *why*
+    /// every figure converts into this currency — true, and not what someone
+    /// tapping a greyed-out control is asking. They want to know it is
+    /// deliberate and where to change it.
+    ///
+    /// `fixedSize` rather than a width: with nothing to wrap, the content has
+    /// one honest size and the popover can take it. Given a `maxWidth`
+    /// instead, the bubble sized itself from the first measuring pass and the
+    /// text then ran out of the top and bottom of it.
+    private var baseNote: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // "Base currency", the exact words Preferences uses for the
+            // row this links to. One name for one thing: a popover that
+            // said "default" and a settings screen that said "base" would
+            // read as two different settings.
+            Text("\(currency?.code ?? "—") is your base currency")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.primary)
+            Button {
+                isShowingBaseNote = false
+                navigation?.openProfile(.preferences)
+            } label: {
+                // The chevron is the promise that this pushes a screen
+                // rather than opening another layer on top of this one.
+                HStack(spacing: 4) {
+                    Text("Go to settings")
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                }
+                .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            .disabled(navigation == nil)
+        }
+        .padding(16)
+        .fixedSize()
+        .presentationCompactAdaptation(.popover)
     }
 
     // MARK: - Expanded
@@ -137,10 +239,10 @@ struct FxRateWidget: View {
     /// part that says *what the number is being compared to*, so losing it
     /// to an ellipsis costs more than the vertical line it takes to keep.
     private var expanded: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             pair
             MetricHeadlineBlock(
-                value: .rate(series.highlightedPoint?.value), size: 28,
+                value: .rate(series.highlightedPoint?.value), size: WidgetStyle.metricExpanded,
                 percentChange: series.percentChange, caption: badgeCaption
             )
             SeriesChartOrMessage(series: series, color: trendColor)
@@ -159,11 +261,43 @@ struct FxRateWidget: View {
             : TrendCaption.collapsed(series.granularity, averaged: true)
     }
 
+    private var quoteSelection: FxQuoteSelection {
+        FxQuoteSelection(available: quotable, picked: series.config.quoteCurrency)
+    }
+
     private var collapsedKey: FxCollapsedKey {
         FxCollapsedKey(
             quote: series.config.quoteCurrency, token: context?.token ?? 0, scope: context?.scope ?? .total
         )
     }
+}
+
+/// The two halves of "is the picked currency still a valid pick" — what the
+/// list offers and what is currently chosen. One `Equatable` value so a
+/// change to *either* re-runs the default pick.
+private struct FxQuoteSelection: Equatable {
+    let available: [String]
+    let picked: String?
+}
+
+/// The pill both currencies are drawn in. One modifier rather than two call
+/// sites, because the whole point of the base pill is that it is the same
+/// shape as the one beside it — laid out separately they drifted by a point
+/// of padding and read as two different controls.
+private struct CurrencyPill: ViewModifier {
+    let stroke: Color
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.leading, 4)
+            .padding(.trailing, 8)
+            .padding(.vertical, 4)
+            .overlay(Capsule().stroke(stroke, lineWidth: 1))
+    }
+}
+
+private extension View {
+    func currencyPill(stroke: Color) -> some View { modifier(CurrencyPill(stroke: stroke)) }
 }
 
 private struct FxCollapsedKey: Equatable {

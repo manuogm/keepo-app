@@ -3,16 +3,17 @@ import SwiftUI
 /// One segment of a fill bar: a share of the whole, in a colour that means
 /// something.
 ///
-/// `isNegative` is not a colour flag — it says the segment represents a
-/// position the user is *short*, which cannot honestly be drawn as a slice
-/// of a positive total. It renders as an outline rather than a fill, so a
-/// credit card inside a currency's holdings reads as the offset it is
-/// instead of adding to the bar it should be subtracting from.
+/// There is no "negative" segment. There used to be — an outlined, dashed one
+/// for a credit card inside a currency's holdings — and it was the wrong
+/// shape for the idea: a card *offsets* the holdings rather than being a
+/// slice of them, so it had no honest length, and at a realistic magnitude it
+/// rendered as a three-point dash too short to show a dash pattern at all.
+/// Currency Exposure lists those accounts instead, with a red figure and no
+/// share, which says the same thing without needing a key.
 struct FillSegment: Identifiable, Equatable {
     let id: String
     let share: Double
     let color: Color
-    var isNegative = false
 }
 
 /// The dashboard's fill bar — horizontal or vertical, one segment or
@@ -54,23 +55,13 @@ struct WidgetFillBar: View {
         layout {
             if axis == .vertical { Spacer(minLength: 0) }
             ForEach(segments) { segment in
-                segmentView(segment)
+                Capsule().fill(segment.color)
                     .frame(
                         width: axis == .horizontal ? length(segment, extent: extent) : nil,
                         height: axis == .vertical ? length(segment, extent: extent) : nil
                     )
             }
             if axis == .horizontal { Spacer(minLength: 0) }
-        }
-    }
-
-    @ViewBuilder
-    private func segmentView(_ segment: FillSegment) -> some View {
-        if segment.isNegative {
-            Capsule()
-                .strokeBorder(segment.color, style: StrokeStyle(lineWidth: 1.5, dash: [2, 2]))
-        } else {
-            Capsule().fill(segment.color)
         }
     }
 

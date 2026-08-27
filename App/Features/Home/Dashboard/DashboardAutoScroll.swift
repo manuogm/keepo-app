@@ -9,11 +9,35 @@ struct DashboardScrollGeometry: Equatable {
     var offsetY: CGFloat = 0
     var viewportHeight: CGFloat = 0
     var contentHeight: CGFloat = 0
+    /// The scroll view's top content inset — the safe area and header the
+    /// content passes under. Only carried so `scrollTarget(for:)` can undo
+    /// it; nothing else should need it.
+    var insetTop: CGFloat = 0
 
     /// The largest legal `offsetY`. Clamping to this is what stops the
     /// auto-scroll from running past the end of the dashboard and leaving
     /// the dragged tile hovering over nothing.
     var maximumOffsetY: CGFloat { max(contentHeight - viewportHeight, 0) }
+
+    /// An `offsetY` translated into the number `ScrollPosition.scrollTo(y:)`
+    /// actually wants.
+    ///
+    /// **They are not the same coordinate space, and nothing says so.**
+    /// `ScrollGeometry.contentOffset` is measured from the top of the
+    /// *content area*, inside the insets; `scrollTo(y:)` is measured from
+    /// the top of the content itself. On this screen they differ by the
+    /// 116pt the header and status bar take, so reading an offset and
+    /// writing it straight back moved the dashboard 116pt upwards.
+    ///
+    /// It never looked like a coordinate bug. The expansion scroll moved,
+    /// and moved roughly the right way — it just always stopped one header
+    /// short, so an expanded widget sat lower on the screen than asked and
+    /// the tallest one (Cashflow) came to rest against the tab bar. Measured
+    /// by asking for 652 and watching `contentOffset` settle at 536.
+    ///
+    /// Every programmatic scroll goes through here, so the two spaces can
+    /// only ever be reconciled in one place.
+    func scrollTarget(for offsetY: CGFloat) -> CGFloat { offsetY + insetTop }
 }
 
 /// Edge auto-scroll while a tile is being dragged.
@@ -108,7 +132,7 @@ extension DashboardCanvasView {
             // Zero when the finger is nowhere near an edge, and also at the
             // very top or bottom, where there is nothing further to give.
             if travelled != 0 {
-                scrollPosition.scrollTo(y: offset)
+                scrollPosition.scrollTo(y: scrollGeometry.scrollTarget(for: offset))
                 // The finger hasn't moved, but the grid underneath it has,
                 // so its position in grid coordinates changed by exactly
                 // what we just scrolled. Without this the drop target would

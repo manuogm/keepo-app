@@ -121,7 +121,7 @@ enum LocalDashboardQueries {
         let rows = try Row.fetchAll(
             database,
             sql: """
-            SELECT a.id, a.name, a.currency, a.icon, a.color, cur.minor_unit
+            SELECT a.id, a.name, a.currency, a.icon, a.color, a.kind, cur.minor_unit
             FROM accounts a
             LEFT JOIN currencies cur ON cur.code = a.currency
             WHERE a.deleted_at IS NULL AND a.archived_at IS NULL AND (\(scopeClause))
@@ -141,6 +141,7 @@ enum LocalDashboardQueries {
             byCurrency[currency, default: []].append(
                 CurrencyAccountLocal(
                     accountId: accountId, name: row["name"], icon: row["icon"], color: row["color"],
+                    kind: PublicSchema.AccountKind(rawValue: row["kind"] ?? "") ?? .regular,
                     // Its own minor unit, read rather than assumed — JPY has
                     // none, and a hardcoded 2 would render ¥1,200 as ¥12.00
                     // (money rule 2).
@@ -151,10 +152,17 @@ enum LocalDashboardQueries {
         }
 
         return byCurrency
-            .map { currency, accounts in
-                CurrencyExposureLocal(
-                    currency: currency,
+            .compactMap { _, accounts -> CurrencyExposureLocal? in
+                // Every account in a group is in the same currency by
+                // construction, so the first one's `CurrencyInfo` is the
+                // group's. A group is never empty — the dictionary is only
+                // written by appending — but reading it as an optional keeps
+                // that a fact about the code rather than a force-unwrap.
+                guard let currencyInfo = accounts.first?.currencyInfo else { return nil }
+                return CurrencyExposureLocal(
+                    currencyInfo: currencyInfo,
                     amountBaseE4: accounts.reduce(0) { $0 + $1.amountBaseE4 },
+                    nativeAmountE4: accounts.reduce(0) { $0 + $1.nativeAmountE4 },
                     accounts: accounts.sorted { $0.amountBaseE4 > $1.amountBaseE4 }
                 )
             }
@@ -282,14 +290,29 @@ struct UpcomingTransactionLocal: Equatable, Identifiable {
 }
 
 struct CurrencyExposureLocal: Equatable, Identifiable {
-    let currency: String
-    /// Signed: a currency you are net short in (a credit card, an overdraft)
-    /// is negative, and the widget says so rather than hiding it.
+    /// The currency itself, with its own minor unit — read from
+    /// `currencies`, never assumed to be two (money rule 2). Carried as the
+    /// full `CurrencyInfo` rather than a bare code because the expanded
+    /// widget formats `nativeAmountE4` below in *this* currency, and a slice
+    /// that had to reach into its own first account to find out how to round
+    /// itself would be one refactor away from rendering ¥1,200 as ¥12.00.
+    let currencyInfo: CurrencyInfo
+    /// Signed, converted to the user's base currency: a currency you are net
+    /// short in (a credit card, an overdraft) is negative, and the widget
+    /// says so rather than hiding it. This is the figure every **share** is
+    /// taken against, because it is the only one comparable across
+    /// currencies.
     let amountBaseE4: Int64
+    /// Signed, in the currency's own units — what the user would see in the
+    /// bank app for these accounts. The expanded widget leads with it, and
+    /// leads with the converted figure underneath, so the row is
+    /// recognisable *and* comparable rather than one or the other.
+    let nativeAmountE4: Int64
     /// What the total is made of, largest first. Always present — the
     /// expanded widget breaks a currency down without a second read.
     let accounts: [CurrencyAccountLocal]
 
+    var currency: String { currencyInfo.code }
     var id: String { currency }
 
     /// Accounts the user is net *long* in. These are the ones that can be
@@ -315,6 +338,11 @@ struct CurrencyAccountLocal: Equatable, Identifiable {
     let name: String
     let icon: String
     let color: String
+    /// The user's own declaration that this account is an investment.
+    /// Presentational only — it never touches a balance (money rule 1) — and
+    /// carried here so the expanded widget can badge the row without a second
+    /// read of `accounts`.
+    let kind: PublicSchema.AccountKind
     /// The currency the account is held in, with its own minor unit — the
     /// same for every account in one `CurrencyExposureLocal`, carried along
     /// so a row can format its own native figure without reaching back up to

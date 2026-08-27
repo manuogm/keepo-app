@@ -35,7 +35,7 @@ struct UpcomingBillsWidget: View {
     var body: some View {
         WidgetChrome(
             title: DashboardWidgetKind.upcomingBills.title,
-            systemImage: DashboardWidgetKind.upcomingBills.systemImage,
+            guide: isExpanded ? DashboardWidgetKind.upcomingBills.guide : nil,
             onTap: onTap
         ) {
             if let metrics, !metrics.items.isEmpty {
@@ -63,17 +63,28 @@ struct UpcomingBillsWidget: View {
     /// This used to be a single cramped row: the tile was half-height, which
     /// left about 27 points of content once the card's padding and header
     /// were taken out. It is a full-height tile now — same as every other
-    /// collapsed widget — so the counts get their own line and the fortnight
-    /// gets a strip of day rings, which is the part that answers "when".
+    /// collapsed widget — so the fortnight gets a strip of day rings, which
+    /// is the part that answers "when".
+    ///
+    /// Figure, then the fortnight, then what it is made of.
+    ///
+    /// The rings sit **directly under the figure**, with the slack below them
+    /// rather than above. Pinned to the bottom of the tile they sat about
+    /// forty points lower than the same rings on the expanded one, so
+    /// expanding slid the whole fortnight upwards past the figure — the one
+    /// thing on screen that had not changed appeared to move the most.
+    ///
+    /// The counts read **under** the rings, not beside the figure. They are a
+    /// summary of the strip above them ("three of those rings are money going
+    /// out"), and on the figure's line they read as a caption on the net
+    /// instead. Expanded keeps them on the headline's line, where the rings
+    /// are followed immediately by a list that needs the width.
     private func collapsed(_ metrics: UpcomingTransactionsMetrics) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                MetricHeadline(value: .money(metrics.totalE4, currency), size: 30)
-                Spacer(minLength: 4)
-            }
+            MetricHeadline(value: .money(metrics.totalE4, currency), size: WidgetStyle.metric)
+            carousel(metrics, isInteractive: false)
             counts(metrics)
             Spacer(minLength: 0)
-            carousel(metrics, isInteractive: false)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -105,7 +116,7 @@ struct UpcomingBillsWidget: View {
     private func expanded(_ metrics: UpcomingTransactionsMetrics) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                MetricHeadline(value: .money(metrics.totalE4, currency), size: 28)
+                MetricHeadline(value: .money(metrics.totalE4, currency), size: WidgetStyle.metricExpanded)
                 Spacer(minLength: 4)
                 counts(metrics)
             }
@@ -122,15 +133,20 @@ struct UpcomingBillsWidget: View {
     /// widget like a tap anywhere else on the card. Wrapping them in buttons
     /// there would put fourteen targets over a card whose only job is to
     /// expand, and picking a day you cannot yet see the list for.
+    /// The day rings' size. Everything inside a ring is drawn as a fraction
+    /// of this, so the date and its weekday letter grow with it — which is
+    /// what the extra height freed by moving the counts up actually bought.
+    private var ringDiameter: CGFloat { 46 }
+
     private func carousel(_ metrics: UpcomingTransactionsMetrics, isInteractive: Bool) -> some View {
         ScrollView(.horizontal) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ForEach(metrics.days(from: today, calendar: utcCalendar), id: \.self) { day in
                     let items = metrics.items(on: day, calendar: utcCalendar)
                     let ring = DaySplitRing(
                         day: day, segments: segments(items),
                         isSelected: isInteractive && selectedDay == day, isToday: day == today,
-                        calendar: utcCalendar
+                        diameter: ringDiameter, calendar: utcCalendar
                     )
                     if isInteractive {
                         Button {
@@ -138,7 +154,9 @@ struct UpcomingBillsWidget: View {
                                 selectedDay = selectedDay == day ? nil : day
                             }
                         } label: {
-                            // HIG's minimum, around a 38pt ring.
+                            // A 46pt ring already clears HIG's 44, but the
+                            // frame stays: it is what guarantees that, not
+                            // the diameter happening to be larger today.
                             ring.frame(minWidth: WidgetStyle.minimumTarget, minHeight: WidgetStyle.minimumTarget)
                                 .contentShape(Rectangle())
                         }
@@ -149,7 +167,7 @@ struct UpcomingBillsWidget: View {
                     }
                 }
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 4)
         }
         .scrollIndicators(.hidden)
         .sensoryFeedback(.selection, trigger: selectedDay)
@@ -185,7 +203,7 @@ struct UpcomingBillsWidget: View {
                         ForEach(items) { item in
                             row(item)
                             if item.id != items.last?.id {
-                                Divider().padding(.leading, 38)
+                                Divider().padding(.leading, 40)
                             }
                         }
                     }
@@ -207,7 +225,7 @@ struct UpcomingBillsWidget: View {
         Button {
             openRule(item.ruleId)
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 CategoryIconView(icon: item.categoryIcon, color: Color(hex: item.categoryColor), diameter: 28)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(item.categoryName)
@@ -220,13 +238,12 @@ struct UpcomingBillsWidget: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 6)
-                Text(amountLabel(item.amountBaseE4))
+                PrivateText(amountLabel(item.amountBaseE4))
                     .font(.subheadline.weight(.medium))
-                    .monospacedDigit()
                     .foregroundStyle(item.isInbound ? CashflowPalette.income : Color.primary)
             }
             // Opens the recurring rule's form — worth HIG's full 44pt.
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .frame(minHeight: WidgetStyle.minimumTarget)
             .contentShape(Rectangle())
         }

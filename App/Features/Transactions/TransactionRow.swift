@@ -78,7 +78,7 @@ struct TransactionRow: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(isPrivacyMode ? "••••" : formattedAmount)
+                PrivateText(formattedAmount)
                     .font(.body.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(amountColor)

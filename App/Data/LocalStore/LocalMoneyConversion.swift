@@ -22,12 +22,18 @@ enum LocalMoneyConversion {
     /// Port of `fx_rate_on(p_currency, p_date)` — EUR is structurally 1;
     /// everything else carries forward the newest `fx_rates` row at or
     /// before `date`, exactly like the server's `order by rate_date desc limit 1`.
+    ///
+    /// **Returns units of `currency` per one euro** — 1.1669 means a euro
+    /// buys 1.1669 dollars. That is the shape Frankfurter answers `?base=EUR`
+    /// with, and the shape `convert` below needs: divide out of the source
+    /// currency into euros, multiply into the target. EUR is 1 by
+    /// construction, which is why `fx_rates` never holds a row for it.
     static func fxRateOn(_ database: Database, currency: String, date: String) throws -> Decimal? {
         if currency == "EUR" { return 1 }
         guard let rateString = try String.fetchOne(
             database,
             sql: """
-            SELECT rate_to_eur FROM fx_rates WHERE currency = ? AND rate_date <= ?
+            SELECT units_per_eur FROM fx_rates WHERE currency = ? AND rate_date <= ?
             ORDER BY rate_date DESC LIMIT 1
             """,
             arguments: [currency, date]
@@ -55,8 +61,8 @@ enum LocalMoneyConversion {
     // MARK: - net_worth(scope) / net_worth_series
 
     /// Port of `net_worth(p_scope)` at an arbitrary date — server-side this
-    /// is always "today"; L4 generalizes it because `netWorthSeries` below
-    /// needs the same computation once per day and there is no on-device
+    /// is always "today". L4 generalized it because the dashboard needs the
+    /// same computation at each bucket's end and there is no on-device
     /// `net_worth_daily` to read instead (the plan's explicit call: a local
     /// store can afford to recompute).
     static func netWorth(
@@ -66,23 +72,6 @@ enum LocalMoneyConversion {
             database, baseCurrency: moneyScope.baseCurrency, asOf: asOf, now: now,
             accountIds: try scopedAccountIds(database, scope: moneyScope.scope)
         )
-    }
-
-    static func netWorthSeries(
-        _ database: Database, _ moneyScope: LocalMoneyScope, from: String, through: String, now: Date
-    ) throws -> [(asOf: String, totalE4: Int64?)] {
-        guard var cursor = PostgresDate.dateOnly(from: from, calendar: utcCalendar),
-              let end = PostgresDate.dateOnly(from: through, calendar: utcCalendar)
-        else { return [] }
-
-        var results: [(String, Int64?)] = []
-        while cursor <= end {
-            let asOf = PostgresDate.dateOnlyString(cursor, calendar: utcCalendar)
-            let total = try netWorth(database, moneyScope, asOf: asOf, now: now)
-            results.append((asOf, total))
-            cursor = utcCalendar.date(byAdding: .day, value: 1, to: cursor) ?? end.addingTimeInterval(1)
-        }
-        return results
     }
 
     /// Accounts (not deleted, not archived) in scope, mirroring the

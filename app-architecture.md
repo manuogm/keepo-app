@@ -329,7 +329,7 @@ One `SECURITY DEFINER`, transactional RPC: copies every row in `household_accoun
 
 ## 5. Charts
 
-**Swift Charts** (native SwiftUI, iOS 16+) replaces the retired backend's hand-rolled SVG — no third-party charting dependency, matching the "reuse before writing" principle now that a first-party equivalent exists on the platform. Bucketing/scale logic that Swift Charts doesn't provide out of the box (weekly vs. monthly granularity by span) lives in `KeepoCore`, unit-tested, per §2.
+**Swift Charts** (native SwiftUI, iOS 16+) replaces the retired backend's hand-rolled SVG — no third-party charting dependency, matching the "reuse before writing" principle now that a first-party equivalent exists on the platform. Bucketing/scale logic that Swift Charts doesn't provide out of the box lives in `KeepoCore`, unit-tested, per §2 — today that is `MetricGranularity`, which owns the whole vocabulary a bucket needs: which period it covers, the date its value is evaluated at (the open period clamped to today), the label under it, and the noun the trend badge says.
 
 Two findings from the retired doc's palette work still hold and are **not being re-derived**, since they were validated against actual CVD tooling rather than chosen by eye:
 
@@ -341,7 +341,9 @@ Two findings from the retired doc's palette work still hold and are **not being 
 - **Income is blue, not green.** Coral-vs-green is the canonical red-green colorblind failure (ΔE 7.6); coral-vs-blue clears it (ΔE 19.5).
 - **Mango (`#FF9F1C`, BrandSecondary) stays a UI accent** (budget limits, goal markers) — it falls outside the lightness band needed for a data series on a white surface.
 
-Other rules carried forward: one axis, never dual — a second implied scale is a comprehension tax the chart doesn't need to impose. Gaps filled with real zeroes, never omitted, so evenly-spaced bars don't imply evenly-spaced dates. Category bars carry their name and value as text, so an unvalidated user-chosen category color is never the only identity channel. Bucket granularity is derived from the span, never a user control: 30/90-day ranges bucket weekly, longer ranges monthly — daily income-vs-expense is dominated by the one day salary lands.
+Other rules carried forward: one axis, never dual — a second implied scale is a comprehension tax the chart doesn't need to impose. Gaps filled with real zeroes, never omitted, so evenly-spaced bars don't imply evenly-spaced dates. Category bars carry their name and value as text, so an unvalidated user-chosen category color is never the only identity channel. Daily buckets are not offered at all — daily income-vs-expense is dominated by the one day salary lands.
+
+Granularity itself **used to be derived from the span and never a user control** (30/90-day ranges weekly, longer monthly), in a `DateBucketing` type that has since been deleted. The dashboard's expanded widgets reverse that: their W/M/Y filter *is* the interaction, so the resolution is chosen, not inferred. Collapsed tiles no longer infer one either — the Net Worth trajectory is built from the same `MetricGranularity` month buckets its expanded chart draws, so a widget's two states cannot disagree about what a month is.
 
 ---
 

@@ -12,7 +12,7 @@ struct DashboardWidgetMetricsTests {
 
     private func account(_ name: String, _ amountE4: Int64, currency: String = "EUR") -> CurrencyAccountLocal {
         CurrencyAccountLocal(
-            accountId: name, name: name, icon: "banknote", color: "#8E8E93",
+            accountId: name, name: name, icon: "banknote", color: "#8E8E93", kind: .regular,
             currencyInfo: CurrencyInfo(code: currency, minorUnit: 2),
             amountBaseE4: amountE4, nativeAmountE4: amountE4
         )
@@ -20,7 +20,10 @@ struct DashboardWidgetMetricsTests {
 
     private func slice(_ code: String, _ accounts: [CurrencyAccountLocal]) -> CurrencyExposureLocal {
         CurrencyExposureLocal(
-            currency: code, amountBaseE4: accounts.reduce(0) { $0 + $1.amountBaseE4 }, accounts: accounts
+            currencyInfo: CurrencyInfo(code: code, minorUnit: 2),
+            amountBaseE4: accounts.reduce(0) { $0 + $1.amountBaseE4 },
+            nativeAmountE4: accounts.reduce(0) { $0 + $1.nativeAmountE4 },
+            accounts: accounts
         )
     }
 

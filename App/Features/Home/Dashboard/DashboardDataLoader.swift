@@ -12,11 +12,19 @@ import KeepoCore
 /// so the dashboard's load time scales with what is actually on screen
 /// rather than with everything the catalogue offers.
 enum DashboardDataLoader {
-    /// How far back the collapsed trend lines look. Long enough to have a
-    /// shape, short enough that the per-day recomputation stays cheap; the
-    /// expanded Net Worth widget asks for its own range separately, only
-    /// once it is actually expanded.
-    static let trendRangeDays = 90
+    /// How far back the collapsed Net Worth trajectory looks — **the same
+    /// twelve buckets the expanded widget opens on**
+    /// (`SeriesWidgetState.visibleBuckets`), so the tile's little line is a
+    /// small copy of the chart it becomes rather than a different picture of
+    /// the same money.
+    ///
+    /// It used to be 90 *days*, walked one day at a time. That made the two
+    /// states visibly disagree — a jagged three-month line collapsed, a
+    /// smooth twelve-month one expanded — and it recomputed every account's
+    /// balance ninety times on every dashboard refresh. Twelve month-end
+    /// readings are the same answer at the resolution the chart actually
+    /// draws, and cost a seventh of the work.
+    static let netWorthTrendMonths = 12
 
     /// The Upcoming Bills window — "the next two weeks", per its own spec.
     static let billsWindowDays = 14
@@ -35,9 +43,9 @@ enum DashboardDataLoader {
             // Always, not gated on `kinds`: the catalogue needs these to
             // explain why a widget the user does not yet have is disabled.
             data.capabilities = DashboardCapabilities(
-                hasInvestmentAccounts: try LocalDashboardQueries.hasInvestmentAccounts(
+                hasInvestmentAccounts: try LocalDashboardQueries.investmentAccountCount(
                     database, scope: moneyScope.scope
-                ),
+                ) > 0,
                 foreignCurrencies: try LocalDashboardQueries.heldCurrencies(
                     database, scope: moneyScope.scope, excluding: baseCurrency
                 )
@@ -63,20 +71,55 @@ enum DashboardDataLoader {
         }
     }
 
+    /// One set of month-end readings answers all three of the collapsed
+    /// tile's questions.
+    ///
+    /// The figure, the badge and the trajectory used to be computed three
+    /// different ways — today's balance, the balance on this day last month,
+    /// and ninety daily points bucketed after the fact. So the collapsed
+    /// badge compared *today against the same day last month* while the
+    /// expanded one compared *this month-end against last month-end*, and
+    /// the two states could disagree about which way net worth had gone.
+    ///
+    /// Now every one of them is a bucket out of this array, and the buckets
+    /// are built by `MetricGranularity` from the same `evaluationDate` rule
+    /// `DashboardMetricSeries` uses for the expanded chart — the current
+    /// bucket clamped to today, so "this month" means "so far this month" in
+    /// both places. The two states cannot drift, because there is one
+    /// definition.
     private static func netWorthMetrics(
         _ database: Database, _ moneyScope: LocalMoneyScope, now: Date
     ) throws -> NetWorthMetrics {
-        let today = PostgresDate.dateOnlyString(now, calendar: utcCalendar)
-        let monthAgo = utcCalendar.date(byAdding: .month, value: -1, to: now) ?? now
-        let from = utcCalendar.date(byAdding: .day, value: -(trendRangeDays - 1), to: now) ?? now
-
+        let readings = try monthEndNetWorth(database, moneyScope, months: netWorthTrendMonths, now: now)
         return NetWorthMetrics(
-            current: try LocalMoneyConversion.netWorth(database, moneyScope, asOf: today, now: now),
-            previousMonth: try LocalMoneyConversion.netWorth(
-                database, moneyScope, asOf: PostgresDate.dateOnlyString(monthAgo, calendar: utcCalendar), now: now
-            ),
-            series: try series(database, moneyScope, from: from, through: now)
+            current: readings.last?.totalE4 ?? nil,
+            previousMonth: readings.count >= 2 ? readings[readings.count - 2].totalE4 : nil,
+            // A bucket whose total can't be resolved is dropped, never zeroed
+            // — a missing FX rate must not draw as a dip to the axis (money
+            // rule 5).
+            series: readings.compactMap { reading in
+                reading.totalE4.map { DashboardSeriesPoint(date: reading.bucket, value: $0) }
+            }
         )
+    }
+
+    /// Net worth at the end of each of the last `months` months, newest last.
+    /// The current month reads as of today rather than as of a date that
+    /// hasn't happened.
+    private static func monthEndNetWorth(
+        _ database: Database, _ moneyScope: LocalMoneyScope, months: Int, now: Date
+    ) throws -> [(bucket: Date, totalE4: Int64?)] {
+        let start = utcCalendar.date(byAdding: .month, value: -(months - 1), to: now) ?? now
+        let buckets = MetricGranularity.month.buckets(from: start, through: now, calendar: utcCalendar)
+        return try buckets.map { bucket in
+            let asOf = MetricGranularity.month.evaluationDate(forBucket: bucket, now: now, calendar: utcCalendar)
+            return (
+                bucket: bucket,
+                totalE4: try LocalMoneyConversion.netWorth(
+                    database, moneyScope, asOf: PostgresDate.dateOnlyString(asOf, calendar: utcCalendar), now: now
+                )
+            )
+        }
     }
 
     private static func upcomingMetrics(
@@ -136,7 +179,7 @@ enum DashboardDataLoader {
             previousNetWorthE4: try LocalMoneyConversion.netWorth(
                 database, moneyScope, asOf: monthAgoString, now: now
             ),
-            hasInvestmentAccounts: try LocalDashboardQueries.hasInvestmentAccounts(
+            investmentAccountCount: try LocalDashboardQueries.investmentAccountCount(
                 database, scope: moneyScope.scope
             )
         )
@@ -184,58 +227,5 @@ enum DashboardDataLoader {
               let lastDay = utcCalendar.date(byAdding: .day, value: -1, to: nextMonth)
         else { return nil }
         return min(lastDay, now)
-    }
-
-    /// The expanded Currency Exposure widget's own trend load — lazy for the
-    /// same reason the net-worth range is: a currency the user never selects
-    /// is never walked day by day.
-    static func fxTrend(
-        dbQueue: DatabaseQueue, currency: String, baseCurrency: String, from: Date, through: Date
-    ) async throws -> [DashboardSeriesPoint] {
-        try await dbQueue.read { database in
-            let points = try LocalDashboardQueries.fxTrend(
-                database, currency: currency, baseCurrency: baseCurrency, from: from, through: through
-            )
-            let granularity = DateBucketing.granularity(from: from, through: through)
-            return DateBucketing.bucket(points, granularity: granularity)
-                .map { DashboardSeriesPoint(date: $0.date, value: $0.value) }
-        }
-    }
-
-    /// The expanded Net Worth widget's own range load — deliberately its own
-    /// call rather than part of `load` above, so a range the user never
-    /// opens is never computed. Same bucketing rule as everywhere else:
-    /// granularity is derived from the span, never a user control
-    /// (app-architecture.md §5).
-    static func netWorthSeries(
-        dbQueue: DatabaseQueue, scope: PublicSchema.AccountScope, baseCurrency: String,
-        from: Date, through: Date
-    ) async throws -> [DashboardSeriesPoint] {
-        let moneyScope = LocalMoneyScope(scope: scope, baseCurrency: baseCurrency)
-        return try await dbQueue.read { database in
-            try series(database, moneyScope, from: from, through: through)
-        }
-    }
-
-    private static func series(
-        _ database: Database, _ moneyScope: LocalMoneyScope, from: Date, through: Date
-    ) throws -> [DashboardSeriesPoint] {
-        let points = try LocalMoneyConversion.netWorthSeries(
-            database, moneyScope,
-            from: PostgresDate.dateOnlyString(from, calendar: utcCalendar),
-            through: PostgresDate.dateOnlyString(through, calendar: utcCalendar),
-            now: through
-        )
-        // A day whose total can't be resolved is dropped, not zeroed — a
-        // missing FX rate must never draw as a dip to the axis (money rule 5).
-        let parsed: [(date: Date, value: Int64)] = points.compactMap { point in
-            guard let date = PostgresDate.dateOnly(from: point.asOf, calendar: utcCalendar),
-                  let total = point.totalE4
-            else { return nil }
-            return (date: date, value: total)
-        }
-        let granularity = DateBucketing.granularity(from: from, through: through)
-        return DateBucketing.bucket(parsed, granularity: granularity)
-            .map { DashboardSeriesPoint(date: $0.date, value: $0.value) }
     }
 }

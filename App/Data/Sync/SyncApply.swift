@@ -45,7 +45,7 @@ enum SyncApply {
             "created_at", "updated_at", "sync_seq"
         ],
         "currencies": ["code", "minor_unit", "sync_seq"],
-        "fx_rates": ["currency", "rate_date", "rate_to_eur", "source", "fetched_at", "sync_seq"],
+        "fx_rates": ["currency", "rate_date", "units_per_eur", "source", "fetched_at", "sync_seq"],
         "card_mappings": [
             "id", "owner_id", "card_identifier", "account_id", "source", "created_at", "updated_at", "deleted_at",
             "sync_seq"

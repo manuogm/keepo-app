@@ -12,8 +12,15 @@ import SwiftUI
 /// The donut this widget used to be is gone deliberately. A donut answers
 /// "what share", and only that; the tile answers "what share, how much, and
 /// which accounts", which is the question someone holding four currencies
-/// actually has. Cashflow keeps its donut, where a category split genuinely is
-/// the whole question.
+/// actually has.
+///
+/// Every currency is drawn in a **shade of one colour**, ranked by size
+/// (`WidgetPalette.shade`), rather than in a hue of its own. Four unrelated
+/// hues on a 2×1 read as four categories; a single-hue ramp says the one
+/// thing the bar is actually claiming, which is that this currency is bigger
+/// than that one. The user's own account colours are still used — but only
+/// inside a currency, once it has been opened, where the question really is
+/// "which of *these* accounts".
 struct CurrencyExposureWidget: View {
     let metrics: CurrencyExposureMetrics?
     let currency: CurrencyInfo?
@@ -22,12 +29,16 @@ struct CurrencyExposureWidget: View {
 
     /// Which currency tiles are open. Reset on collapse, like every other
     /// widget's transient state — a widget always opens in a known state.
-    @State private var openCurrencies: Set<String> = []
+    ///
+    /// Internal rather than `private` because the expanded half of this
+    /// widget lives in `CurrencyExposureWidget+Expanded.swift`, and a
+    /// `private` member is not visible to an extension in another file.
+    @State var openCurrencies: Set<String> = []
 
     var body: some View {
         WidgetChrome(
             title: DashboardWidgetKind.currencyExposure.title,
-            systemImage: DashboardWidgetKind.currencyExposure.systemImage,
+            guide: isExpanded ? DashboardWidgetKind.currencyExposure.guide : nil,
             onTap: onTap
         ) {
             content
@@ -63,260 +74,134 @@ struct CurrencyExposureWidget: View {
 
     // MARK: - Collapsed
 
-    /// The dominant currency as the subject, the rest as a bar and a caption.
+    /// The dominant currency as the subject, the minority ones as a small row
+    /// of flags, and the whole split as a bar along the bottom.
     ///
     /// A 2×1 tile is a square about 130pt wide inside its padding, which is
     /// three short rows at most. Listing every currency in it would either
     /// truncate at an arbitrary number or shrink the type past reading size,
-    /// so one figure leads and the bar carries the shape of the remainder —
-    /// the expanded tile is where the full list lives.
+    /// so one figure leads and the row below names as many of the rest as
+    /// will honestly fit — the expanded tile is where the full list lives.
     private func collapsed(_ metrics: CurrencyExposureMetrics) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            CurrencyBadge(code: metrics.largest?.currency, diameter: 22)
-            MetricHeadline(value: .percent(metrics.largestShare), size: 30)
+            CurrencyBadge(code: metrics.largest?.currency, diameter: 26)
+            MetricHeadline(value: .percent(metrics.largestShare), size: WidgetStyle.metric)
             Spacer(minLength: 0)
+            // The gap under the minority row is deliberately wider than the
+            // stack's own: the row and the bar are both about the split, so
+            // with 4 points between them they read as one block and the row
+            // looked like a label *on* the bar rather than a list beside it.
+            minorRow(minorCurrencies(metrics))
+                .padding(.bottom, 6)
+            // Along the bottom edge, under everything it explains.
             WidgetFillBar(segments: shareSegments(metrics), thickness: 8)
-            Text(remainderCaption(metrics))
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    /// Every held currency as one stacked bar. Net-short currencies are absent
-    /// rather than drawn as an outline here: at this size the bar is a shape,
-    /// not a legend, and a dashed sliver a few points wide reads as a
-    /// rendering artefact.
+    /// Every held currency as one stacked bar, darkest first. Net-short
+    /// currencies are absent rather than drawn as an outline here: at this
+    /// size the bar is a shape, not a legend, and a dashed sliver a few points
+    /// wide reads as a rendering artefact.
     private func shareSegments(_ metrics: CurrencyExposureMetrics) -> [FillSegment] {
-        metrics.positiveSlices.compactMap { slice in
+        metrics.positiveSlices.enumerated().compactMap { rank, slice in
             guard let share = metrics.share(of: slice) else { return nil }
-            return FillSegment(id: slice.currency, share: share, color: CurrencyColor.color(for: slice.currency))
+            return FillSegment(id: slice.currency, share: share, color: WidgetPalette.shade(rank: rank))
         }
     }
 
-    /// "EUR 28% · GBP 10%", or how many more there are when they won't fit.
-    private func remainderCaption(_ metrics: CurrencyExposureMetrics) -> String {
-        let rest = metrics.positiveSlices.dropFirst()
-        guard !rest.isEmpty else { return "All in one currency" }
-        if rest.count > 2 {
-            return "+\(rest.count) more currencies"
-        }
-        return rest
-            .map { "\($0.currency) \(shareLabel(metrics.share(of: $0)))" }
-            .joined(separator: " · ")
+    /// One entry in the minority row: a currency, or the roll-up standing for
+    /// all the ones that wouldn't fit.
+    private struct MinorCurrency: Identifiable {
+        let id: String
+        /// `nil` draws the roll-up's globe rather than a flag.
+        let code: String?
+        let label: String?
+        let share: Double?
     }
 
-    // MARK: - Expanded
+    /// Everything except the headline currency, named where there is room and
+    /// rolled up where there isn't.
+    ///
+    /// One currency shows nothing at all — a row saying "and no others" is
+    /// noise. Two or three fit as themselves. Past that the last slot becomes
+    /// "REST", carrying the *combined* share of everything it stands for, so
+    /// the row's percentages still add up with the headline's rather than
+    /// trailing off into an unaccounted remainder.
+    private func minorCurrencies(_ metrics: CurrencyExposureMetrics) -> [MinorCurrency] {
+        let rest = Array(metrics.positiveSlices.dropFirst())
+        guard !rest.isEmpty else { return [] }
+        guard rest.count > 2 else {
+            return rest.map {
+                MinorCurrency(id: $0.currency, code: $0.currency, label: nil, share: metrics.share(of: $0))
+            }
+        }
+        let second = rest[0]
+        return [
+            MinorCurrency(
+                id: second.currency, code: second.currency, label: nil, share: metrics.share(of: second)
+            ),
+            MinorCurrency(
+                id: "rest", code: nil, label: "REST",
+                share: metrics.share(ofCombined: Array(rest.dropFirst()))
+            )
+        ]
+    }
 
-    /// One tile per currency, scrolling. Net-short currencies sit under a
-    /// divider at the end — they are real positions and omitting them would be
-    /// lying by selection, but they cannot be a share of anything, so they do
-    /// not belong in the same run as the currencies that can.
-    private func expanded(_ metrics: CurrencyExposureMetrics) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(metrics.positiveSlices) { slice in
-                    currencyTile(slice, metrics: metrics)
-                }
-                if !metrics.netShortSlices.isEmpty {
-                    Divider().padding(.vertical, 2)
-                    Text("Net short")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.secondary)
-                    ForEach(metrics.netShortSlices) { slice in
-                        currencyTile(slice, metrics: metrics)
+    /// Deliberately much smaller than the headline. These are the currencies
+    /// the user holds *least* of, and a row that competed with the figure
+    /// above it would say the opposite of what it means.
+    ///
+    /// **The row sizes itself to how many entries it holds**, because the
+    /// tile does not grow to match. A 2×1 leaves about 144 points of width,
+    /// and each entry is a disc, a three-letter code and a percentage — one
+    /// of those has room to be comfortable, two do not. Sized for one at
+    /// both counts, the second entry's percentage truncated to an ellipsis,
+    /// and a figure drawn as "…" is worse than the same figure drawn small.
+    ///
+    /// The disc is the part that has to step down rather than the type: it
+    /// is the only element `minimumScaleFactor` cannot shrink, so at a fixed
+    /// diameter every point it takes comes out of the numbers.
+    @ViewBuilder
+    private func minorRow(_ entries: [MinorCurrency]) -> some View {
+        if !entries.isEmpty {
+            let isCrowded = entries.count > 1
+            HStack(spacing: isCrowded ? 4 : 8) {
+                ForEach(entries) { entry in
+                    HStack(spacing: isCrowded ? 3 : 4) {
+                        CurrencyBadge(code: entry.code, diameter: isCrowded ? 18 : 24, label: entry.label)
+                        Text(shareLabel(entry.share))
+                            .font(isCrowded ? .caption2 : .caption)
+                            .monospacedDigit()
+                            .foregroundStyle(Color.secondary)
                     }
                 }
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
         }
-        .scrollIndicators(.hidden)
-    }
-
-    private func currencyTile(_ slice: CurrencyExposureLocal, metrics: CurrencyExposureMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            currencyHeader(slice, metrics: metrics)
-            // A net-short currency gets no bar: the bar means "this is what
-            // the total is made of", and a negative total isn't made of
-            // anything you could stack.
-            if slice.amountBaseE4 > 0 {
-                bars(slice)
-            }
-            if openCurrencies.contains(slice.currency) {
-                accountList(slice)
-            }
-        }
-    }
-
-    private func currencyHeader(_ slice: CurrencyExposureLocal, metrics: CurrencyExposureMetrics) -> some View {
-        Button {
-            withAnimation(.snappy(duration: 0.22)) {
-                if openCurrencies.contains(slice.currency) {
-                    openCurrencies.remove(slice.currency)
-                } else {
-                    openCurrencies.insert(slice.currency)
-                }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                CurrencyBadge(code: slice.currency, diameter: 24)
-                Spacer(minLength: 4)
-                Text(amountLabel(slice.amountBaseE4))
-                    .font(.subheadline.weight(.medium))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.primary)
-                Text(shareLabel(metrics.share(of: slice)))
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(Color.secondary)
-                    .frame(minWidth: 38, alignment: .trailing)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.secondary)
-                    .rotationEffect(.degrees(openCurrencies.contains(slice.currency) ? 90 : 0))
-            }
-            // Opens the accounts inside this currency — HIG's 44pt minimum.
-            .frame(minHeight: WidgetStyle.minimumTarget)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.pressableRow)
-        .accessibilityLabel("\(slice.currency), \(amountLabel(slice.amountBaseE4))")
-        .accessibilityHint(openCurrencies.contains(slice.currency) ? "Hide accounts" : "Show accounts")
-    }
-
-    /// What is held, and — separately — what is owed against it.
-    ///
-    /// The accounts the user is long in fill the track exactly, because they
-    /// *are* the total. A credit card therefore has no room left inside the
-    /// bar, and putting one there anyway would either overflow it or shrink
-    /// every share below the percentage stated beside it. That is what
-    /// "outlined, never stacked" protects against.
-    ///
-    /// Drawn as a **labelled swatch** rather than as a second scaled bar. A
-    /// card offsetting 2% of a currency's holdings renders as a three-point
-    /// dash — too short to show a dash pattern at all, so it reads as a
-    /// rendering fault rather than as a debt. A swatch is legible at any
-    /// magnitude, and the figure beside it says what the length couldn't.
-    @ViewBuilder
-    private func bars(_ slice: CurrencyExposureLocal) -> some View {
-        let owed = slice.accounts.filter { $0.amountBaseE4 < 0 }
-        VStack(alignment: .leading, spacing: 4) {
-            WidgetFillBar(segments: accountSegments(slice), thickness: 8)
-            if !owed.isEmpty {
-                owedCaption(owed)
-            }
-        }
-    }
-
-    private func owedCaption(_ owed: [CurrencyAccountLocal]) -> some View {
-        HStack(spacing: 5) {
-            // The dash pattern comes from `WidgetFillBar` rather than being
-            // redrawn here, so "outlined means owed" looks the same wherever
-            // it appears.
-            WidgetFillBar(
-                segments: [FillSegment(
-                    id: "owed",
-                    share: 1,
-                    color: owed.count == 1 ? Color(hex: owed[0].color) : Color.secondary,
-                    isNegative: true
-                )],
-                thickness: 8,
-                showsTrack: false
-            )
-            .frame(width: 24)
-            Text(owedLabel(owed))
-                .font(.caption2)
-                .foregroundStyle(Color.secondary)
-                .monospacedDigit()
-                .lineLimit(1)
-        }
-    }
-
-    private func owedLabel(_ owed: [CurrencyAccountLocal]) -> String {
-        let total = owed.reduce(0) { $0 + abs($1.amountBaseE4) }
-        let amount = amountLabel(total)
-        return owed.count == 1 ? "\(amount) owed on \(owed[0].name)" : "\(amount) owed on \(owed.count) accounts"
-    }
-
-    /// The accounts inside a currency, in the colours the user picked for
-    /// them, scaled against what the currency actually holds.
-    private func accountSegments(_ slice: CurrencyExposureLocal) -> [FillSegment] {
-        let total = slice.positiveTotalE4
-        guard total > 0 else { return [] }
-        return slice.positiveAccounts.map { account in
-            FillSegment(
-                id: account.accountId,
-                share: Double(account.amountBaseE4) / Double(total),
-                color: Color(hex: account.color)
-            )
-        }
-    }
-
-    private func accountList(_ slice: CurrencyExposureLocal) -> some View {
-        VStack(spacing: 0) {
-            ForEach(slice.accounts) { account in
-                accountRow(account, in: slice)
-                if account.id != slice.accounts.last?.id {
-                    Divider().padding(.leading, 34)
-                }
-            }
-        }
-        .padding(.leading, 4)
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-
-    private func accountRow(_ account: CurrencyAccountLocal, in slice: CurrencyExposureLocal) -> some View {
-        HStack(spacing: 10) {
-            CategoryIconView(icon: account.icon, color: Color(hex: account.color), diameter: 24)
-            Text(account.name)
-                .font(.subheadline)
-                .foregroundStyle(Color.primary)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            VStack(alignment: .trailing, spacing: 0) {
-                Text(amountLabel(account.amountBaseE4))
-                    .font(.subheadline.weight(.medium))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.primary)
-                Text(contributionLabel(account, in: slice))
-                    .font(.caption2)
-                    .monospacedDigit()
-                    .foregroundStyle(Color.secondary)
-            }
-        }
-        .padding(.vertical, 6)
-    }
-
-    /// What the account contributes to its currency, plus its own native
-    /// figure when that is a different number worth seeing. A negative
-    /// account has no contribution — money rule 5's shape again.
-    private func contributionLabel(_ account: CurrencyAccountLocal, in slice: CurrencyExposureLocal) -> String {
-        let native = account.currencyInfo.code == currency?.code
-            ? nil
-            : MoneyFormatter.format(account.nativeAmountE4, currency: account.currencyInfo)
-        let share: String
-        if account.amountBaseE4 > 0, slice.positiveTotalE4 > 0 {
-            share = (Double(account.amountBaseE4) / Double(slice.positiveTotalE4))
-                .formatted(.percent.precision(.fractionLength(0)))
-        } else {
-            share = "—"
-        }
-        return native.map { "\(share) · \($0)" } ?? share
     }
 
     // MARK: - Formatting
 
     /// Money rule 5's shape, applied to a ratio: an unresolvable share is
     /// "—", never 0%.
-    private func shareLabel(_ share: Double?) -> String {
+    func shareLabel(_ share: Double?) -> String {
         guard let share else { return "—" }
         return share.formatted(.percent.precision(.fractionLength(0)))
     }
 
-    private func amountLabel(_ amountE4: Int64?) -> String {
-        guard let currency else { return "—" }
-        return MoneyFormatter.format(amountE4, currency: currency)
+    /// The base-currency figure that a native one converts to, or nothing
+    /// when the two are the same money.
+    func convertedLabel(_ amountBaseE4: Int64, from native: CurrencyInfo) -> String? {
+        guard let currency, native.code != currency.code else { return nil }
+        return MoneyFormatter.compact(amountBaseE4, currency: currency)
+    }
+
+    /// The unabbreviated figure, for VoiceOver. A screen reader has no width
+    /// to run out of, so it gets the cents the visible row gives up.
+    func exactLabel(_ amountE4: Int64, in native: CurrencyInfo) -> String {
+        MoneyFormatter.format(amountE4, currency: native)
     }
 }

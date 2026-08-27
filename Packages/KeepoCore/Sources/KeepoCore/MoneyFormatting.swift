@@ -25,6 +25,16 @@ public enum MoneySignStyle: Sendable, Equatable {
     /// already says which direction the money went: an outflow drops its
     /// minus sign, an inflow gains an explicit `+`.
     case ledger
+    /// The figure alone, unsigned — for a place where a **label** already
+    /// names the direction. Cashflow's collapsed tile puts "Money In" and
+    /// "Money Out" directly above their own totals, on opposite ends of a
+    /// bar that also diverges from the centre; a `+` on one of them and
+    /// nothing on the other is a third answer to a question already
+    /// answered twice.
+    ///
+    /// Differs from `ledger` only in dropping that `+`. Both draw the
+    /// magnitude, neither changes what is stored (money rule 1).
+    case magnitude
 }
 
 /// The single place money renders as text. Every screen calls this — never a
@@ -84,6 +94,45 @@ public enum MoneyFormatter {
         return (String(rendered[..<range.lowerBound]), String(rendered[range.lowerBound...]))
     }
 
+    /// The same figure at a glance — `$4.2K` where `format` would give
+    /// `$4,231.87`.
+    ///
+    /// For the one place a tile has room for a magnitude and nothing else:
+    /// the collapsed Cashflow widget's two direction totals, which sit at
+    /// the ends of a bar roughly 70 points wide. The full form does not fit
+    /// there, and letting `minimumScaleFactor` shrink it until it does is
+    /// worse than rounding it — nobody reads a total to the cent off a 2×2
+    /// tile, and a figure at 60% of its intended size is the tile's own
+    /// typography breaking down.
+    ///
+    /// Two rules, both deliberate:
+    ///
+    /// - **Never a fractional currency unit.** Under a thousand the figure
+    ///   loses its cents (`$842`), because a tile rendering `$842.37` beside
+    ///   `$4.2K` would be exact in one column and approximate in the other,
+    ///   and the reader has no way to know which.
+    /// - **Compact only past a thousand**, where the locale's own short form
+    ///   takes over. ICU places the suffix itself, so a locale that trails
+    ///   its currency symbol still reads correctly — appending a `K` to an
+    ///   already-formatted string would not.
+    ///
+    /// `nil` is `—`, exactly as `format` renders it. Money rule 5 gets no
+    /// exception for being short of space.
+    public static func compact(
+        _ amountE4: Int64?,
+        currency: CurrencyInfo,
+        locale: Locale = .current,
+        signStyle: MoneySignStyle = .standard
+    ) -> String {
+        guard let amountE4 else { return "—" }
+        let drawn = Decimal(drawnAmount(amountE4, signStyle: signStyle)) / Decimal(10_000)
+        let style = Decimal.FormatStyle.Currency(code: currency.code, locale: locale)
+        let rendered = abs(drawn) < 1000
+            ? drawn.formatted(style.precision(.fractionLength(0)))
+            : drawn.formatted(style.notation(.compactName).precision(.fractionLength(0 ... 1)))
+        return prefix(for: amountE4, signStyle: signStyle) + rendered
+    }
+
     /// The locale's symbol for this currency ("$", "€", "¥") — used by the
     /// amount fields that draw the symbol themselves instead of letting the
     /// formatter place it. Falls back to the code, which is never wrong,
@@ -105,7 +154,7 @@ public enum MoneyFormatter {
         // `Int64(clamping:)`, not `abs()` — `abs(Int64.min)` traps. No real
         // balance is anywhere near that, but a formatter must not be the
         // thing that crashes on absurd input.
-        case .ledger: return Int64(clamping: amountE4.magnitude)
+        case .ledger, .magnitude: return Int64(clamping: amountE4.magnitude)
         }
     }
 

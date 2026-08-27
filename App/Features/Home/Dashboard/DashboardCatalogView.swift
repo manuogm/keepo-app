@@ -29,15 +29,17 @@ import SwiftUI
 struct DashboardCatalogView: View {
     let geometry: DashboardGeometry
     let maxHeight: CGFloat
-    /// Why a widget can't be added right now, keyed by kind — absent means
-    /// it can. Passed in rather than worked out here: whether a widget is
-    /// already placed is the arrangement's business, and whether it has
-    /// anything to show is the data's, and this view has neither.
+    /// Which widgets are already on the dashboard. They move to their own
+    /// group rather than sitting greyed among the ones you can still add —
+    /// the rule is one of each, so a used widget is not an entry that
+    /// happens to be disabled, it is an entry that has already been spent.
+    var placed: Set<DashboardWidgetKind> = []
+    /// Why a widget that **isn't** placed still can't be added — missing
+    /// data, keyed by kind. Absent means it can.
     ///
-    /// Disabled entries stay **visible**, greyed, with the reason under
-    /// them. Hiding them would answer "where is the FX widget?" with
-    /// silence; showing it disabled answers it with "add a second
-    /// currency".
+    /// These entries stay **visible**, greyed, with the reason under them.
+    /// Hiding them would answer "where is the FX widget?" with silence;
+    /// showing it disabled answers it with "add a second currency".
     var unavailable: [DashboardWidgetKind: String] = [:]
     /// Tapping still adds the widget the quick way, at the first free slot.
     let onSelect: (DashboardWidgetKind) -> Void
@@ -48,13 +50,23 @@ struct DashboardCatalogView: View {
     /// see the comment on `onDrag` below.
     let onLift: (DashboardWidgetKind) -> Void
 
+    /// Which groups are shut. "Used" starts shut because it is the one
+    /// group whose entries you cannot act on — it exists to get widgets out
+    /// of the way, and leaving it open would put them straight back in the
+    /// way.
+    @State private var collapsed: Set<CatalogGroup> = [.used]
+    /// Which widget's explainer is open. The catalogue's ⓘ opens the **same**
+    /// sheet the widget's own header does — one description of a widget,
+    /// wherever you meet it.
+    @State private var explaining: DashboardWidgetKind?
+
     var body: some View {
         VStack(spacing: 0) {
             header
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
-                    ForEach(DashboardWidgetKind.allCases, id: \.self) { kind in
-                        entry(kind)
+                LazyVStack(alignment: .leading, spacing: 20, pinnedViews: []) {
+                    ForEach(CatalogGroup.allCases) { group in
+                        section(group)
                     }
                 }
                 .padding(.horizontal, inset)
@@ -69,6 +81,9 @@ struct DashboardCatalogView: View {
             in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
         )
         .shadow(color: .black.opacity(0.18), radius: 20, y: -6)
+        .sheet(item: $explaining) { kind in
+            WidgetGuideSheet(title: kind.title, guide: kind.guide)
+        }
     }
 
     private var inset: CGFloat { 16 }
@@ -93,22 +108,148 @@ struct DashboardCatalogView: View {
         .padding(.bottom, 4)
     }
 
-    /// No size badge. The preview underneath is rendered at the exact cell
-    /// size the dashboard would give it, so the footprint is already on
-    /// screen — a "2×1" beside it describes the grid's bookkeeping rather
-    /// than anything the user needs to read.
-    private func entry(_ kind: DashboardWidgetKind) -> some View {
-        let reason = unavailable[kind]
+    // MARK: - Groups
+
+    /// The three shelves a widget can be on.
+    ///
+    /// Not a filter over one list: a widget is on exactly one of these, and
+    /// which one answers a different question each time. "Keepo" is what
+    /// you can add, "Yours" is what you have built, "Used" is what is
+    /// already out. Collapsing is what makes that useful on a phone — six
+    /// widgets is a scroll, and the group you want is usually the first
+    /// one.
+    enum CatalogGroup: String, CaseIterable, Identifiable {
+        case keepo
+        case yours
+        case used
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .keepo: return "Keepo Widgets"
+            case .yours: return "Your Widgets"
+            case .used: return "Used Widgets"
+            }
+        }
+
+        /// What an empty shelf says. Never a bare "nothing here" — an empty
+        /// group is either an achievement (everything is on the dashboard)
+        /// or a promise (this is where your own widgets will live), and
+        /// both are worth saying.
+        var blankState: String {
+            switch self {
+            case .keepo: return "Every Keepo widget is on your dashboard."
+            case .yours: return "Widgets you build yourself will show up here."
+            case .used: return "Nothing on your dashboard yet — add one from above."
+            }
+        }
+    }
+
+    /// The widgets on each shelf. `yours` is deliberately empty rather than
+    /// absent: the group is the promise, and a promise you can see is worth
+    /// more than a group that appears the day the feature does.
+    private func kinds(in group: CatalogGroup) -> [DashboardWidgetKind] {
+        switch group {
+        case .keepo: return DashboardWidgetKind.allCases.filter { !placed.contains($0) }
+        case .yours: return []
+        case .used: return DashboardWidgetKind.allCases.filter { placed.contains($0) }
+        }
+    }
+
+    @ViewBuilder
+    private func section(_ group: CatalogGroup) -> some View {
+        let members = kinds(in: group)
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeader(group, count: members.count)
+            if !collapsed.contains(group) {
+                if members.isEmpty {
+                    Text(group.blankState)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 12)
+                } else {
+                    VStack(alignment: .leading, spacing: 24) {
+                        ForEach(members, id: \.self) { kind in
+                            entry(kind, isPlaced: group == .used)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func sectionHeader(_ group: CatalogGroup, count: Int) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.24)) {
+                if collapsed.contains(group) { collapsed.remove(group) } else { collapsed.insert(group) }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Color.secondary)
+                    .rotationEffect(.degrees(collapsed.contains(group) ? 0 : 90))
+                Text(group.title)
+                    .font(.headline)
+                    .foregroundStyle(Color.primary)
+                // The count is what makes a shut group readable: "Used
+                // Widgets 0" and "Used Widgets 4" are different situations
+                // and the chevron alone cannot tell them apart.
+                Text(verbatim: "\(count)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.secondary)
+                    .monospacedDigit()
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 36)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(group.title)
+        .accessibilityValue("\(count) widgets")
+        .accessibilityHint(collapsed.contains(group) ? "Expands the group" : "Collapses the group")
+    }
+
+    // MARK: - Entries
+
+    /// No size badge, and **no description line**. The preview underneath is
+    /// rendered at the exact cell size the dashboard would give it, so the
+    /// footprint is already on screen — a "2×1" beside it describes the
+    /// grid's bookkeeping rather than anything the user needs to read. And a
+    /// one-line summary under every title was six lines of prose stacked
+    /// down the panel, saying a weaker version of what the widget's own ⓘ
+    /// already says properly. The ⓘ moved here instead: one description of a
+    /// widget, written once, reached the same way from the catalogue and
+    /// from the widget's own header.
+    ///
+    /// The unavailability reason stays on the row, because it is not a
+    /// description — it is the thing standing between the user and adding
+    /// the widget, and burying it behind a button would hide the one line
+    /// they can act on.
+    private func entry(_ kind: DashboardWidgetKind, isPlaced: Bool) -> some View {
+        // A placed widget carries no orange warning. It isn't a problem to
+        // fix — the group it is sitting in already says why it can't be
+        // added again.
+        let reason = isPlaced ? nil : unavailable[kind]
         return VStack(alignment: .leading, spacing: 8) {
-            Text(kind.title)
-                .font(.headline)
-                .foregroundStyle(Color.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(reason ?? kind.summary)
-                .font(.subheadline)
-                .foregroundStyle(reason == nil ? Color.secondary : Color.orange)
-                .fixedSize(horizontal: false, vertical: true)
-            if reason == nil {
+            HStack(spacing: 4) {
+                Text(kind.title)
+                    .font(.headline)
+                    .foregroundStyle(Color.primary)
+                infoButton(kind)
+                Spacer(minLength: 0)
+            }
+            if let reason {
+                Text(reason)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if reason == nil, !isPlaced {
                 draggableCard(kind)
             } else {
                 // Still the real widget, still at its real size — the user
@@ -121,8 +262,23 @@ struct DashboardCatalogView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .onTapGesture { if reason == nil { onSelect(kind) } }
-        .accessibilityHint(reason ?? "")
+        .onTapGesture { if reason == nil, !isPlaced { onSelect(kind) } }
+        .accessibilityHint(reason ?? (isPlaced ? "Already on your dashboard" : ""))
+    }
+
+    /// Inside the row, but its own button — so the row's tap still adds the
+    /// widget and only the glyph explains it.
+    private func infoButton(_ kind: DashboardWidgetKind) -> some View {
+        Button {
+            explaining = kind
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.subheadline)
+                .foregroundStyle(Color.secondary)
+                .hitTarget()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("About \(kind.title)")
     }
 
     /// The widget card, and the only part of the row a drag can start from.

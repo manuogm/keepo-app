@@ -57,7 +57,7 @@ struct NetWorthWidget: View {
     private func collapsed(_ metrics: NetWorthMetrics) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             MetricHeadlineBlock(
-                value: .money(metrics.current, currency), size: 36,
+                value: .money(metrics.current, currency), size: WidgetStyle.metric,
                 percentChange: metrics.percentChange, caption: TrendCaption.collapsed(.month)
             )
             Spacer(minLength: 0)
@@ -70,11 +70,16 @@ struct NetWorthWidget: View {
             WidgetSparkline(
                 points: metrics.series.map { MetricPoint(bucket: $0.date, amountE4: $0.value) },
                 color: DashboardTrend.color(for: metrics.percentChange),
-                height: 66
+                height: 64
             )
             .opacity(0.5)
             .padding(.horizontal, -WidgetStyle.padding)
         }
+        // The trajectory is drawn the full width of the tile, headline
+        // included — that is what makes the tile read as a ticker rather
+        // than a label. The wash is what keeps the figure legible where the
+        // line passes behind it.
+        .metricLegibilityScrim()
     }
 
     // MARK: - Expanded
@@ -82,7 +87,7 @@ struct NetWorthWidget: View {
     private var expanded: some View {
         VStack(alignment: .leading, spacing: 8) {
             MetricHeadlineBlock(
-                value: .money(series.highlightedPoint?.amountE4, currency), size: 30,
+                value: .money(series.highlightedPoint?.amountE4, currency), size: WidgetStyle.metricExpanded,
                 percentChange: series.percentChange, caption: badgeCaption
             )
             SeriesChartOrMessage(series: series, color: trendColor)
