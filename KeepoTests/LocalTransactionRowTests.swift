@@ -80,7 +80,7 @@ struct LocalTransactionRowTests {
 
         let rows = try await dbQueue.read { database in
             try LocalTransactionRow.fetchFiltered(
-                database, filter: TransactionFilter(), baseCurrency: "EUR", ownerId: ownerId
+                database, filter: TransactionFilter(), scope: .total, baseCurrency: "EUR", ownerId: ownerId
             )
         }
 
@@ -116,7 +116,7 @@ struct LocalTransactionRowTests {
 
         let rows = try await dbQueue.read { database in
             try LocalTransactionRow.fetchFiltered(
-                database, filter: TransactionFilter(), baseCurrency: "EUR", ownerId: ownerId
+                database, filter: TransactionFilter(), scope: .total, baseCurrency: "EUR", ownerId: ownerId
             )
         }
 
@@ -139,7 +139,7 @@ struct LocalTransactionRowTests {
         // Base currency GBP has no fx_rates row and isn't the seeded EUR.
         let rows = try await dbQueue.read { database in
             try LocalTransactionRow.fetchFiltered(
-                database, filter: TransactionFilter(), baseCurrency: "GBP", ownerId: ownerId
+                database, filter: TransactionFilter(), scope: .total, baseCurrency: "GBP", ownerId: ownerId
             )
         }
 
@@ -195,7 +195,7 @@ struct LocalTransactionRowTests {
 
         let rows = try await dbQueue.read { database in
             try LocalTransactionRow.fetchFiltered(
-                database, filter: TransactionFilter(), baseCurrency: "EUR", ownerId: ownerId
+                database, filter: TransactionFilter(), scope: .total, baseCurrency: "EUR", ownerId: ownerId
             )
         }
         let fetchedStale = try await dbQueue.read { database in

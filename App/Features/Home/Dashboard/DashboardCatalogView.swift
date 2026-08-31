@@ -76,11 +76,17 @@ struct DashboardCatalogView: View {
             .scrollIndicators(.hidden)
         }
         .frame(maxHeight: maxHeight)
-        .background(
-            Color(.systemGroupedBackground),
-            in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
-        )
-        .shadow(color: .black.opacity(0.18), radius: 20, y: -6)
+        // The panel's *layout* stops at the bottom safe area — which is
+        // where the floating tab bar now lives, so the last entry in the
+        // list is reachable instead of sitting under it — while its
+        // background alone paints on through to the screen edge, so the
+        // panel still reads as anchored rather than hovering.
+        .background {
+            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                .fill(Color(.systemGroupedBackground))
+                .shadow(color: .black.opacity(0.18), radius: 20, y: -6)
+                .ignoresSafeArea(edges: .bottom)
+        }
         .sheet(item: $explaining) { kind in
             WidgetGuideSheet(title: kind.title, guide: kind.guide)
         }

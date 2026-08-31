@@ -40,7 +40,16 @@ struct TransactionsListView: View {
     @State private var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
     @State private var editingRecurringRule: PublicSchema.RecurringRulesSelect?
     @State var filter = TransactionFilter()
-    @State private var isSearching = false
+    // Not `private` — read/written from TransactionsListView+Filters.swift.
+    @State var isSearching = false
+    /// Whether the header's filter panel is showing. Owned here rather than
+    /// by the banner: `applyPendingRequest` opens it when another screen
+    /// hands this one a filter, so the state has to outlive the button.
+    @State var isFiltersExpanded = false
+    /// Whether the Needs Review drawer has taken over the screen. Owned here
+    /// because the ledger is what it takes over *from* — the drawer cannot
+    /// hide a sibling it does not own.
+    @State private var isInboxExpanded = false
     @State private var groupedByDay: [DayGroup] = []
     @State private var categoriesById: [UUID: PublicSchema.CategoriesSelect] = [:]
 
@@ -59,6 +68,10 @@ struct TransactionsListView: View {
     /// and a non-optional `@Environment(AppNavigation.self)` would trap
     /// instead. Not `private` — read from TransactionsListView+Period.swift.
     @Environment(AppNavigation.self) var navigation: AppNavigation?
+    @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
+
+    // Not `private` — read from TransactionsListView+Filters.swift.
+    var scope: PublicSchema.AccountScope { session.scope }
 
     var range: DateInterval {
         guard let component = period.component else {
@@ -102,30 +115,10 @@ struct TransactionsListView: View {
     // MARK: - Body
 
     var body: some View {
-        mainContent
-            .navigationTitle("Transactions")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    ScopeSwitcherButton(session: session)
-                }
-                ToolbarItem(placement: .principal) {
-                    ScreenTitleBar(title: "Transactions", session: session)
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isSearching = true
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isAddingTransaction = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
+        listContent
+            .toolbar(.hidden, for: .navigationBar)
+            .onChange(of: navigation?.pendingAdd) { _, _ in
+                if navigation?.consumeAdd(.transactions) == true { isAddingTransaction = true }
             }
             .sheet(isPresented: $isAddingTransaction) {
                 TransactionFormView(session: session) {
@@ -154,7 +147,9 @@ struct TransactionsListView: View {
             .sheet(isPresented: $isCustomRangePresented) {
                 customRangeSheet
             }
-            .task(id: TransactionsLoadKey(token: session.refresh.token, filter: filter, range: range)) { await load() }
+            .task(id: TransactionsLoadKey(
+                token: session.refresh.token, scope: session.scope, filter: filter, range: range
+            )) { await load() }
             // Another screen asking for a specific slice of the ledger — the
             // Cashflow widget's category chevron. `onAppear` as well as
             // `onChange` because the request is set in the same turn as the
@@ -166,97 +161,109 @@ struct TransactionsListView: View {
 
     // MARK: - Content
 
-    /// `.searchable` is attached only while `isSearching` is true — attaching
-    /// it unconditionally makes SwiftUI render a persistent full-width search
-    /// row in the List regardless of the `isPresented` binding, which is
-    /// exactly the row the toolbar search icon was meant to replace.
-    @ViewBuilder
-    private var mainContent: some View {
-        if isSearching {
-            listContent
-                .searchable(text: searchBinding, isPresented: $isSearching, prompt: "Merchant, category, or account")
-        } else {
-            listContent
-        }
-    }
-
     private var listContent: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
             VStack(spacing: 0) {
-                accountFilterMenu
-                periodNavigator
+                ScopeBannerView(
+                    title: "Transactions",
+                    session: session,
+                    isFiltersExpanded: isFiltersExpanded,
+                    onOpenProfile: { navigation?.openProfileRoot() },
+                    accessory: { filterToggle },
+                    filters: { filterPanel }
+                )
+                .zIndex(1)
 
-                if isLoading {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                } else if transactions.isEmpty {
-                    Spacer()
-                    Text("No transactions in this period")
-                        .foregroundStyle(Color.secondary)
-                    Spacer()
-                } else {
-                    List {
-                        ForEach(groupedByDay) { group in
-                            Section {
-                                ForEach(group.items, id: \.transactionId) { transaction in
-                                    // A `Button`, not `.onTapGesture`: a bare
-                                    // tap gesture inside a `List` loses races
-                                    // with the scroll recogniser (the "first
-                                    // tap does nothing after scrolling" bug)
-                                    // and draws no press state at all.
-                                    Button {
-                                        handleTap(on: transaction)
-                                    } label: {
-                                        TransactionRow(
-                                            transaction: transaction, category: category(for: transaction)
-                                        )
-                                    }
-                                        .buttonStyle(.pressableRow)
-                                        .swipeActions(edge: .trailing) {
-                                            // A second, quick path to confirm a capture,
-                                            // alongside the full review form's Save — only
-                                            // offered once an account is actually known
-                                            // (unresolved captures still route through the
-                                            // form, which requires the explicit account
-                                            // verification a blind swipe can't provide).
-                                            if transaction.status == .pending, transaction.accountId != nil {
-                                                Button("Confirm") {
-                                                    Task { await confirmCapture(transaction) }
-                                                }
-                                                .tint(Color.primary)
-                                            }
-                                        }
-                                }
-                                .onDelete { offsets in
-                                    Task { await delete(at: offsets, in: group.items) }
-                                }
-                            } header: {
-                                Text(group.day.formatted(date: .abbreviated, time: .omitted))
-                            }
-                        }
-                    }
-                    .scrollContentBackground(.hidden)
-                    .refreshable { await load() }
-                }
+                // Deliberately outside the scope blank state below: a
+                // capture waiting for review is a task, not a balance, and
+                // it does not stop existing because the user swiped to a
+                // scope with nothing in it.
+                //
+                // `zIndex(0)` against the banner's 1 is what puts the
+                // drawer *behind* it — see `NeedsReviewPanel`'s own header.
+                NeedsReviewPanel(session: session, isExpanded: $isInboxExpanded)
+                    .zIndex(0)
 
-                if let loadErrorMessage {
-                    Text(loadErrorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .padding()
+                if !isInboxExpanded {
+                    ledger
+                        .padding(.top, 4)
+                        .fadingTopEdge()
+                        .transition(.opacity)
                 }
             }
         }
     }
 
-    // MARK: - Transaction helpers
+    @ViewBuilder
+    private var ledger: some View {
+        if let emptiness = scopeContext?.emptiness(for: session.scope) {
+            ScopeEmptyStateView(emptiness: emptiness, session: session)
+        } else if isLoading {
+            Spacer()
+            ProgressView()
+            Spacer()
+        } else if transactions.isEmpty {
+            Spacer()
+            Text("No transactions in this period")
+                .foregroundStyle(Color.secondary)
+            Spacer()
+        } else {
+            transactionList
 
-    private var searchBinding: Binding<String> {
-        Binding(get: { filter.search ?? "" }, set: { filter.search = $0.isEmpty ? nil : $0 })
+            if let loadErrorMessage {
+                Text(loadErrorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .padding()
+            }
+        }
     }
+
+    private var transactionList: some View {
+        List {
+            ForEach(groupedByDay) { group in
+                Section {
+                    ForEach(group.items, id: \.transactionId) { transaction in
+                        // A `Button`, not `.onTapGesture`: a bare tap
+                        // gesture inside a `List` loses races with the
+                        // scroll recogniser (the "first tap does nothing
+                        // after scrolling" bug) and draws no press state.
+                        Button {
+                            handleTap(on: transaction)
+                        } label: {
+                            TransactionRow(transaction: transaction, category: category(for: transaction))
+                        }
+                        .buttonStyle(.pressableRow)
+                        .swipeActions(edge: .trailing) {
+                            // A second, quick path to confirm a capture,
+                            // alongside the full review form's Save — only
+                            // offered once an account is actually known
+                            // (unresolved captures still route through the
+                            // form, which requires the explicit account
+                            // verification a blind swipe can't provide).
+                            if transaction.status == .pending, transaction.accountId != nil {
+                                Button("Confirm") {
+                                    Task { await confirmCapture(transaction) }
+                                }
+                                .tint(Color.primary)
+                            }
+                        }
+                    }
+                    .onDelete { offsets in
+                        Task { await delete(at: offsets, in: group.items) }
+                    }
+                } header: {
+                    Text(group.day.formatted(date: .abbreviated, time: .omitted))
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .refreshable { await load() }
+    }
+
+    // MARK: - Transaction helpers
 
     func sibling(
         of transaction: PublicSchema.TransactionsWithDetailsSelect
@@ -293,6 +300,7 @@ extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
 
 private struct TransactionsLoadKey: Equatable {
     let token: Int
+    let scope: PublicSchema.AccountScope
     let filter: TransactionFilter
     let range: DateInterval
 }

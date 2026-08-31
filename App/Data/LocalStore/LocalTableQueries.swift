@@ -123,6 +123,51 @@ enum LocalTableQueries {
         )
     }
 
+    // MARK: - scope availability
+
+    /// How many accounts the user can see at all, and how many of those are
+    /// shared into their household — the two counts every "this scope has
+    /// nothing in it" blank state is decided from (`ScopeContext`).
+    ///
+    /// Counted in SQL rather than by filtering `LocalAccountRow.fetchAll`,
+    /// which is the same visibility clause but also FX-converts a balance
+    /// for every account on the way. Nothing here needs a figure — only
+    /// whether a row exists — and that read runs on every refresh.
+    ///
+    /// "Shared" is `household_accounts`, matching `LocalMoneyQueries
+    /// .scopeFilterSQL` exactly, so "private" here means precisely what the
+    /// `me` scope means everywhere else: visible and not shared. Archived
+    /// accounts are excluded — they are out of every balance on screen, so
+    /// a user whose only account is archived is correctly told they have
+    /// none to look at.
+    struct ScopeAvailability {
+        let visibleCount: Int
+        let sharedCount: Int
+    }
+
+    static func scopeAvailability(_ database: Database, ownerId: String) throws -> ScopeAvailability {
+        let row = try Row.fetchOne(
+            database,
+            sql: """
+            SELECT
+                COUNT(*) AS visible_count,
+                COALESCE(SUM(CASE WHEN shared.account_id IS NULL THEN 0 ELSE 1 END), 0) AS shared_count
+            FROM accounts a
+            LEFT JOIN (
+                SELECT DISTINCT ha.account_id FROM household_accounts ha
+                JOIN household_members hm ON hm.household_id = ha.household_id
+                WHERE hm.user_id = ? AND hm.deleted_at IS NULL AND ha.deleted_at IS NULL
+            ) shared ON shared.account_id = a.id
+            WHERE a.deleted_at IS NULL AND a.archived_at IS NULL
+                AND (a.owner_id = ? OR shared.account_id IS NOT NULL)
+            """,
+            arguments: [ownerId, ownerId]
+        )
+        return ScopeAvailability(
+            visibleCount: row?["visible_count"] ?? 0, sharedCount: row?["shared_count"] ?? 0
+        )
+    }
+
     // MARK: - households (read side only — create/share/unshare/invite/leave stay writes on Outbox/network)
 
     static func myHousehold(_ database: Database, userId: String) throws -> PublicSchema.HouseholdsSelect? {

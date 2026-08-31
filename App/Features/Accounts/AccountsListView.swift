@@ -43,14 +43,34 @@ struct AccountsListView: View {
     @State var isEverydayExpanded = true
     @State var isInvestmentsExpanded = true
 
+    @Environment(AppNavigation.self) private var navigation: AppNavigation?
+    @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
+
+    /// Dragging rearranges — and converts between Everyday and Investments —
+    /// only in Total. `reorder_accounts` writes each account's `sort_order`
+    /// from its index in the array it is handed, so handing it a *filtered*
+    /// subset would renumber those rows 1…n and leave every account the
+    /// current scope hides sitting on the positions it just took. The
+    /// gesture isn't disabled because a subset is hard to drag; it's
+    /// disabled because a subset cannot express the thing being written.
+    var isReorderable: Bool { session.scope == .total }
+
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if isLoading {
-                ProgressView()
-            } else {
-                accountList
+            VStack(spacing: 0) {
+                ScopeBannerView(
+                    title: "Accounts", session: session, onOpenProfile: { navigation?.openProfileRoot() }
+                )
+                .padding(.bottom, 6)
+                // The deck's cards tilt past their own bounds mid-swipe, and
+                // nothing clips them — so the banner has to win against the
+                // content underneath it.
+                .zIndex(1)
+
+                content
+                    .fadingTopEdge()
             }
 
             if let actionErrorMessage {
@@ -63,22 +83,9 @@ struct AccountsListView: View {
                 }
             }
         }
-        .navigationTitle("Accounts")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                ScopeSwitcherButton(session: session)
-            }
-            ToolbarItem(placement: .principal) {
-                ScreenTitleBar(title: "Accounts", session: session)
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isAddingAccount = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
+        .toolbar(.hidden, for: .navigationBar)
+        .onChange(of: navigation?.pendingAdd) { _, _ in
+            if navigation?.consumeAdd(.accounts) == true { isAddingAccount = true }
         }
         .sheet(isPresented: $isAddingAccount) {
             AddAccountFlowView(session: session) {
@@ -90,7 +97,7 @@ struct AccountsListView: View {
                 session.refresh.bump()
             }
         }
-        .task(id: session.refresh.token) { await load() }
+        .task(id: AccountsLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
         .alert(
             "Archive \"\(archiveCandidate?.name ?? "")\"?",
             isPresented: archiveConfirmationBinding
@@ -104,6 +111,22 @@ struct AccountsListView: View {
                 "Archiving an account will remove it from your total balance but will not delete "
                     + "the account or the transactions associated."
             )
+        }
+    }
+
+    /// The scope's own blank state outranks the list — an Accounts screen
+    /// under a Household banner with nothing shared should say so, not draw
+    /// two empty group headers.
+    @ViewBuilder
+    private var content: some View {
+        if let emptiness = scopeContext?.emptiness(for: session.scope) {
+            ScopeEmptyStateView(emptiness: emptiness, session: session)
+        } else if isLoading {
+            Spacer()
+            ProgressView()
+            Spacer()
+        } else {
+            accountList
         }
     }
 
@@ -121,6 +144,7 @@ struct AccountsListView: View {
                 row(for: item)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+                    .moveDisabled(!isReorderable)
             }
             .onMove { offsets, destination in
                 Task { await handleMove(from: offsets, to: destination) }
@@ -224,13 +248,28 @@ struct AccountsListView: View {
             let rows = try await dbQueue.read { database in
                 try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency)
             }
-            everyday = rows.filter { $0.kind == .regular && $0.archivedAt == nil }
-            investments = rows.filter { $0.kind == .investment && $0.archivedAt == nil }
-            archived = rows.filter { $0.archivedAt != nil }
+            let visible = rows.filter(isInScope)
+            everyday = visible.filter { $0.kind == .regular && $0.archivedAt == nil }
+            investments = visible.filter { $0.kind == .investment && $0.archivedAt == nil }
+            archived = visible.filter { $0.archivedAt != nil }
         } catch {
             actionErrorMessage = UserFacingError.describe(error)
         }
         isLoading = false
+    }
+
+    /// The same rule `LocalMoneyQueries.scopeFilterSQL` applies in SQL,
+    /// expressed against the row's own `isShared` — which is that exact
+    /// `household_accounts` lookup, already done. Duplicating the predicate
+    /// here rather than adding a scope term to `LocalAccountRow.fetchAll`
+    /// keeps one query serving both this screen and the Transactions
+    /// screen's own account filter menu, which wants every account.
+    private func isInScope(_ row: LocalAccountRow) -> Bool {
+        switch session.scope {
+        case .total: return true
+        case .me: return !row.isShared
+        case .household: return row.isShared
+        }
     }
 
     /// B: goes through `session.outbox`, never `AccountRepository` directly —
@@ -243,4 +282,11 @@ struct AccountsListView: View {
         await session.outbox.submitArchiveAccount(payload)
         session.refresh.bump()
     }
+}
+
+/// `.task(id:)` needs an `Equatable` id — the scope decides which accounts
+/// this screen shows, so changing it has to reload exactly like a write does.
+private struct AccountsLoadKey: Equatable {
+    let token: Int
+    let scope: PublicSchema.AccountScope
 }

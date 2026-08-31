@@ -294,6 +294,16 @@ Cashflow drops from two expansion steps to one — the category breakdown is alw
 
 *Resolved for now:* the in-memory cache shipped and **nobody has measured**. It felt fine on the simulator across every widget, which is not the same thing. One further saving landed along the way — `DashboardMetricSeries.flows` computes money in, money out and the net in a single pass and files all three under their own cache keys, so Cashflow's three-series chart costs one query per bucket rather than three. Measure before building the rollup table.
 
+## UI redesign workstream (2026-08-31)
+
+User-driven, not a numbered phase, and shipped in one pass. The shell went from four tabs to **three icon-only tabs plus a separate Add button** whose action follows the screen; the top of every main screen became a **full-bleed, swipeable scope banner** (Total / Private / Household) that replaced both the "…" scope menu and the title bar; Needs Review left Home and became a **drawer dropping from the banner** on Transactions; and four scope blank states landed. Full delivery notes, the four bugs found on the way, and the two open items are in `version-logs/ui-redesign-2026-08-31-log.md`.
+
+A second pass the same day took it further on user feedback: gradients out everywhere, full-bleed banner cards with the page dots inside them, a **hand-rolled drag** for the scope carousel (resistance then a point of no return — paging cannot express that), a masked fade where content passes under the header, a neutral tab bar with titles, Transactions' filters moved into the header behind a funnel on a shade-darker panel, and the Needs Review inbox expanding to a full view with an "All caught up" state before it closes.
+
+A third pass made the banner a **deck** — cards separated by a gap, tilting and shrinking as they travel, drawn unclipped so the tilt survives — gave the current page indicator a pill, added a subtle top-darker gradient to the header, added an Expense/Income/Transfers filter, and moved the tab bar and Add button onto **Liquid Glass** (`glassEffect`, gated on iOS 26 with the old material as fallback).
+
+One decision here is not cosmetic and is worth knowing before touching those screens: **scope now actually filters Accounts and Transactions.** It never did — the old scope switcher sat in both toolbars and only Home's widgets honoured it — and a banner that names the scope over the list makes that a contradiction. `LocalTransactionRow.fetchFiltered` takes a `scope:` and applies the existing `LocalMoneyQueries.scopeFilterSQL`; `AccountsListView` filters on `isShared`. The knock-on: **drag-to-reorder accounts is Total-only**, because `reorder_accounts` renumbers from array position and a filtered subset cannot express the write.
+
 ## Known gaps this plan does not close
 
 - iOS 18.0 remains the declared minimum but is never executed (user's call). Surfaces at TestFlight if it bites.

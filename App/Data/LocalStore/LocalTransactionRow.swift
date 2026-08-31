@@ -53,8 +53,21 @@ enum LocalTransactionRow {
     /// unmapped capture (`account_id`/`currency` both null) must still show
     /// up here with its Pending badge, per spec step B9, instead of only
     /// existing in Needs Review.
+    /// `scope` is the same Total/Private/Household selection every other
+    /// financial read honours, applied through the one shared predicate
+    /// (`LocalMoneyQueries.scopeFilterSQL`) rather than a second copy of the
+    /// `household_accounts` lookup written here. It is a separate parameter
+    /// rather than a field on `TransactionFilter` because that type is also
+    /// what the PostgREST path builds its query from, and no server-side
+    /// scope term exists there to match.
+    ///
+    /// An **unmapped capture** (`account_id IS NULL`) satisfies `me` and not
+    /// `household`, which falls out of the predicate rather than being
+    /// special-cased: nothing is shared until it lands on an account, so a
+    /// capture waiting for review is the user's own.
     static func fetchFiltered(
-        _ database: Database, filter: TransactionFilter, baseCurrency: String, ownerId: String
+        _ database: Database, filter: TransactionFilter, scope: PublicSchema.AccountScope,
+        baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
         var sql = """
         SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
@@ -71,6 +84,7 @@ enum LocalTransactionRow {
         WHERE t.deleted_at IS NULL
           AND (t.account_id IS NULL AND t.owner_id = ? OR a.id IS NOT NULL)
         """
+        sql += " AND (\(LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "t.account_id")))"
         var arguments: [DatabaseValueConvertible] = [ownerId, ownerId, ownerId]
         if let accountId = filter.accountId {
             sql += " AND t.account_id = ?"

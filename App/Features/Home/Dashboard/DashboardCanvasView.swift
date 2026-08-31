@@ -18,6 +18,9 @@ struct DashboardCanvasView: View {
     let data: DashboardData
     let isLoading: Bool
     @Binding var isEditing: Bool
+    /// Owned by `HomeView`: the shell's "+" opens the catalogue from outside
+    /// this view entirely, and the Add tile writes to the same flag.
+    @Binding var isPickingWidget: Bool
 
     @State private var expandedId: UUID?
     /// Which of the expanded tile's sizes is showing. Only Cashflow has more
@@ -34,7 +37,6 @@ struct DashboardCanvasView: View {
     /// The cell the preview was last built for, so a finger moving *within*
     /// one cell doesn't rebuild and re-animate the whole grid.
     @State var previewCell: DashboardGridCell?
-    @State var isPickingWidget = false
     // Not `private`: `DashboardAutoScroll.swift` extends this type, and a
     // `private` member is invisible to its own type's extension in a
     // different file.

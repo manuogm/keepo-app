@@ -1,10 +1,10 @@
 import KeepoCore
 import SwiftUI
 
-/// The signed-in app shell — four tabs plus the offline/pending-sync status
-/// overlay. Extracted from `RootView` so the root router stays a thin
-/// traffic controller; this owns everything specific to the `.ready`
-/// session phase.
+/// The signed-in app shell — three icon-only tabs, the Add button beside
+/// them, the Profile sheet, and the offline/pending-sync status overlay.
+/// Extracted from `RootView` so the root router stays a thin traffic
+/// controller; this owns everything specific to the `.ready` session phase.
 struct MainTabView: View {
     let session: SessionStore
     let network: NetworkMonitor
@@ -15,6 +15,13 @@ struct MainTabView: View {
     /// a widget four layers into Home can ask for a tab switch without every
     /// signature between here and it carrying a navigation parameter.
     @State private var navigation = AppNavigation()
+    /// Loaded here, once, for the same reason: all three screens render the
+    /// identical "this scope is empty" answer, and the read behind it is
+    /// the same read whichever screen asks.
+    @State private var scopeContext = ScopeContext()
+    /// Measured here and handed down, because this is the last view that
+    /// still sees it — see `EnvironmentValues.topSafeAreaInset`.
+    @State private var topSafeAreaInset: CGFloat = 0
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -22,50 +29,63 @@ struct MainTabView: View {
             NavigationStack {
                 HomeView(session: session)
             }
-            .tabItem { Label("Home", systemImage: "globe") }
-            .badge(needsReviewCount > 0 ? needsReviewCount : 0)
+            .toolbar(.hidden, for: .tabBar)
             .tag(AppNavigation.Tab.home)
 
             NavigationStack {
                 AccountsListView(session: session)
             }
-            .tabItem { Label("Accounts", systemImage: "creditcard") }
+            .toolbar(.hidden, for: .tabBar)
             .tag(AppNavigation.Tab.accounts)
 
             NavigationStack {
                 TransactionsListView(session: session)
             }
-            .tabItem { Label("Transactions", systemImage: "list.bullet") }
+            .toolbar(.hidden, for: .tabBar)
             .tag(AppNavigation.Tab.transactions)
-
+        }
+        .tint(Color.primary)
+        .environment(navigation)
+        .environment(scopeContext)
+        .environment(\.isPrivacyMode, session.isPrivacyMode)
+        .environment(\.topSafeAreaInset, topSafeAreaInset)
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topSafeAreaInset = $0 }
+        // A safe-area inset, not an overlay: the system bar is hidden, so
+        // this is the only thing telling a list where its content actually
+        // ends. (The offline banner below stays an overlay — see its own
+        // comment; it floats *over* content by design.)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            KeepoTabBar(
+                tab: $navigation.tab, needsReviewCount: needsReviewCount, onAdd: { navigation.requestAdd() }
+            )
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+        }
+        // Presented from here rather than `RootView` — see
+        // `CaptureDeepLinkModifier`'s own header for the two device-testing
+        // bugs that presenting it from outside this `TabView` caused.
+        .captureDeepLink(session: session)
+        .sheet(isPresented: $navigation.isProfilePresented) {
             NavigationStack(path: $navigation.profilePath) {
                 ProfileView(session: session)
                     .navigationDestination(for: AppNavigation.ProfileDestination.self) { destination in
                         profileDestination(destination)
                     }
             }
-            .tabItem { Label("My Profile", systemImage: "person.circle") }
-            .tag(AppNavigation.Tab.profile)
         }
-        .tint(Color.primary)
-        .environment(navigation)
-        .environment(\.isPrivacyMode, session.isPrivacyMode)
-        // Presented from here rather than `RootView` — see
-        // `CaptureDeepLinkModifier`'s own header for the two device-testing
-        // bugs that presenting it from outside this `TabView` caused.
-        .captureDeepLink(session: session)
-        .task(id: session.refresh.token) { await loadNeedsReviewCount() }
-        // `.overlay`, not `.safeAreaInset` — iOS 26's floating pill tab
-        // bar renders above the safe area it reports, so a view
-        // placed relative to that reported inset still lands behind
-        // the pill's own visual bounds. Floating our own banner a
-        // fixed distance off the true screen bottom sidesteps that
-        // mismatch entirely.
+        .task(id: session.refresh.token) {
+            await loadNeedsReviewCount()
+            await scopeContext.reload(session: session)
+        }
+        // `.overlay`, not `.safeAreaInset` — the banner is a transient
+        // floating notice that must not reflow the screen under it every
+        // time connectivity blips. It clears the tab bar by sitting on the
+        // inset that bar already claims.
         .overlay(alignment: .bottom) {
             if network.isOffline {
                 OfflineStatusBar(lastSyncedAt: session.syncEngine?.lastSyncedAt)
                     .padding(.horizontal)
-                    .padding(.bottom, 60)
+                    .padding(.bottom, 76)
             } else if session.outbox.hasStalePending(threshold: 120)
                 || session.syncEngine?.lastErrorMessage != nil {
                 PendingSyncStatusBar(
@@ -74,13 +94,13 @@ struct MainTabView: View {
                     retry: { await session.syncNow() }
                 )
                 .padding(.horizontal)
-                .padding(.bottom, 60)
+                .padding(.bottom, 76)
             }
         }
     }
 
-    /// The Profile tab's pushable screens, in one place. `ProfileView`'s own
-    /// rows are value links into this same table, so a row tap and a
+    /// The Profile sheet's pushable screens, in one place. `ProfileView`'s
+    /// own rows are value links into this same table, so a row tap and a
     /// programmatic `openProfile` land on exactly the same view.
     @ViewBuilder
     private func profileDestination(_ destination: AppNavigation.ProfileDestination) -> some View {
@@ -94,7 +114,7 @@ struct MainTabView: View {
 
     /// Local mirror, not a network read (X-01) — this used to call
     /// `NeedsReviewRepository.fetchAll` against the server view, which
-    /// disagreed with `HomeView`'s bell-dot count (computed from
+    /// disagreed with the in-app count (computed from
     /// `LocalMoneyQueries.needsReview`) whenever a capture hadn't synced
     /// yet, and silently dropped to 0 offline (`try?` swallowing the
     /// network failure). Same query both badges now read.

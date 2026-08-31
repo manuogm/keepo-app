@@ -11,6 +11,7 @@ extension TransactionsListView {
             return
         }
         let dbQueue = session.dbQueue
+        let scope = session.scope
         let effectiveFilter: TransactionFilter = {
             var effective = filter
             effective.from = range.start
@@ -21,7 +22,8 @@ extension TransactionsListView {
             let loaded: LoadedTransactionsState = try await dbQueue.read { database in
                 LoadedTransactionsState(
                     transactions: try LocalTransactionRow.fetchFiltered(
-                        database, filter: effectiveFilter, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
+                        database, filter: effectiveFilter, scope: scope, baseCurrency: baseCurrency,
+                        ownerId: ownerId.uuidString
                     ),
                     categories: try LocalTableQueries.categories(database, ownerId: ownerId.uuidString),
                     accounts: try LocalAccountRow.fetchAll(

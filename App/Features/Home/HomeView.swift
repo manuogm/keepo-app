@@ -1,18 +1,14 @@
 import KeepoCore
 import SwiftUI
 
-/// Home — a widget dashboard the user arranges themselves, plus the screen
-/// chrome that was always here: the top-left "more options" button that
-/// picks the scope every financial screen computes for, and the bell that
-/// opens the Needs Review inbox as a floating notifications panel. Scope
-/// lives in SessionStore so it persists across tab switches and drives every
-/// financial screen from the same source of truth — and, on this screen,
-/// every widget at once.
+/// Dashboard — a widget canvas the user arranges themselves, under the
+/// scope banner every main screen now shares.
 ///
-/// The dashboard replaced Home's *body*, not Home: the toolbar, the overlay
-/// cards, and the needs-review plumbing below are unchanged. What used to be
-/// a single hard-coded net-worth card is now `DashboardCanvasView`, and the
-/// widgets on it are `DashboardStore`'s business.
+/// Two things left this screen in the redesign. The scope menu became the
+/// banner's swipeable cards (`ScopeBannerView`), and the Needs Review bell
+/// moved to Transactions, where the items it lists actually are. What is
+/// left here is the dashboard and nothing else — adding a widget is the
+/// shell's "+" button, arriving as `AppNavigation.pendingAdd`.
 ///
 /// Reads straight off the local GRDB mirror (Phase L6) — no server round
 /// trip, no payload cache, no pending-write overlay. `Outbox`'s optimistic
@@ -28,30 +24,48 @@ struct HomeView: View {
     @State private var data = DashboardData()
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var needsReviewCount = 0
-    // Kept, not just the count — so opening the bell popover can seed
-    // `NeedsReviewView` with rows already in hand instead of it blanking to
-    // a spinner and re-querying the same local table this screen just read
-    // (the "notification button ... laggy" complaint: a fresh `NeedsReviewView`
-    // starts `isLoading = true` every time it's constructed here).
-    @State private var needsReviewItems: [PublicSchema.NeedsReviewSelect] = []
-    @State private var needsReviewCurrencyMinorUnits: [String: Int] = [:]
-    @State private var showNotifications = false
-    @State private var showScopeMenu = false
     /// Lifted out of the canvas so the toolbar can offer "Done" — the canvas
-    /// owns entering edit mode (via long press), the toolbar owns the most
+    /// owns entering edit mode (via long press), the banner owns the most
     /// obvious way out of it.
     @State private var isEditing = false
+    /// Lifted out of the canvas for the same reason the shell's "+" exists:
+    /// the button that opens the catalogue is no longer inside the canvas.
+    /// The canvas's own Add tile and blank state still write to it.
+    @State private var isPickingWidget = false
 
-    private var isOverlayPresented: Bool { showNotifications || showScopeMenu }
+    @Environment(AppNavigation.self) private var navigation: AppNavigation?
+    @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
 
     var body: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            DashboardCanvasView(
-                session: session, store: store, data: data, isLoading: isLoading, isEditing: $isEditing
-            )
+            VStack(spacing: 0) {
+                ScopeBannerView(
+                    title: "Dashboard",
+                    session: session,
+                    onOpenProfile: { navigation?.openProfileRoot() },
+                    accessory: { doneButton }
+                )
+                .padding(.bottom, 10)
+                // The deck's cards tilt past their own bounds mid-swipe, and
+                // nothing clips them — so the banner has to win against the
+                // content underneath it.
+                .zIndex(1)
+                // The canvas dims itself behind the widget catalogue, and
+                // that dim cannot reach up here — it lives inside the
+                // canvas, one `VStack` cell below. Matching it keeps the
+                // screen looking like one surface going quiet rather than
+                // two halves disagreeing.
+                .overlay {
+                    Color.black.opacity(isPickingWidget ? 0.25 : 0)
+                        .allowsHitTesting(false)
+                }
+                .animation(.easeInOut(duration: 0.2), value: isPickingWidget)
+
+                content
+                    .fadingTopEdge()
+            }
 
             if let errorMessage {
                 VStack {
@@ -62,148 +76,58 @@ struct HomeView: View {
                         .padding()
                 }
             }
-
-            // Both top-bar buttons present as a plain SwiftUI overlay here —
-            // not a system `.popover` — because a popover's own outside-tap
-            // dismissal happens above our content and gives us no reliable
-            // hook to keep a background curtain in sync with it (tested:
-            // both watching its delayed `isPresented` flip and trying to
-            // race it with our own tap gesture failed). Owning the whole
-            // presentation ourselves means one piece of state drives the
-            // trigger, the curtain, and the outside-tap dismiss together.
-            Color.black.opacity(isOverlayPresented ? 0.25 : 0)
-                .ignoresSafeArea()
-                .allowsHitTesting(isOverlayPresented)
-                .onTapGesture {
-                    showScopeMenu = false
-                    showNotifications = false
-                }
-
-            if showScopeMenu {
-                scopeMenuCard
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.top, 4)
-                    .padding(.leading, 8)
-                    .transition(.scale(scale: 0.85, anchor: .topLeading).combined(with: .opacity))
-            }
-
-            if showNotifications {
-                notificationsCard
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.top, 4)
-                    .padding(.trailing, 8)
-                    .transition(.scale(scale: 0.85, anchor: .topTrailing).combined(with: .opacity))
-            }
         }
-        .animation(.easeInOut(duration: 0.15), value: isOverlayPresented)
-        .navigationTitle("Home")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    showScopeMenu = true
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-            }
-            ToolbarItem(placement: .principal) {
-                ScreenTitleBar(title: "Home", session: session)
-            }
-            ToolbarItem(placement: .primaryAction) {
-                // Edit mode borrows this slot: while arranging, the bell is
-                // the wrong thing to offer and "Done" is the only thing the
-                // user wants. Tapping the surface around the widgets also
-                // finishes, but that is not discoverable on its own.
-                if isEditing {
-                    Button("Done") {
-                        withAnimation(.snappy(duration: 0.24)) { isEditing = false }
-                    }
-                    .font(.body.weight(.semibold))
-                } else {
-                    Button {
-                        showNotifications = true
-                    } label: {
-                        Image(systemName: "bell")
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if needsReviewCount > 0 {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 8, height: 8)
-                                .offset(x: 2, y: -2)
-                        }
-                    }
-                }
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         // Keyed on the mounted widget kinds as well as the refresh token and
         // the scope: adding or removing a widget has to reload, because the
         // loader deliberately computes nothing for a widget that isn't there.
         .task(id: HomeLoadKey(token: session.refresh.token, scope: session.scope, kinds: store.mountedKinds)) {
             await load()
         }
-    }
-
-    /// Rows keep their identity icon (globe/person/person.2) even when
-    /// selected — the checkmark is appended at the trailing edge instead of
-    /// replacing it, so which option is which stays visible at a glance.
-    private var scopeMenuCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            scopeRow(.total, label: "Total Net Worth", icon: "globe")
-            Divider()
-            scopeRow(.me, label: "Personal", icon: "person.fill")
-            Divider()
-            scopeRow(.household, label: "Household", icon: "person.2.fill")
+        .onChange(of: navigation?.pendingAdd) { _, _ in
+            if navigation?.consumeAdd(.home) == true { isPickingWidget = true }
         }
-        .padding(.vertical, 4)
-        .frame(width: 220)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
     }
 
-    private var notificationsCard: some View {
-        NavigationStack {
-            NeedsReviewView(
-                session: session, seed: (items: needsReviewItems, currencyMinorUnits: needsReviewCurrencyMinorUnits)
+    /// The way out of edit mode. It borrows the banner's accessory slot
+    /// because that is this screen's chrome now — tapping the surface around
+    /// the widgets also finishes, but that is not discoverable on its own.
+    @ViewBuilder
+    private var doneButton: some View {
+        if isEditing {
+            Button("Done") {
+                withAnimation(.snappy(duration: 0.24)) { isEditing = false }
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.22), in: Capsule())
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// A scope with nothing behind it takes the whole canvas — an empty
+    /// dashboard under a Household banner should say "you have no
+    /// household", not draw six widgets all reading "—".
+    @ViewBuilder
+    private var content: some View {
+        if let emptiness = scopeContext?.emptiness(for: session.scope) {
+            ScopeEmptyStateView(emptiness: emptiness, session: session)
+        } else {
+            DashboardCanvasView(
+                session: session, store: store, data: data, isLoading: isLoading,
+                isEditing: $isEditing, isPickingWidget: $isPickingWidget
             )
         }
-        .frame(width: 340, height: 480)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
     }
 
-    private func scopeRow(_ scope: PublicSchema.AccountScope, label: String, icon: String) -> some View {
-        Button {
-            session.scope = scope
-            showScopeMenu = false
-        } label: {
-            HStack {
-                Image(systemName: icon)
-                    .frame(width: 20)
-                Text(label)
-                Spacer()
-                if session.scope == scope {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(Color.accentColor)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Color.primary)
-    }
-
-    /// One read for the whole dashboard, plus the bell's own rows. Widget
-    /// figures come back as a single `DashboardData` value — see
-    /// `DashboardDataLoader` for why this is one query rather than one per
-    /// widget.
+    /// One read for the whole dashboard. Widget figures come back as a
+    /// single `DashboardData` value — see `DashboardDataLoader` for why this
+    /// is one query rather than one per widget.
     private func load() async {
         errorMessage = nil
-        guard let baseCurrency = session.profile?.baseCurrency, let ownerId = session.profile?.id else {
+        guard let baseCurrency = session.profile?.baseCurrency else {
             isLoading = false
             return
         }
@@ -212,7 +136,6 @@ struct HomeView: View {
                 dbQueue: session.dbQueue, scope: session.scope, baseCurrency: baseCurrency,
                 kinds: store.mountedKinds
             )
-            try await loadNeedsReview(ownerId: ownerId)
         } catch {
             // A cancelled load is not a failure — the task id changed and a
             // fresh load is already running. Same shape as `HouseholdView`'s
@@ -221,21 +144,6 @@ struct HomeView: View {
             errorMessage = UserFacingError.isCancellation(error) ? nil : UserFacingError.describe(error)
         }
         isLoading = false
-    }
-
-    private func loadNeedsReview(ownerId: UUID) async throws {
-        let loaded = try await session.dbQueue.read { database in
-            (
-                try LocalTableQueries.currencies(database),
-                try LocalMoneyQueries.needsReview(database, ownerId: ownerId.uuidString)
-            )
-        }
-        let (currencies, reviewRows) = loaded
-        needsReviewItems = try reviewRows.map { try LocalTransactionRow.needsReviewSelect(from: $0) }
-        needsReviewCurrencyMinorUnits = Dictionary(
-            uniqueKeysWithValues: currencies.map { ($0.code, Int($0.minorUnit)) }
-        )
-        needsReviewCount = needsReviewItems.count
     }
 }
 

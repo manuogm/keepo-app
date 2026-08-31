@@ -17,11 +17,14 @@ import KeepoCore
 @Observable
 @MainActor
 final class AppNavigation {
-    enum Tab: Hashable {
+    /// Three destinations, icon-only (`KeepoTabBar`). Profile is no longer
+    /// among them: it is reached by tapping the avatar on the scope banner,
+    /// which is on every one of these three screens, and presents as a
+    /// sheet over whichever tab asked for it.
+    enum Tab: Hashable, CaseIterable {
         case home
         case accounts
         case transactions
-        case profile
     }
 
     /// A screen inside the Profile tab that some other screen has asked to
@@ -37,11 +40,24 @@ final class AppNavigation {
 
     var tab: Tab = .home
 
-    /// The Profile tab's navigation stack. Driven by a path so a push can
+    /// The Profile sheet's navigation stack. Driven by a path so a push can
     /// come from somewhere other than a tap on the row itself — the FX
     /// widget's "this is your base currency" note links straight to
-    /// Preferences.
+    /// Preferences, and the scope banner's "Create Household" blank state
+    /// links straight to Household.
     var profilePath: [ProfileDestination] = []
+
+    /// Whether the Profile sheet is up. Profile stopped being a tab when
+    /// the bar went down to three; presenting it modally from the shell
+    /// keeps one copy of it (and one copy of `profilePath`) rather than a
+    /// separate push inside each of the three tabs' own stacks.
+    var isProfilePresented = false
+
+    /// Which screen's Add button was pressed, waiting for that screen to
+    /// act on it. Same set-then-clear shape as `transactionsRequest` below:
+    /// all three tabs are mounted at once, so the request has to name its
+    /// destination or every screen would answer it.
+    var pendingAdd: Tab?
 
     /// A slice of the ledger some other screen has asked to be shown, waiting
     /// for the Transactions screen to pick it up. Cleared once applied, so
@@ -49,18 +65,39 @@ final class AppNavigation {
     /// user has since changed.
     var transactionsRequest: TransactionsRequest?
 
+    /// Pressed the "+" beside the tab bar. What it adds is the current
+    /// screen's business — a widget, an account, a transaction — so this
+    /// only records where it was pressed.
+    func requestAdd() {
+        pendingAdd = tab
+    }
+
+    /// Consumed by the screen the request named. Returns false for every
+    /// other screen, so the three `onChange` observers stay one line each.
+    func consumeAdd(_ destination: Tab) -> Bool {
+        guard pendingAdd == destination else { return false }
+        pendingAdd = nil
+        return true
+    }
+
     func openTransactions(_ request: TransactionsRequest) {
         transactionsRequest = request
         tab = .transactions
     }
 
-    /// Switches to Profile and pushes one screen. The path is **replaced**,
-    /// not appended to: the ask is "show me this setting", and landing on it
+    /// Opens the Profile sheet on one screen. The path is **replaced**, not
+    /// appended to: the ask is "show me this setting", and landing on it
     /// underneath whatever the user had left open would be a different
     /// screen with a wrong back button.
     func openProfile(_ destination: ProfileDestination) {
         profilePath = [destination]
-        tab = .profile
+        isProfilePresented = true
+    }
+
+    /// Opens the Profile sheet at its root — the scope banner's avatar.
+    func openProfileRoot() {
+        profilePath = []
+        isProfilePresented = true
     }
 }
 

@@ -112,7 +112,7 @@ struct LocalMoneyConversionArchivedAccountTests {
 
         let rows = try await dbQueue.read { database in
             try LocalTransactionRow.fetchFiltered(
-                database, filter: TransactionFilter(), baseCurrency: "EUR", ownerId: ownerId.uuidString
+                database, filter: TransactionFilter(), scope: .total, baseCurrency: "EUR", ownerId: ownerId.uuidString
             )
         }
 

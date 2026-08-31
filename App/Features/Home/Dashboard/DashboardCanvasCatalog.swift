@@ -44,7 +44,6 @@ extension DashboardCanvasView {
                 onClose: { isPickingWidget = false },
                 onLift: { kind in liftedKind = kind }
             )
-            .ignoresSafeArea(edges: .bottom)
             .transition(.move(edge: .bottom))
         }
     }

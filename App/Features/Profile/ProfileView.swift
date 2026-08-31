@@ -6,6 +6,10 @@ struct ProfileView: View {
 
     @State private var isSigningOut = false
     @State private var signOutError: String?
+    /// Profile is a sheet now, not a tab — reached by tapping the avatar on
+    /// any main screen's scope banner. It is the root of the sheet's own
+    /// navigation stack, so this dismisses the whole sheet.
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
@@ -13,14 +17,7 @@ struct ProfileView: View {
             List {
                 Section {
                     HStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.primary.opacity(0.15))
-                                .frame(width: 64, height: 64)
-                            Text(avatarInitial)
-                                .font(.title2.bold())
-                                .foregroundStyle(Color.primary)
-                        }
+                        ProfileAvatarView(email: session.userEmail, size: 64)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(session.userEmail ?? "—")
                                 .font(.headline)
@@ -77,10 +74,11 @@ struct ProfileView: View {
         }
         .navigationTitle("My Profile")
         .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var avatarInitial: String {
-        String((session.userEmail ?? "?").prefix(1)).uppercased()
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
+            }
+        }
     }
 
     private func signOut() async {

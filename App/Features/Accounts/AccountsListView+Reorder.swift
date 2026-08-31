@@ -65,6 +65,7 @@ extension AccountsListView {
         // destination — UIKit displaces the header out of the way as you
         // drag over it, which is also what makes both sides of the boundary
         // visibly reachable — and a header drag is simply ignored here.
+        guard isReorderable else { return }
         guard !offsets.contains(where: { isHeader(items[$0]) }) else { return }
 
         var moved = items
