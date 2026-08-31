@@ -73,9 +73,18 @@ Two things worth knowing before touching this again: `.ignoresSafeArea` **reposi
 - **Cards reach 20pt above the screen.** A tilted card's dipping top corner drops by about half its width times the sine of the angle — ~9pt — plus a couple more from the scale, which showed as a hairline of page across the very top for the length of every swipe. The card now simply starts higher than the screen does.
 - **Haptics on the swipe**, fired from `commit(to:)` via a local counter rather than a trigger on `session.scope`: all three tabs' banners are mounted at once and a shared trigger would have fired three taps for one swipe.
 
+## Fifth pass (same day, user feedback)
+
+- **The home indicator's inset is gone from all three screens** (`dropsBottomSafeArea`). Floating the tab bar in pass four removed the reserved strip but not the inset behind it: every screen still stopped 34pt short of the display, and the page background filling that gap read as a grey band pinned across the bottom of the app — a list row was visibly sliced off against it. Content now runs to the physical edge and passes under the glass, which is what the clearance below every last row was always for.
+- **It has to be applied to the screen's own root view.** Neither the `TabView` nor the `NavigationStack` will pass `.ignoresSafeArea` down — both host their content separately, so on either of them it is inert: the strip stays and the only visible effect is that the shell's overlays move. Both were tried before the third. Hence three call sites, behind one modifier so they cannot drift.
+- The shell's overlays — the bar, the offline and pending-sync notices — are **not** covered by that, since an overlay is laid out in the parent's still-inset space. Each carries `− bottomSafeAreaInset` so it is positioned from the true screen edge like the bar already was; the status notices now sit 10pt above the bar rather than 44.
+- **Content fades out under the tab bar.** `FadingTopEdge` became `FadingEdges`: the same mask, now with a second ramp at the bottom running the full `KeepoTabBarMetrics.topEdge` (84pt — the bar's top edge above the display). The two ends are different lengths on purpose. The top is a short hand-off to a banner sitting on the content; the bottom has no edge to hand off to now that content runs past the bar to the physical bottom, so the fade is the only thing that ends it. `clearance` is derived from `topEdge` so the fade and the room every last row leaves can't disagree.
+- The Needs Review drawer's item list gets the bottom ramp too (`fadingEdges(top: 0)`) — expanded it reaches the display's bottom like the ledger it replaces. On the **rows only**: masking the whole drawer would dissolve its own surface with them.
+- **Tab bar icons went from 17pt to 20pt** (and their fixed box from 20 to 23). The plus was tried thinner and put back at 21pt semibold on the user's call.
+
 ## Tests
 
-`KeepoTests/ScopeFilteringTests.swift` — scope filtering on the transactions read path (total/private/household), `scopeAvailability` counts (including that an archived account counts towards no scope), and the whole `ScopeEmptiness` decision table. 136 unit tests + the UI smoke test pass; SwiftLint clean.
+`KeepoTests/ScopeFilteringTests.swift` — scope filtering on the transactions read path (total/private/household), `scopeAvailability` counts (including that an archived account counts towards no scope), and the whole `ScopeEmptiness` decision table. 147 unit tests in 33 suites pass; SwiftLint clean.
 
 ## Open
 

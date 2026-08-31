@@ -70,7 +70,7 @@ struct AccountsListView: View {
                 .zIndex(1)
 
                 content
-                    .fadingTopEdge()
+                    .fadingEdges()
             }
 
             if let actionErrorMessage {
@@ -83,6 +83,7 @@ struct AccountsListView: View {
                 }
             }
         }
+        .dropsBottomSafeArea()
         .toolbar(.hidden, for: .navigationBar)
         .onChange(of: navigation?.pendingAdd) { _, _ in
             if navigation?.consumeAdd(.accounts) == true { isAddingAccount = true }

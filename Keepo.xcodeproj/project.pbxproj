@@ -19,6 +19,7 @@
 		0CFAB8B74442EB878B25B5D6 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487EAE5A42131446A0EA564D /* ColorHex.swift */; };
 		0D5315A665A76FCABF1A2724 /* SeriesWidgetChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D0D6AA2508CE2682EE3445 /* SeriesWidgetChrome.swift */; };
 		0EC6927922D113746FDC1FD4 /* ConflictResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81CEAFFB8092FE202B4DB40 /* ConflictResolution.swift */; };
+		124124D5FCC9AB799601F076 /* FadingEdges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1690836BEC31AA131CD45E46 /* FadingEdges.swift */; };
 		12A356D345021336EACE2540 /* UnmappedCardLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58EC8D21829E6A9DDBC381D8 /* UnmappedCardLifecycleTests.swift */; };
 		12BE40DBFAD37D5D3A93A7B5 /* CategoryFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C641FD642C4420E3E3D9173 /* CategoryFormView.swift */; };
 		1422E9D10EA7EBCE4F82B38E /* SyncApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0692E171C05E5C17DF39EB68 /* SyncApply.swift */; };
@@ -106,7 +107,6 @@
 		8211BBB44578D76679772CAD /* AlwaysFailingSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82B551364B6EDE8D6F79CFC /* AlwaysFailingSender.swift */; };
 		826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11F9FF9F9234C2EFC83BBD8B /* Assets.xcassets */; };
 		83DF90BF223D0288F19B4F12 /* CurrencyExposureWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C66FB827DFBD10EF7AEC18 /* CurrencyExposureWidget.swift */; };
-		845BEE547EB47A5C9ADA8138 /* FadingTopEdge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BEF988C7B19F9B2B60BC31 /* FadingTopEdge.swift */; };
 		8525C2DA0046AEC5CE3A14AA /* Outbox+CaptureRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C523EC45C1A5230DC5341B /* Outbox+CaptureRecovery.swift */; };
 		85B1EC2B4B07AC6786D23109 /* KeepoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A520844CB1127366801CB8 /* KeepoCore */; };
 		85B464049FC139E39A07D57B /* LocalMoneyConversionBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F450AAFA803FEA51265A620A /* LocalMoneyConversionBudget.swift */; };
@@ -136,6 +136,7 @@
 		A656E34C52736534DDD666F4 /* WidgetSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4878BEA7F7011EC05DB475C2 /* WidgetSegment.swift */; };
 		A66A84D1DAEAF5A4F347291C /* DashboardCanvasDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DBDB63AD4D05BD8A1403EA /* DashboardCanvasDrag.swift */; };
 		A6E02A53EABAE8F0D8A74907 /* TransactionsRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FC1BC7AE3C35B901FDBC490 /* TransactionsRequestTests.swift */; };
+		A7E7A7AA57AE3AA8A98E0B85 /* DropsBottomSafeArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2EFE59B1202392CFCB41D33 /* DropsBottomSafeArea.swift */; };
 		A8C3B22C1F1507158B971007 /* MappedCardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6E6B97FB91FA6725C935483 /* MappedCardSheet.swift */; };
 		AB95F8EE581EE512211B1275 /* ScopeContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323D6E84BA1E735B53FDE6E7 /* ScopeContext.swift */; };
 		AD2A7DB89BBDB050452CA807 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE9D5EF2222D3BBB7A7C333C /* Outbox.swift */; };
@@ -262,6 +263,7 @@
 		12FF29F32E42DD3CA5E20B7D /* KeepoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1506F139C92C88A14BDEE6BE /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		165D0C1A1BF53D4803DE5FBC /* LocalMoneyTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyTypes.swift; sourceTree = "<group>"; };
+		1690836BEC31AA131CD45E46 /* FadingEdges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FadingEdges.swift; sourceTree = "<group>"; };
 		18D7EDAF6788363C5C9CB5C9 /* ChartAxisLabels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartAxisLabels.swift; sourceTree = "<group>"; };
 		1907CF10603055CC52ED389C /* NetWorthWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthWidget.swift; sourceTree = "<group>"; };
 		1978AC02A9A187AF7E931051 /* CaptureQuickActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionsTests.swift; sourceTree = "<group>"; };
@@ -372,6 +374,7 @@
 		9F1EE0D361A84BD4A2D11460 /* SyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
 		A0CACCDB94B18F3F770A4D1A /* LocalDashboardQueries+Cashflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalDashboardQueries+Cashflow.swift"; sourceTree = "<group>"; };
 		A23166A8674504049A46489F /* LocalAccountRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRow.swift; sourceTree = "<group>"; };
+		A2EFE59B1202392CFCB41D33 /* DropsBottomSafeArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropsBottomSafeArea.swift; sourceTree = "<group>"; };
 		A3AF792C04D22B7EF9030339 /* LocalDashboardQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDashboardQueries.swift; sourceTree = "<group>"; };
 		A5D45833432D943398CC902D /* LocalMoneyConversionArchivedAccountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversionArchivedAccountTests.swift; sourceTree = "<group>"; };
 		A6EC2DB7E832362CEA7CCF77 /* KeepoCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = KeepoCore; path = Packages/KeepoCore; sourceTree = SOURCE_ROOT; };
@@ -399,14 +402,13 @@
 		BFC2601A5B057E9F8CD882E7 /* ConflictDetailSheet+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConflictDetailSheet+Loading.swift"; sourceTree = "<group>"; };
 		C02190F3A60526A587EFCA91 /* CaptureQuickActionSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionSuggestions.swift; sourceTree = "<group>"; };
 		C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
-		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2304E1D42EB8B69A267C0AC /* MetricKitSubscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitSubscriber.swift; sourceTree = "<group>"; };
 		C2C989DB9E673F3B36CD29E0 /* TransactionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFormView.swift; sourceTree = "<group>"; };
 		C3AF9A7AEAB1809042F92E29 /* OTPSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPSignInView.swift; sourceTree = "<group>"; };
 		C3FEA59391FE97D8365A918F /* DashboardScopeFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardScopeFixture.swift; sourceTree = "<group>"; };
 		C530C2B618EC1FE781257410 /* DashboardWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidgetView.swift; sourceTree = "<group>"; };
 		C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoreTests.swift; sourceTree = "<group>"; };
-		C5BEF988C7B19F9B2B60BC31 /* FadingTopEdge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FadingTopEdge.swift; sourceTree = "<group>"; };
 		C80AB872EF3B66A5C757E62D /* DashboardGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardGeometryTests.swift; sourceTree = "<group>"; };
 		C91440E871E1BD48AB796B63 /* Keepo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Keepo.entitlements; sourceTree = "<group>"; };
 		C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxCaptureRecoveryTests.swift; sourceTree = "<group>"; };
@@ -741,7 +743,8 @@
 		978A560D3AAE06360198F16B /* Modifiers */ = {
 			isa = PBXGroup;
 			children = (
-				C5BEF988C7B19F9B2B60BC31 /* FadingTopEdge.swift */,
+				A2EFE59B1202392CFCB41D33 /* DropsBottomSafeArea.swift */,
+				1690836BEC31AA131CD45E46 /* FadingEdges.swift */,
 				889A58B06A94E4D8F1740EEF /* PrivacyToggleButton.swift */,
 			);
 			path = Modifiers;
@@ -1068,7 +1071,7 @@
 			mainGroup = 7EFAF88579B01776BD0774BC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */,
+				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				ADEF292666A264221272220B /* XCLocalSwiftPackageReference "Packages/KeepoCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -1218,8 +1221,9 @@
 				04DAB563D2880FF92D7AF874 /* DashboardWidgetView.swift in Sources */,
 				BC2164BD9D96F9AB4C55FDDD /* DataPrivacyView.swift in Sources */,
 				3869BFDA8B7529874F2CD254 /* DaySplitRing.swift in Sources */,
+				A7E7A7AA57AE3AA8A98E0B85 /* DropsBottomSafeArea.swift in Sources */,
 				DCEFB45D20BC131FA0C9519B /* ExportView.swift in Sources */,
-				845BEE547EB47A5C9ADA8138 /* FadingTopEdge.swift in Sources */,
+				124124D5FCC9AB799601F076 /* FadingEdges.swift in Sources */,
 				E035D81A41952DFA11DEBB47 /* FormPrimitives.swift in Sources */,
 				29A9DAF6B04FAC0AE4F55FE5 /* FxRateWidget.swift in Sources */,
 				8ADD0ACBFCB1B3DFE7B7B5BD /* HighlightableChart.swift in Sources */,
@@ -1467,7 +1471,6 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1509,7 +1512,6 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1626,7 +1628,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */ = {
+		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -1639,7 +1641,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		0D525863FB5ABAE4C22CDAE5 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
 		};
 		55A520844CB1127366801CB8 /* KeepoCore */ = {
@@ -1648,7 +1650,7 @@
 		};
 		6CF67C6B40F5CAB317C7F6FC /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */

@@ -16,9 +16,10 @@ import SwiftUI
 /// thing competing to say where you are.
 ///
 /// `TabView` still owns selection and keeps each tab's state alive; its own
-/// bar is hidden per tab (`.toolbar(.hidden, for: .tabBar)`) and this sits
-/// in the resulting space as a bottom safe-area inset, so a list scrolls to
-/// a natural stop above it instead of underneath it.
+/// bar is hidden per tab (`.toolbar(.hidden, for: .tabBar)`) and this rides
+/// over the content as an overlay, reserving no row of its own — see
+/// `KeepoTabBarMetrics.clearance` for what every scrolling view leaves
+/// below its last row instead.
 struct KeepoTabBar: View {
     @Binding var tab: AppNavigation.Tab
     /// Drawn as a dot on the Transactions icon — the Needs Review inbox
@@ -55,12 +56,12 @@ struct KeepoTabBar: View {
         } label: {
             VStack(spacing: 2) {
                 Image(systemName: isSelected ? destination.selectedIcon : destination.icon)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 20, weight: .medium))
                     // A fixed box, because these three glyphs are not the
                     // same height: `list.bullet.rectangle.portrait` is taller
                     // than `creditcard`, so laid out naturally each label sat
                     // on its own baseline and the row read as crooked.
-                    .frame(height: 20)
+                    .frame(height: 23)
                     // Sits *outside* the icon, and mango rather than coral —
                     // this is the one thing in the bar allowed a colour,
                     // because it is the one thing reporting a fact rather
@@ -170,6 +171,10 @@ enum KeepoTabBarMetrics {
     /// The same on the sides and the bottom — a uniform margin is half of
     /// what makes the corners concentric; matching radii are the other half.
     static let margin: CGFloat = 30
+    /// Where the bar's top edge sits above the bottom of the display — the
+    /// line content has to be gone by, and so the length of the bottom fade
+    /// (`FadingEdges`).
+    static let topEdge: CGFloat = margin + height
     /// How much room a scrolling view must leave below its last row.
-    static let clearance: CGFloat = margin + height + 10
+    static let clearance: CGFloat = topEdge + 10
 }

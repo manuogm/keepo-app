@@ -64,7 +64,7 @@ struct HomeView: View {
                 .animation(.easeInOut(duration: 0.2), value: isPickingWidget)
 
                 content
-                    .fadingTopEdge()
+                    .fadingEdges()
             }
 
             if let errorMessage {
@@ -77,6 +77,7 @@ struct HomeView: View {
                 }
             }
         }
+        .dropsBottomSafeArea()
         .toolbar(.hidden, for: .navigationBar)
         // Keyed on the mounted widget kinds as well as the refresh token and
         // the scope: adding or removing a widget has to reload, because the

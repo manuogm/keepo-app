@@ -164,6 +164,12 @@ struct NeedsReviewPanel: View {
         .scrollBounceBehavior(.basedOnSize)
         .contentMargins(.bottom, KeepoTabBarMetrics.clearance, for: .scrollContent)
         .frame(maxHeight: .infinity)
+        // The rows only, not the drawer: expanded, this reaches the bottom
+        // of the display like the ledger it replaces, so it needs the same
+        // fade under the tab bar — but masking the whole drawer would
+        // dissolve its own surface along with them. There is nothing to
+        // fade at the top; the drawer's header is above this.
+        .fadingEdges(top: 0)
         .transition(.opacity)
     }
 

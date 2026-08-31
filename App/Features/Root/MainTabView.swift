@@ -57,13 +57,10 @@ struct MainTabView: View {
             topSafeAreaInset = insets.top
             bottomSafeAreaInset = insets.bottom
         }
-        // An overlay, not a safe-area inset. An inset reserves a strip of
-        // page background under every screen — a grey band across the
-        // bottom that reads as part of the design rather than as the edge
-        // of the content. Floating the bar lets content run to the screen
-        // edge and pass under the glass, which is the whole point of the
-        // material; each scrolling view leaves `KeepoTabBarMetrics
-        // .clearance` below its last row so nothing is trapped there.
+        // An overlay, not a safe-area inset. An inset would put back exactly
+        // the strip `dropsBottomSafeArea` just removed; floating the bar
+        // lets content run to the screen edge and pass under the glass,
+        // which is the whole point of the material.
         .overlay(alignment: .bottom) {
             KeepoTabBar(
                 tab: $navigation.tab, needsReviewCount: needsReviewCount, onAdd: { navigation.requestAdd() }
@@ -72,8 +69,6 @@ struct MainTabView: View {
             // the margin is measured from the true screen edge, not from
             // the safe area, so the gap under the bar equals the gap beside
             // it — which is the whole basis of the concentric corners.
-            // `.ignoresSafeArea` cannot do this from inside an overlay; it
-            // is laid out in the parent's already-inset space.
             .padding(.bottom, KeepoTabBarMetrics.margin - bottomSafeAreaInset)
         }
         // Presented from here rather than `RootView` — see
@@ -94,12 +89,13 @@ struct MainTabView: View {
         }
         // Also an overlay — a transient floating notice must not reflow the
         // screen under it every time connectivity blips. It rides above the
-        // tab bar on the same clearance every scrolling view leaves.
+        // tab bar on the same clearance every scrolling view leaves, less
+        // the inset this layer still has and the screens no longer do.
         .overlay(alignment: .bottom) {
             if network.isOffline {
                 OfflineStatusBar(lastSyncedAt: session.syncEngine?.lastSyncedAt)
                     .padding(.horizontal)
-                    .padding(.bottom, KeepoTabBarMetrics.clearance)
+                    .padding(.bottom, KeepoTabBarMetrics.clearance - bottomSafeAreaInset)
             } else if session.outbox.hasStalePending(threshold: 120)
                 || session.syncEngine?.lastErrorMessage != nil {
                 PendingSyncStatusBar(
@@ -108,7 +104,7 @@ struct MainTabView: View {
                     retry: { await session.syncNow() }
                 )
                 .padding(.horizontal)
-                .padding(.bottom, KeepoTabBarMetrics.clearance)
+                .padding(.bottom, KeepoTabBarMetrics.clearance - bottomSafeAreaInset)
             }
         }
     }

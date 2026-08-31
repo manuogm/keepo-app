@@ -116,6 +116,7 @@ struct TransactionsListView: View {
 
     var body: some View {
         listContent
+            .dropsBottomSafeArea()
             .toolbar(.hidden, for: .navigationBar)
             .onChange(of: navigation?.pendingAdd) { _, _ in
                 if navigation?.consumeAdd(.transactions) == true { isAddingTransaction = true }
@@ -189,7 +190,7 @@ struct TransactionsListView: View {
                 if !isInboxExpanded {
                     ledger
                         .padding(.top, 4)
-                        .fadingTopEdge()
+                        .fadingEdges()
                         .transition(.opacity)
                 }
             }
