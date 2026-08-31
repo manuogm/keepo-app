@@ -60,6 +60,10 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     /// card is already on its way and a finger that keeps moving (or
     /// wanders back) must not drag it off course.
     @State private var isCommitted = false
+    /// Bumped by whichever banner actually performed the swipe, so the two
+    /// mounted-but-offscreen banners on the other tabs stay silent. A
+    /// trigger on `session.scope` would have fired all three at once.
+    @State private var hapticTick = 0
     @Environment(\.topSafeAreaInset) private var topSafeAreaInset
 
     private var scopes: [PublicSchema.AccountScope] { PublicSchema.AccountScope.carousel }
@@ -72,6 +76,15 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     private var gap: CGFloat { 14 }
     /// One card plus one gap — the distance the deck travels per scope.
     private var step: CGFloat { cardWidth + gap }
+    /// How far each card reaches **above** the screen's top edge.
+    ///
+    /// A tilted card's dipping top corner drops by roughly half the card's
+    /// width times the sine of the angle — about 9pt here — and the scale
+    /// pulls the edge down a little further. Without the overshoot that
+    /// showed as a hairline of page across the very top of the screen for
+    /// the length of every swipe. The card simply starts higher than the
+    /// screen does.
+    private var topOvershoot: CGFloat { 20 }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -82,6 +95,10 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
         }
         .shadow(color: .black.opacity(0.13), radius: 10, y: 5)
         .animation(.snappy(duration: 0.28), value: isFiltersExpanded)
+        // The one moment worth a bump: the card breaking free. Not the
+        // finger touching down, not the spring settling — the instant the
+        // drag stops being reversible.
+        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.8), trigger: hapticTick)
     }
 
     // MARK: - Carousel
@@ -104,7 +121,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
         .overlay(alignment: .bottom) { pageDots }
         .contentShape(Rectangle())
         .gesture(swipe)
-        .padding(.top, -topSafeAreaInset)
+        .padding(.top, -(topSafeAreaInset + topOvershoot))
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 
@@ -134,7 +151,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
                 .frame(width: 32, height: 32)
         }
         .padding(.horizontal, 16)
-        .padding(.top, topSafeAreaInset + 12)
+        .padding(.top, topSafeAreaInset + topOvershoot + 12)
         // Leaves the room the page dots are drawn into, so they sit inside
         // the card rather than on a strip of their own below it.
         .padding(.bottom, 26)
@@ -144,7 +161,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
         // rule everywhere else in the app is untouched.
         .background(
             LinearGradient(
-                colors: [scope.tint.shifted(brightness: -0.07), scope.tint],
+                colors: [scope.tint.shifted(brightness: -0.16), scope.tint],
                 startPoint: .top, endPoint: .bottom
             ),
             in: UnevenRoundedRectangle(bottomLeadingRadius: 24, bottomTrailingRadius: 24, style: .continuous)
@@ -245,6 +262,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
 
     private func commit(to target: PublicSchema.AccountScope) {
         isCommitted = true
+        hapticTick += 1
         withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
             session.scope = target
             dragOffset = 0

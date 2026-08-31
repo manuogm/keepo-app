@@ -16,9 +16,10 @@ import SwiftUI
 /// chart palette.
 extension PublicSchema.AccountScope {
     /// Left to right in the banner's carousel, and the order the page dots
-    /// are drawn in. Total sits in the middle of nothing — it is the
-    /// default, so it leads.
-    static let carousel: [PublicSchema.AccountScope] = [.total, .me, .household]
+    /// are drawn in. Total leads because it is the default; **Household
+    /// comes second** because it is the one a user is more likely to reach
+    /// for next, and it should be one swipe away rather than two.
+    static let carousel: [PublicSchema.AccountScope] = [.total, .household, .me]
 
     /// The user's own word for this scope. `.me` is **"Private"**, not the
     /// "Personal" the old scope menu used: the badge beside a screen title
@@ -64,7 +65,14 @@ extension PublicSchema.AccountScope {
 
     /// The scope's colour — the banner card's fill, and the accent anywhere
     /// else the scope needs naming (an empty-state icon, a badge).
-    var tint: Color {
+    ///
+    /// Pulled back from the brand values rather than restated as new hex:
+    /// at full saturation a whole screen's worth of `BrandPrimary` shouted
+    /// at everything on it. The literals stay the brand's, and the one place
+    /// they are softened says so.
+    var tint: Color { baseTint.shifted(saturation: -0.09) }
+
+    private var baseTint: Color {
         switch self {
         case .total: return Color(hex: "#FF5A5F")
         case .me: return Color(hex: "#5B5BD6")

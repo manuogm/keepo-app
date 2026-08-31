@@ -46,6 +46,9 @@ struct ScopeEmptyStateView: View {
             }
         }
         .padding(.horizontal, 40)
+        // Centred in what the user can actually see, not in a region that
+        // now runs under the floating tab bar.
+        .padding(.bottom, KeepoTabBarMetrics.clearance)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $isAddingAccount) {
             AddAccountFlowView(session: session) { session.refresh.bump() }

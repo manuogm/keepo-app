@@ -22,6 +22,10 @@ struct MainTabView: View {
     /// Measured here and handed down, because this is the last view that
     /// still sees it — see `EnvironmentValues.topSafeAreaInset`.
     @State private var topSafeAreaInset: CGFloat = 0
+    /// The home-indicator inset, kept for the tab bar's own placement: the
+    /// bar is positioned from the **screen** edge, not from the safe area,
+    /// so the gap under it matches the gap beside it.
+    @State private var bottomSafeAreaInset: CGFloat = 0
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -49,17 +53,28 @@ struct MainTabView: View {
         .environment(scopeContext)
         .environment(\.isPrivacyMode, session.isPrivacyMode)
         .environment(\.topSafeAreaInset, topSafeAreaInset)
-        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topSafeAreaInset = $0 }
-        // A safe-area inset, not an overlay: the system bar is hidden, so
-        // this is the only thing telling a list where its content actually
-        // ends. (The offline banner below stays an overlay — see its own
-        // comment; it floats *over* content by design.)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets in
+            topSafeAreaInset = insets.top
+            bottomSafeAreaInset = insets.bottom
+        }
+        // An overlay, not a safe-area inset. An inset reserves a strip of
+        // page background under every screen — a grey band across the
+        // bottom that reads as part of the design rather than as the edge
+        // of the content. Floating the bar lets content run to the screen
+        // edge and pass under the glass, which is the whole point of the
+        // material; each scrolling view leaves `KeepoTabBarMetrics
+        // .clearance` below its last row so nothing is trapped there.
+        .overlay(alignment: .bottom) {
             KeepoTabBar(
                 tab: $navigation.tab, needsReviewCount: needsReviewCount, onAdd: { navigation.requestAdd() }
             )
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+            // Negative on a home-indicator phone, and that is the point:
+            // the margin is measured from the true screen edge, not from
+            // the safe area, so the gap under the bar equals the gap beside
+            // it — which is the whole basis of the concentric corners.
+            // `.ignoresSafeArea` cannot do this from inside an overlay; it
+            // is laid out in the parent's already-inset space.
+            .padding(.bottom, KeepoTabBarMetrics.margin - bottomSafeAreaInset)
         }
         // Presented from here rather than `RootView` — see
         // `CaptureDeepLinkModifier`'s own header for the two device-testing
@@ -77,15 +92,14 @@ struct MainTabView: View {
             await loadNeedsReviewCount()
             await scopeContext.reload(session: session)
         }
-        // `.overlay`, not `.safeAreaInset` — the banner is a transient
-        // floating notice that must not reflow the screen under it every
-        // time connectivity blips. It clears the tab bar by sitting on the
-        // inset that bar already claims.
+        // Also an overlay — a transient floating notice must not reflow the
+        // screen under it every time connectivity blips. It rides above the
+        // tab bar on the same clearance every scrolling view leaves.
         .overlay(alignment: .bottom) {
             if network.isOffline {
                 OfflineStatusBar(lastSyncedAt: session.syncEngine?.lastSyncedAt)
                     .padding(.horizontal)
-                    .padding(.bottom, 76)
+                    .padding(.bottom, KeepoTabBarMetrics.clearance)
             } else if session.outbox.hasStalePending(threshold: 120)
                 || session.syncEngine?.lastErrorMessage != nil {
                 PendingSyncStatusBar(
@@ -94,7 +108,7 @@ struct MainTabView: View {
                     retry: { await session.syncNow() }
                 )
                 .padding(.horizontal)
-                .padding(.bottom, 76)
+                .padding(.bottom, KeepoTabBarMetrics.clearance)
             }
         }
     }

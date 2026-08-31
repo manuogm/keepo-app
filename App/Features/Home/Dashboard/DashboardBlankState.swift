@@ -35,7 +35,7 @@ struct DashboardBlankState: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.bottom, 60)
+        .padding(.bottom, KeepoTabBarMetrics.clearance)
         .accessibilityElement(children: .contain)
     }
 }

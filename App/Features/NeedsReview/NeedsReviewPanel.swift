@@ -162,6 +162,7 @@ struct NeedsReviewPanel: View {
             }
         }
         .scrollBounceBehavior(.basedOnSize)
+        .contentMargins(.bottom, KeepoTabBarMetrics.clearance, for: .scrollContent)
         .frame(maxHeight: .infinity)
         .transition(.opacity)
     }

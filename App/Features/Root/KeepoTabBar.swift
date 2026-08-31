@@ -27,21 +27,12 @@ struct KeepoTabBar: View {
     let needsReviewCount: Int
     let onAdd: () -> Void
 
-    private enum Metrics {
-        static let height: CGFloat = 54
-        /// The Add button stays a little taller than the bar on purpose — it
-        /// is a separate object with a separate job, and matching heights
-        /// would read as a fourth tab that had escaped the capsule.
-        static let addSize: CGFloat = 56
-        static let gap: CGFloat = 18
-    }
-
     var body: some View {
-        HStack(spacing: Metrics.gap) {
+        HStack(spacing: KeepoTabBarMetrics.gap) {
             destinations
             addButton
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, KeepoTabBarMetrics.margin)
     }
 
     private var destinations: some View {
@@ -50,7 +41,7 @@ struct KeepoTabBar: View {
                 tabButton(destination)
             }
         }
-        .frame(height: Metrics.height)
+        .frame(height: KeepoTabBarMetrics.height)
         .frame(maxWidth: .infinity)
         .liquidGlass(in: Capsule())
         .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
@@ -87,7 +78,7 @@ struct KeepoTabBar: View {
             }
             .foregroundStyle(isSelected ? Color.primary : Color.secondary)
             .frame(maxWidth: .infinity)
-            .frame(height: Metrics.height)
+            .frame(height: KeepoTabBarMetrics.height)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -100,7 +91,7 @@ struct KeepoTabBar: View {
             Image(systemName: "plus")
                 .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(Color.primary)
-                .frame(width: Metrics.addSize, height: Metrics.addSize)
+                .frame(width: KeepoTabBarMetrics.height, height: KeepoTabBarMetrics.height)
                 .liquidGlass(in: Circle())
                 .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
         }
@@ -156,4 +147,29 @@ private extension View {
                 .overlay(shape.stroke(Color.primary.opacity(0.06), lineWidth: 0.5))
         }
     }
+}
+
+/// Shared because the bar floats *over* the screens rather than reserving a
+/// strip of its own, so every scrolling view has to know how far to let its
+/// last row travel before the glass eats it. One number, not four guesses.
+///
+/// **On the numbers.** The bar and the Add button are the same height and
+/// sit the same distance from the left, right and bottom edges, so their
+/// corners run **concentric** with the display's own: a rounded corner
+/// nested inside another looks right only when the inner radius is the
+/// outer one minus the gap between them. Half of 54 is 27, so a 30pt margin
+/// implies a 57pt display corner — between the 55pt and 62pt of the phones
+/// this ships to, and close enough on either that the curves read as
+/// parallel. There is no public API for the real radius (the only way to
+/// read it is a private `UIScreen` key), so this is calibrated, not
+/// derived — if it ever looks wrong on a new device, `margin` is the number
+/// to move.
+enum KeepoTabBarMetrics {
+    static let height: CGFloat = 54
+    static let gap: CGFloat = 16
+    /// The same on the sides and the bottom — a uniform margin is half of
+    /// what makes the corners concentric; matching radii are the other half.
+    static let margin: CGFloat = 30
+    /// How much room a scrolling view must leave below its last row.
+    static let clearance: CGFloat = margin + height + 10
 }

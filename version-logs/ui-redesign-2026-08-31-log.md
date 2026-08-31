@@ -63,6 +63,16 @@ Two things worth knowing before touching this again: `.ignoresSafeArea` **reposi
 - **The tab bar and Add button are Liquid Glass** (`glassEffect(.regular, in:)`), not the `.regularMaterial` blur they were — gated on `#available(iOS 26.0, *)` since the deployment target is still 18.0, with the material as the fallback. Both treatments draw their own edge, so the hand-drawn hairline border went.
 - **Tab labels sat on three different baselines** because `list.bullet.rectangle.portrait` is taller than `creditcard`. The icon now gets a fixed 20pt box.
 
+## Fourth pass (same day, user feedback)
+
+- **The tab bar floats; it no longer reserves a strip.** A bottom `safeAreaInset` was drawing a band of page background under every screen that read as part of the design rather than as the edge of the content. It is an `.overlay` now, content runs to the screen edge and passes under the glass, and every scrolling surface leaves `KeepoTabBarMetrics.clearance` below its last row instead.
+- **Bar and Add button are concentric with the display.** Same height (54), same 30pt margin from left, right and bottom, so the inner radius (27) is the outer one minus the gap — which is the only way a rounded corner nested in another looks right. There is no public API for the display's radius (only a private `UIScreen` key), so 30 is calibrated for the 55–62pt family, and `margin` is the single number to move if a new device needs it. The bar is positioned from the **screen** edge via a measured `bottomSafeAreaInset`, not from the safe area: `.ignoresSafeArea` cannot do this from inside an overlay, which is laid out in the parent's already-inset space.
+- **The dashboard's first widget cleared the header's fade** — at 4pt of top padding its own top edge was already half dissolved before anything had scrolled.
+- **Scope order is Total → Household → Private.** Household is the one a user reaches for next, so it should be one swipe away rather than two.
+- Tints pulled back 9% in saturation from the brand values (a full screen of `BrandPrimary` shouted at everything on it), and the gradient's top stop went from 7% to 16% darker.
+- **Cards reach 20pt above the screen.** A tilted card's dipping top corner drops by about half its width times the sine of the angle — ~9pt — plus a couple more from the scale, which showed as a hairline of page across the very top for the length of every swipe. The card now simply starts higher than the screen does.
+- **Haptics on the swipe**, fired from `commit(to:)` via a local counter rather than a trigger on `session.scope`: all three tabs' banners are mounted at once and a shared trigger would have fired three taps for one swipe.
+
 ## Tests
 
 `KeepoTests/ScopeFilteringTests.swift` — scope filtering on the transactions read path (total/private/household), `scopeAvailability` counts (including that an archived account counts towards no scope), and the whole `ScopeEmptiness` decision table. 136 unit tests + the UI smoke test pass; SwiftLint clean.

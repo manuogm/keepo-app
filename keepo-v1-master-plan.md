@@ -302,6 +302,8 @@ A second pass the same day took it further on user feedback: gradients out every
 
 A third pass made the banner a **deck** — cards separated by a gap, tilting and shrinking as they travel, drawn unclipped so the tilt survives — gave the current page indicator a pill, added a subtle top-darker gradient to the header, added an Expense/Income/Transfers filter, and moved the tab bar and Add button onto **Liquid Glass** (`glassEffect`, gated on iOS 26 with the old material as fallback).
 
+A fourth pass floated the tab bar over the content instead of reserving a strip for it (the reserved band read as a grey banner across every screen), made it and the Add button **concentric with the display's corners**, reordered the scopes to Total → Household → Private, softened the tints, and added haptics to the swipe.
+
 One decision here is not cosmetic and is worth knowing before touching those screens: **scope now actually filters Accounts and Transactions.** It never did — the old scope switcher sat in both toolbars and only Home's widgets honoured it — and a banner that names the scope over the list makes that a contradiction. `LocalTransactionRow.fetchFiltered` takes a `scope:` and applies the existing `LocalMoneyQueries.scopeFilterSQL`; `AccountsListView` filters on `isShared`. The knock-on: **drag-to-reorder accounts is Total-only**, because `reorder_accounts` renumbers from array position and a filtered subset cannot express the write.
 
 ## Known gaps this plan does not close

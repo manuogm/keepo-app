@@ -159,6 +159,7 @@ struct AccountsListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, KeepoTabBarMetrics.clearance, for: .scrollContent)
         .refreshable { await load() }
     }
 

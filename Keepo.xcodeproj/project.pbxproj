@@ -399,7 +399,7 @@
 		BFC2601A5B057E9F8CD882E7 /* ConflictDetailSheet+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConflictDetailSheet+Loading.swift"; sourceTree = "<group>"; };
 		C02190F3A60526A587EFCA91 /* CaptureQuickActionSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionSuggestions.swift; sourceTree = "<group>"; };
 		C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
-		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2304E1D42EB8B69A267C0AC /* MetricKitSubscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitSubscriber.swift; sourceTree = "<group>"; };
 		C2C989DB9E673F3B36CD29E0 /* TransactionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFormView.swift; sourceTree = "<group>"; };
 		C3AF9A7AEAB1809042F92E29 /* OTPSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPSignInView.swift; sourceTree = "<group>"; };
@@ -1068,7 +1068,7 @@
 			mainGroup = 7EFAF88579B01776BD0774BC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */,
 				ADEF292666A264221272220B /* XCLocalSwiftPackageReference "Packages/KeepoCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -1467,6 +1467,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1508,6 +1509,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/Keepo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K46X3FA9HH;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
@@ -1624,7 +1626,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+		CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -1637,7 +1639,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		0D525863FB5ABAE4C22CDAE5 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 		55A520844CB1127366801CB8 /* KeepoCore */ = {
@@ -1646,7 +1648,7 @@
 		};
 		6CF67C6B40F5CAB317C7F6FC /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = CBCFA5AABD4A70D29593302B /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */

@@ -18,8 +18,8 @@ struct DashboardCanvasView: View {
     let data: DashboardData
     let isLoading: Bool
     @Binding var isEditing: Bool
-    /// Owned by `HomeView`: the shell's "+" opens the catalogue from outside
-    /// this view entirely, and the Add tile writes to the same flag.
+    /// Owned by `HomeView`: the shell's "+" opens the catalogue, and the
+    /// canvas's own Add tile writes to the same flag.
     @Binding var isPickingWidget: Bool
 
     @State private var expandedId: UUID?
@@ -167,8 +167,8 @@ struct DashboardCanvasView: View {
                 .padding(.top, carriedReserve(geometry))
         }
         .padding(.horizontal, horizontalInset)
-        .padding(.top, 4)
-        .padding(.bottom, 24)
+        .padding(.top, 28) // clears the header's fade
+        .padding(.bottom, 24 + KeepoTabBarMetrics.clearance)
         .animation(.snappy(duration: 0.32), value: layout)
         // Tapping the surface around the widgets leaves edit mode — the same
         // "tap the wallpaper to finish" the home screen offers, so Done in

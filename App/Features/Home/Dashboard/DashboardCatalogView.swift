@@ -71,7 +71,7 @@ struct DashboardCatalogView: View {
                 }
                 .padding(.horizontal, inset)
                 .padding(.top, 8)
-                .padding(.bottom, 24)
+                .padding(.bottom, 24 + KeepoTabBarMetrics.clearance)
             }
             .scrollIndicators(.hidden)
         }
