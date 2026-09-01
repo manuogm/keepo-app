@@ -84,9 +84,19 @@ extension AppTheme {
     enum Size {
         /// 8 — a status dot or a page indicator.
         static let dot: CGFloat = 8
-        /// 24 — a badge, or a compact leading icon on a widget's row.
+        /// 12 — an icon packed inside a chip or badge next to caption2-sized
+        /// text (the scope title badge). Matched to the letterforms, not the
+        /// line — anything larger crowds the pill.
+        static let glyphNano: CGFloat = 12
+        /// 16 — an icon sitting inline with a line of caption-sized text: a
+        /// provenance marker on a transaction row, the leading glyph in a
+        /// search field. `glyph` would tower over the words beside it.
+        static let glyphSmall: CGFloat = 16
+        /// 24 — a badge, a compact leading icon on a widget's row, or a
+        /// standalone tappable control glyph (the privacy toggle, the filter
+        /// and search buttons, the calculator affordance).
         static let glyph: CGFloat = 24
-        /// 32 — the standard leading icon on a list row.
+        /// 32 — the standard leading icon on a list row, and the tab bar.
         static let icon: CGFloat = 32
         /// 44 — HIG's minimum touch target. Applied as hit area, not layout —
         /// see `View.hitTarget(_:)`.

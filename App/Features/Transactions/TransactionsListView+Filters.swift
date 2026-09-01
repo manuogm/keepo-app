@@ -24,11 +24,10 @@ extension TransactionsListView {
                 if !isFiltersExpanded { isSearching = false }
             }
         } label: {
-            Image(systemName: "slider.horizontal.3")
-                .font(AppTheme.Typography.bodyEmphasis)
+            KeepoIcon(name: isFiltersExpanded ? "icon-filter-filled" : "icon-filter", size: AppTheme.Size.glyph)
                 .foregroundStyle(AppTheme.Palette.textOnAccent)
                 .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
-                .background(AppTheme.Palette.textOnAccent.opacity(isFiltersExpanded ? 0.28 : 0), in: Circle())
+                .contentShape(Rectangle())
                 .overlay(alignment: .topTrailing) {
                     if hasActiveFilter {
                         Circle()
@@ -71,13 +70,10 @@ extension TransactionsListView {
                     Button {
                         isSearching = true
                     } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(AppTheme.Typography.labelEmphasis)
+                        KeepoIcon(name: "icon-search", size: AppTheme.Size.glyph)
                             .foregroundStyle(AppTheme.Palette.textOnAccent)
                             .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
-                            .background(
-                                AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule()
-                            )
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -284,8 +280,7 @@ extension TransactionsListView {
     private var searchField: some View {
         HStack(spacing: AppTheme.Spacing.s) {
             HStack(spacing: AppTheme.Spacing.xs) {
-                Image(systemName: "magnifyingglass")
-                    .font(AppTheme.Typography.micro)
+                KeepoIcon(name: "icon-search", size: AppTheme.Size.glyphSmall)
                 Text(filter.search.map { _ in "" } ?? "")
                     .hidden()
                     .frame(width: 0)

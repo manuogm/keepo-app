@@ -23,6 +23,7 @@
 		127A423345C08C628C1C9B3F /* AppTheme+Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC83C733F39438E3322B2FF /* AppTheme+Palette.swift */; };
 		12A356D345021336EACE2540 /* UnmappedCardLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58EC8D21829E6A9DDBC381D8 /* UnmappedCardLifecycleTests.swift */; };
 		12BE40DBFAD37D5D3A93A7B5 /* CategoryFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C641FD642C4420E3E3D9173 /* CategoryFormView.swift */; };
+		14134599FBFF0BA0BB84AC41 /* KeepoIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BF15D55D3521FD9A1E4BBEC /* KeepoIcon.swift */; };
 		1422E9D10EA7EBCE4F82B38E /* SyncApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0692E171C05E5C17DF39EB68 /* SyncApply.swift */; };
 		1725F1A36170343D573E57B9 /* OutboxSending.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6882A009B70A74B987B3AD38 /* OutboxSending.swift */; };
 		1890EC0309624822079FFF28 /* OTPSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3AF9A7AEAB1809042F92E29 /* OTPSignInView.swift */; };
@@ -306,6 +307,7 @@
 		36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryLocalWriteTests.swift; sourceTree = "<group>"; };
 		3768CA435AE5F391055BEBA2 /* KindTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KindTabBar.swift; sourceTree = "<group>"; };
 		38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRowTests.swift; sourceTree = "<group>"; };
+		3BF15D55D3521FD9A1E4BBEC /* KeepoIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoIcon.swift; sourceTree = "<group>"; };
 		3C4399D180113EC51C5FA34A /* LocalStore+SchemaMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalStore+SchemaMigration.swift"; sourceTree = "<group>"; };
 		3FB16A0FBB8E0356AFBB7D47 /* WalletAutomationGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAutomationGuideView.swift; sourceTree = "<group>"; };
 		40B7B2CCD755BCA91E020648 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
@@ -638,6 +640,7 @@
 				AEF251868300EF158A6F57D1 /* FormPrimitives.swift */,
 				59D17800B8CAFD32B42ECB90 /* IconCatalogView.swift */,
 				D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */,
+				3BF15D55D3521FD9A1E4BBEC /* KeepoIcon.swift */,
 				3768CA435AE5F391055BEBA2 /* KindTabBar.swift */,
 				03941D7DA3A9DB1450A09F83 /* OfflineInfoSheet.swift */,
 				D152F0778818C2C0DAF37B15 /* OfflineStatusBar.swift */,
@@ -1284,6 +1287,7 @@
 				D2D76D4A52617169279032CF /* InvestingRatioWidget.swift in Sources */,
 				B9A1A4D4B42ACEA800227B4C /* InvestmentBadge.swift in Sources */,
 				04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */,
+				14134599FBFF0BA0BB84AC41 /* KeepoIcon.swift in Sources */,
 				60349D9D98A83C5D45F25F98 /* KeepoTabBar.swift in Sources */,
 				609F9032D22FB12CE197C6B7 /* KindTabBar.swift in Sources */,
 				581E09E6D236BB73E9A99B64 /* LiveOutboxSender.swift in Sources */,

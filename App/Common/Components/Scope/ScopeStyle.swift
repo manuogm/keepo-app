@@ -41,11 +41,15 @@ extension PublicSchema.AccountScope {
         }
     }
 
-    var icon: String {
+    /// The badge glyph — `nil` for Total, which is never badged (see
+    /// `badgeTitle`). `.me` and `.household` are asset icons from
+    /// `Assets.xcassets/Icons`, the filled variant, since the badge is a
+    /// solid statement of which subset you're looking at.
+    var icon: String? {
         switch self {
-        case .total: return "globe.europe.africa.fill"
-        case .me: return "lock.fill"
-        case .household: return "person.2.fill"
+        case .total: return nil
+        case .me: return "icon-lock-filled"
+        case .household: return "icon-home-filled"
         }
     }
 
@@ -76,6 +80,26 @@ extension PublicSchema.AccountScope {
         case .total: return AppTheme.Palette.scopeTotal
         case .me: return AppTheme.Palette.scopePrivate
         case .household: return AppTheme.Palette.scopeHousehold
+        }
+    }
+}
+
+// MARK: - Scope glyph
+
+/// Renders a scope's icon whether it's an `Assets.xcassets/Icons` asset
+/// (`icon-…`) or an SF Symbol. Asset icons take `size`; SF Symbols size from
+/// the caller's `.font(…)`, exactly like a bare `Image(systemName:)`. The
+/// blank state needs the fallback — its "no accounts" case is still the
+/// `creditcard` symbol — while the scope badges are all assets now.
+struct ScopeGlyph: View {
+    let name: String
+    var size: CGFloat = AppTheme.Size.glyphSmall
+
+    var body: some View {
+        if name.hasPrefix("icon-") {
+            KeepoIcon(name: name, size: size)
+        } else {
+            Image(systemName: name)
         }
     }
 }

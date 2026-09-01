@@ -19,7 +19,7 @@ struct ScopeEmptyStateView: View {
 
     var body: some View {
         VStack(spacing: AppTheme.Spacing.m) {
-            Image(systemName: icon)
+            ScopeGlyph(name: icon, size: AppTheme.Size.icon)
                 .font(AppTheme.Typography.screenTitle.weight(.light))
                 .foregroundStyle(tint)
                 .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
@@ -70,8 +70,8 @@ struct ScopeEmptyStateView: View {
     private var icon: String {
         switch emptiness {
         case .noAccounts: return "creditcard"
-        case .noHousehold, .noSharedAccounts: return "person.2"
-        case .noPrivateAccounts: return "lock"
+        case .noHousehold, .noSharedAccounts: return "icon-home"
+        case .noPrivateAccounts: return "icon-lock"
         }
     }
 

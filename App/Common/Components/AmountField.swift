@@ -130,25 +130,19 @@ struct AmountField: View {
         }
     }
 
-    /// Deliberately quiet — grey on a grey fill, no larger than the fields
-    /// it sits beside. It is a convenience for the times an amount needs
-    /// working out, not a second thing competing with the figure for
-    /// attention on a screen whose whole point is that figure.
+    /// Deliberately quiet — a thin outline in the icon's own grey, no larger
+    /// than the fields it sits beside. It is a convenience for the times an
+    /// amount needs working out, not a second thing competing with the figure
+    /// for attention on a screen whose whole point is that figure.
     private var calculatorButton: some View {
         Button {
             isCalculatorPresented = true
         } label: {
-            // `function` (ƒx), not `plus.forwardslash.minus`: ± is the
-            // calculator's own negate key, so on the outside it reads as
-            // "flip the sign" rather than "work this out". SF Symbols has
-            // no calculator glyph, and `square.grid.3x3` — the other honest
-            // candidate, a keypad — is a sibling of the Dashboard tab's
-            // `square.grid.2x2`.
-            Image(systemName: "function")
-                .font(AppTheme.Typography.labelEmphasis)
+            KeepoIcon(name: "icon-calculator2", size: AppTheme.Size.glyphSmall)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
-                .background(AppTheme.Palette.fillSubtle, in: Circle())
+                .overlay(Circle().stroke(AppTheme.Palette.textSecondary, lineWidth: 1))
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Work the amount out on a calculator")

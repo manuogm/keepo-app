@@ -155,8 +155,7 @@ struct AutomaticMarker: View {
     var tint: Color = .secondary
 
     var body: some View {
-        Image(systemName: "cpu")
-            .font(AppTheme.Typography.micro)
+        KeepoIcon(name: "icon-robot", size: AppTheme.Size.glyphSmall)
             .foregroundStyle(tint)
             .accessibilityLabel("Mapped automatically")
     }

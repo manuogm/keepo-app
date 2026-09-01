@@ -90,14 +90,12 @@ struct TransactionRow: View {
                     // spelling it out on every row would crowd out the
                     // account name, which is what people actually scan for.
                     if isCaptured {
-                        Image(systemName: "cpu")
-                            .font(AppTheme.Typography.nano)
+                        KeepoIcon(name: "icon-robot", size: AppTheme.Size.glyphSmall)
                             .foregroundStyle(AppTheme.Palette.textSecondary)
                             .accessibilityLabel("Captured automatically")
                     }
                     if isRecurring {
-                        Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                            .font(AppTheme.Typography.nano)
+                        KeepoIcon(name: "icon-recurrent", size: AppTheme.Size.glyphSmall)
                             .foregroundStyle(AppTheme.Palette.textSecondary)
                             .accessibilityLabel("Part of a recurring payment")
                     }

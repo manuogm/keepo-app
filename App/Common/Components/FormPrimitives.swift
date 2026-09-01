@@ -49,12 +49,15 @@ struct IconPickerButton: View {
         Button(action: action) {
             CategoryIconView(icon: icon, color: color, diameter: diameter)
                 .overlay(alignment: .bottomTrailing) {
-                    Image(systemName: "pencil")
-                        .font(AppTheme.Typography.microEmphasis)
+                    KeepoIcon(name: "icon-edit", size: AppTheme.Size.glyphSmall)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                         .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
                         .background(AppTheme.Palette.bgSurface, in: Circle())
                         .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
+                        // Nudged out along the diagonal so the badge rides the
+                        // circle's rim instead of sitting on top of the chosen
+                        // glyph.
+                        .offset(x: 8, y: 8)
                 }
         }
         .buttonStyle(.pressableCard)
@@ -79,8 +82,7 @@ struct SharedWithHouseholdIcon: View {
 /// opening the account form to check.
 struct MappedCardIcon: View {
     var body: some View {
-        Image(systemName: "creditcard.fill")
-            .font(AppTheme.Typography.micro)
+        KeepoIcon(name: "icon-mappedcard", size: AppTheme.Size.glyphSmall)
             .foregroundStyle(AppTheme.Palette.textSecondary)
             .accessibilityLabel("Has a linked card")
     }

@@ -24,7 +24,6 @@ struct PrivacyToggleButton: View {
     /// Defaults to the neutral treatment it has always had; the scope
     /// banner draws it on a saturated gradient card and passes white.
     var tint: Color = .secondary
-    var font: Font = .caption
 
     /// Read fresh on every render rather than cached — the "Enable Hiding
     /// Balance" toggle in Security lives in a different screen, and this
@@ -37,11 +36,14 @@ struct PrivacyToggleButton: View {
             Button {
                 session.isPrivacyMode.toggle()
             } label: {
-                Image(systemName: session.isPrivacyMode ? "eye.slash" : "eye")
-                    .font(font)
+                // `icon-hidden` (struck-through eye) when amounts are masked,
+                // `icon-visible` (open eye) when they're shown — the glyph
+                // names the state you're in, tapping it flips to the other.
+                KeepoIcon(name: session.isPrivacyMode ? "icon-hidden" : "icon-visible")
                     .foregroundStyle(tint)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(session.isPrivacyMode ? "Show amounts" : "Hide amounts")
         }
     }
 }

@@ -137,8 +137,8 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
                 Text(title)
                     .font(AppTheme.Typography.cardTitle)
                     .foregroundStyle(AppTheme.Palette.textOnAccent)
-                if let badge = scope.badgeTitle {
-                    ScopeBadge(title: badge, icon: scope.icon)
+                if let badge = scope.badgeTitle, let icon = scope.icon {
+                    ScopeBadge(title: badge, icon: icon)
                 }
             }
             .lineLimit(1)
@@ -147,7 +147,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
             Spacer(minLength: AppTheme.Spacing.xs)
 
             accessory
-            PrivacyToggleButton(session: session, tint: .white, font: .body)
+            PrivacyToggleButton(session: session, tint: .white)
                 .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
         }
         .padding(.horizontal, AppTheme.Spacing.l)
@@ -319,8 +319,8 @@ struct ScopeBadge: View {
     let icon: String
 
     var body: some View {
-        HStack(spacing: AppTheme.Spacing.xxs) {
-            Image(systemName: icon)
+        HStack(spacing: AppTheme.Spacing.xs) {
+            ScopeGlyph(name: icon, size: AppTheme.Size.glyphNano)
                 .font(AppTheme.Typography.nanoEmphasis)
             Text(title.uppercased())
                 .font(AppTheme.Typography.nanoEmphasis)

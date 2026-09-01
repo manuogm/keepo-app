@@ -245,9 +245,9 @@ struct TransactionFormView: View {
     @ViewBuilder
     private var recurringLine: some View {
         if isCaptured {
-            recurringLabel("Automatically captured", icon: "cpu")
+            recurringLabel("Automatically captured", icon: "icon-robot")
         } else if editingRecurringRuleId != nil {
-            recurringLabel("Recurring", icon: "arrow.trianglehead.2.clockwise.rotate.90")
+            recurringLabel("Recurring", icon: "icon-recurrent")
         } else if kind != .transfer {
             // `recurring_rules` has a single account_id/category_id pair
             // (app-architecture.md §3) — there is no shape in the schema for
@@ -259,7 +259,7 @@ struct TransactionFormView: View {
                 // Filled only in this branch. The other two states are
                 // statements of fact, not buttons — giving all three the same
                 // pill would promise a tap that two of them do not honour.
-                recurringLabel("Make recurring", icon: "arrow.trianglehead.2.clockwise.rotate.90")
+                recurringLabel("Make recurring", icon: "icon-recurrent")
                     .padding(.horizontal, AppTheme.Spacing.m)
                     .padding(.vertical, AppTheme.Spacing.s)
                     .background(AppTheme.Palette.bgSurfaceRaised, in: Capsule())
@@ -271,7 +271,7 @@ struct TransactionFormView: View {
 
     private func recurringLabel(_ title: String, icon: String) -> some View {
         HStack(spacing: AppTheme.Spacing.xs) {
-            Image(systemName: icon)
+            KeepoIcon(name: icon, size: AppTheme.Size.glyphSmall)
             Text(title)
         }
         .font(AppTheme.Typography.micro)

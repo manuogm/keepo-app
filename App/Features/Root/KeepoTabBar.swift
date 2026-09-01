@@ -36,14 +36,6 @@ struct KeepoTabBar: View {
             addButton
         }
         .padding(.horizontal, KeepoTabBarMetrics.margin)
-        // The bar is a fixed-height capsule sized to the display's corner
-        // (`KeepoTabBarMetrics`), so it is the one place in the app that
-        // cannot let Dynamic Type run all the way up: measured on device, the
-        // label starts truncating past `.xxLarge` because 54pt has to hold a
-        // 23pt glyph box and a caption under it. Everything the bar navigates
-        // *to* scales without a cap — this is furniture, not content, and the
-        // three labels are backed by icons and an accessibility trait.
-        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 
     private var destinations: some View {
@@ -64,36 +56,34 @@ struct KeepoTabBar: View {
             guard !isSelected else { return }
             tab = destination
         } label: {
-            VStack(spacing: AppTheme.Spacing.xxs) {
-                Image(systemName: isSelected ? destination.selectedIcon : destination.icon)
-                    .font(AppTheme.Typography.cardTitle)
-                    // A fixed box, because these three glyphs are not the
-                    // same height: `list.bullet.rectangle.portrait` is taller
-                    // than `creditcard`, so laid out naturally each label sat
-                    // on its own baseline and the row read as crooked.
-                    .frame(height: 23)
-                    // Sits *outside* the icon, and mango rather than coral —
-                    // this is the one thing in the bar allowed a colour,
-                    // because it is the one thing reporting a fact rather
-                    // than a location.
-                    .overlay(alignment: .topTrailing) {
-                        if destination == .transactions && needsReviewCount > 0 {
-                            Circle()
-                                .fill(AppTheme.Palette.brandSecondary)
-                                .frame(width: AppTheme.Size.dot, height: AppTheme.Size.dot)
-                                .offset(x: 6, y: -2)
-                        }
-                    }
-                Text(destination.label)
-                    .font(isSelected ? AppTheme.Typography.nanoEmphasis : AppTheme.Typography.nano)
+            // Icon-only — the label lives on the button as an accessibility
+            // string, not on screen. `KeepoIcon`'s square frame keeps the
+            // three glyphs on one baseline despite differing natural heights.
+            KeepoIcon(
+                name: isSelected ? destination.selectedIcon : destination.icon,
+                size: AppTheme.Size.icon
+            )
+            // Sits *outside* the icon, and mango rather than coral — this is
+            // the one thing in the bar allowed a colour, because it is the one
+            // thing reporting a fact rather than a location.
+            .overlay(alignment: .topTrailing) {
+                if destination == .transactions && needsReviewCount > 0 {
+                    Circle()
+                        .fill(AppTheme.Palette.brandSecondary)
+                        .frame(width: AppTheme.Size.dot, height: AppTheme.Size.dot)
+                        .offset(x: 6, y: -2)
+                }
             }
-            .foregroundStyle(isSelected ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
+            // Same colour whether or not it's selected — the outline vs filled
+            // asset is the only thing that marks the current tab.
+            .foregroundStyle(AppTheme.Palette.textPrimary)
             .frame(maxWidth: .infinity)
             .frame(height: KeepoTabBarMetrics.height)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .animation(AppTheme.Motion.quick, value: isSelected)
+        .accessibilityLabel(destination.label)
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
     }
 
@@ -122,19 +112,22 @@ struct KeepoTabBar: View {
 }
 
 extension AppNavigation.Tab {
+    /// Asset-catalogue icons from `Assets.xcassets/Icons`, not SF Symbols —
+    /// outline for the unselected state, the matching `-filled` variant for
+    /// the selected one. All are template-rendered and tinted by the caller.
     var icon: String {
         switch self {
-        case .home: return "square.grid.2x2"
-        case .accounts: return "creditcard"
-        case .transactions: return "list.bullet.rectangle.portrait"
+        case .home: return "icon-dashboard"
+        case .accounts: return "icon-account"
+        case .transactions: return "icon-transaction"
         }
     }
 
     var selectedIcon: String {
         switch self {
-        case .home: return "square.grid.2x2.fill"
-        case .accounts: return "creditcard.fill"
-        case .transactions: return "list.bullet.rectangle.portrait.fill"
+        case .home: return "icon-dashboard-filled"
+        case .accounts: return "icon-account-filled"
+        case .transactions: return "icon-transaction-filled"
         }
     }
 
