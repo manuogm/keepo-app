@@ -24,7 +24,13 @@ struct TransactionEntry: Identifiable {
     /// excluded.
     let counterpart: PublicSchema.TransactionsWithDetailsSelect?
 
-    var id: UUID { transaction.transactionId ?? UUID() }
+    /// **Never `?? UUID()`.** A computed `id` that mints a fresh UUID on
+    /// every read gives the row a different identity on every diff, so
+    /// SwiftUI tears down and rebuilds it instead of reusing it — and
+    /// `.sheet(item:)`/`.onDelete` on that row target something that no
+    /// longer exists. A row with no id is not a row this ledger can address
+    /// at all, so it says so rather than inventing an address.
+    var id: UUID? { transaction.transactionId }
 
     /// Folds each complete pair of transfer legs into a single entry,
     /// keeping the position of whichever leg came first so the ledger's

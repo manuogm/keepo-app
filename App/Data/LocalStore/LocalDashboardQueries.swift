@@ -4,8 +4,8 @@ import KeepoCore
 
 /// The dashboard's own local reads — the figures no existing screen already
 /// computed. Every one of them is built on the L4 primitives rather than on
-/// fresh SQL of its own: `scopedAccountIds` for scope, `accountBalance` for a
-/// native balance, and `LocalMoneyConversion.convert` for every single
+/// fresh SQL of its own: `inScopeFilter` for scope, `accountBalances` for
+/// native balances, and `LocalMoneyConversion.convert` for every single
 /// currency conversion. Nothing here does FX arithmetic (see
 /// `LocalMoneyQueries`' header for why that lives in exactly one place), and
 /// nothing here re-derives a balance.
@@ -58,15 +58,17 @@ enum LocalDashboardQueries {
         // that hasn't happened, so `fx_rate_on` would carry today's forward
         // anyway; naming today says what the figure actually is (what this
         // would cost at today's rate) instead of implying a forecast.
-        let today = PostgresDate.dateOnlyString(now, calendar: utcCalendar)
+        let convert = BaseConversion(
+            moneyScope.baseCurrency, at: PostgresDate.dateOnlyString(now, calendar: utcCalendar)
+        )
         return try rows.flatMap { row in
-            try occurrences(database, row: row, window: window, baseCurrency: moneyScope.baseCurrency, today: today)
+            try occurrences(database, row: row, window: window, convert: convert)
         }
         .sorted { $0.dueOn < $1.dueOn }
     }
 
     private static func occurrences(
-        _ database: Database, row: Row, window: ClosedRange<Date>, baseCurrency: String, today: String
+        _ database: Database, row: Row, window: ClosedRange<Date>, convert: BaseConversion
     ) throws -> [UpcomingTransactionLocal] {
         guard let anchor = PostgresDate.dateOnly(from: row["next_due_at"], calendar: utcCalendar),
               let frequency = PublicSchema.RecurringFrequency(rawValue: row["frequency"])
@@ -74,9 +76,7 @@ enum LocalDashboardQueries {
 
         let amountE4: Int64 = row["amount_e4"]
         let currency: String = row["currency"]
-        let converted = try LocalMoneyConversion.convert(
-            database, amountE4: amountE4, from: currency, toCurrency: baseCurrency, date: today
-        )
+        let converted = try convert(database, amountE4, from: currency)
         let dates = RecurrenceSchedule.occurrences(
             anchoredAt: anchor, frequency: frequency, in: window, calendar: utcCalendar
         )
@@ -128,16 +128,24 @@ enum LocalDashboardQueries {
             ORDER BY a.sort_order, a.name
             """
         )
+        // Every balance in one statement, keyed by id — the presentation
+        // columns above still come from their own ordered query, because the
+        // expanded widget's row order is `sort_order, name` and a GROUP BY
+        // has no business carrying that.
+        let balances = try LocalMoneyQueries.accountBalances(
+            database, matching: LocalMoneyQueries.inScopeFilter(moneyScope.scope), asOf: today, now: now
+        ).reduce(into: [String: Int64]()) { $0[$1.accountId] = $1.balanceE4 }
+        let cache = LocalFxCache()
 
         var byCurrency: [String: [CurrencyAccountLocal]] = [:]
         for row in rows {
             let accountId: String = row["id"]
             let currency: String = row["currency"]
-            guard let native = try LocalMoneyQueries.accountBalance(
-                database, accountId: accountId, asOf: today, now: now
-            ), let converted = try LocalMoneyConversion.convert(
-                database, amountE4: native, from: currency, toCurrency: moneyScope.baseCurrency, date: today
-            ) else { return nil }
+            guard let native = balances[accountId],
+                  let converted = try LocalMoneyConversion.convert(
+                      database, amountE4: native, from: currency, toCurrency: moneyScope.baseCurrency,
+                      date: today, cache: cache
+                  ) else { return nil }
             byCurrency[currency, default: []].append(
                 CurrencyAccountLocal(
                     accountId: accountId, name: row["name"], icon: row["icon"], color: row["color"],
@@ -240,12 +248,17 @@ enum LocalDashboardQueries {
         guard currency != baseCurrency else { return [] }
         var cursor = from
         var points: [(date: Date, value: Int64)] = []
+        // One memo across the whole window. The base currency's own rate is
+        // looked up once per day here, and carried-forward rates mean many
+        // of those days resolve to the identical `fx_rates` row — over a
+        // year that is 730 statements for a few dozen distinct answers.
+        let cache = LocalFxCache()
         while cursor <= through {
             let day = PostgresDate.dateOnlyString(cursor, calendar: utcCalendar)
             // A day with no rate yet is omitted, never zeroed — a gap in FX
             // history is not a currency that became worthless.
             if let value = try LocalMoneyConversion.convert(
-                database, amountE4: oneUnitE4, from: currency, toCurrency: baseCurrency, date: day
+                database, amountE4: oneUnitE4, from: currency, toCurrency: baseCurrency, date: day, cache: cache
             ) {
                 points.append((date: cursor, value: value))
             }

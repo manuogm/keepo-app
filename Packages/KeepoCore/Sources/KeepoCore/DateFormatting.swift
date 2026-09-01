@@ -12,7 +12,7 @@ import Foundation
 public enum PostgresDate {
     /// Encodes a `timestamptz` column (`occurred_at`, `deleted_at`, `onboarded_at`, ...).
     public static func timestampString(_ date: Date) -> String {
-        ISO8601DateFormatter().string(from: date)
+        FormatterCache.iso8601(.withInternetDateTime).string(from: date)
     }
 
     /// Decodes a `timestamptz` column back into a `Date`. Tries a
@@ -27,10 +27,9 @@ public enum PostgresDate {
     /// the whole-second formatter for `timestampString`'s own output, which
     /// has no fractional part.
     public static func date(fromTimestamp string: String) -> Date? {
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let fractional = FormatterCache.iso8601([.withInternetDateTime, .withFractionalSeconds])
         if let date = fractional.date(from: string) { return date }
-        return ISO8601DateFormatter().date(from: string)
+        return FormatterCache.iso8601(.withInternetDateTime).date(from: string)
     }
 
     /// Encodes a `date`-only column (`balance_snapshots.as_of`,
@@ -38,22 +37,14 @@ public enum PostgresDate {
     /// `YYYY-MM-DD` — never by truncating a UTC timestamp string, the bug
     /// this replaces.
     public static func dateOnlyString(_ date: Date, calendar: Calendar = .current) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+        FormatterCache.fixedFormat(dateOnlyFormat, calendar: calendar).string(from: date)
     }
 
     /// Decodes a `date`-only column (PostgREST renders it as a bare
     /// `YYYY-MM-DD` string, not a full timestamp) — `date(fromTimestamp:)`
     /// above expects timezone-qualified ISO8601 and fails on this format.
     public static func dateOnly(from string: String, calendar: Calendar = .current) -> Date? {
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: string)
+        FormatterCache.fixedFormat(dateOnlyFormat, calendar: calendar).date(from: string)
     }
 
     /// Renders a `date`-only value for display **in the calendar it was
@@ -95,10 +86,17 @@ public enum PostgresDate {
     /// it exists here rather than reintroducing the ad-hoc-formatter bug
     /// `timestampString` itself was written to close.
     public static func sqliteTimestampBoundaryString(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
-        return formatter.string(from: date) + "000+00:00"
+        FormatterCache.fixedFormat(boundaryFormat, calendar: boundaryCalendar).string(from: date) + "000+00:00"
     }
+
+    private static let dateOnlyFormat = "yyyy-MM-dd"
+    private static let boundaryFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+
+    /// Gregorian/UTC, fixed — the zone and calendar the local store's `TEXT`
+    /// timestamp columns are written in, never the device's.
+    private static let boundaryCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
 }

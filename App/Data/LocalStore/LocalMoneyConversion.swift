@@ -28,8 +28,19 @@ enum LocalMoneyConversion {
     /// with, and the shape `convert` below needs: divide out of the source
     /// currency into euros, multiply into the target. EUR is 1 by
     /// construction, which is why `fx_rates` never holds a row for it.
-    static func fxRateOn(_ database: Database, currency: String, date: String) throws -> Decimal? {
+    /// `cache` is a per-read memo (`LocalFxCache`) — see its own header for
+    /// why it exists and why it must not outlive the `dbQueue.read` block
+    /// that made it. Omitting it is exactly the old behaviour: one `SELECT`
+    /// per call.
+    static func fxRateOn(
+        _ database: Database, currency: String, date: String, cache: LocalFxCache? = nil
+    ) throws -> Decimal? {
         if currency == "EUR" { return 1 }
+        guard let cache else { return try loadFxRate(database, currency: currency, date: date) }
+        return try cache.rate(database, currency: currency, date: date, load: loadFxRate)
+    }
+
+    private static func loadFxRate(_ database: Database, currency: String, date: String) throws -> Decimal? {
         guard let rateString = try String.fetchOne(
             database,
             sql: """
@@ -46,11 +57,12 @@ enum LocalMoneyConversion {
     /// call into `LocalFxConvert` — the shared, unit-tested, exact-rounding
     /// function the plan calls for.
     static func convert(
-        _ database: Database, amountE4: Int64, from: String, toCurrency: String, date: String
+        _ database: Database, amountE4: Int64, from: String, toCurrency: String, date: String,
+        cache: LocalFxCache? = nil
     ) throws -> Int64? {
         if from == toCurrency { return amountE4 }
-        guard let fromRate = try fxRateOn(database, currency: from, date: date),
-              let toRate = try fxRateOn(database, currency: toCurrency, date: date)
+        guard let fromRate = try fxRateOn(database, currency: from, date: date, cache: cache),
+              let toRate = try fxRateOn(database, currency: toCurrency, date: date, cache: cache)
         else { return nil }
         var rates: [String: Decimal] = [:]
         if from != "EUR" { rates[from] = fromRate }
@@ -66,41 +78,38 @@ enum LocalMoneyConversion {
     /// `net_worth_daily` to read instead (the plan's explicit call: a local
     /// store can afford to recompute).
     static func netWorth(
-        _ database: Database, _ moneyScope: LocalMoneyScope, asOf: String, now: Date
+        _ database: Database, _ moneyScope: LocalMoneyScope, asOf: String, now: Date,
+        cache: LocalFxCache? = nil
     ) throws -> Int64? {
-        try netWorth(
-            database, baseCurrency: moneyScope.baseCurrency, asOf: asOf, now: now,
-            accountIds: try scopedAccountIds(database, scope: moneyScope.scope)
+        try sum(
+            try LocalMoneyQueries.accountBalances(
+                database, matching: LocalMoneyQueries.inScopeFilter(moneyScope.scope), asOf: asOf, now: now
+            ),
+            database, into: moneyScope.baseCurrency, asOf: asOf, cache: cache ?? LocalFxCache()
         )
     }
 
-    /// Accounts (not deleted, not archived) in scope, mirroring the
-    /// `EXISTS`/`NOT EXISTS household_accounts` predicate every scoped
-    /// server function repeats, plus `net_worth()`'s own `archived_at is
-    /// null` filter (20260820100000_archived_account_net_worth_exclusion).
-    static func scopedAccountIds(_ database: Database, scope: PublicSchema.AccountScope) throws -> [String] {
-        let scopeClause = LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "id")
-        let sql = "SELECT id FROM accounts WHERE deleted_at IS NULL AND archived_at IS NULL AND (\(scopeClause))"
-        return try String.fetchAll(database, sql: sql)
-    }
-
-    private static func netWorth(
-        _ database: Database, baseCurrency: String, asOf: String, now: Date, accountIds: [String]
+    /// Converts each native balance into `baseCurrency` and adds them up,
+    /// propagating money rule 5: one unresolvable rate makes the whole total
+    /// `nil`, never a figure that quietly omits an account.
+    ///
+    /// Conversion is once per account — each balance is single-currency, so
+    /// converting the already-aggregated native figure is exact by
+    /// construction and matches what Postgres does (see `LocalMoneyQueries`'
+    /// header on conversion granularity).
+    static func sum(
+        _ balances: [NativeAccountBalance], _ database: Database,
+        into baseCurrency: String, asOf: String, cache: LocalFxCache
     ) throws -> Int64? {
-        if accountIds.isEmpty { return 0 }
         var total: Int64 = 0
-        for accountId in accountIds {
-            guard let currency = try String.fetchOne(
-                database, sql: "SELECT currency FROM accounts WHERE id = ?", arguments: [accountId]
-            ) else { continue }
-            guard let native = try LocalMoneyQueries.accountBalance(
-                database, accountId: accountId, asOf: asOf, now: now
-            ) else { return nil }
+        for balance in balances {
             guard let converted = try convert(
-                database, amountE4: native, from: currency, toCurrency: baseCurrency, date: asOf
+                database, amountE4: balance.balanceE4, from: balance.currency,
+                toCurrency: baseCurrency, date: asOf, cache: cache
             ) else { return nil }
             total += converted
         }
         return total
     }
+
 }

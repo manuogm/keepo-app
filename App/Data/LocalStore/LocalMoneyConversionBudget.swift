@@ -19,6 +19,7 @@ extension LocalMoneyConversion {
         let today = PostgresDate.dateOnlyString(Date(), calendar: utcCalendar)
 
         let names = try LocalMoneyQueries.categoryNames(database)
+        let cache = LocalFxCache()
         let budgets = try Row.fetchAll(
             database,
             sql: """
@@ -30,22 +31,45 @@ extension LocalMoneyConversion {
 
         return try budgets.map { row in
             try budgetProgressRow(
-                database, row: row, ownerId: ownerId, baseCurrency: baseCurrency, monthStart: monthStart,
-                monthEnd: monthEnd, today: today, names: names
+                database, row: row, ownerId: ownerId, period: BudgetPeriod(monthStart, monthEnd, today),
+                context: BudgetContext(baseCurrency: baseCurrency, names: names, cache: cache)
             )
         }
     }
 
-    // swiftlint:disable:next function_parameter_count
+    /// The three date bounds one budget row is measured between.
+    struct BudgetPeriod {
+        let monthStart: String
+        let monthEnd: String
+        let today: String
+
+        init(_ monthStart: String, _ monthEnd: String, _ today: String) {
+            self.monthStart = monthStart
+            self.monthEnd = monthEnd
+            self.today = today
+        }
+    }
+
+    /// What every row in one `budgetProgress` call shares — including the FX
+    /// memo, so the spent side's row-by-row conversion asks for each
+    /// `(currency, date)` pair once rather than once per transaction.
+    struct BudgetContext {
+        let baseCurrency: String
+        let names: [String: String]
+        let cache: LocalFxCache
+    }
+
     private static func budgetProgressRow(
-        _ database: Database, row: Row, ownerId: String, baseCurrency: String, monthStart: String, monthEnd: String,
-        today: String, names: [String: String]
+        _ database: Database, row: Row, ownerId: String, period: BudgetPeriod, context: BudgetContext
     ) throws -> BudgetProgressLocal {
         let budgetId: String = row["id"]
         let categoryId: String? = row["category_id"]
         let amountE4: Int64 = row["amount_e4"]
         let currency: String = row["currency"]
-        let budgeted = try convert(database, amountE4: amountE4, from: currency, toCurrency: baseCurrency, date: today)
+        let budgeted = try convert(
+            database, amountE4: amountE4, from: currency, toCurrency: context.baseCurrency,
+            date: period.today, cache: context.cache
+        )
 
         let spentRows = try Row.fetchAll(
             database,
@@ -55,7 +79,7 @@ extension LocalMoneyConversion {
               AND substr(occurred_at, 1, 10) BETWEEN ? AND ?
               AND (? IS NULL OR category_id = ?)
             """,
-            arguments: [ownerId, monthStart, monthEnd, categoryId, categoryId]
+            arguments: [ownerId, period.monthStart, period.monthEnd, categoryId, categoryId]
         )
         var spent = RunningTotal()
         for spentRow in spentRows {
@@ -63,13 +87,17 @@ extension LocalMoneyConversion {
             let spentCurrency: String = spentRow["currency"]
             let occurredDate: String = spentRow["occurred_date"]
             try spent.add(abs(native), from: spentCurrency, at: occurredDate) {
-                try convert(database, amountE4: $0, from: $1, toCurrency: baseCurrency, date: $2)
+                try convert(
+                    database, amountE4: $0, from: $1, toCurrency: context.baseCurrency,
+                    date: $2, cache: context.cache
+                )
             }
         }
 
         return BudgetProgressLocal(
-            budgetId: budgetId, categoryId: categoryId, categoryName: categoryId.flatMap { names[$0] },
-            budgetedE4: budgeted, spentE4: spent.result, currency: baseCurrency
+            budgetId: budgetId, categoryId: categoryId,
+            categoryName: categoryId.flatMap { context.names[$0] },
+            budgetedE4: budgeted, spentE4: spent.result, currency: context.baseCurrency
         )
     }
 }

@@ -9,13 +9,23 @@ import Supabase
 /// downstream of this file changes. That type has no public initializer
 /// reachable from the App target (it's a plain `Codable` struct in the
 /// `KeepoCore` package with no custom `init`, so only its synthesized,
-/// public `init(from decoder:)` is usable cross-module) — so a row is built
-/// as an `AnyJSON` object with the view's own snake_case column names and
-/// decoded through that, rather than duplicating its ~20 fields into a
-/// second, parallel struct the way `LocalMoneyQueries`'s other result types
-/// do (those exist because their source isn't a straight table mirror
-/// either, but nothing else already consumes their shape the way half the
-/// app already consumes this one).
+/// public `init(from decoder:)` is usable cross-module) — so a row is
+/// **decoded**, rather than duplicating its ~20 fields into a second,
+/// parallel struct the way `LocalMoneyQueries`'s other result types do
+/// (those exist because their source isn't a straight table mirror either,
+/// but nothing else already consumes their shape the way half the app
+/// already consumes this one).
+///
+/// It decodes straight out of the GRDB `Row`. It used to go through JSON:
+/// every row built an `AnyJSON` object, encoded it to `Data` with a
+/// freshly-constructed `JSONEncoder`, and decoded that back with a freshly
+/// constructed `JSONDecoder` — a full serialise/parse round trip and two of
+/// Foundation's more expensive objects, per transaction, on a screen whose
+/// whole job is to list several hundred of them. `Decodable` is
+/// `Decodable`: GRDB reads the same `CodingKeys` off the row's own columns,
+/// which is why the queries below alias `t.id AS transaction_id` — the
+/// column names *are* the contract, and they were already snake_case to
+/// match this exact type.
 ///
 /// Mirrors `transactions_with_details`'s own view definition exactly
 /// (`supabase/migrations/20260815100000_money_as_integers.sql`): `kind` is
@@ -70,7 +80,7 @@ enum LocalTransactionRow {
         baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
         var sql = """
-        SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
+        SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
                t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                t.recurring_rule_id,
@@ -86,6 +96,20 @@ enum LocalTransactionRow {
         """
         sql += " AND (\(LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "t.account_id")))"
         var arguments: [DatabaseValueConvertible] = [ownerId, ownerId, ownerId]
+        append(filter, to: &sql, arguments: &arguments)
+        sql += " ORDER BY t.occurred_at DESC, t.id DESC"
+
+        let rows = try Row.fetchAll(database, sql: sql, arguments: StatementArguments(arguments))
+        let base = try BaseCurrency(database, code: baseCurrency)
+        return try rows.map { try build($0, database: database, base: base) }
+    }
+
+    /// The user's own filter terms, appended to `sql` with their arguments
+    /// in the same order. Split out of `fetchFiltered` purely to keep that
+    /// function under the project's `function_body_length` lint.
+    private static func append(
+        _ filter: TransactionFilter, to sql: inout String, arguments: inout [DatabaseValueConvertible]
+    ) {
         if let accountId = filter.accountId {
             sql += " AND t.account_id = ?"
             arguments.append(accountId.uuidString)
@@ -116,10 +140,6 @@ enum LocalTransactionRow {
             let pattern = "%\(search)%"
             arguments.append(contentsOf: [pattern, pattern, pattern, pattern])
         }
-        sql += " ORDER BY t.occurred_at DESC, t.id DESC"
-
-        let rows = try Row.fetchAll(database, sql: sql, arguments: StatementArguments(arguments))
-        return try rows.map { try build($0, database: database, baseCurrency: baseCurrency) }
     }
 
     /// Both legs of a transfer, by group id — `TransactionFormView`'s
@@ -131,7 +151,7 @@ enum LocalTransactionRow {
         let rows = try Row.fetchAll(
             database,
             sql: """
-            SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
+            SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
                    t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                    t.recurring_rule_id,
@@ -145,7 +165,8 @@ enum LocalTransactionRow {
             """,
             arguments: [ownerId, ownerId, transferGroupId]
         )
-        return try rows.map { try build($0, database: database, baseCurrency: baseCurrency) }
+        let base = try BaseCurrency(database, code: baseCurrency)
+        return try rows.map { try build($0, database: database, base: base) }
     }
 
     /// The one place a null-account pending capture (an unmapped Wallet
@@ -165,7 +186,7 @@ enum LocalTransactionRow {
         guard let row = try Row.fetchOne(
             database,
             sql: """
-            SELECT t.id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
+            SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
                    t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                    t.recurring_rule_id,
@@ -180,7 +201,33 @@ enum LocalTransactionRow {
             """,
             arguments: [ownerId, ownerId, id, ownerId]
         ) else { return nil }
-        return try build(row, database: database, baseCurrency: baseCurrency)
+        return try build(row, database: database, base: try BaseCurrency(database, code: baseCurrency))
+    }
+
+    /// The base currency and its minor unit — looked up **once per fetch**,
+    /// not once per row.
+    ///
+    /// `base_minor_unit` is the same value for every row in a result set by
+    /// definition (it is the user's own base currency), and `build` used to
+    /// re-issue `SELECT minor_unit FROM currencies WHERE code = ?` for each
+    /// one. On a busy month that was several hundred identical queries for a
+    /// single `Int16`.
+    struct BaseCurrency {
+        let code: String
+        let minorUnit: Int16?
+        /// Shared by every row in the fetch. Conversion here is per row at
+        /// each transaction's own `occurred_at`, so the pairs repeat heavily
+        /// — a day's shopping is one `(currency, date)` pair however many
+        /// rows it is, and the base currency's own rate is looked up once
+        /// per distinct date rather than once per row.
+        let cache = LocalFxCache()
+
+        init(_ database: Database, code: String) throws {
+            self.code = code
+            self.minorUnit = try Int16.fetchOne(
+                database, sql: "SELECT minor_unit FROM currencies WHERE code = ?", arguments: [code]
+            )
+        }
     }
 
     /// `account_id`/`account_name`/`currency`/`minor_unit` are read as
@@ -192,7 +239,7 @@ enum LocalTransactionRow {
     /// — not "no currency at all"; both cases already render the amount as
     /// `—` via `amount_base_e4` being nil either way (money rule 5).
     private static func build(
-        _ row: Row, database: Database, baseCurrency: String
+        _ row: Row, database: Database, base: BaseCurrency
     ) throws -> PublicSchema.TransactionsWithDetailsSelect {
         let amountE4: Int64 = row["amount_e4"]
         let currency: String? = row["currency"]
@@ -200,37 +247,35 @@ enum LocalTransactionRow {
         let occurredDate = String(occurredAt.prefix(10))
         let amountBaseE4 = try currency.flatMap {
             try LocalMoneyConversion.convert(
-                database, amountE4: amountE4, from: $0, toCurrency: baseCurrency, date: occurredDate
+                database, amountE4: amountE4, from: $0, toCurrency: base.code, date: occurredDate, cache: base.cache
             )
         }
-        let baseMinorUnit = try Int16.fetchOne(
-            database, sql: "SELECT minor_unit FROM currencies WHERE code = ?", arguments: [baseCurrency]
+        // The four columns no SQL here produces: the base currency is the
+        // caller's, and the converted amount is Swift's by design (see
+        // `LocalMoneyQueries`' header for why FX conversion is not ported to
+        // SQLite). Merged into the fetched row so the whole value decodes in
+        // one pass instead of being assembled field by field.
+        return try decode(
+            row, adding: [
+                "base_currency": base.code,
+                "base_minor_unit": base.minorUnit,
+                "amount_base_e4": amountBaseE4,
+                "has_missing_rate": currency != nil && amountBaseE4 == nil
+            ]
         )
-        let minorUnit: Int16? = row["minor_unit"]
+    }
 
-        let json: JSONObject = [
-            "transaction_id": .string(row["id"]),
-            "account_id": (row["account_id"] as String?).map(AnyJSON.string) ?? .null,
-            "account_name": (row["account_name"] as String?).map(AnyJSON.string) ?? .null,
-            "category_id": (row["category_id"] as String?).map(AnyJSON.string) ?? .null,
-            "category_name": (row["category_name"] as String?).map(AnyJSON.string) ?? .null,
-            "amount_e4": .integer(Int(amountE4)), "currency": currency.map(AnyJSON.string) ?? .null,
-            "minor_unit": minorUnit.map { .integer(Int($0)) } ?? .null, "occurred_at": .string(occurredAt),
-            "merchant_raw": (row["merchant_raw"] as String?).map(AnyJSON.string) ?? .null,
-            "merchant_normalized": (row["merchant_normalized"] as String?).map(AnyJSON.string) ?? .null,
-            "notes": (row["notes"] as String?).map(AnyJSON.string) ?? .null,
-            "transfer_group_id": (row["transfer_group_id"] as String?).map(AnyJSON.string) ?? .null,
-            "source": .string(row["source"]), "status": .string(row["status"]), "kind": .string(row["kind"]),
-            "created_by": .string(row["created_by"]), "created_at": .string(row["created_at"]),
-            "version": .integer(row["version"]),
-            "recurring_rule_id": (row["recurring_rule_id"] as String?).map(AnyJSON.string) ?? .null,
-            "base_currency": .string(baseCurrency),
-            "base_minor_unit": baseMinorUnit.map { .integer(Int($0)) } ?? .null,
-            "amount_base_e4": amountBaseE4.map { .integer(Int($0)) } ?? .null,
-            "has_missing_rate": .bool(currency != nil && amountBaseE4 == nil)
-        ]
-        let data = try JSONEncoder().encode(AnyJSON.object(json))
-        return try JSONDecoder().decode(PublicSchema.TransactionsWithDetailsSelect.self, from: data)
+    /// One `Row`, with `extra` layered over the fetched columns, decoded
+    /// through the target type's own `CodingKeys`.
+    private static func decode<T: FetchableRecord>(
+        _ row: Row, adding extra: [String: (any DatabaseValueConvertible)?]
+    ) throws -> T {
+        var columns: [String: (any DatabaseValueConvertible)?] = Dictionary(
+            minimumCapacity: row.count + extra.count
+        )
+        for (column, value) in row { columns[column] = value }
+        for (column, value) in extra { columns[column] = value }
+        return try T(row: Row(columns))
     }
 
     /// Same reuse rationale as `build` above, for `needs_review`'s stable
@@ -243,14 +288,23 @@ enum LocalTransactionRow {
     /// documented scope), so a local-only read has nothing to derive it
     /// from.
     static func needsReviewSelect(from row: NeedsReviewLocalRow) throws -> PublicSchema.NeedsReviewSelect {
-        let json: JSONObject = [
-            "kind": .string(row.kind), "item_id": .string(row.itemId),
-            "account_id": row.accountId.map(AnyJSON.string) ?? .null, "occurred_at": .string(row.occurredAt),
-            "title": .string(row.title), "subtitle": row.subtitle.map(AnyJSON.string) ?? .null,
-            "amount_e4": row.amountE4.map { .integer(Int($0)) } ?? .null,
-            "currency": row.currency.map(AnyJSON.string) ?? .null
+        let columns: [String: (any DatabaseValueConvertible)?] = [
+            "kind": row.kind, "item_id": row.itemId,
+            "account_id": row.accountId, "occurred_at": row.occurredAt,
+            "title": row.title, "subtitle": row.subtitle,
+            "amount_e4": row.amountE4, "currency": row.currency
         ]
-        let data = try JSONEncoder().encode(AnyJSON.object(json))
-        return try JSONDecoder().decode(PublicSchema.NeedsReviewSelect.self, from: data)
+        return try PublicSchema.NeedsReviewSelect(row: Row(columns))
     }
 }
+
+/// Retroactive `FetchableRecord`, so GRDB can decode these straight off a
+/// row using the `CodingKeys` `supabase gen types swift` already generated —
+/// the same snake_case names the local schema mirrors. Retroactive is safe
+/// here in the way it usually isn't: both the type and this conformance are
+/// first-party (`KeepoCore` is this project's own package), so no other
+/// module can add a competing one. It lives in the App target because
+/// `KeepoCore` has no GRDB dependency and should not gain one — it is a
+/// pure-logic package.
+extension PublicSchema.TransactionsWithDetailsSelect: @retroactive FetchableRecord {}
+extension PublicSchema.NeedsReviewSelect: @retroactive FetchableRecord {}

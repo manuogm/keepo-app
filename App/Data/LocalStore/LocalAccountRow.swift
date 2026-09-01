@@ -61,19 +61,17 @@ struct LocalAccountRow: Identifiable {
             uniqueKeysWithValues: try LocalTableQueries.currencies(database).map { ($0.code, Int($0.minorUnit)) }
         )
         let baseMinorUnit = currencies[baseCurrency]
-        let today = PostgresDate.dateOnlyString(Date(), calendar: utcCalendar)
         let now = Date()
+        let today = PostgresDate.dateOnlyString(now, calendar: utcCalendar)
+        let balances = try balances(database, ownerId: ownerId, asOf: today, now: now)
+        let convert = BaseConversion(baseCurrency, at: today)
 
         return try accounts.map { row in
             let accountId: String = row["id"]
             let currency: String = row["currency"]
             let kindRaw: String = row["kind"]
-            let balance = try LocalMoneyQueries.accountBalance(database, accountId: accountId, asOf: today, now: now)
-            let balanceBase = try balance.flatMap {
-                try LocalMoneyConversion.convert(
-                    database, amountE4: $0, from: currency, toCurrency: baseCurrency, date: today
-                )
-            }
+            let balance = balances[accountId]
+            let balanceBase = try balance.flatMap { try convert(database, $0, from: currency) }
             return LocalAccountRow(
                 id: UUID(uuidString: accountId) ?? UUID(), name: row["name"], currency: currency,
                 currencyInfo: CurrencyInfo(code: currency, minorUnit: currencies[currency] ?? 2),
@@ -85,6 +83,40 @@ struct LocalAccountRow: Identifiable {
                 baseCurrencyInfo: baseMinorUnit.map { CurrencyInfo(code: baseCurrency, minorUnit: $0) }
             )
         }
+    }
+
+    /// Every visible account's balance at `asOf`, keyed by id — in **one**
+    /// statement, and one FX memo for the whole list.
+    ///
+    /// This used to be four queries per account (currency, opening balance,
+    /// the transaction SUM, and two rate lookups) on a screen that reloads
+    /// on every write anywhere in the app.
+    ///
+    /// The predicate repeats the *visibility* rule `fetchAll` selects on
+    /// rather than reusing `LocalMoneyQueries.inScopeFilter`, and that is
+    /// deliberate: this list is scoped by who can see an account, not by the
+    /// Total/Private/Household scope, and it deliberately includes archived
+    /// accounts (they render in their own section) which `inScopeFilter`
+    /// excludes.
+    private static func balances(
+        _ database: Database, ownerId: String, asOf: String, now: Date
+    ) throws -> [String: Int64] {
+        try LocalMoneyQueries.accountBalances(
+            database,
+            matching: AccountFilter(
+                """
+                a.deleted_at IS NULL AND (
+                    a.owner_id = ? OR a.id IN (
+                        SELECT ha.account_id FROM household_accounts ha
+                        JOIN household_members hm ON hm.household_id = ha.household_id
+                        WHERE hm.user_id = ? AND hm.deleted_at IS NULL AND ha.deleted_at IS NULL
+                    )
+                )
+                """,
+                [ownerId, ownerId]
+            ),
+            asOf: asOf, now: now
+        ).reduce(into: [String: Int64]()) { $0[$1.accountId] = $1.balanceE4 }
     }
 
     private static func sharedAccountIds(_ database: Database, ownerId: String) throws -> Set<String> {

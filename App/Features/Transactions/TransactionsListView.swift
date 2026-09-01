@@ -306,7 +306,10 @@ struct TransactionsListView: View {
 // MARK: - Supporting types
 
 extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
-    public var id: UUID { transactionId ?? UUID() }
+    /// Optional, and never `?? UUID()` — see `TransactionEntry.id` for what
+    /// a freshly-minted fallback identity does to a `List` row and to
+    /// `.sheet(item:)`.
+    public var id: UUID? { transactionId }
 }
 
 private struct TransactionsLoadKey: Equatable {

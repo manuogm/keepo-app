@@ -15,9 +15,18 @@ extension AccountFormView {
         currencies = (try? await session.dbQueue.read { database in
             try LocalTableQueries.currencies(database)
         }) ?? []
-        hasHousehold = ownerId.flatMap { id in
-            try? session.dbQueue.read { database in try LocalTableQueries.myHousehold(database, userId: id) }
-        } != nil
+        // `await`, never the synchronous `dbQueue.read` overload: this
+        // function runs on the main actor, and a blocking read parks the
+        // main thread for as long as a concurrent sync pull's write holds
+        // the database — every other read in this file already awaits.
+        if let ownerId {
+            let household = (try? await session.dbQueue.read { database in
+                try LocalTableQueries.myHousehold(database, userId: ownerId)
+            }) ?? nil
+            hasHousehold = household != nil
+        } else {
+            hasHousehold = false
+        }
 
         switch mode {
         case .create(let kind):

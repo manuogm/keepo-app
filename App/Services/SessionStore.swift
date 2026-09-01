@@ -79,22 +79,36 @@ public final class SessionStore {
         self.authProvider = config.isLocal
             ? StubAuthProvider(client: client, config: config)
             : PasswordAuthProvider(client: client)
-        // A container failure here (disk full, corrupt store) would make
-        // the entire app unusable either way — no code path exists that
+        // A store failure here (disk full, corrupt store) would make the
+        // entire app unusable either way — no code path exists that
         // doesn't eventually need the outbox once offline writes matter,
         // so this fatalError matches the one in loadConfig() below rather
         // than limping along with an outbox that silently never persists.
-        let container: ModelContainer
         let dbQueue: DatabaseQueue
         do {
-            container = try OfflineStore.makeContainer()
             dbQueue = try LocalStore.makeQueue()
         } catch {
             fatalError("Failed to create the offline store: \(error)")
         }
         self.dbQueue = dbQueue
-        let context = ModelContext(container)
-        OutboxMigration.migrateIfNeeded(swiftDataContext: context, to: dbQueue)
+        // X-03/X-10: `OfflineStore.makeContainer()` opens a SwiftData store
+        // whose *only* remaining reader is the one-time legacy outbox
+        // migration — and opening it is the expensive part, not the fetch
+        // inside. This runs on the main thread during scene setup (`init`
+        // is `@MainActor`, and `RootView` holds this in `@State`), so every
+        // cold launch was paying a SwiftData store open plus a migration
+        // plan for a table that has been empty since the first launch after
+        // L3. `CaptureEnvironment.makeOutbox()` already guarded it exactly
+        // this way; this is the same guard at the launch path that lacked
+        // it, not a new policy.
+        if !OutboxMigration.isDone() {
+            do {
+                let context = ModelContext(try OfflineStore.makeContainer())
+                OutboxMigration.migrateIfNeeded(swiftDataContext: context, to: dbQueue)
+            } catch {
+                fatalError("Failed to open the legacy offline store: \(error)")
+            }
+        }
         self.outbox = Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
         self.outbox.startRetryLoop()
     }

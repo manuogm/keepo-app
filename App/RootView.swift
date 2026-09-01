@@ -6,7 +6,10 @@ import UIKit
 /// until a base currency + first account exist, main TabView after.
 struct RootView: View {
     @State private var session = SessionStore()
-    @State private var network = NetworkMonitor()
+    /// `let`, not `@State`: `NetworkMonitor` is a process-wide singleton, so
+    /// there is no lifetime for `@State` to own — and `@Observable` tracking
+    /// works from any stored property a body reads, not only from `@State`.
+    private let network = NetworkMonitor.shared
     /// Backs the privacy curtain instead of `@Environment(\.scenePhase)` —
     /// SwiftUI's `scenePhase` is documented (and reproduces on real devices,
     /// never in the simulator) to flicker to `.inactive` for reasons that

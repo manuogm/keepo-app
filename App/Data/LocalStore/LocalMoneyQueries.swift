@@ -48,40 +48,67 @@ enum LocalMoneyQueries {
     /// confirmed, non-deleted transactions up to `asOf`. `asOf` is a
     /// `YYYY-MM-DD` string; `now` bounds a same-day `asOf` to "so far today"
     /// exactly like Postgres's `least(p_date + 1 day, now())`.
+    ///
+    /// **`accountBalances` below is the formula**; this is the one-account
+    /// case of it, not a second copy. Money rule 1 forbids a second balance
+    /// computation existing at all, so the batch and the single share one
+    /// query text and differ only in their `AccountFilter`.
     static func accountBalance(_ database: Database, accountId: String, asOf: String, now: Date) throws -> Int64? {
-        guard let account = try Row.fetchOne(
-            database, sql: "SELECT opening_balance_e4 FROM accounts WHERE id = ?",
-            arguments: [accountId]
-        ) else { return nil }
-
-        let boundary = occurredAtBoundary(asOf: asOf, now: now)
-        let openingBalance: Int64 = account["opening_balance_e4"]
-        let delta: Int64 = try Int64.fetchOne(
-            database,
-            sql: """
-            SELECT COALESCE(SUM(amount_e4), 0) FROM transactions
-            WHERE account_id = ? AND deleted_at IS NULL AND status = 'confirmed' AND occurred_at <= ?
-            """,
-            arguments: [accountId, boundary]
-        ) ?? 0
-        return openingBalance + delta
+        try accountBalances(
+            database, matching: AccountFilter("a.id = ?", [accountId]), asOf: asOf, now: now
+        ).first?.balanceE4
     }
 
-    /// One native `(accountId, currency, balanceE4)` row per non-deleted
-    /// account, at `asOf` — the local counterpart to `account_balances`
-    /// (which is always "as of today" server-side; L4 generalizes it to any
-    /// date since `net_worth_series` needs exactly that, and recomputing
-    /// per day is the plan's explicit choice over caching a
-    /// `net_worth_daily` equivalent on-device).
-    static func nativeAccountBalances(_ database: Database, asOf: String, now: Date) throws -> [NativeAccountBalance] {
-        let accounts = try Row.fetchAll(
-            database, sql: "SELECT id, currency FROM accounts WHERE deleted_at IS NULL"
-        )
-        return try accounts.map { row in
-            let accountId: String = row["id"]
-            let balance = try accountBalance(database, accountId: accountId, asOf: asOf, now: now)
-            return NativeAccountBalance(accountId: accountId, currency: row["currency"], balanceE4: balance)
+    /// One native `(accountId, currency, balanceE4)` row per account
+    /// matching `filter`, at `asOf` — the local counterpart to
+    /// `account_balances` (which is always "as of today" server-side; L4
+    /// generalizes it to any date since `net_worth_series` needs exactly
+    /// that, and recomputing per day is the plan's explicit choice over
+    /// caching a `net_worth_daily` equivalent on-device).
+    ///
+    /// **One statement for every account, not three per account.** This
+    /// used to be a loop: each caller fetched a list of account ids, then
+    /// per id ran `SELECT currency`, `SELECT opening_balance_e4`, and a
+    /// `SELECT SUM(amount_e4)` over that account's own transactions. Net
+    /// worth alone does that at twelve month-end dates, so a ten-account
+    /// dashboard issued several hundred statements — and each `SUM` was its
+    /// own index scan over the same `transactions` table the previous one
+    /// had just walked. Grouped, the whole set is one pass.
+    ///
+    /// The aggregate lives in SQL, where money rule 3 requires it: nothing
+    /// here sums decoded amounts in Swift.
+    static func accountBalances(
+        _ database: Database, matching filter: AccountFilter, asOf: String, now: Date
+    ) throws -> [NativeAccountBalance] {
+        let boundary = occurredAtBoundary(asOf: asOf, now: now)
+        return try Row.fetchAll(
+            database,
+            sql: """
+            SELECT a.id AS account_id, a.currency AS currency,
+                   a.opening_balance_e4 + COALESCE(SUM(t.amount_e4), 0) AS balance_e4
+            FROM accounts a
+            LEFT JOIN transactions t
+                   ON t.account_id = a.id AND t.deleted_at IS NULL
+                  AND t.status = 'confirmed' AND t.occurred_at <= ?
+            WHERE \(filter.sql)
+            GROUP BY a.id, a.currency, a.opening_balance_e4
+            """,
+            arguments: StatementArguments([boundary] + filter.arguments)
+        ).map { row in
+            NativeAccountBalance(
+                accountId: row["account_id"], currency: row["currency"], balanceE4: row["balance_e4"]
+            )
         }
+    }
+
+    /// The `accounts` predicate every money query shares: not deleted, not
+    /// archived, in scope. `net_worth`'s own, mirrored by
+    /// `investedTotal`/`currencyExposure` so the three can never disagree
+    /// about which accounts count.
+    static func inScopeFilter(_ scope: PublicSchema.AccountScope) -> AccountFilter {
+        AccountFilter(
+            "a.deleted_at IS NULL AND a.archived_at IS NULL AND (\(scopeFilterSQL(scope, accountIdColumn: "a.id")))"
+        )
     }
 
     private static func occurredAtBoundary(asOf: String, now: Date) -> String {
@@ -223,9 +250,11 @@ enum LocalMoneyQueries {
 struct NativeAccountBalance {
     let accountId: String
     let currency: String
-    /// `nil` propagates money rule 5 — an account that can't be found has
-    /// no computable balance, never a `0`.
-    let balanceE4: Int64?
+    /// Never `nil` for a row that came back: an account that matched the
+    /// filter has an `opening_balance_e4` and therefore a balance. Money
+    /// rule 5's "unresolvable is nil" lives one level up, where a *missing*
+    /// account (no row at all) and a missing FX rate both become nil.
+    let balanceE4: Int64
 }
 
 struct NeedsReviewLocalRow {

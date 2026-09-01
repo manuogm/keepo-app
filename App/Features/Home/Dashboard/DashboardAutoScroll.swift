@@ -1,4 +1,5 @@
 import KeepoCore
+import QuartzCore
 import SwiftUI
 
 /// What the dashboard's scroll view currently looks like, sampled through
@@ -66,8 +67,10 @@ extension DashboardCanvasView {
     private var autoScrollMinSpeed: CGFloat { 26 }
     private var autoScrollMaxSpeed: CGFloat { 240 }
 
-    /// One display frame, in both the units the loop needs.
-    private var autoScrollTick: Duration { .milliseconds(16) }
+    /// The nominal frame the ramp speeds are expressed against. The loop
+    /// no longer *sleeps* for this — it steps by however long the frame
+    /// actually took — but the speeds above are still points per second, so
+    /// something has to name the units.
     private var autoScrollTickSeconds: CGFloat { 0.016 }
 
     /// Called on every drag change. Sets the speed the view should be
@@ -119,12 +122,32 @@ extension DashboardCanvasView {
     /// scroll stutter and drift.
     private func runAutoScroll(geometry: DashboardGeometry) async {
         var offset = scrollGeometry.offsetY
+        // Driven by the display, not by `Task.sleep(for: .milliseconds(16))`.
+        //
+        // That sleep was a wall-clock timer pretending to be a frame clock:
+        // it has no display synchronisation and a floor that is *at least*
+        // its interval, so on a 120Hz ProMotion screen it stepped the offset
+        // roughly every other frame at an interval that drifted — visible as
+        // judder in exactly the moment the user is trying to place a tile
+        // precisely. `CADisplayLink` fires in step with the compositor and
+        // reports the real time between frames, so the scroll advances by
+        // the distance it should have travelled rather than by a constant
+        // that assumed 62.5Hz.
+        var lastTimestamp: CFTimeInterval?
         // `drag` is the loop's real lifetime: every ordinary exit cancels
         // the task, and this catches the one that doesn't — a gesture the
         // system interrupts without an `onEnded`, which would otherwise
         // leave the dashboard scrolling on its own with nothing in hand.
-        while !Task.isCancelled, drag != nil || incoming != nil {
-            let step = autoScrollVelocity * autoScrollTickSeconds
+        for await timestamp in DisplayLinkTicks.stream() {
+            guard !Task.isCancelled, drag != nil || incoming != nil else { break }
+            // First tick has no predecessor to measure against, so it moves
+            // by one nominal frame. Clamped so a stall (a slow drop-target
+            // pass, the app being briefly descheduled) can't turn into a
+            // single enormous jump.
+            let elapsed = lastTimestamp.map { min(CGFloat(timestamp - $0), autoScrollTickSeconds * 4) }
+                ?? autoScrollTickSeconds
+            lastTimestamp = timestamp
+            let step = autoScrollVelocity * elapsed
             let next = min(max(offset + step, 0), scrollGeometry.maximumOffsetY)
             let travelled = next - offset
             offset = next
@@ -149,7 +172,6 @@ extension DashboardCanvasView {
                     previewIncoming(at: point, geometry: geometry)
                 }
             }
-            try? await Task.sleep(for: autoScrollTick)
         }
     }
 
@@ -157,5 +179,68 @@ extension DashboardCanvasView {
         autoScrollTask?.cancel()
         autoScrollTask = nil
         autoScrollVelocity = 0
+    }
+}
+
+/// One `CADisplayLink`, as a stream of frame timestamps.
+///
+/// The link is created on the main run loop and invalidated when the
+/// stream's consumer stops — leaving the `for await` (which
+/// `runAutoScroll` does the moment the drag ends) or cancelling the task
+/// that drives it (`stopAutoScroll`) releases the iterator, which fires
+/// `onTermination` and tears the link down. Nothing keeps firing once the
+/// finger is up.
+enum DisplayLinkTicks {
+    @MainActor
+    static func stream() -> AsyncStream<CFTimeInterval> {
+        AsyncStream { continuation in
+            let target = DisplayLinkTarget(continuation)
+            continuation.onTermination = { _ in
+                // `invalidate()` is main-thread-only, and `onTermination`
+                // fires wherever the consumer happened to stop.
+                Task { @MainActor in target.stop() }
+            }
+        }
+    }
+}
+
+/// `CADisplayLink` needs an ObjC target, and the target has to outlive the
+/// call that made it — the link holds it, and it holds the link, until
+/// `stop()` breaks the pair.
+///
+/// `@unchecked Sendable` is carrying exactly one thing across an isolation
+/// boundary: the reference itself, into `onTermination`'s `@Sendable`
+/// closure, which does nothing with it but hop back to the main actor. The
+/// `link` property is created, ticked and invalidated on the main thread
+/// and touched nowhere else — `init` and `stop()` are both `@MainActor`,
+/// and `tick` is only ever called by the main run loop.
+private final class DisplayLinkTarget: NSObject, @unchecked Sendable {
+    private var link: CADisplayLink?
+    private let continuation: AsyncStream<CFTimeInterval>.Continuation
+
+    @MainActor
+    init(_ continuation: AsyncStream<CFTimeInterval>.Continuation) {
+        self.continuation = continuation
+        super.init()
+        let link = CADisplayLink(target: self, selector: #selector(tick))
+        // `.common`, not `.default`: the dashboard's own scroll view is
+        // tracking a drag while this runs, and a `.default`-mode link stops
+        // firing for the whole of it — which is precisely the moment edge
+        // auto-scroll exists for.
+        link.add(to: .main, forMode: .common)
+        self.link = link
+    }
+
+    @MainActor
+    func stop() {
+        link?.invalidate()
+        link = nil
+        continuation.finish()
+    }
+
+    /// `targetTimestamp`, not `timestamp` — the time the frame being built
+    /// will be *shown*, which is what the offset should be correct for.
+    @objc private func tick(_ link: CADisplayLink) {
+        continuation.yield(link.targetTimestamp)
     }
 }

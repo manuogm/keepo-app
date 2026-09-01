@@ -47,10 +47,13 @@ public enum CurrencyRegion {
     /// `nil` when there is no honest flag to show and the caller should draw
     /// a globe instead.
     ///
-    /// A non-`nil` name is not a promise that the asset exists: the whole
-    /// alpha-2 space is bundled, but a currency code whose first two letters
-    /// are not a real region would still produce a name here. The caller
-    /// checks, and falls back to the same globe.
+    /// A non-`nil` name is not a promise that the asset exists, and the
+    /// caller must check. Two ways it can miss: a currency code whose first
+    /// two letters are not a real region at all, and a real region whose
+    /// artwork simply isn't bundled — the catalogue carries the
+    /// currency-bearing regions rather than the whole alpha-2 space (see
+    /// `CurrencyFlagAssetTests` for the set and why). Both fall back to the
+    /// same globe.
     public static func flagAssetName(for currencyCode: String) -> String? {
         guard let region = region(for: currencyCode) else { return nil }
         return assetPrefix + region.lowercased()

@@ -113,11 +113,21 @@ struct HighlightableChart: View {
     /// them. A line's meaning is its shape, and anchoring a running balance
     /// at zero flattens a real month of movement into a rule near the top of
     /// the tile — the exact bug this chart's predecessor shipped with.
+    ///
+    /// Walked in a single pass rather than built as `flatMap` +
+    /// `compactMap` over `points + backdrop`. That spelling allocated three
+    /// intermediate arrays per series, and `body` re-runs on every frame of
+    /// a scroll or a scrub — so a chart of a few hundred buckets was
+    /// allocating and throwing away several thousand elements per frame for
+    /// two numbers.
     private var yDomain: ClosedRange<Double> {
-        let values = series.flatMap { series in
-            (series.points + (series.backdrop ?? [])).compactMap(\.value)
+        var low: Double?
+        var high: Double?
+        for series in series {
+            for point in series.points { track(point.value, &low, &high) }
+            for point in series.backdrop ?? [] { track(point.value, &low, &high) }
         }
-        guard let low = values.min(), let high = values.max() else { return 0 ... 1 }
+        guard let low, let high else { return 0 ... 1 }
         if series.contains(where: { $0.visualization == .bar }) {
             let floor = min(low, 0)
             let ceiling = max(high, 0)
@@ -126,6 +136,22 @@ struct HighlightableChart: View {
         guard high > low else { return (low - 1) ... (high + 1) }
         let padding = (high - low) * 0.18
         return (low - padding) ... (high + padding)
+    }
+
+    private func track(_ value: Double?, _ low: inout Double?, _ high: inout Double?) {
+        guard let value else { return }
+        low = low.map { Swift.min($0, value) } ?? value
+        high = high.map { Swift.max($0, value) } ?? value
+    }
+
+    /// Each bucket's slot on the x axis, built **once per body**.
+    ///
+    /// `plotted` used to build this dictionary itself, so it was rebuilt
+    /// once per series *and* once per backdrop — three to six times a frame
+    /// on Cashflow and Investing Ratio, over every bucket in the timeline
+    /// (which is the whole of "All time", not just the visible window).
+    private var bucketPositions: [Date: Int] {
+        Dictionary(uniqueKeysWithValues: buckets.enumerated().map { ($0.element, $0.offset) })
     }
 
     var body: some View {
@@ -138,7 +164,7 @@ struct HighlightableChart: View {
         // with the data; the y axis even scaled to include it.
         GeometryReader { geometry in
             let slot = slotWidth(plotWidth: geometry.size.width)
-            chart(barWidth: barWidth(slot: slot))
+            chart(barWidth: barWidth(slot: slot), positions: bucketPositions)
                 .chartLegend(.hidden)
             .chartYAxis(.hidden)
             .chartXScale(domain: -0.5 ... Double(max(buckets.count, 1)) - 0.5)
@@ -194,14 +220,27 @@ struct HighlightableChart: View {
         max(min(slot * 0.58, 16), 4)
     }
 
-    private func chart(barWidth: CGFloat) -> some View {
+    private func chart(barWidth: CGFloat, positions: [Date: Int]) -> some View {
         Chart {
             ForEach(series) { series in
                 if let backdrop = series.backdrop {
-                    marks(for: backdrop, in: series, isBackdrop: true, barWidth: barWidth)
+                    marks(for: backdrop, in: series, isBackdrop: true, style: MarkStyle(barWidth, positions))
                 }
-                marks(for: series.points, in: series, isBackdrop: false, barWidth: barWidth)
+                marks(for: series.points, in: series, isBackdrop: false, style: MarkStyle(barWidth, positions))
             }
+        }
+    }
+
+    /// The two things every mark needs and neither series owns — bundled so
+    /// `marks`/`plotted` stay inside the project's `function_parameter_count`
+    /// limit while `positions` is passed in rather than rebuilt.
+    private struct MarkStyle {
+        let barWidth: CGFloat
+        let positions: [Date: Int]
+
+        init(_ barWidth: CGFloat, _ positions: [Date: Int]) {
+            self.barWidth = barWidth
+            self.positions = positions
         }
     }
 
@@ -210,9 +249,9 @@ struct HighlightableChart: View {
     /// Charts to animate it instead of rebuilding it.
     @ChartContentBuilder
     private func marks(
-        for points: [MetricPoint], in series: ChartSeries, isBackdrop: Bool, barWidth: CGFloat
+        for points: [MetricPoint], in series: ChartSeries, isBackdrop: Bool, style: MarkStyle
     ) -> some ChartContent {
-        ForEach(plotted(points, series: series.id, isBackdrop: isBackdrop)) { entry in
+        ForEach(plotted(points, series: series.id, isBackdrop: isBackdrop, positions: style.positions)) { entry in
             switch series.visualization {
             case .line:
                 LineMark(
@@ -238,7 +277,7 @@ struct HighlightableChart: View {
                     x: .value("Period", entry.position),
                     yStart: .value("Baseline", 0),
                     yEnd: .value("Value", entry.value),
-                    width: .fixed(barWidth)
+                    width: .fixed(style.barWidth)
                 )
                     .foregroundStyle(colour(series, bucket: entry.bucket, isBackdrop: isBackdrop))
                     // Fully rounded ends rather than a fixed 3pt softening.
@@ -249,7 +288,7 @@ struct HighlightableChart: View {
                     // one. Swift Charts clamps the radius against the bar's
                     // short side, so a near-zero bar stays a sliver rather
                     // than becoming a dot.
-                    .cornerRadius(barWidth / 2, style: .continuous)
+                    .cornerRadius(style.barWidth / 2, style: .continuous)
             }
         }
     }
@@ -267,8 +306,9 @@ struct HighlightableChart: View {
 
     /// Points that can actually be drawn, paired with their x position.
     /// A `nil` value is dropped here — that is the gap.
-    private func plotted(_ points: [MetricPoint], series: String, isBackdrop: Bool) -> [PlottedMark] {
-        let positions = Dictionary(uniqueKeysWithValues: buckets.enumerated().map { ($0.element, $0.offset) })
+    private func plotted(
+        _ points: [MetricPoint], series: String, isBackdrop: Bool, positions: [Date: Int]
+    ) -> [PlottedMark] {
         let prefix = isBackdrop ? "\(series)-backdrop" : series
         return points.compactMap { point in
             guard let value = point.value, let index = positions[point.bucket] else { return nil }
@@ -276,91 +316,6 @@ struct HighlightableChart: View {
                 id: "\(prefix)-\(index)", position: Double(index), bucket: point.bucket, value: value
             )
         }
-    }
-
-    // MARK: - Axis
-
-    /// Every bucket gets a label, written at whichever form fits.
-    ///
-    /// The previous version thinned the labels instead — one every second
-    /// or fourth bucket — and inset the first one so it wouldn't be clipped
-    /// by the plot edge. Both were wrong for a chart this short: the
-    /// thinning left the reader counting bars to find March, and the inset
-    /// moved labels off the buckets they named, which is the misalignment
-    /// that was visible on the device. A label centred on its own bucket
-    /// and narrow enough to fit that bucket's slot needs neither trick —
-    /// the domain already runs half a slot past each end, so a label that
-    /// fits one slot cannot hang off the plot.
-    private func xAxis(slot: CGFloat) -> AxisMarks<some AxisMark> {
-        let labels = ChartAxisLabels.fitted(buckets: buckets, granularity: granularity, slotWidth: slot)
-        let gridStride = gridStride(slot: slot)
-        return AxisMarks(values: buckets.indices.map(Double.init)) { value in
-            let index = value.as(Double.self).map { Int($0.rounded()) }
-            if showsGridLines, let index, index.isMultiple(of: gridStride) {
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-                    .foregroundStyle(AppTheme.Palette.fillStrong)
-            }
-            // `anchor: .top` — UnitPoint(0.5, 0) — is what actually centres
-            // the label on its tick.
-            //
-            // Given custom content, `AxisValueLabel`'s default anchor puts
-            // the label's *leading* edge at the tick, so every label sat
-            // half its own width to the right of the bar it named. Measured
-            // with a temporary `AxisGridLine`: the gridlines landed exactly
-            // on the marks, and the labels landed 14pt to the right of the
-            // gridlines. Naming the anchor puts the label's horizontal
-            // centre on the tick and its top edge on the axis, which is
-            // where a bottom-axis label belongs.
-            //
-            // Not `centered: true`, which is a different thing — that
-            // centres a label within the *step* after its tick, which is
-            // right for categorical bars and would move ours half a bucket
-            // further right still.
-            AxisValueLabel(anchor: .top) {
-                if let index, labels.indices.contains(index) {
-                    Text(labels[index])
-                        .font(AppTheme.Typography.micro)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
-                        .lineLimit(1)
-                        // **No `fixedSize()`.** It is what put every label
-                        // half its own width to the right of the bar it
-                        // names — measured on device: three points at
-                        // x = 0, 1, 2 carried labels sitting at 0.12, 1.11
-                        // and 2.15. A fixed-size label reports a width
-                        // larger than the slot Swift Charts allotted it, and
-                        // the overflow spills to one side instead of being
-                        // centred on the tick. It was there to stop a long
-                        // label being truncated; the fitting pass above now
-                        // guarantees the label is narrow enough, so the
-                        // workaround has nothing left to protect and was
-                        // costing the alignment it was hiding behind.
-                }
-            }
-        }
-    }
-
-    /// Whether to rule the plot.
-    ///
-    /// **Line charts only.** A dotted rule is what lets a reader carry a
-    /// point on the line down to the month underneath it — without one, a
-    /// value halfway along a smooth curve has nothing to be measured
-    /// against. A bar does that job itself: it *is* a vertical mark standing
-    /// on its own label, so a dotted line drawn through it adds nothing and
-    /// takes contrast away from the bar.
-    private var showsGridLines: Bool {
-        !series.contains { $0.visualization == .bar }
-    }
-
-    /// Every bucket where there is room, every other where there isn't.
-    ///
-    /// Ruled at every bucket a wide chart is legible and a crowded one turns
-    /// into hatching — the rules stop reading as reference lines and start
-    /// reading as a texture over the data. The threshold is a slot width
-    /// rather than a bucket count so it answers the real question (how close
-    /// together would these actually be drawn) on any tile size and at any
-    /// Dynamic Type setting.
-    private func gridStride(slot: CGFloat) -> Int {
-        slot >= 24 ? 1 : 2
     }
 
     // MARK: - Highlighting

@@ -16,6 +16,14 @@ import Foundation
 /// once, inside the lock, before it is ever returned. The `NSLock` +
 /// `nonisolated(unsafe)` pairing matches `LocalStore`'s own precedent for
 /// process-wide shared state in this codebase.
+public extension Locale {
+    /// The locale every **fixed-format** date formatter in this package
+    /// uses. Apple's own long-standing guidance (QA1480): a `DateFormatter`
+    /// with a hand-written `dateFormat` and a user locale can render digits,
+    /// eras and years the format string never asked for.
+    static let posix = Locale(identifier: "en_US_POSIX")
+}
+
 enum FormatterCache {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var formatters: [Key: NumberFormatter] = [:]
@@ -91,7 +99,56 @@ enum FormatterCache {
         return formatter
     }
 
+    /// A cached `DateFormatter` for a **fixed** format string — a wire
+    /// format (`yyyy-MM-dd`, the SQLite timestamp boundary), never something
+    /// shown to a user.
+    ///
+    /// Separate from `dateOnly` above because the two want opposite things
+    /// from the locale. A displayed date follows the reader's locale; a
+    /// value that round-trips through Postgres must not, ever — so this
+    /// pins `en_US_POSIX`. That is not only a caching decision: a bare
+    /// `DateFormatter` with a fixed format inherits the device locale, and
+    /// under a locale whose default numbering system isn't Latin (or whose
+    /// calendar isn't Gregorian, when the caller passes `.current`)
+    /// `yyyy-MM-dd` renders digits or a year Postgres cannot parse. Every
+    /// caller here writes to or reads from a database column, so the
+    /// fixed-locale formatter is the correct one regardless of the cache.
+    static func fixedFormat(_ format: String, calendar: Calendar, locale: Locale = .posix) -> DateFormatter {
+        let key = DateKey(
+            template: format, calendarIdentifier: "\(calendar.identifier)",
+            timeZoneIdentifier: calendar.timeZone.identifier, localeIdentifier: locale.identifier
+        )
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = fixedFormatters[key] { return cached }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = format
+        fixedFormatters[key] = formatter
+        return formatter
+    }
+
+    /// A cached `ISO8601DateFormatter`, keyed on its options.
+    ///
+    /// `ISO8601DateFormatter` is the most expensive of the three to build,
+    /// and `PostgresDate.date(fromTimestamp:)` — which every transaction row
+    /// in a day-grouped ledger goes through, on the main actor — used to
+    /// construct one (sometimes two) per call.
+    static func iso8601(_ options: ISO8601DateFormatter.Options) -> ISO8601DateFormatter {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = isoFormatters[options.rawValue] { return cached }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = options
+        isoFormatters[options.rawValue] = formatter
+        return formatter
+    }
+
     nonisolated(unsafe) private static var dateFormatters: [DateKey: DateFormatter] = [:]
+    nonisolated(unsafe) private static var fixedFormatters: [DateKey: DateFormatter] = [:]
+    nonisolated(unsafe) private static var isoFormatters: [UInt: ISO8601DateFormatter] = [:]
 
     private struct DateKey: Hashable {
         let template: String

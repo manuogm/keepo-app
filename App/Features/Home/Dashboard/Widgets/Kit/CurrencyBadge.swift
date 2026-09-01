@@ -65,17 +65,48 @@ struct CurrencyBadge: View {
     }
 
     /// The bundled flag for this currency, or `nil` to draw the globe.
-    ///
-    /// The existence check is not defensive noise. `CurrencyRegion` derives a
-    /// name from the currency code's own letters, so it will happily name
-    /// `flag-zz` for a code whose first two letters are not a real region —
-    /// and `Image(_:)` given a name it cannot find draws **nothing at all**,
-    /// silently, leaving a hole where the badge should be. Asking the bundle
-    /// first turns that into the globe every other unknown currency gets.
     private var flagAsset: String? {
-        guard let code, let name = CurrencyRegion.flagAssetName(for: code),
-              UIImage(named: name) != nil
-        else { return nil }
-        return name
+        code.flatMap(FlagArtwork.assetName(for:))
+    }
+}
+
+/// Which currencies actually have flag artwork in this build, memoized.
+///
+/// The existence check is not defensive noise. `CurrencyRegion` derives a
+/// name from the currency code's own letters, so it will happily name
+/// `flag-zz` for a code whose first two letters are not a real region — and
+/// `Image(_:)` given a name it cannot find draws **nothing at all**,
+/// silently, leaving a hole where the badge should be. Asking the bundle
+/// first turns that into the globe every other unknown currency gets. It
+/// matters more now than it did: the bundle carries currency-bearing
+/// regions only (see `CurrencyFlagAssetTests`), so the miss is a real,
+/// reachable case rather than a theoretical one.
+///
+/// It has to be **cached**, though. `CurrencyBadge` read it from a computed
+/// property inside `body`, so every render did an asset-catalogue lookup
+/// purely as a boolean test and then loaded the same image again to draw it
+/// — once per row, per render, in a list the expanded Currency Exposure
+/// widget can fill. The answer cannot change within a process (the bundle is
+/// read-only), so it is asked once per currency and remembered.
+///
+/// Same `NSLock` + `nonisolated(unsafe)` shape as `HexColorCache` and
+/// `FormatterCache`, and for the same reason: the values are immutable once
+/// built, so concurrent reads are safe.
+enum FlagArtwork {
+    private static let lock = NSLock()
+    /// A `nil` *value* is a cached miss — distinct from an absent key, which
+    /// means "not asked yet". Without that, every globe-drawing currency
+    /// would re-probe the bundle on every render, which is most of what this
+    /// exists to stop.
+    nonisolated(unsafe) private static var cache: [String: String?] = [:]
+
+    static func assetName(for currencyCode: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = cache[currencyCode] { return cached }
+        let resolved = CurrencyRegion.flagAssetName(for: currencyCode)
+            .flatMap { UIImage(named: $0) != nil ? $0 : nil }
+        cache[currencyCode] = resolved
+        return resolved
     }
 }

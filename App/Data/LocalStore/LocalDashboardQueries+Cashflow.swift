@@ -32,7 +32,10 @@ extension LocalDashboardQueries {
     static func cashflow(
         _ database: Database, _ moneyScope: LocalMoneyScope, period: ClosedRange<Date>
     ) throws -> CashflowTotalsLocal {
-        var accumulator = FlowAccumulator(baseCurrency: moneyScope.baseCurrency)
+        // One memo for the whole period. Conversion here is row by row (see
+        // this function's own note on why), and a busy month is hundreds of
+        // rows sharing a handful of `(currency, occurred_date)` pairs.
+        var accumulator = FlowAccumulator(baseCurrency: moneyScope.baseCurrency, cache: LocalFxCache())
         let bounds = [
             PostgresDate.dateOnlyString(period.lowerBound, calendar: utcCalendar),
             PostgresDate.dateOnlyString(period.upperBound, calendar: utcCalendar)
@@ -107,6 +110,7 @@ extension LocalDashboardQueries {
     /// transfer leg. Money rule 1: nothing re-signs anything on the way in.
     private struct FlowAccumulator {
         let baseCurrency: String
+        let cache: LocalFxCache
         var moneyIn = RunningTotal()
         var moneyOut = RunningTotal()
         var buckets: [String: CategoryBucket] = [:]
@@ -116,9 +120,10 @@ extension LocalDashboardQueries {
             let currency: String = row["currency"]
             let occurredDate: String = row["occurred_date"]
             let base = baseCurrency
+            let cache = cache
             let convert: (Int64, String, String) throws -> Int64? = {
                 try LocalMoneyConversion.convert(
-                    database, amountE4: $0, from: $1, toCurrency: base, date: $2
+                    database, amountE4: $0, from: $1, toCurrency: base, date: $2, cache: cache
                 )
             }
             if bucket.isInbound {
@@ -219,25 +224,19 @@ extension LocalDashboardQueries {
     static func investedTotal(
         _ database: Database, _ moneyScope: LocalMoneyScope, asOf: String, now: Date
     ) throws -> Int64? {
-        let scopeClause = LocalMoneyQueries.scopeFilterSQL(moneyScope.scope, accountIdColumn: "id")
-        let accounts = try Row.fetchAll(
+        let scopeClause = LocalMoneyQueries.scopeFilterSQL(moneyScope.scope, accountIdColumn: "a.id")
+        let balances = try LocalMoneyQueries.accountBalances(
             database,
-            sql: """
-            SELECT id, currency FROM accounts
-            WHERE deleted_at IS NULL AND archived_at IS NULL AND kind = 'investment' AND (\(scopeClause))
-            """
+            matching: AccountFilter(
+                """
+                a.deleted_at IS NULL AND a.archived_at IS NULL AND a.kind = 'investment' AND (\(scopeClause))
+                """
+            ),
+            asOf: asOf, now: now
         )
-        var total: Int64 = 0
-        for row in accounts {
-            let accountId: String = row["id"]
-            guard let native = try LocalMoneyQueries.accountBalance(
-                database, accountId: accountId, asOf: asOf, now: now
-            ), let converted = try LocalMoneyConversion.convert(
-                database, amountE4: native, from: row["currency"], toCurrency: moneyScope.baseCurrency, date: asOf
-            ) else { return nil }
-            total += converted
-        }
-        return total
+        return try LocalMoneyConversion.sum(
+            balances, database, into: moneyScope.baseCurrency, asOf: asOf, cache: LocalFxCache()
+        )
     }
 
     /// How many accounts the user has declared as investments.

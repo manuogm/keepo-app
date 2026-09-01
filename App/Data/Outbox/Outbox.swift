@@ -1,7 +1,6 @@
 import Foundation
 import GRDB
 import KeepoCore
-import Network
 import Supabase
 
 // MARK: - Outbox
@@ -41,8 +40,11 @@ public enum OutboxCaptureResult: Equatable, Sendable {
 @Observable
 @MainActor
 public final class Outbox {
-    public private(set) var pendingCount = 0
-    public private(set) var oldestPendingAt: Date?
+    // `internal(set)`, not `private(set)`: these three are written by
+    // `refreshCounts()`, which lives in `Outbox+Retry.swift`. Still
+    // read-only to everything outside this module.
+    public internal(set) var pendingCount = 0
+    public internal(set) var oldestPendingAt: Date?
     /// Why the oldest queued write keeps failing — recorded by `enqueue`
     /// on every failed attempt since the outbox existed, but surfaced
     /// nowhere until a real bug made that gap expensive: a server-side RPC
@@ -50,20 +52,24 @@ public final class Outbox {
     /// silently, so the queue simply grew with no visible reason, and the
     /// symptom looked identical to a client sync bug. A write that cannot
     /// reach the server must always be able to say why.
-    public private(set) var lastError: String?
+    public internal(set) var lastError: String?
 
     let dbQueue: DatabaseQueue
     let sender: OutboxSending
     private let encoder = JSONEncoder()
     let decoder = JSONDecoder()
     // `deinit` runs in a nonisolated context even on a `@MainActor` class,
-    // so it can't otherwise touch actor-isolated state. `pathMonitor` is
-    // `Sendable` itself so no annotation is needed; `retryTask` is a
+    // so it can't otherwise touch actor-isolated state. `retryTask` is a
     // mutable `@Observable`-tracked property, which `nonisolated` (without
     // `(unsafe)`) can't be applied to — `(unsafe)` is still required here.
-    private let pathMonitor = NWPathMonitor()
-    private var isOnline = false
-    nonisolated(unsafe) private var retryTask: Task<Void, Never>?
+    //
+    // Not `private`: `Outbox+Retry.swift` extends this type, and a `private`
+    // member is invisible to its own type's extension in a different file.
+    nonisolated(unsafe) var retryTask: Task<Void, Never>?
+    /// Whether `SessionStore` has opted this outbox into background retries
+    /// at all. The short-lived `Outbox` a capture builds never does, so it
+    /// never schedules a timer it has no use for.
+    var isRetryLoopEnabled = false
 
     public init(dbQueue: DatabaseQueue, sender: OutboxSending) {
         self.dbQueue = dbQueue
@@ -72,44 +78,12 @@ public final class Outbox {
     }
 
     deinit {
-        pathMonitor.cancel()
         retryTask?.cancel()
     }
 
     public func hasStalePending(threshold: TimeInterval) -> Bool {
         guard let oldestPendingAt else { return false }
         return Date().timeIntervalSince(oldestPendingAt) > threshold
-    }
-
-    /// C-10: every existing drain trigger (cold start, sign-in, foreground,
-    /// reconnect, manual banner tap) needs an app-lifecycle or connectivity
-    /// *event* to fire. A transient 5xx during an otherwise-online, otherwise
-    /// idle session left the write parked for however long the user happened
-    /// to keep the app foregrounded, with only `hasStalePending`'s 120s
-    /// banner as a symptom. Called once by `SessionStore` — not from `init`,
-    /// so the short-lived `Outbox` `CaptureIntent` constructs for a single
-    /// capture never starts a network monitor it has no use for.
-    ///
-    /// Backs off 30s → 5min, capped, resetting to the floor once the queue
-    /// actually drains — a lingering failure doesn't retry as eagerly as a
-    /// fresh one.
-    public func startRetryLoop() {
-        guard retryTask == nil else { return }
-        pathMonitor.pathUpdateHandler = { [weak self] path in
-            Task { @MainActor in self?.isOnline = path.status == .satisfied }
-        }
-        pathMonitor.start(queue: DispatchQueue(label: "app.keepo.outbox-retry-monitor"))
-        retryTask = Task { [weak self] in
-            var delay: Duration = .seconds(30)
-            while !Task.isCancelled {
-                try? await Task.sleep(for: delay)
-                guard let self, !Task.isCancelled else { return }
-                if self.pendingCount > 0 && self.isOnline {
-                    await self.drainAll()
-                }
-                delay = self.pendingCount > 0 ? min(delay * 2, .seconds(300)) : .seconds(30)
-            }
-        }
     }
 
     /// A: every submit* here awaits only the local write-through before
@@ -352,10 +326,4 @@ public final class Outbox {
         }) ?? []
     }
 
-    private func refreshCounts() async {
-        let items = await pendingItems()
-        pendingCount = items.count
-        oldestPendingAt = items.first?.createdAt
-        lastError = items.compactMap(\.lastError).first
-    }
 }
