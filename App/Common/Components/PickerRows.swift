@@ -125,6 +125,10 @@ struct CategoryPickerRow: View {
             // outshout the amount directly above it.
             .background(pillFill, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
             .contentShape(Rectangle())
+            // Same reason the transactions filter pills and
+            // `FxRateWidget.quotePicker` opt out — see
+            // `TransactionsListView.pillLabel` for the traced explanation.
+            .transaction { $0.animation = nil }
         }
         .menuStyle(.button)
         .buttonStyle(.pressableCard)

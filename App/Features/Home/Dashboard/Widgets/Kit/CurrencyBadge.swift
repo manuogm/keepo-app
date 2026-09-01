@@ -16,6 +16,19 @@ struct CurrencyBadge: View {
     var showsCode = true
     /// What to write instead of a code — "REST" for the roll-up.
     var label: String?
+    /// A fixed width for the code, so the badge is the same size whichever
+    /// currency it names.
+    ///
+    /// Only the FX widget's two pills pass it, and only because they are
+    /// `Menu`/`Button` labels: UIKit snapshots those while the menu is open
+    /// and morphs the snapshot back on dismissal, so a badge that changes
+    /// width between one code and the next briefly draws distorted. Three
+    /// letters differ by only a few points, which is still enough to see.
+    /// See `TransactionsListView.pillLabel` for the traced explanation.
+    ///
+    /// `nil` everywhere else — a row in Currency Exposure has no snapshot to
+    /// disagree with and should hug its own code.
+    var codeWidth: CGFloat?
 
     var body: some View {
         HStack(spacing: AppTheme.Spacing.xs) {
@@ -31,6 +44,7 @@ struct CurrencyBadge: View {
                     // which reads as a different currency rather than as a
                     // squeezed label.
                     .fixedSize()
+                    .frame(width: codeWidth)
             }
         }
     }

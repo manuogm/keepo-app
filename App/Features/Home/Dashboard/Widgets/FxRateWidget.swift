@@ -117,6 +117,11 @@ struct FxRateWidget: View {
     /// side. It is the only thing on the row saying these two currencies are
     /// a *ratio* and not a list, and at caption size between two 22pt discs
     /// it read as a stray mark.
+    /// Both FX pills draw their code at one width — see `CurrencyBadge`'s
+    /// `codeWidth`. Scaled so three letters still fit at larger Dynamic Type
+    /// sizes.
+    @ScaledMetric(relativeTo: .subheadline) private var codeWidth: CGFloat = 34
+
     private var pair: some View {
         HStack(spacing: AppTheme.Spacing.s) {
             quotePicker
@@ -145,9 +150,11 @@ struct FxRateWidget: View {
                 }
             }
         } label: {
-            CurrencyBadge(code: series.config.quoteCurrency, diameter: AppTheme.Size.glyph)
+            CurrencyBadge(code: series.config.quoteCurrency, diameter: AppTheme.Size.glyph, codeWidth: codeWidth)
                 .currencyPill(stroke: AppTheme.Palette.fillStrong)
                 .hitTarget()
+                // See `basePill` for why both pills take their ideal width.
+                .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.plain)
         // **The pill must not animate.** Picking a currency changes the
@@ -157,6 +164,13 @@ struct FxRateWidget: View {
         // clipped at both ends while it went. Nothing about a label swapping
         // three letters for three others should move, so this pill opts out
         // of every animation around it.
+        //
+        // **This shortens the distortion; it does not remove it.** The
+        // comment above used to imply otherwise, and the clipping was still
+        // visible (briefer) with only the transaction suppressed. The rest
+        // of it is UIKit's, not ours — see
+        // `TransactionsListView.pillLabel`'s note, which traced the same
+        // artifact frame by frame on the filter pills.
         .transaction { $0.animation = nil }
     }
 
@@ -172,10 +186,15 @@ struct FxRateWidget: View {
         Button {
             isShowingBaseNote = true
         } label: {
-            CurrencyBadge(code: currency?.code, diameter: AppTheme.Size.glyph)
+            CurrencyBadge(code: currency?.code, diameter: AppTheme.Size.glyph, codeWidth: codeWidth)
                 .opacity(AppTheme.Opacity.muted)
                 .currencyPill(stroke: AppTheme.Palette.fillStrong)
                 .hitTarget()
+                // Both pills report their own ideal width rather than
+                // accepting a proposal, so the host measures them once. See
+                // `TransactionsListView.pillLabel` for the artifact this
+                // helps with and for what it cannot fix.
+                .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(currency?.code ?? "Base currency"), your base currency")

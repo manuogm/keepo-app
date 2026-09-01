@@ -60,6 +60,14 @@ struct TransactionsListView: View {
     @State var customThrough = Date()
     @State var isCustomRangePresented = false
 
+    /// The filter pills' fixed width — the fix for the distortion
+    /// `pillLabel` documents, and the reason it is a *width* rather than a
+    /// minimum. `@ScaledMetric` so a chip still fits its own label at larger
+    /// Dynamic Type sizes instead of truncating "Categories" at AX1.
+    ///
+    /// Not `private` — read from TransactionsListView+Filters.swift.
+    @ScaledMetric(relativeTo: .subheadline) var pillWidth: CGFloat = 104
+
     // Not `private` — read from TransactionsListView+Period.swift.
     let calendar = Calendar.current
 

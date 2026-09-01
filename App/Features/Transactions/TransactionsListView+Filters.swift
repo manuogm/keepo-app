@@ -101,6 +101,7 @@ extension TransactionsListView {
         } label: {
             pillLabel(selectedKindName, isActive: filter.kind != nil)
         }
+        .transaction { $0.animation = nil }
     }
 
     private func kindOption(_ kind: String?, label: String) -> some View {
@@ -149,11 +150,12 @@ extension TransactionsListView {
         } label: {
             pillLabel(selectedCategoryName, isActive: filter.categoryId != nil)
         }
+        .transaction { $0.animation = nil }
     }
 
     private var selectedCategoryName: String {
-        guard let categoryId = filter.categoryId else { return "Categories" }
-        return filterCategories.first { $0.id == categoryId }?.name ?? "Categories"
+        guard let categoryId = filter.categoryId else { return "Category" }
+        return filterCategories.first { $0.id == categoryId }?.name ?? "Category"
     }
 
     var accountFilterMenu: some View {
@@ -181,11 +183,52 @@ extension TransactionsListView {
         } label: {
             pillLabel(selectedAccountName, isActive: filter.accountId != nil)
         }
+        .transaction { $0.animation = nil }
     }
 
     /// All three menus wear the same pill, so "which account", "which
     /// category" and "which type" read as three of one thing rather than
     /// three designs.
+    ///
+    /// **On the brief distortion after picking an option.** Traced frame by
+    /// frame from a `simctl io recordVideo` capture, after several wrong
+    /// guesses — record it again before believing any new theory about it.
+    ///
+    /// While a `Menu` is open, UIKit hides the real pill and shows a
+    /// *snapshot* of it taken when the menu opened. On dismissal it morphs
+    /// that snapshot back into the live view's frame. Picking a different
+    /// option changes this label's text, so by the time the morph runs the
+    /// live pill is a **different width than the snapshot** — UIKit scales
+    /// and shears a stale bitmap into a frame that no longer matches it, and
+    /// a capsule's rounded caps do not survive that. For ~0.15–0.3s the pill
+    /// reads as a torn, square-ended blob with its text hanging off.
+    ///
+    /// The control experiment is what pins it: picking the option that was
+    /// *already selected* dismisses through the identical animation and
+    /// renders cleanly the whole way, because the snapshot and the live view
+    /// still agree. The wider the new name is than the old one, the larger
+    /// the mismatch and the longer it stays visible — which is why a name
+    /// wider than the visible row is the worst case.
+    ///
+    /// The two mitigations below take it from about a second to ~0.15–0.3s.
+    /// Neither removes it: the morph is UIKit's, and the mismatch it is
+    /// morphing is inherent to a pill whose width depends on its selection.
+    /// **The cure is a pill whose width does not change with the
+    /// selection** — a fixed width with tail truncation — which is a visual
+    /// decision this note deliberately does not make on its own.
+    ///
+    /// 1. `pillWidth` — a **fixed** width, which is what actually removes
+    ///    it: the snapshot and the live view are now always the same size,
+    ///    so there is no mismatch left for the morph to reveal. It is a
+    ///    width and not a `minWidth` for exactly that reason — a minimum
+    ///    still grows for a long name and brings the artifact back with it.
+    ///    The cost is that a name wider than a chip truncates, which is the
+    ///    trade this control was deliberately given.
+    /// 2. `.transaction { $0.animation = nil }` on each of the three `Menu`s
+    ///    — on the menu, not on this label. Picking an option re-keys
+    ///    `TransactionsLoadKey`, so the reload lands in the same turn, and
+    ///    the pill was being carried along by whatever animation that turn
+    ///    had open. Same reason `FxRateWidget.quotePicker` does it.
     ///
     /// A pill that is **doing** something goes solid white with the panel's
     /// own colour for its label — the same treatment the selected period
@@ -194,18 +237,37 @@ extension TransactionsListView {
     /// Accounts": shorter, so all three fit a phone's width without the
     /// last one being sliced by the scroll edge, and no less clear next to
     /// a chevron.
+    ///
+    /// The axis names are **singular** ("Account", "Category"), which is
+    /// load-bearing now rather than a style choice: a uniform chip has to be
+    /// as wide as its longest unset label, and three chips plus the search
+    /// button have one 402pt row to share. At "Categories" the third chip was
+    /// sliced at rest — the very thing this paragraph says the short labels
+    /// exist to avoid. Singular also happens to be the more accurate word:
+    /// each of these filters to exactly one.
     private func pillLabel(_ title: String, isActive: Bool) -> some View {
         HStack(spacing: AppTheme.Spacing.xs) {
             Text(title)
                 .font(AppTheme.Typography.label)
                 .fontWeight(isActive ? .semibold : .regular)
                 .lineLimit(1)
+                .truncationMode(.tail)
             Image(systemName: "chevron.down")
                 .font(AppTheme.Typography.nanoEmphasis)
         }
         .foregroundStyle(isActive ? session.scope.panelTint : AppTheme.Palette.textOnAccent)
-        .padding(.horizontal, AppTheme.Spacing.m)
+        // `.s`, not `.m`: a fixed width has to be wide enough for the
+        // longest *unset* label ("Categories", which must never truncate —
+        // an axis name with an ellipsis reads as a bug), and three chips
+        // plus the search button have one 402pt row to live on. Tighter
+        // side padding is what buys that back.
+        .padding(.horizontal, AppTheme.Spacing.s)
         .padding(.vertical, AppTheme.Spacing.xs)
+        // The width is fixed **after** the padding, so the chip is one size
+        // whatever is in it and the label truncates inside that rather than
+        // stretching it. See this function's own note for why this is a
+        // width and not a minimum.
+        .frame(width: pillWidth)
         .background(
             isActive
                 ? AppTheme.Palette.textOnAccent
@@ -215,8 +277,8 @@ extension TransactionsListView {
     }
 
     private var selectedAccountName: String {
-        guard let accountId = filter.accountId else { return "Accounts" }
-        return filterAccounts.first { $0.id == accountId }?.name ?? "Accounts"
+        guard let accountId = filter.accountId else { return "Account" }
+        return filterAccounts.first { $0.id == accountId }?.name ?? "Account"
     }
 
     private var searchField: some View {
