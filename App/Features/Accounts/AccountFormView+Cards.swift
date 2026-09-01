@@ -155,7 +155,7 @@ struct AutomaticMarker: View {
     var tint: Color = .secondary
 
     var body: some View {
-        KeepoIcon(name: "icon-robot", size: AppTheme.Size.glyphSmall)
+        KeepoIcon(name: "icon-robot", size: AppTheme.Size.glyphNano)
             .foregroundStyle(tint)
             .accessibilityLabel("Mapped automatically")
     }

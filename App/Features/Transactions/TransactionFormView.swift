@@ -271,7 +271,7 @@ struct TransactionFormView: View {
 
     private func recurringLabel(_ title: String, icon: String) -> some View {
         HStack(spacing: AppTheme.Spacing.xs) {
-            KeepoIcon(name: icon, size: AppTheme.Size.glyphSmall)
+            KeepoIcon(name: icon, size: AppTheme.Size.glyphNano)
             Text(title)
         }
         .font(AppTheme.Typography.micro)

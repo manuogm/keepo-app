@@ -84,9 +84,9 @@ extension AppTheme {
     enum Size {
         /// 8 — a status dot or a page indicator.
         static let dot: CGFloat = 8
-        /// 12 — an icon packed inside a chip or badge next to caption2-sized
-        /// text (the scope title badge). Matched to the letterforms, not the
-        /// line — anything larger crowds the pill.
+        /// 12 — an icon packed next to caption2-sized text: the scope title
+        /// badge, a transaction row's provenance markers. Matched to the
+        /// letterforms, not the line — anything larger crowds them.
         static let glyphNano: CGFloat = 12
         /// 16 — an icon sitting inline with a line of caption-sized text: a
         /// provenance marker on a transaction row, the leading glyph in a
