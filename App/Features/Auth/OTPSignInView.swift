@@ -18,15 +18,15 @@ struct OTPSignInView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            VStack(spacing: 32) {
-                VStack(spacing: 4) {
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
+            VStack(spacing: AppTheme.Spacing.xxl) {
+                VStack(spacing: AppTheme.Spacing.xs) {
                     Text("Keepo")
-                        .font(.largeTitle).fontWeight(.bold)
-                        .foregroundStyle(Color.primary)
+                        .font(AppTheme.Typography.screenTitle).fontWeight(.bold)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
                     Text("Personal finance, captured automatically.")
-                        .font(.footnote)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
 
                 switch step {
@@ -38,21 +38,21 @@ struct OTPSignInView: View {
                 let linkError = session.linkError ?? errorMessage
                 if let linkError {
                     Text(linkError)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.statusNegative)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
             }
-            .padding(24)
+            .padding(AppTheme.Spacing.xl)
         }
     }
 
     private var emailStep: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppTheme.Spacing.l) {
             Text("Sign in to continue")
-                .font(.title3).fontWeight(.semibold)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.cardTitle).fontWeight(.semibold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
 
             TextField("Email address", text: $email)
                 .textFieldStyle(.roundedBorder)
@@ -72,30 +72,31 @@ struct OTPSignInView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, AppTheme.Spacing.m)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.primary)
+            .tint(AppTheme.Palette.textPrimary)
             .disabled(email.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
         }
     }
 
     private var waitingStep: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: AppTheme.Spacing.l) {
             Image(systemName: "envelope.badge")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.screenTitle.weight(.regular))
+                .imageScale(.large)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
 
             Text("Check your email")
-                .font(.title3).fontWeight(.semibold)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.cardTitle).fontWeight(.semibold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
 
             Text(
                 "We sent a sign-in link to\n**\(email)**\n\n"
                     + "Tap the link in your email to continue. It may take a minute to arrive."
             )
-                .font(.callout)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.body)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
 
             Button {
@@ -107,16 +108,16 @@ struct OTPSignInView: View {
                     Text("Resend Link")
                 }
             }
-            .font(.footnote)
-            .foregroundStyle(Color.primary)
+            .font(AppTheme.Typography.caption)
+            .foregroundStyle(AppTheme.Palette.textPrimary)
             .disabled(isLoading)
 
             Button("Use a different email") {
                 step = .email
                 errorMessage = nil
             }
-            .font(.footnote)
-            .foregroundStyle(Color.secondary)
+            .font(AppTheme.Typography.caption)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
         }
     }
 

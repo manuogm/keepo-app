@@ -12,7 +12,7 @@ struct WalletAutomationGuideView: View {
                     "Keepo can log Apple Pay purchases automatically, but the automation itself lives in "
                         + "Apple's Shortcuts app — this is a one-time setup."
                 )
-                .foregroundStyle(Color.secondary)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
             }
 
             Section("Setup") {
@@ -29,8 +29,8 @@ struct WalletAutomationGuideView: View {
                     "A purchase never opens the app — you'll get a notification with the amount, category, and "
                         + "account to glance at, and can tap it to review or fix anything that looks off."
                 )
-                .font(.footnote)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
             }
 
             Section {
@@ -38,8 +38,8 @@ struct WalletAutomationGuideView: View {
                     "Apple Pay only, on this device — closed-loop apps (like Walmart Pay) never touch Wallet "
                         + "and can't trigger this automation."
                 )
-                .font(.footnote)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
             }
         }
         .navigationTitle("Apple Pay Capture")
@@ -47,12 +47,12 @@ struct WalletAutomationGuideView: View {
     }
 
     private func step(_ number: Int, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.m) {
             Text("\(number)")
-                .font(.footnote).fontWeight(.semibold)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.caption).fontWeight(.semibold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
             Text(text)
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
         }
     }
 }

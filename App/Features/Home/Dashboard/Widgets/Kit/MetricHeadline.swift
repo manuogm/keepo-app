@@ -56,8 +56,8 @@ struct MetricHeadline: View {
     /// leak the shape of it.
     private func text(_ string: String?) -> some View {
         PrivateText(string ?? "—")
-            .font(.system(size: size, weight: .bold))
-            .foregroundStyle(Color.primary)
+            .numberFont(size)
+            .foregroundStyle(AppTheme.Palette.textPrimary)
     }
 }
 
@@ -88,8 +88,8 @@ struct MetricHeadlineBlock<Adjacent: View>: View {
     @ViewBuilder var adjacent: () -> Adjacent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
                 MetricHeadline(value: value, size: size, signStyle: signStyle)
                 adjacent()
                 Spacer(minLength: 0)

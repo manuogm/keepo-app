@@ -12,7 +12,7 @@ struct CategoryIconView: View {
 
     init(category: PublicSchema.CategoriesSelect?, diameter: CGFloat = 32) {
         self.icon = category?.icon ?? "questionmark"
-        self.color = category.map { Color(hex: $0.color) } ?? Color.gray
+        self.color = category.map { Color(hex: $0.color) } ?? AppTheme.Palette.textSecondary
         self.diameter = diameter
     }
 
@@ -27,7 +27,7 @@ struct CategoryIconView: View {
     var body: some View {
         Image(systemName: icon)
             .font(.system(size: diameter * 0.45))
-            .foregroundStyle(.white)
+            .foregroundStyle(AppTheme.Palette.textOnAccent)
             .frame(width: diameter, height: diameter)
             .background(color)
             .clipShape(Circle())

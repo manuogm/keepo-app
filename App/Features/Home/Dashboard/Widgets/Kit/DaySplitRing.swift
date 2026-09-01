@@ -30,11 +30,11 @@ struct DaySplitRing: View {
     var body: some View {
         ZStack {
             if isSelected {
-                Circle().fill(Color.secondary.opacity(0.18))
+                Circle().fill(AppTheme.Palette.fillStrong)
             }
             if segments.isEmpty {
                 Circle()
-                    .stroke(Color.secondary.opacity(0.18), lineWidth: 2.5)
+                    .stroke(AppTheme.Palette.fillStrong, lineWidth: 2.5)
             } else {
                 ForEach(Array(arcs.enumerated()), id: \.offset) { _, arc in
                     Circle()
@@ -46,11 +46,11 @@ struct DaySplitRing: View {
             VStack(spacing: 0) {
                 Text(dayNumber)
                     .font(.system(size: diameter * 0.37, weight: isToday ? .bold : .regular))
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                     .monospacedDigit()
                 Text(weekdayInitial)
                     .font(.system(size: diameter * 0.24))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
         }
         .frame(width: diameter, height: diameter)

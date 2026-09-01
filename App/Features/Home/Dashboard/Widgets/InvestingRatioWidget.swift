@@ -58,8 +58,8 @@ struct InvestingRatioWidget: View {
     /// opens — a run of vertical columns — so expanding reads as the same
     /// bar joined by its own history rather than as a change of picture.
     private func collapsed(_ metrics: InvestingRatioMetrics) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.m) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                 // The caption is stated in full even here, on a 2×1. It does
                 // not fit on one line at this width, so the pill wraps onto two
                 // — which is the right trade: "-2.2 pts" alone does not say
@@ -98,15 +98,15 @@ struct InvestingRatioWidget: View {
     private func accountCount(_ metrics: InvestingRatioMetrics) -> some View {
         let count = metrics.investmentAccountCount
         return Text(count == 1 ? "1 Account" : "\(count) Accounts")
-            .font(.subheadline)
-            .foregroundStyle(Color.secondary)
+            .font(AppTheme.Typography.label)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
             .lineLimit(1)
     }
 
     // MARK: - Expanded
 
     private func expanded(_ metrics: InvestingRatioMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             MetricHeadlineBlock(
                 value: .percent(series.highlightedPoint?.value ?? metrics.ratio), size: WidgetStyle.metricExpanded,
                 percentChange: series.pointChange, unit: "pts", caption: badgeCaption
@@ -131,11 +131,11 @@ struct InvestingRatioWidget: View {
     /// appeared on expand and belonged to nothing on screen.
     private var driversToggle: some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.22)) { showsDrivers.toggle() }
+            withAnimation(AppTheme.Motion.standard) { showsDrivers.toggle() }
         } label: {
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.microEmphasis)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .rotationEffect(.degrees(showsDrivers ? 90 : 0))
                 // A 12pt glyph is far under HIG's 44pt minimum, and this
                 // one sits beside the headline where a miss collapses the
@@ -155,7 +155,7 @@ struct InvestingRatioWidget: View {
     /// width this tile is drawn at, so opening into it costs the chart
     /// nothing.
     private var drivers: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: AppTheme.Spacing.s) {
             driver(change(\.amountE4), "Investments")
             driver(change(\.denominatorE4), "Networth")
         }
@@ -163,13 +163,13 @@ struct InvestingRatioWidget: View {
     }
 
     private func driver(_ percentChange: Double?, _ label: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: AppTheme.Spacing.xs) {
             Text(percentChange.map { String(format: "%+.0f%%", $0) } ?? "—")
                 .monospacedDigit()
             Text(label)
         }
-        .font(.caption)
-        .foregroundStyle(Color.secondary)
+        .font(AppTheme.Typography.micro)
+        .foregroundStyle(AppTheme.Palette.textSecondary)
         .lineLimit(1)
     }
 

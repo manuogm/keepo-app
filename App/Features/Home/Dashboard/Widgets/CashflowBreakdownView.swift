@@ -34,8 +34,8 @@ struct CashflowBreakdownView: View {
     var body: some View {
         if isLoading {
             Text("Working this out…")
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if categories.isEmpty {
             WidgetEmptyState(
@@ -46,7 +46,7 @@ struct CashflowBreakdownView: View {
             // Top-aligned, not centred: the list is a `ScrollView`, which
             // takes every point of height offered, so a centred stack puts
             // the bar halfway down with a dead band above it.
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
                 bar
                 list
             }
@@ -97,7 +97,7 @@ struct CashflowBreakdownView: View {
                 ForEach(categories) { category in
                     row(category)
                     if category.id != categories.last?.id {
-                        Divider().padding(.leading, 40)
+                        Divider().padding(.leading, AppTheme.Size.dividerInset(icon: AppTheme.Size.icon, leading: 0))
                     }
                 }
             }
@@ -111,33 +111,33 @@ struct CashflowBreakdownView: View {
         Button {
             open(category)
         } label: {
-            HStack(spacing: 12) {
-                CategoryIconView(icon: category.icon, color: Color(hex: category.color), diameter: 28)
+            HStack(spacing: AppTheme.Spacing.m) {
+                CategoryIconView(icon: category.icon, color: Color(hex: category.color), diameter: AppTheme.Size.icon)
                 Text(category.name)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.primary)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                     .lineLimit(1)
-                Spacer(minLength: 4)
+                Spacer(minLength: AppTheme.Spacing.xs)
                 VStack(alignment: .trailing, spacing: 0) {
                     PrivateText(amountLabel(category.amountE4))
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Color.primary)
+                        .font(AppTheme.Typography.labelEmphasis)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
                     // The *share* is not hidden. It says how the money is
                     // split, not how much there is, and blanking it would
                     // leave the bar above it explaining a breakdown whose
                     // rows had all become bullets.
                     Text(shareLabel(category.amountE4))
-                        .font(.caption2)
+                        .font(AppTheme.Typography.nano)
                         .monospacedDigit()
-                        .foregroundStyle(Color.secondary)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.microEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
             // The whole row is the target, at HIG's 44pt minimum — this one
             // navigates to another tab, so a miss is expensive.
-            .padding(.vertical, 8)
+            .padding(.vertical, AppTheme.Spacing.s)
             .frame(minHeight: WidgetStyle.minimumTarget)
             .contentShape(Rectangle())
         }

@@ -18,17 +18,17 @@ struct InvestmentBadge: View {
 
     var body: some View {
         Text(compact ? "Inv." : "Investment")
-            .font(.caption2)
-            .foregroundStyle(Color.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.secondary.opacity(0.12), in: Capsule())
+            .font(AppTheme.Typography.nano)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
+            .padding(.horizontal, AppTheme.Spacing.xs)
+            .padding(.vertical, AppTheme.Spacing.xxs)
+            .background(AppTheme.Palette.fillSubtle, in: Capsule())
             .accessibilityLabel("Investment account")
     }
 }
 
 #Preview {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
         Text("Brokerage")
         InvestmentBadge()
     }

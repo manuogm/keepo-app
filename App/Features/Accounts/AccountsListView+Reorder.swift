@@ -77,7 +77,7 @@ extension AccountsListView {
         // Apply to the UI first, in one animation, so the row settles where
         // the finger left it rather than snapping back and then jumping once
         // the writes land.
-        withAnimation(.snappy(duration: 0.25)) {
+        withAnimation(AppTheme.Motion.standard) {
             everyday = regrouped
             investments = investmentGroup
         }

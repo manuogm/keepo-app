@@ -15,19 +15,25 @@ import SwiftUI
 /// static on `WidgetChrome` itself, which is generic — `WidgetChrome<EmptyView>
 /// .cornerRadius` at a call site that doesn't otherwise care about the
 /// content type is noise.
+///
+/// Every value here now *names* an `AppTheme` token rather than restating a
+/// number. The dashboard was where the 4pt grid was first written down, so
+/// nothing about it changes except that the rest of the app is now on the
+/// same grid — the one visible difference is the card corner, 22 before and
+/// `Radius.surface` (20) now, which is the value `keepo-brand-identity.md`
+/// §4 asked for all along.
 enum WidgetStyle {
-    static let cornerRadius: CGFloat = 22
-    /// Every gap on this dashboard is a multiple of four points, and these
-    /// constants are where that starts. The card's inset is 16 — the same
-    /// step the grid's own 12pt gutter is drawn from — so the distance from
-    /// a title to the card's edge is a number that appears elsewhere in the
-    /// layout rather than a value that happened to look right.
-    static let padding: CGFloat = 16
+    static let cornerRadius = AppTheme.Radius.surface
+    /// The card's inset — the same step the grid's own gutter is drawn from,
+    /// so the distance from a title to the card's edge is a number that
+    /// appears elsewhere in the layout rather than a value that happened to
+    /// look right.
+    static let padding = AppTheme.Spacing.l
     /// The smallest a control on this dashboard may be, per Apple's HIG.
     /// Applied as a *hit* area rather than as visible furniture — a 44pt
     /// capsule around every W/M/Y segment would swamp a widget header — so
     /// the control keeps its drawn size and grows its `contentShape`.
-    static let minimumTarget: CGFloat = 44
+    static let minimumTarget = AppTheme.Size.touchTarget
     /// The headline figure's size — **one number per state, for every
     /// widget**.
     ///
@@ -42,8 +48,8 @@ enum WidgetStyle {
     /// widget opens and the figure becomes its caption — that is a change of
     /// role, which every widget makes at the same moment, not a per-widget
     /// size.
-    static let metric: CGFloat = 32
-    static let metricExpanded: CGFloat = 28
+    static let metric = AppTheme.Typography.Number.metric
+    static let metricExpanded = AppTheme.Typography.Number.metricCompact
 }
 
 extension View {
@@ -92,7 +98,7 @@ struct WidgetChrome<Content: View>: View {
     @State private var titleHeight: CGFloat = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             header
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -100,7 +106,7 @@ struct WidgetChrome<Content: View>: View {
         .padding(WidgetStyle.padding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
-            Color(.secondarySystemGroupedBackground),
+            AppTheme.Palette.bgSurface,
             in: RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
         )
         // Nothing may draw outside the card. The tile's frame is a fixed size
@@ -155,18 +161,18 @@ struct WidgetChrome<Content: View>: View {
     /// decoration on a surface that has none to spare; dropping it is what
     /// buys the ⓘ its place without the header getting busier.
     private var header: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: AppTheme.Spacing.xs) {
             Text(title)
-                .font(.caption)
+                .font(AppTheme.Typography.micro)
                 .fontWeight(.semibold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { titleHeight = $0 }
             if guide != nil { infoButton }
-            Spacer(minLength: 4)
+            Spacer(minLength: AppTheme.Spacing.xs)
             accessory?()
         }
-        .foregroundStyle(Color.secondary)
+        .foregroundStyle(AppTheme.Palette.textSecondary)
         // `nil` for the first frame, before the title has been measured —
         // the row is briefly its natural height rather than collapsed to
         // nothing.
@@ -178,8 +184,8 @@ struct WidgetChrome<Content: View>: View {
             isShowingGuide = true
         } label: {
             Image(systemName: "info.circle")
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.micro)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .hitTarget()
         }
         .buttonStyle(.plain)
@@ -198,18 +204,18 @@ struct WidgetEmptyState: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AppTheme.Spacing.s) {
             Image(systemName: systemImage)
-                .font(.title2)
-                .foregroundStyle(Color.secondary.opacity(0.7))
+                .font(AppTheme.Typography.sectionTitle)
+                .foregroundStyle(AppTheme.Palette.fillStrong)
             Text(message)
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppTheme.Typography.labelEmphasis)
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accentColor)
                     // HIG minimum target: the label alone is ~20pt tall.
@@ -218,7 +224,7 @@ struct WidgetEmptyState: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.bottom, 4)
+        .padding(.bottom, AppTheme.Spacing.xs)
     }
 }
 
@@ -251,7 +257,7 @@ struct WidgetTrendBadge: View {
         // badge is a single line on an expanded 4×2 and two lines on a
         // collapsed 2×1 without either being a special case.
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 4) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 figure
                 captionText
             }
@@ -260,7 +266,7 @@ struct WidgetTrendBadge: View {
                 captionText
             }
         }
-        .font(.caption.weight(.semibold))
+        .font(AppTheme.Typography.microEmphasis)
         .foregroundStyle(DashboardTrend.color(for: percentChange))
         .monospacedDigit()
         // The pill is tinted by the trend rather than a flat grey, so the
@@ -268,16 +274,16 @@ struct WidgetTrendBadge: View {
         // caption having to be read. Kept faint — it is a backing for the
         // number, not a second coloured object competing with the figure
         // above it.
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(DashboardTrend.color(for: percentChange).opacity(0.14), in: Capsule())
+        .padding(.horizontal, AppTheme.Spacing.s)
+        .padding(.vertical, AppTheme.Spacing.xs)
+        .background(DashboardTrend.color(for: percentChange).opacity(AppTheme.Opacity.fill), in: Capsule())
     }
 
     private var figure: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: AppTheme.Spacing.xs) {
             if let percentChange {
                 Image(systemName: percentChange >= 0 ? "arrow.up.right" : "arrow.down.right")
-                    .font(.caption2.weight(.bold))
+                    .font(AppTheme.Typography.nanoEmphasis)
                 Text(String(format: unit == "%" ? "%.1f%%" : "%.1f \(unit)", abs(percentChange)))
             } else {
                 // Money rule 5 — an uncomputable change is "—", never 0.0%.
@@ -291,7 +297,7 @@ struct WidgetTrendBadge: View {
     private var captionText: some View {
         if let caption {
             Text(caption)
-                .foregroundStyle(Color.secondary)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .lineLimit(1)
                 .fixedSize()
         }
@@ -322,9 +328,9 @@ struct MetricLegibilityScrim: ViewModifier {
         content.background {
             LinearGradient(
                 stops: [
-                    .init(color: Color(.secondarySystemGroupedBackground), location: 0),
-                    .init(color: Color(.secondarySystemGroupedBackground).opacity(0.94), location: 0.5),
-                    .init(color: Color(.secondarySystemGroupedBackground).opacity(0), location: 1)
+                    .init(color: AppTheme.Palette.bgSurface, location: 0),
+                    .init(color: AppTheme.Palette.bgSurface.opacity(0.94), location: 0.5),
+                    .init(color: AppTheme.Palette.bgSurface.opacity(0), location: 1)
                 ],
                 startPoint: .top, endPoint: .bottom
             )
@@ -357,8 +363,8 @@ extension View {
 /// "we could not compute this" must never look like good news.
 enum DashboardTrend {
     static func color(for percentChange: Double?) -> Color {
-        guard let percentChange else { return .secondary }
-        return percentChange >= 0 ? .green : .red
+        guard let percentChange else { return AppTheme.Palette.textSecondary }
+        return percentChange >= 0 ? AppTheme.Palette.statusPositive : AppTheme.Palette.statusNegative
     }
 
     /// Period-over-period change as a percentage, or `nil` when it cannot be

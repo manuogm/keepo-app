@@ -12,7 +12,7 @@ struct PreferencesView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
             List {
                 Section {
                     Picker("Base Currency", selection: $selectedCurrency) {
@@ -28,7 +28,7 @@ struct PreferencesView: View {
                         ProgressView()
                     }
                     if let errorMessage {
-                        Text(errorMessage).font(.footnote).foregroundStyle(.red)
+                        FormErrorText(message: errorMessage)
                     }
                 } footer: {
                     Text("Every balance and chart converts into your chosen base currency.")

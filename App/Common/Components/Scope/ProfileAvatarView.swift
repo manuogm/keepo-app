@@ -6,7 +6,7 @@ import SwiftUI
 /// apart the day a real uploaded photo replaces the initial.
 struct ProfileAvatarView: View {
     let email: String?
-    var size: CGFloat = 40
+    var size = AppTheme.Size.icon
     /// Drawn on a saturated gradient card (`onColor: true`) or on the app's
     /// own neutral surface. Only the two fill/foreground colours differ, so
     /// this is a flag rather than two views.
@@ -14,15 +14,19 @@ struct ProfileAvatarView: View {
 
     var body: some View {
         ZStack {
-            Circle().fill(onColor ? Color.white.opacity(0.25) : Color.primary.opacity(0.12))
+            Circle().fill(
+                onColor
+                    ? AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong)
+                    : AppTheme.Palette.textPrimary.opacity(AppTheme.Opacity.fill)
+            )
             Text(initial)
                 .font(.system(size: size * 0.42, weight: .bold))
-                .foregroundStyle(onColor ? Color.white : Color.primary)
+                .foregroundStyle(onColor ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textPrimary)
         }
         .frame(width: size, height: size)
         .overlay {
             if onColor {
-                Circle().strokeBorder(Color.white.opacity(0.45), lineWidth: 1)
+                Circle().strokeBorder(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.muted), lineWidth: 1)
             }
         }
     }

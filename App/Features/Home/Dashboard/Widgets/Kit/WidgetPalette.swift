@@ -17,7 +17,7 @@ enum WidgetPalette {
     /// A real colour set with both appearances, not a literal: `#262626` is
     /// near-black, which is right on the light card and invisible on the
     /// dark one.
-    static let neutral = Color("Neutral chart color")
+    static let neutral = AppTheme.Palette.chartNeutral
 
     /// How far back an un-highlighted mark sits.
     ///
@@ -27,7 +27,7 @@ enum WidgetPalette {
     /// opacity, because the contrast between dim and bright is the signal —
     /// two widgets disagreeing about it would read as one of them being
     /// broken.
-    static let dimmedOpacity: Double = 0.32
+    static let dimmedOpacity: Double = AppTheme.Opacity.dim
 
     /// A series colour at the right emphasis for its state.
     static func mark(_ color: Color, isHighlighted: Bool) -> Color {
@@ -67,17 +67,16 @@ enum WidgetPalette {
 /// directions rather than verdicts. The widget spec asks for green income in
 /// several places; it loses to the CVD finding, deliberately and on the
 /// user's own call.
+///
+/// The light/dark pair used to be resolved here by hand, out of a
+/// `UITraitCollection` closure. It is a colour set now — same two values,
+/// but the appearance switch is the asset catalogue's job, and the pair
+/// picked up a high-contrast variant it could never have had as a literal.
 enum CashflowPalette {
-    static var income: Color { adaptive(light: "#2A78D6", dark: "#3987E5") }
-    static var expense: Color { adaptive(light: "#FF5A5F", dark: "#F04A50") }
+    static let income = AppTheme.Palette.cashflowIncome
+    static let expense = AppTheme.Palette.cashflowExpense
     /// Transfers that cross the current scope's boundary — real movement,
     /// but neither earning nor spending, so it takes the neutral colour
     /// rather than a third hue competing with the two that mean something.
-    static var transfer: Color { WidgetPalette.neutral }
-
-    private static func adaptive(light: String, dark: String) -> Color {
-        Color(uiColor: UIColor { traits in
-            UIColor(Color(hex: traits.userInterfaceStyle == .dark ? dark : light))
-        })
-    }
+    static let transfer = WidgetPalette.neutral
 }

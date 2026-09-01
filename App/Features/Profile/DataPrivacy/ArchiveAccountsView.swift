@@ -21,13 +21,13 @@ struct ArchiveAccountsView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
             } else if archived.isEmpty {
                 Text("No archived accounts")
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             } else {
                 List {
                     ForEach(archived) { row in
@@ -42,8 +42,8 @@ struct ArchiveAccountsView: View {
                 VStack {
                     Spacer()
                     Text(actionErrorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.statusNegative)
                         .padding()
                 }
             }
@@ -70,8 +70,8 @@ struct ArchiveAccountsView: View {
 
     private func archiveRow(_ row: LocalAccountRow) -> some View {
         HStack {
-            CategoryIconView(icon: row.icon, color: Color(hex: row.color), diameter: 32)
-            Text(row.name).foregroundStyle(Color.secondary)
+            CategoryIconView(icon: row.icon, color: Color(hex: row.color), diameter: AppTheme.Size.icon)
+            Text(row.name).foregroundStyle(AppTheme.Palette.textSecondary)
             Spacer()
             Button {
                 Task { await unarchive(row) }
@@ -83,7 +83,7 @@ struct ArchiveAccountsView: View {
                 deleteCandidate = row
             } label: {
                 Image(systemName: "trash")
-                    .foregroundStyle(Color.red)
+                    .foregroundStyle(AppTheme.Palette.statusNegative)
             }
             .buttonStyle(.borderless)
             .disabled(isDeleting)

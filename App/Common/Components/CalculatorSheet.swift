@@ -28,6 +28,10 @@ struct CalculatorSheet: View {
     /// the answer, which is what every calculator does and what fingers
     /// expect.
     @State private var isShowingResult = false
+    /// A keystroke is not a state change — two `7`s in a row leave `entry`
+    /// looking different but a `.sensoryFeedback` trigger has to *move*.
+    /// A counter is the trigger, so every press fires exactly once.
+    @State private var keyTick = 0
 
     private var separator: String { MoneyFormatter.decimalSeparator() }
 
@@ -60,13 +64,14 @@ struct CalculatorSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
+            VStack(spacing: AppTheme.Spacing.l) {
                 readout
                 Spacer(minLength: 0)
                 keypad
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            .sensoryFeedback(AppTheme.Feedback.typing, trigger: keyTick)
+            .padding(.horizontal, AppTheme.Spacing.l)
+            .padding(.bottom, AppTheme.Spacing.l)
             .navigationTitle("Calculator")
             .navigationBarTitleDisplayMode(.inline)
             // The same pair the transaction and account forms carry, in the
@@ -97,24 +102,23 @@ struct CalculatorSheet: View {
     }
 
     private var readout: some View {
-        VStack(alignment: .trailing, spacing: 4) {
+        VStack(alignment: .trailing, spacing: AppTheme.Spacing.xs) {
             Text(expression.isEmpty ? " " : expression)
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.head)
             Text(displayText)
-                .font(.system(size: 40, weight: .semibold))
-                .monospacedDigit()
+                .numberFont(AppTheme.Typography.Number.balance, weight: .semibold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.top, 8)
+        .padding(.top, AppTheme.Spacing.s)
     }
 
     private var keypad: some View {
-        Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+        Grid(horizontalSpacing: AppTheme.Spacing.s, verticalSpacing: AppTheme.Spacing.s) {
             GridRow {
                 key(.clear); key(.backspace); key(.negate); key(.operation(.divide))
             }
@@ -144,11 +148,14 @@ struct CalculatorSheet: View {
             press(key)
         } label: {
             key.label
-                .font(.system(size: 22, weight: .medium))
+                .font(AppTheme.Typography.sectionTitle)
                 .foregroundStyle(key.tint)
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(key.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .frame(height: AppTheme.Size.avatar)
+                .background(
+                    key.background,
+                    in: RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous)
+                )
         }
         .buttonStyle(.pressableCard)
         .accessibilityLabel(key.accessibilityLabel)
@@ -157,6 +164,7 @@ struct CalculatorSheet: View {
     // MARK: - Key handling
 
     private func press(_ pressed: CalculatorKey) {
+        keyTick += 1
         switch pressed {
         case .digit(let digit): appendDigit(digit)
         case .decimal: appendDecimal()
@@ -266,16 +274,16 @@ private enum CalculatorKey: Hashable {
     /// to money, not to a keypad.
     var background: Color {
         switch self {
-        case .digit, .decimal: return Color(.tertiarySystemGroupedBackground)
-        case .equals: return Color(.systemFill)
-        default: return Color(.quaternarySystemFill)
+        case .digit, .decimal: return AppTheme.Palette.bgSurfaceRaised
+        case .equals: return AppTheme.Palette.fillStrong
+        default: return AppTheme.Palette.fillSubtle
         }
     }
 
     var tint: Color {
         switch self {
-        case .digit, .decimal, .equals: return Color.primary
-        default: return Color.secondary
+        case .digit, .decimal, .equals: return AppTheme.Palette.textPrimary
+        default: return AppTheme.Palette.textSecondary
         }
     }
 

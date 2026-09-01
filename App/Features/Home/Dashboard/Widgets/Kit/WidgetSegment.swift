@@ -25,12 +25,12 @@ struct WidgetSegment<Label: View>: View {
                 .fontWeight(isSelected ? .bold : .regular)
                 .foregroundStyle(foreground)
                 .frame(minWidth: 24)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, AppTheme.Spacing.s)
                 // Tight, like the tab bar this is meant to read as. It used
                 // to be 6pt of padding inside a 44pt frame, and the frame —
                 // not the padding — is what made every expanded widget's
                 // header 44pt tall and pushed its title and headline down.
-                .padding(.vertical, 4)
+                .padding(.vertical, AppTheme.Spacing.xs)
                 .background(background, in: Capsule())
                 // The 44pt target comes back as an *overlay*, so the finger
                 // gets HIG's area without the layout getting its height.
@@ -43,8 +43,8 @@ struct WidgetSegment<Label: View>: View {
     }
 
     private var foreground: Color {
-        guard let tint else { return isSelected ? Color.primary : Color.secondary }
-        return isSelected ? tint : Color.secondary
+        guard let tint else { return isSelected ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary }
+        return isSelected ? tint : AppTheme.Palette.textSecondary
     }
 
     /// The selected segment's capsule.
@@ -61,7 +61,7 @@ struct WidgetSegment<Label: View>: View {
     /// track behind it, so a card-coloured capsule there would be invisible.
     private var background: Color {
         guard isSelected else { return .clear }
-        guard let tint else { return Color(.secondarySystemGroupedBackground) }
-        return tint.opacity(0.16)
+        guard let tint else { return AppTheme.Palette.bgSurface }
+        return tint.opacity(AppTheme.Opacity.fill)
     }
 }

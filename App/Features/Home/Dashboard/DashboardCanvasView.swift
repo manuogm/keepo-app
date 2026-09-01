@@ -126,7 +126,7 @@ struct DashboardCanvasView: View {
                 }
             }
             .onDrop(of: [.plainText], delegate: widgetDrop(geometry))
-            .animation(.snappy(duration: 0.3), value: isPickingWidget)
+            .animation(AppTheme.Motion.standard, value: isPickingWidget)
             .modifier(DashboardHaptics(
                 isEditing: isEditing, carriedId: incoming?.id, draggedId: drag?.id,
                 targetCell: previewCell, isOverTrash: isOverTrash, arrangement: store.arrangement
@@ -167,9 +167,9 @@ struct DashboardCanvasView: View {
                 .padding(.top, carriedReserve(geometry))
         }
         .padding(.horizontal, horizontalInset)
-        .padding(.top, 28) // clears the header's fade
+        .padding(.top, AppTheme.Spacing.xxl) // clears the header's fade
         .padding(.bottom, 24 + KeepoTabBarMetrics.clearance)
-        .animation(.snappy(duration: 0.32), value: layout)
+        .animation(AppTheme.Motion.layout, value: layout)
         // Tapping the surface around the widgets leaves edit mode — the same
         // "tap the wallpaper to finish" the home screen offers, so Done in
         // the toolbar isn't the only way out — and closes an expanded
@@ -224,7 +224,7 @@ struct DashboardCanvasView: View {
             // (see `previewIncoming`), so it dims in place instead.
             DashboardLandingSlot()
                 .opacity(isOverTrash ? 0.3 : 1)
-                .animation(.easeInOut(duration: 0.18), value: isOverTrash)
+                .animation(AppTheme.Motion.colorSafe, value: isOverTrash)
         } else {
             placedTile(resolved, geometry: geometry)
         }
@@ -259,7 +259,7 @@ struct DashboardCanvasView: View {
         // owns the tiles themselves. At full size those gutters are 12pt and
         // genuinely hard to hit.
         .scaleEffect(editModeScale(isDragging: isDragging))
-        .shadow(color: .black.opacity(isDragging ? 0.22 : 0), radius: 16, y: 8)
+        .elevation(.floating, isActive: isDragging)
         .offset(isDragging ? dragOffset(for: resolved, geometry: geometry) : .zero)
         .zIndex(isDragging ? 10 : 0)
         // The lifted tile opts out of the reflow animation the other tiles
@@ -311,7 +311,7 @@ struct DashboardCanvasView: View {
     private func setExpansion(_ tile: DashboardResolvedTile, step: Int?, geometry: DashboardGeometry) {
         guard !isEditing else { return }
         guard let step, step >= 0, step < tile.kind.expandedSizes.count else {
-            withAnimation(.snappy(duration: 0.32)) {
+            withAnimation(AppTheme.Motion.layout) {
                 expandedId = nil
                 expansionStep = 0
             }
@@ -325,11 +325,11 @@ struct DashboardCanvasView: View {
         // this animation runs; issued in the same turn, the scroll was
         // swallowed exactly where it was needed most — on a dashboard already
         // scrolled near its end.
-        withAnimation(.snappy(duration: 0.32)) {
+        withAnimation(AppTheme.Motion.layout) {
             expandedId = tile.id
             expansionStep = step
         } completion: {
-            withAnimation(.snappy(duration: 0.3)) {
+            withAnimation(AppTheme.Motion.layout) {
                 scrollToFit(row: tile.row, size: size, geometry: geometry)
             }
         }
@@ -341,7 +341,7 @@ struct DashboardCanvasView: View {
     /// the empty canvas under it.
     private func collapseExpanded() {
         guard expandedId != nil else { return }
-        withAnimation(.snappy(duration: 0.32)) {
+        withAnimation(AppTheme.Motion.layout) {
             expandedId = nil
             expansionStep = 0
         }
@@ -351,7 +351,7 @@ struct DashboardCanvasView: View {
 
     func beginEditing() {
         guard !isEditing else { return }
-        withAnimation(.snappy(duration: 0.28)) {
+        withAnimation(AppTheme.Motion.standard) {
             isEditing = true
             // Everything compacts on the way in, so the arrangement you drag
             // is the arrangement you keep.
@@ -363,11 +363,11 @@ struct DashboardCanvasView: View {
 
     private func endEditing() {
         cancelEditModeTimeout()
-        withAnimation(.snappy(duration: 0.24)) { isEditing = false }
+        withAnimation(AppTheme.Motion.standard) { isEditing = false }
     }
 
     private func remove(_ id: UUID) {
-        withAnimation(.snappy(duration: 0.3)) {
+        withAnimation(AppTheme.Motion.layout) {
             store.remove(id: id)
             if expandedId == id {
                 expandedId = nil
@@ -388,7 +388,7 @@ struct DashboardCanvasView: View {
     /// which is rarely where they want it, and this is the one moment they
     /// definitely want to move something.
     func add(_ kind: DashboardWidgetKind) {
-        withAnimation(.snappy(duration: 0.3)) {
+        withAnimation(AppTheme.Motion.layout) {
             store.append(kind: kind)
             isEditing = true
             expandedId = nil

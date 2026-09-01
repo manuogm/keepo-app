@@ -6,12 +6,12 @@ import SwiftUI
 struct RootLoadingView: View {
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            VStack(spacing: 12) {
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
+            VStack(spacing: AppTheme.Spacing.m) {
                 ProgressView()
                 Text("Keepo")
-                    .font(.title2).fontWeight(.bold)
-                    .foregroundStyle(Color.primary)
+                    .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
             }
         }
     }
@@ -20,10 +20,10 @@ struct RootLoadingView: View {
 struct RootPrivacyCurtainView: View {
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
             Text("Keepo")
-                .font(.title2).fontWeight(.bold)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
         }
     }
 }
@@ -33,14 +33,14 @@ struct RootErrorView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            VStack(spacing: 12) {
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
+            VStack(spacing: AppTheme.Spacing.m) {
                 Text("Couldn't connect")
-                    .font(.title2).fontWeight(.bold)
-                    .foregroundStyle(Color.primary)
+                    .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                 Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }

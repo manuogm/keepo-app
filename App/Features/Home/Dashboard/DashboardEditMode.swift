@@ -63,17 +63,17 @@ struct WidgetRemoveBadge: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "minus")
-                .font(.system(size: 12, weight: .black))
-                .foregroundStyle(.white)
+                .font(AppTheme.Typography.nanoEmphasis)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
                 // Red, because this is the one destructive control on the
                 // dashboard and it sits on a card the user is about to drag
                 // — it has to read as "remove", not as another handle.
-                .frame(width: 22, height: 22)
-                .background(Color.red, in: Circle())
-                .overlay(Circle().strokeBorder(Color(.systemBackground), lineWidth: 1.5))
+                .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.glyph)
+                .background(AppTheme.Palette.statusNegative, in: Circle())
+                .overlay(Circle().strokeBorder(AppTheme.Palette.bgSurface, lineWidth: 1.5))
                 // The badge straddles the tile's corner, so the tap target
                 // has to extend past the card's own bounds to feel right.
-                .padding(6)
+                .padding(AppTheme.Spacing.xs)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -94,11 +94,11 @@ struct WidgetRemoveBadge: View {
 struct DashboardLandingSlot: View {
     var body: some View {
         RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
-            .fill(Color.secondary.opacity(0.18))
+            .fill(AppTheme.Palette.fillStrong)
             .overlay(
                 RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
                     .strokeBorder(
-                        Color.secondary.opacity(0.45),
+                        AppTheme.Palette.fillStrong,
                         style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
                     )
             )
@@ -123,17 +123,17 @@ struct DashboardTrashSlot: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
-            .fill(Color.red.opacity(isTargeted ? 1 : 0.12))
+            .fill(AppTheme.Palette.statusNegative.opacity(isTargeted ? 1 : 0.12))
             .overlay(
                 RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
                     .strokeBorder(
-                        Color.red.opacity(isTargeted ? 0 : 0.5),
+                        AppTheme.Palette.statusNegative.opacity(isTargeted ? 0 : 0.5),
                         style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
                     )
             )
             .overlay(label)
             .scaleEffect(isTargeted ? 1.02 : 1)
-            .animation(.snappy(duration: 0.18), value: isTargeted)
+            .animation(AppTheme.Motion.quick, value: isTargeted)
             .accessibilityLabel(isTargeted ? "Release to discard widget" : "Discard widget")
     }
 
@@ -142,8 +142,8 @@ struct DashboardTrashSlot: View {
             isTargeted ? "Release to discard" : "Drag here to discard",
             systemImage: isTargeted ? "trash.fill" : "trash"
         )
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(isTargeted ? Color.white : Color.red)
+        .font(AppTheme.Typography.labelEmphasis)
+        .foregroundStyle(isTargeted ? AppTheme.Palette.textOnAccent : AppTheme.Palette.statusNegative)
         .contentTransition(.opacity)
     }
 }

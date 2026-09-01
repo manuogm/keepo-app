@@ -44,9 +44,9 @@ struct TimeframeFilterView: View {
             )
             .accessibilityLabel("Custom period")
         }
-        .font(.caption)
+        .font(AppTheme.Typography.micro)
         .widgetHeaderTrack()
-        .sensoryFeedback(.selection, trigger: timeframe)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: timeframe)
         .sheet(isPresented: $isPickingPeriod) {
             TimeframePeriodSheet(timeframe: $timeframe, precision: precision)
                 .presentationDetents([.medium])
@@ -77,10 +77,10 @@ struct TimeframeFilterView: View {
 private struct WidgetHeaderTrack: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .padding(.horizontal, 4)
-            .padding(.vertical, 4)
-            .background(Color.secondary.opacity(0.08), in: Capsule())
-            .overlay(Capsule().stroke(Color.secondary.opacity(0.22), lineWidth: 1))
+            .padding(.horizontal, AppTheme.Spacing.xs)
+            .padding(.vertical, AppTheme.Spacing.xs)
+            .background(AppTheme.Palette.fillSubtle, in: Capsule())
+            .overlay(Capsule().stroke(AppTheme.Palette.fillStrong, lineWidth: 1))
     }
 }
 
@@ -104,11 +104,11 @@ struct WidgetHeaderPill: View {
 
     var body: some View {
         Text(label)
-            .font(.caption)
-            .foregroundStyle(Color.secondary)
+            .font(AppTheme.Typography.micro)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
             .lineLimit(1)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, AppTheme.Spacing.s)
+            .padding(.vertical, AppTheme.Spacing.xs)
             .widgetHeaderTrack()
     }
 }
@@ -219,7 +219,7 @@ private struct MonthYearPicker: View {
     var body: some View {
         HStack {
             Text(title)
-            Spacer(minLength: 8)
+            Spacer(minLength: AppTheme.Spacing.s)
             Picker("Month", selection: monthBinding) {
                 ForEach(1 ... 12, id: \.self) { month in
                     Text(monthName(month)).tag(month)

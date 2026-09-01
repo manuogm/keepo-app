@@ -56,7 +56,7 @@ struct ConflictDetailSheet: View {
                     ProgressView()
                 } else if let detail {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
                             subjectHeader
                             explanation
                             if !fields.isEmpty {
@@ -67,28 +67,28 @@ struct ConflictDetailSheet: View {
                                         + "Check your connection and reopen this.",
                                     systemImage: "wifi.slash"
                                 )
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .font(AppTheme.Typography.caption)
+                                .foregroundStyle(AppTheme.Palette.textSecondary)
                             } else {
                                 Text(
                                     "Nothing about this \(subjectName) looks different anymore "
                                         + "— it may be safe to keep either version."
                                 )
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .font(AppTheme.Typography.caption)
+                                .foregroundStyle(AppTheme.Palette.textSecondary)
                             }
                             if let errorMessage {
-                                Text(errorMessage).font(.footnote).foregroundStyle(.red)
+                                FormErrorText(message: errorMessage)
                             }
                         }
                         .padding()
                     }
                 } else {
-                    VStack(spacing: 8) {
+                    VStack(spacing: AppTheme.Spacing.s) {
                         Image(systemName: "checkmark.circle")
-                            .font(.largeTitle)
-                            .foregroundStyle(Color.secondary)
-                        Text("This conflict no longer applies.").foregroundStyle(Color.secondary)
+                            .font(AppTheme.Typography.screenTitle)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
+                        Text("This conflict no longer applies.").foregroundStyle(AppTheme.Palette.textSecondary)
                     }
                 }
             }
@@ -118,94 +118,94 @@ struct ConflictDetailSheet: View {
     @ViewBuilder
     private var subjectHeader: some View {
         if let myTransaction {
-            HStack(spacing: 12) {
+            HStack(spacing: AppTheme.Spacing.m) {
                 // `TransactionsWithDetailsSelect` carries `categoryName`
                 // but not the category's own icon/color — a neutral badge,
                 // same fallback `CategoryIconView` already uses for a
                 // transfer or an uncached category.
                 CategoryIconView(category: nil)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                     Text(myTransaction.merchantRaw ?? myTransaction.categoryName ?? "—")
-                        .font(.headline)
+                        .font(AppTheme.Typography.rowTitle)
                     Text("\(formattedDate(myTransaction.occurredAt)) · \(myTransaction.accountName ?? "—")")
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.micro)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
                 Spacer()
                 Text(formattedAmount(myTransaction))
-                    .font(.subheadline)
+                    .font(AppTheme.Typography.label)
                     .fontWeight(.semibold)
                     .monospacedDigit()
             }
             .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(AppTheme.Palette.bgSurface)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.control))
         } else if let myAccount {
-            HStack(spacing: 12) {
+            HStack(spacing: AppTheme.Spacing.m) {
                 CategoryIconView(icon: myAccount.icon, color: Color(hex: myAccount.color))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(myAccount.name).font(.headline)
-                    Text("Account").font(.caption).foregroundStyle(Color.secondary)
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
+                    Text(myAccount.name).font(AppTheme.Typography.rowTitle)
+                    Text("Account").font(AppTheme.Typography.micro).foregroundStyle(AppTheme.Palette.textSecondary)
                 }
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(AppTheme.Palette.bgSurface)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.control))
         }
     }
 
     private var explanation: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
             Label("Changed in two places", systemImage: "arrow.triangle.branch")
-                .font(.headline)
+                .font(AppTheme.Typography.rowTitle)
             Text(
                 "You changed this \(subjectName) on this device, but it was also changed elsewhere "
                     + "(another device, or directly on the server) before the two could sync up. "
                     + "Pick which version should win — the other will be discarded."
             )
-            .font(.subheadline)
-            .foregroundStyle(Color.secondary)
+            .font(AppTheme.Typography.label)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
         }
     }
 
     private var comparisonCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
             ForEach(fields) { field in
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                     Text(field.label)
-                        .font(.subheadline)
+                        .font(AppTheme.Typography.label)
                         .fontWeight(.semibold)
-                    HStack(spacing: 8) {
+                    HStack(spacing: AppTheme.Spacing.s) {
                         fieldValue(icon: "iphone", caption: "This device", value: field.mine)
                         Image(systemName: "arrow.left.arrow.right")
-                            .font(.caption)
-                            .foregroundStyle(Color.secondary)
+                            .font(AppTheme.Typography.micro)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
                         fieldValue(icon: "icloud", caption: "Currently saved", value: field.server)
                     }
                 }
             }
         }
         .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(AppTheme.Palette.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.control))
     }
 
     private func fieldValue(icon: String, caption: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
             Label(caption, systemImage: icon)
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.micro)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
             Text(value)
-                .font(.body)
+                .font(AppTheme.Typography.body)
                 .fontWeight(.semibold)
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var actionButtons: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: AppTheme.Spacing.m) {
             Button {
                 Task { await keepServer() }
             } label: {

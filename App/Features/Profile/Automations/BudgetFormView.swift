@@ -46,12 +46,12 @@ struct BudgetFormView: View {
                     if isEditing {
                         Section("Category") {
                             Text(selectedCategoryName)
-                                .foregroundStyle(Color.secondary)
+                                .foregroundStyle(AppTheme.Palette.textSecondary)
                         }
                     } else {
                         Section {
                             Toggle("Overall (not tied to a category)", isOn: $isOverall)
-                    .tint(.green)
+                    .tint(AppTheme.Palette.statusPositive)
                         }
                         if !isOverall {
                             Section("Category") {
@@ -71,13 +71,11 @@ struct BudgetFormView: View {
                     }
 
                     Section("Currency") {
-                        Text(currency).foregroundStyle(Color.secondary)
+                        Text(currency).foregroundStyle(AppTheme.Palette.textSecondary)
                     }
 
                     if let errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
+                        FormErrorText(message: errorMessage)
                     }
                 }
             }

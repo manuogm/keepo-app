@@ -129,13 +129,11 @@ struct RecurringRuleFormView: View {
 
                     if isEditing {
                         Toggle("Active", isOn: $active)
-                    .tint(.green)
+                    .tint(AppTheme.Palette.statusPositive)
                     }
 
                     if let errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
+                        FormErrorText(message: errorMessage)
                     }
                 }
             }

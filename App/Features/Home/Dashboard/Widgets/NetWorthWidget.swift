@@ -72,7 +72,7 @@ struct NetWorthWidget: View {
                 color: DashboardTrend.color(for: metrics.percentChange),
                 height: 64
             )
-            .opacity(0.5)
+            .opacity(AppTheme.Opacity.muted)
             .padding(.horizontal, -WidgetStyle.padding)
         }
         // The trajectory is drawn the full width of the tile, headline
@@ -85,7 +85,7 @@ struct NetWorthWidget: View {
     // MARK: - Expanded
 
     private var expanded: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             MetricHeadlineBlock(
                 value: .money(series.highlightedPoint?.amountE4, currency), size: WidgetStyle.metricExpanded,
                 percentChange: series.percentChange, caption: badgeCaption

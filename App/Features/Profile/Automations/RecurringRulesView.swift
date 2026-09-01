@@ -19,13 +19,13 @@ struct RecurringRulesView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
             } else if rules.isEmpty {
                 Text("No recurring transactions yet")
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             } else {
                 List {
                     ForEach(rules, id: \.id) { rule in
@@ -45,8 +45,8 @@ struct RecurringRulesView: View {
                 VStack {
                     Spacer()
                     Text(actionErrorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.statusNegative)
                         .padding()
                 }
             }
@@ -141,21 +141,21 @@ private struct RecurringRuleRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                 Text(category?.name ?? "—")
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                 Text("\(account?.name ?? "—") · \(frequencyLabel) · next \(nextDueLabel)")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.micro)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
             Spacer()
             let currencyInfo = CurrencyInfo(code: rule.currency, minorUnit: account?.currencyInfo.minorUnit ?? 2)
             Text(MoneyFormatter.format(rule.amountE4, currency: currencyInfo))
                 .monospacedDigit()
-                .foregroundStyle(rule.active ? Color.primary : Color.secondary)
+                .foregroundStyle(rule.active ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
             if !rule.active {
                 Image(systemName: "pause.circle")
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
         }
     }

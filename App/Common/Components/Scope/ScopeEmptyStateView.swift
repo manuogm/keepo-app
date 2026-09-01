@@ -18,34 +18,34 @@ struct ScopeEmptyStateView: View {
     @State private var isAddingAccount = false
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: AppTheme.Spacing.m) {
             Image(systemName: icon)
-                .font(.system(size: 34, weight: .light))
+                .font(AppTheme.Typography.screenTitle.weight(.light))
                 .foregroundStyle(tint)
-                .frame(width: 80, height: 80)
-                .background(tint.opacity(0.12), in: Circle())
+                .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
+                .background(tint.opacity(AppTheme.Opacity.fill), in: Circle())
 
-            VStack(spacing: 6) {
+            VStack(spacing: AppTheme.Spacing.xs) {
                 Text(title)
-                    .font(.headline)
+                    .font(AppTheme.Typography.rowTitle)
                 Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .multilineTextAlignment(.center)
             }
 
             if let action {
                 Button(action.title) { perform(action.kind) }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 11)
+                    .font(AppTheme.Typography.labelEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
+                    .padding(.horizontal, AppTheme.Spacing.l)
+                    .padding(.vertical, AppTheme.Spacing.m)
                     .background(tint, in: Capsule())
                     .buttonStyle(.plain)
-                    .padding(.top, 2)
+                    .padding(.top, AppTheme.Spacing.xxs)
             }
         }
-        .padding(.horizontal, 40)
+        .padding(.horizontal, AppTheme.Spacing.xxl)
         // Centred in what the user can actually see, not in a region that
         // now runs under the floating tab bar.
         .padding(.bottom, KeepoTabBarMetrics.clearance)
@@ -80,7 +80,7 @@ struct ScopeEmptyStateView: View {
     /// account case is scope-independent, so it takes the brand accent.
     private var tint: Color {
         switch emptiness {
-        case .noAccounts: return Color(hex: "#FF5A5F")
+        case .noAccounts: return AppTheme.Palette.brandPrimary
         case .noHousehold, .noSharedAccounts: return PublicSchema.AccountScope.household.tint
         case .noPrivateAccounts: return PublicSchema.AccountScope.me.tint
         }

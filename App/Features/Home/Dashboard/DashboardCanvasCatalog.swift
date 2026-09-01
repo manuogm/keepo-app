@@ -108,7 +108,7 @@ extension DashboardCanvasView {
             }
         }
         .frame(width: size.width, height: size.height)
-        .animation(.easeInOut(duration: 0.18), value: incoming == nil)
+        .animation(AppTheme.Motion.colorSafe, value: incoming == nil)
         // Measured in canvas space, like the grid, because that is the space
         // the drop delegate reports finger positions in.
         .onGeometryChange(for: CGRect.self) { proxy in
@@ -254,7 +254,7 @@ extension DashboardCanvasView {
     /// so cancelling is throwing the preview away rather than reversing a
     /// change the user watched happen.
     func discardArrival() {
-        withAnimation(.snappy(duration: 0.3)) {
+        withAnimation(AppTheme.Motion.layout) {
             clearDrag()
             // Cancelling the first widget onto an empty dashboard leaves
             // nothing to arrange, so edit mode ends with it — the same rule

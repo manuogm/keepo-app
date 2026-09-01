@@ -37,7 +37,7 @@ struct TransactionDetailCard: View {
     // MARK: - Expense / Income
 
     private var ledgerBody: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: AppTheme.Spacing.m) {
             TransactionDetailContainer(
                 accountId: $fromAccountId,
                 amountText: $amountText,
@@ -45,7 +45,7 @@ struct TransactionDetailCard: View {
                 excluding: nil
             )
 
-            HStack(spacing: 10) {
+            HStack(spacing: AppTheme.Spacing.s) {
                 CategoryPickerRow(selection: $categoryId, categories: categories)
                 AddTagPlaceholder()
                 Spacer(minLength: 0)
@@ -59,9 +59,9 @@ struct TransactionDetailCard: View {
     /// sitting between them: a glyph in the gap reads as a divider, while a
     /// line that starts at one block and ends at the other reads as flow.
     private var transferBody: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.s) {
             FlowRail()
-            VStack(spacing: 12) {
+            VStack(spacing: AppTheme.Spacing.m) {
                 TransactionDetailContainer(
                     accountId: $fromAccountId,
                     amountText: $amountText,
@@ -99,19 +99,19 @@ struct TransactionDetailContainer: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             AccountPickerRow(selection: $accountId, accounts: accounts, excluding: excluding)
 
             AmountField(
                 text: $amountText,
                 currency: selected?.currencyInfo,
                 isEnabled: isAmountEditable,
-                size: 40
+                size: AppTheme.Typography.Number.balance
             )
         }
-        .padding(16)
+        .padding(AppTheme.Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .background(AppTheme.Palette.bgSurfaceRaised, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
     }
 }
 
@@ -120,17 +120,17 @@ private struct FlowRail: View {
     var body: some View {
         VStack(spacing: 0) {
             Circle()
-                .fill(Color.secondary.opacity(0.35))
-                .frame(width: 7, height: 7)
+                .fill(AppTheme.Palette.fillStrong)
+                .frame(width: AppTheme.Size.dot, height: AppTheme.Size.dot)
             Rectangle()
-                .fill(Color.secondary.opacity(0.25))
+                .fill(AppTheme.Palette.fillStrong)
                 .frame(width: 1.5)
                 .frame(maxHeight: .infinity)
             Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 9))
-                .foregroundStyle(Color.secondary.opacity(0.45))
+                .font(AppTheme.Typography.nano)
+                .foregroundStyle(AppTheme.Palette.fillStrong)
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, AppTheme.Spacing.l)
         .accessibilityLabel("Money moves from the first account to the second")
     }
 }
@@ -141,18 +141,18 @@ private struct FlowRail: View {
 /// obviously-not-ready one.
 struct AddTagPlaceholder: View {
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: AppTheme.Spacing.xs) {
             Image(systemName: "plus")
-                .font(.caption.weight(.semibold))
+                .font(AppTheme.Typography.microEmphasis)
             Text("Add Tag")
-                .font(.subheadline)
+                .font(AppTheme.Typography.label)
         }
-        .foregroundStyle(Color.secondary.opacity(0.6))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .foregroundStyle(AppTheme.Palette.fillStrong)
+        .padding(.horizontal, AppTheme.Spacing.m)
+        .padding(.vertical, AppTheme.Spacing.m)
         .background {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.secondary.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            RoundedRectangle(cornerRadius: AppTheme.Radius.card)
+                .strokeBorder(AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
         }
         .accessibilityHidden(true)
     }

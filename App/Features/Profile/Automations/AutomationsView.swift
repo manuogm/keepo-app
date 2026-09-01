@@ -6,7 +6,7 @@ struct AutomationsView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
             List {
                 Section {
                     NavigationLink("Recurring Transactions") {

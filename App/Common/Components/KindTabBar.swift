@@ -24,8 +24,8 @@ struct KindTabBar<Kind: Hashable & CaseIterable & Identifiable>: View where Kind
                 tab(kind)
             }
         }
-        .animation(.snappy(duration: 0.22), value: selection)
-        .sensoryFeedback(.selection, trigger: selection)
+        .animation(AppTheme.Motion.quick, value: selection)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: selection)
     }
 
     private func tab(_ kind: Kind) -> some View {
@@ -33,18 +33,18 @@ struct KindTabBar<Kind: Hashable & CaseIterable & Identifiable>: View where Kind
         return Button {
             selection = kind
         } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: AppTheme.Spacing.s) {
                 Text(title(kind))
                     .font(.subheadline.weight(isSelected ? .semibold : .regular))
                     .foregroundStyle(foreground(isSelected: isSelected))
                     .frame(maxWidth: .infinity)
 
                 ZStack {
-                    Capsule().fill(Color.clear).frame(height: 2)
+                    Capsule().fill(Color.clear).frame(height: AppTheme.Spacing.xxs)
                     if isSelected {
                         Capsule()
-                            .fill(isEnabled ? Color.primary : Color.secondary)
-                            .frame(height: 2)
+                            .fill(isEnabled ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
+                            .frame(height: AppTheme.Spacing.xxs)
                             .matchedGeometryEffect(id: "underline", in: underline)
                     }
                 }
@@ -56,7 +56,7 @@ struct KindTabBar<Kind: Hashable & CaseIterable & Identifiable>: View where Kind
     }
 
     private func foreground(isSelected: Bool) -> Color {
-        guard isEnabled else { return isSelected ? Color.secondary : Color.secondary.opacity(0.4) }
-        return isSelected ? Color.primary : Color.secondary
+        guard isEnabled else { return isSelected ? AppTheme.Palette.textSecondary : AppTheme.Palette.fillStrong }
+        return isSelected ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary
     }
 }

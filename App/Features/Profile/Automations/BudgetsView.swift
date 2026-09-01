@@ -16,13 +16,13 @@ struct BudgetsView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
             } else if progress.isEmpty {
                 Text("No budgets set for this month")
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             } else {
                 List {
                     ForEach(progress, id: \.budgetId) { entry in
@@ -38,9 +38,7 @@ struct BudgetsView: View {
             if let errorMessage {
                 VStack {
                     Spacer()
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    FormErrorText(message: errorMessage)
                         .padding()
                 }
             }
@@ -102,17 +100,17 @@ private struct BudgetRow: View {
     let entry: BudgetProgressLocal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
             HStack {
                 Text(entry.categoryName ?? "Overall")
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                 Spacer()
                 Text(spentOfBudgetedText)
                     .monospacedDigit()
-                    .foregroundStyle(isOverBudget ? Color.primary : Color.secondary)
+                    .foregroundStyle(isOverBudget ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
             }
             ProgressView(value: fraction)
-                .tint(isOverBudget ? Color.primary : Color.secondary)
+                .tint(isOverBudget ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
         }
     }
 

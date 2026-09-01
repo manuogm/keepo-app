@@ -19,3 +19,19 @@ opt_in_rules:
 line_length:
   warning: 120
   error: 160
+
+identifier_name:
+  # The design-token scale is named `.xs`/`.s`/`.m`/`.l`/`.xl` on purpose —
+  # a t-shirt scale is only readable at a call site if it stays short, and
+  # `AppTheme.Spacing.medium` beside `AppTheme.Radius.card` reads worse than
+  # `.m` does. `y` is the vertical offset of a shadow, matching SwiftUI's own
+  # `.shadow(radius:x:y:)` label.
+  excluded:
+    # SwiftLint's own default, which naming anything here would otherwise drop.
+    - id
+    - xs
+    - s
+    - m
+    - l
+    - xl
+    - y

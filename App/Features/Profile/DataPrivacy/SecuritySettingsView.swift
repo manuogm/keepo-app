@@ -19,10 +19,10 @@ struct SecuritySettingsView: View {
             Section {
                 if session.authCapabilities.requiresBiometricStepUp {
                     Toggle("Enable Face ID", isOn: $isFaceIDEnabled)
-                    .tint(.green)
+                    .tint(AppTheme.Palette.statusPositive)
                 } else {
                     Text("Biometric step-up isn't available with this account type.")
-                        .foregroundStyle(Color.secondary)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
             } header: {
                 Text("Security")
@@ -35,7 +35,7 @@ struct SecuritySettingsView: View {
 
             Section {
                 Toggle("Enable Hiding Balance", isOn: $isHideBalanceEnabled)
-                    .tint(.green)
+                    .tint(AppTheme.Palette.statusPositive)
             } footer: {
                 Text(
                     "Adds a button to Home, Accounts, and Transactions to hide financial figures "
@@ -76,7 +76,7 @@ struct SecuritySettingsView: View {
             }
 
             if let errorMessage {
-                Text(errorMessage).font(.footnote).foregroundStyle(.red)
+                FormErrorText(message: errorMessage)
             }
         }
         .navigationTitle("Security")

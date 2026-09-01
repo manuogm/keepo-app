@@ -27,11 +27,11 @@ struct ExportView: View {
         Form {
             Section {
                 Toggle("All Accounts", isOn: $exportAllAccounts)
-                    .tint(.green)
+                    .tint(AppTheme.Palette.statusPositive)
                 if !exportAllAccounts {
                     ForEach(accounts) { account in
                         Toggle(account.name, isOn: selectionBinding(for: account.id))
-                    .tint(.green)
+                    .tint(AppTheme.Palette.statusPositive)
                     }
                 }
             } header: {
@@ -42,7 +42,7 @@ struct ExportView: View {
 
             Section {
                 Toggle("All Time", isOn: $exportAllTime)
-                    .tint(.green)
+                    .tint(AppTheme.Palette.statusPositive)
                 if !exportAllTime {
                     DatePicker("From", selection: $from, displayedComponents: .date)
                     DatePicker("Through", selection: $through, displayedComponents: .date)
@@ -65,7 +65,7 @@ struct ExportView: View {
             }
 
             if let errorMessage {
-                Text(errorMessage).foregroundStyle(.red)
+                FormErrorText(message: errorMessage)
             }
         }
         .navigationTitle("Export")

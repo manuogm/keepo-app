@@ -38,8 +38,8 @@ struct CSVImportView: View {
                 }
                 if !parsedRows.isEmpty {
                     Text("\(parsedRows.count) row(s) parsed")
-                        .font(.footnote)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
             } header: {
                 Text("Statement")
@@ -63,10 +63,10 @@ struct CSVImportView: View {
             }
 
             if let resultMessage {
-                Text(resultMessage).foregroundStyle(Color.primary)
+                Text(resultMessage).foregroundStyle(AppTheme.Palette.textPrimary)
             }
             if let errorMessage {
-                Text(errorMessage).foregroundStyle(.red)
+                FormErrorText(message: errorMessage)
             }
         }
         .navigationTitle("Import CSV")

@@ -172,8 +172,8 @@ struct SeriesChartOrMessage: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Text(series.isLoading ? "Working this out…" : "Not enough history in this period yet.")
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

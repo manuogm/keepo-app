@@ -23,7 +23,7 @@ struct IconCatalogView: View {
     /// migration for a convenience list.
     @AppStorage(AppSettingsKeys.customIconColors) private var customColorsRaw = ""
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.m), count: 6)
 
     private var customColors: [String] {
         customColorsRaw.split(separator: ",").map(String.init)
@@ -66,25 +66,25 @@ struct IconCatalogView: View {
                 // bottom of the icon grid and no longer being able to see
                 // what you have picked makes every tap a guess.
                 hero
-                    .padding(.bottom, 18)
+                    .padding(.bottom, AppTheme.Spacing.l)
                     .frame(maxWidth: .infinity)
-                    .background(Color(.systemGroupedBackground))
+                    .background(AppTheme.Palette.bgCanvas)
 
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 28) {
+                    LazyVStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
                         colorSection
                         iconSection
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 32)
+                    .padding(.horizontal, AppTheme.Spacing.l)
+                    .padding(.bottom, AppTheme.Spacing.xxl)
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            .background(AppTheme.Palette.bgCanvas)
             // Keyed off the selection itself, not a per-tile isSelected flag:
             // that flips on two tiles per tap (the old one and the new one)
             // and would fire the haptic twice.
-            .sensoryFeedback(.selection, trigger: icon)
-            .sensoryFeedback(.selection, trigger: color)
+            .sensoryFeedback(AppTheme.Feedback.selection, trigger: icon)
+            .sensoryFeedback(AppTheme.Feedback.selection, trigger: color)
             .navigationTitle("Icon Catalogue")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -99,21 +99,21 @@ struct IconCatalogView: View {
     // MARK: - Hero
 
     private var hero: some View {
-        CategoryIconView(icon: icon, color: color, diameter: 96)
+        CategoryIconView(icon: icon, color: color, diameter: AppTheme.Size.illustration)
             .frame(maxWidth: .infinity)
-            .padding(.top, 12)
+            .padding(.top, AppTheme.Spacing.m)
             // The preview is the whole point of this screen, so it should
             // visibly react rather than cutting between states.
-            .animation(.snappy(duration: 0.2), value: icon)
-            .animation(.snappy(duration: 0.2), value: color)
+            .animation(AppTheme.Motion.quick, value: icon)
+            .animation(AppTheme.Motion.quick, value: color)
     }
 
     // MARK: - Colour
 
     private var colorSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
             sectionTitle("Colour")
-            LazyVGrid(columns: columns, spacing: 12) {
+            LazyVGrid(columns: columns, spacing: AppTheme.Spacing.m) {
                 ForEach(swatches, id: \.self) { hex in
                     swatch(hex)
                 }
@@ -130,16 +130,16 @@ struct IconCatalogView: View {
         } label: {
             Circle()
                 .fill(swatchColor)
-                .frame(height: 40)
+                .frame(height: AppTheme.Size.touchTarget)
                 .overlay {
                     if isSelected {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
+                            .font(AppTheme.Typography.labelEmphasis)
+                            .foregroundStyle(AppTheme.Palette.textOnAccent)
                     }
                 }
                 .overlay {
-                    Circle().strokeBorder(Color.primary.opacity(isSelected ? 0.35 : 0), lineWidth: 2)
+                    Circle().strokeBorder(AppTheme.Palette.textPrimary.opacity(isSelected ? 0.35 : 0), lineWidth: 2)
                 }
         }
         .buttonStyle(.pressableCard)
@@ -154,18 +154,18 @@ struct IconCatalogView: View {
     private var addColorSwatch: some View {
         ZStack {
             Circle()
-                .strokeBorder(Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                .strokeBorder(AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                 .overlay {
                     Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.labelEmphasis)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
 
             ColorPicker("Custom colour", selection: $customDraft, supportsOpacity: false)
                 .labelsHidden()
                 .opacity(0.02)
         }
-        .frame(height: 40)
+        .frame(height: AppTheme.Size.touchTarget)
         .onChange(of: customDraft) { _, newValue in
             // Round-tripped through hex before being applied, so the swatch
             // row and the stored value are the same colour — `hexString` is
@@ -180,14 +180,14 @@ struct IconCatalogView: View {
     // MARK: - Icons
 
     private var iconSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
             sectionTitle("Icons")
             ForEach(families) { family in
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
                     Text(family.name)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Color.secondary)
-                    LazyVGrid(columns: columns, spacing: 12) {
+                        .font(AppTheme.Typography.labelEmphasis)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
+                    LazyVGrid(columns: columns, spacing: AppTheme.Spacing.m) {
                         ForEach(family.icons, id: \.self) { candidate in
                             iconTile(candidate)
                         }
@@ -203,17 +203,17 @@ struct IconCatalogView: View {
             icon = candidate
         } label: {
             Image(systemName: candidate)
-                .font(.system(size: 19))
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .frame(width: 44, height: 44)
-                .background(isSelected ? color : Color(.secondarySystemGroupedBackground), in: Circle())
+                .font(AppTheme.Typography.cardTitle)
+                .foregroundStyle(isSelected ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textPrimary)
+                .frame(width: AppTheme.Size.touchTarget, height: AppTheme.Size.touchTarget)
+                .background(isSelected ? color : AppTheme.Palette.bgSurface, in: Circle())
         }
         .buttonStyle(.pressableCard)
     }
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.headline)
+            .font(AppTheme.Typography.rowTitle)
     }
 
     /// Newest first, de-duplicated, capped — a palette the user has to

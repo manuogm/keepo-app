@@ -52,16 +52,16 @@ struct MappedCardSheet: View {
             // with the card's own colour.
             Rectangle()
                 .fill(.ultraThinMaterial)
-                .overlay(Color.black.opacity(0.12))
+                .overlay(Color.black.opacity(AppTheme.Opacity.fill))
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { dismiss() }
 
-            VStack(spacing: 14) {
+            VStack(spacing: AppTheme.Spacing.m) {
                 card
                 actions
             }
-            .padding(.horizontal, 28)
+            .padding(.horizontal, AppTheme.Spacing.xxl)
             // Pushed up a little from true centre: dead-centre puts the name
             // field right where the keyboard's top edge lands for a new card.
             .offset(y: -30)
@@ -96,7 +96,7 @@ struct MappedCardSheet: View {
             Spacer(minLength: 0)
 
             TextField("", text: $cardName, prompt: Text("Card Name").foregroundColor(face.secondaryForeground))
-                .font(.title2.weight(.semibold))
+                .font(AppTheme.Typography.sectionTitle)
                 .foregroundStyle(face.foreground)
                 .tint(face.foreground)
                 .textInputAutocapitalization(.words)
@@ -106,24 +106,25 @@ struct MappedCardSheet: View {
                 .onSubmit { Task { await save() } }
 
             provenanceLine
-                .padding(.top, 6)
+                .padding(.top, AppTheme.Spacing.xs)
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.white)
-                    .padding(.top, 6)
+                    .font(AppTheme.Typography.micro)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
+                    .padding(.top, AppTheme.Spacing.xs)
             }
         }
-        .padding(22)
+        .padding(AppTheme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .aspectRatio(1.586, contentMode: .fit)
-        .background(face.gradient, in: RoundedRectangle(cornerRadius: 22))
-        .overlay { face.sheen.clipShape(RoundedRectangle(cornerRadius: 22)) }
+        .background(face.gradient, in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
+        .overlay { face.sheen.clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.surface)) }
         .overlay {
-            RoundedRectangle(cornerRadius: 22).strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppTheme.Radius.surface)
+                .strokeBorder(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.3), radius: 28, y: 10)
+        .elevation(.lifted)
     }
 
     /// Non-editable, small, and in the card's own ink — a fact about the
@@ -133,17 +134,17 @@ struct MappedCardSheet: View {
     @ViewBuilder
     private var provenanceLine: some View {
         if let existing = editor.existing {
-            HStack(spacing: 5) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 if existing.source == .automatic {
                     AutomaticMarker(tint: face.secondaryForeground)
                 }
                 Text("\(existing.source == .automatic ? "Automatically" : "Manually") mapped on \(mappedOn(existing))")
             }
-            .font(.caption)
+            .font(AppTheme.Typography.micro)
             .foregroundStyle(face.secondaryForeground)
         } else {
             Text("Charges on this card will be routed to this account.")
-                .font(.caption)
+                .font(AppTheme.Typography.micro)
                 .foregroundStyle(face.secondaryForeground)
         }
     }
@@ -152,7 +153,7 @@ struct MappedCardSheet: View {
     /// directly under where the thumb rests after Save — one row puts
     /// deliberate horizontal distance between "keep this" and "lose it".
     private var actions: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: AppTheme.Spacing.m) {
             if !isNew {
                 DestructiveActionButton(title: "Delete", isEnabled: !isSaving) {
                     showDeleteConfirm = true
@@ -166,13 +167,13 @@ struct MappedCardSheet: View {
                     if isSaving {
                         ProgressView().controlSize(.small)
                     } else {
-                        Text("Save").font(.body.weight(.semibold))
+                        Text("Save").font(AppTheme.Typography.bodyEmphasis)
                     }
                 }
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+                .padding(.vertical, AppTheme.Spacing.m)
+                .background(AppTheme.Palette.bgSurface, in: Capsule())
                 .contentShape(Capsule())
             }
             .buttonStyle(.pressableCard)

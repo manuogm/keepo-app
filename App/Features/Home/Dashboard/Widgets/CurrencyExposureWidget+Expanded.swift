@@ -17,15 +17,15 @@ extension CurrencyExposureWidget {
     /// not belong in the same run as the currencies that can.
     func expanded(_ metrics: CurrencyExposureMetrics) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
                 ForEach(Array(metrics.positiveSlices.enumerated()), id: \.element.id) { rank, slice in
                     currencyTile(slice, metrics: metrics, rank: rank)
                 }
                 if !metrics.netShortSlices.isEmpty {
-                    Divider().padding(.vertical, 4)
+                    Divider().padding(.vertical, AppTheme.Spacing.xs)
                     Text("Net short")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.microEmphasis)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                     ForEach(metrics.netShortSlices) { slice in
                         // Rank means nothing for a currency outside the ramp;
                         // it draws no bar anyway.
@@ -41,7 +41,7 @@ extension CurrencyExposureWidget {
     func currencyTile(
         _ slice: CurrencyExposureLocal, metrics: CurrencyExposureMetrics, rank: Int
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             currencyHeader(slice, metrics: metrics, rank: rank)
             if openCurrencies.contains(slice.currency) {
                 accountList(slice)
@@ -60,7 +60,7 @@ extension CurrencyExposureWidget {
         _ slice: CurrencyExposureLocal, metrics: CurrencyExposureMetrics, rank: Int
     ) -> some View {
         Button {
-            withAnimation(.snappy(duration: 0.22)) {
+            withAnimation(AppTheme.Motion.quick) {
                 if openCurrencies.contains(slice.currency) {
                     openCurrencies.remove(slice.currency)
                 } else {
@@ -68,18 +68,18 @@ extension CurrencyExposureWidget {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
-                CurrencyBadge(code: slice.currency, diameter: 26)
+            HStack(spacing: AppTheme.Spacing.s) {
+                CurrencyBadge(code: slice.currency, diameter: AppTheme.Size.glyph)
                 bar(slice, metrics: metrics, rank: rank)
                 amounts(slice.nativeAmountE4, converted: slice.amountBaseE4, in: slice.currencyInfo)
                 Text(shareLabel(metrics.share(of: slice)))
-                    .font(.caption)
+                    .font(AppTheme.Typography.micro)
                     .monospacedDigit()
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .frame(minWidth: 36, alignment: .trailing)
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.microEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .rotationEffect(.degrees(openCurrencies.contains(slice.currency) ? 90 : 0))
             }
             // Opens the accounts inside this currency — HIG's 44pt minimum.
@@ -119,7 +119,7 @@ extension CurrencyExposureWidget {
         _ slice: CurrencyExposureLocal, metrics: CurrencyExposureMetrics, rank: Int
     ) -> some View {
         if slice.amountBaseE4 <= 0 {
-            Spacer(minLength: 4)
+            Spacer(minLength: AppTheme.Spacing.xs)
         } else if openCurrencies.contains(slice.currency) {
             WidgetFillBar(segments: accountSegments(slice), thickness: 8)
         } else {
@@ -148,11 +148,11 @@ extension CurrencyExposureWidget {
             ForEach(slice.accounts) { account in
                 accountRow(account, in: slice)
                 if account.id != slice.accounts.last?.id {
-                    Divider().padding(.leading, 32)
+                    Divider().padding(.leading, AppTheme.Size.dividerInset(icon: AppTheme.Size.glyph, leading: 0))
                 }
             }
         }
-        .padding(.leading, 4)
+        .padding(.leading, AppTheme.Spacing.xs)
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
@@ -167,18 +167,18 @@ extension CurrencyExposureWidget {
     /// offsets — the colour is what stops that dash reading as missing data
     /// rather than as a card.
     func accountRow(_ account: CurrencyAccountLocal, in slice: CurrencyExposureLocal) -> some View {
-        HStack(spacing: 12) {
-            CategoryIconView(icon: account.icon, color: Color(hex: account.color), diameter: 24)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: AppTheme.Spacing.m) {
+            CategoryIconView(icon: account.icon, color: Color(hex: account.color), diameter: AppTheme.Size.glyph)
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                 Text(account.name)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.primary)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                     .lineLimit(1)
                 if account.kind == .investment {
                     InvestmentBadge()
                 }
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: AppTheme.Spacing.xs)
             amounts(
                 account.nativeAmountE4, converted: account.amountBaseE4, in: account.currencyInfo,
                 // Always drawn, even when it is "—". A row that simply
@@ -188,7 +188,7 @@ extension CurrencyExposureWidget {
                 share: shareLabel(share(of: account, in: slice))
             )
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, AppTheme.Spacing.s)
     }
 
     /// **The money the user recognises leads; the money that makes it
@@ -220,11 +220,11 @@ extension CurrencyExposureWidget {
     func amounts(
         _ nativeE4: Int64, converted convertedE4: Int64, in native: CurrencyInfo, share: String? = nil
     ) -> some View {
-        VStack(alignment: .trailing, spacing: 2) {
+        VStack(alignment: .trailing, spacing: AppTheme.Spacing.xxs) {
             PrivateText(MoneyFormatter.compact(nativeE4, currency: native))
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(nativeE4 < 0 ? CashflowPalette.expense : Color.primary)
-            HStack(spacing: 4) {
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(nativeE4 < 0 ? CashflowPalette.expense : AppTheme.Palette.textPrimary)
+            HStack(spacing: AppTheme.Spacing.xs) {
                 if let share {
                     Text(share)
                 }
@@ -233,9 +233,9 @@ extension CurrencyExposureWidget {
                     PrivateText(converted)
                 }
             }
-            .font(.caption2)
+            .font(AppTheme.Typography.nano)
             .monospacedDigit()
-            .foregroundStyle(Color.secondary)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
         }
         .lineLimit(1)
     }

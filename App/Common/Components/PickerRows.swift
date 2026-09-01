@@ -37,18 +37,20 @@ struct AccountPickerRow: View {
                 }
             }
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: AppTheme.Spacing.s) {
                 if let selected {
-                    CategoryIconView(icon: selected.icon, color: Color(hex: selected.color), diameter: 30)
+                    CategoryIconView(icon: selected.icon, color: Color(hex: selected.color))
                 } else {
-                    CategoryIconView(icon: "questionmark", color: Color.gray, diameter: 30)
+                    CategoryIconView(icon: "questionmark", color: AppTheme.Palette.textSecondary)
                 }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 5) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
+                    HStack(spacing: AppTheme.Spacing.xs) {
                         Text(selected?.name ?? "Choose account")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(selected == nil ? Color.secondary : Color.primary)
+                            .font(AppTheme.Typography.labelEmphasis)
+                            .foregroundStyle(
+                                selected == nil ? AppTheme.Palette.textSecondary : AppTheme.Palette.textPrimary
+                            )
                             .lineLimit(1)
                         if selected?.isShared == true {
                             SharedWithHouseholdIcon()
@@ -59,17 +61,17 @@ struct AccountPickerRow: View {
                     }
                 }
 
-                Spacer(minLength: 4)
+                Spacer(minLength: AppTheme.Spacing.xs)
 
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.nanoEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
             .contentShape(Rectangle())
         }
         .menuStyle(.button)
         .buttonStyle(.pressableRow)
-        .sensoryFeedback(.selection, trigger: selection)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: selection)
     }
 }
 
@@ -86,8 +88,8 @@ struct CategoryPickerRow: View {
     }
 
     private var pillFill: Color {
-        guard let selected else { return Color(.tertiarySystemGroupedBackground) }
-        return Color(hex: selected.color).opacity(0.18)
+        guard let selected else { return AppTheme.Palette.bgSurfaceRaised }
+        return Color(hex: selected.color).opacity(AppTheme.Opacity.fillStrong)
     }
 
     var body: some View {
@@ -104,28 +106,28 @@ struct CategoryPickerRow: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
-                CategoryIconView(category: selected, diameter: 26)
+            HStack(spacing: AppTheme.Spacing.s) {
+                CategoryIconView(category: selected, diameter: AppTheme.Size.glyph)
                 Text(selected?.name ?? "Category")
                     // Same weight and size as the account name above it —
                     // they are peers in the hierarchy, both answering "which
                     // one", and typographic parity is what says so.
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(selected == nil ? Color.secondary : Color.primary)
+                    .font(AppTheme.Typography.labelEmphasis)
+                    .foregroundStyle(selected == nil ? AppTheme.Palette.textSecondary : AppTheme.Palette.textPrimary)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .padding(.vertical, AppTheme.Spacing.s)
             // Tinted with the category's own colour rather than a neutral
             // fill, so the pill and the icon inside it are visibly the same
             // thing. Low opacity, not the solid colour: the label has to stay
             // readable in both appearances, and a saturated chip would also
             // outshout the amount directly above it.
-            .background(pillFill, in: RoundedRectangle(cornerRadius: 14))
+            .background(pillFill, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
             .contentShape(Rectangle())
         }
         .menuStyle(.button)
         .buttonStyle(.pressableCard)
-        .sensoryFeedback(.selection, trigger: selection)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: selection)
     }
 }

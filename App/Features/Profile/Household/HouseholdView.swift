@@ -26,7 +26,7 @@ struct HouseholdView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
@@ -43,7 +43,7 @@ struct HouseholdView: View {
                     }
 
                     if let errorMessage {
-                        Text(errorMessage).font(.footnote).foregroundStyle(.red)
+                        FormErrorText(message: errorMessage)
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -81,7 +81,7 @@ struct HouseholdView: View {
                 .disabled(isCreatingHousehold)
             } else {
                 ForEach(members, id: \.userId) { member in
-                    Text(memberLabel(member)).foregroundStyle(Color.primary)
+                    Text(memberLabel(member)).foregroundStyle(AppTheme.Palette.textPrimary)
                 }
             }
         }
@@ -92,7 +92,7 @@ struct HouseholdView: View {
         Section {
             ForEach(myAccounts, id: \.id) { account in
                 Toggle(account.name, isOn: sharedBinding(for: account.id))
-                    .tint(.green)
+                    .tint(AppTheme.Palette.statusPositive)
             }
         } header: {
             Text("Share accounts")
@@ -107,7 +107,7 @@ struct HouseholdView: View {
             if let generatedToken {
                 Text(generatedToken).font(.system(.body, design: .monospaced)).textSelection(.enabled)
                 Text("Share this code — it expires in 7 days and works once.")
-                    .font(.footnote).foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.caption).foregroundStyle(AppTheme.Palette.textSecondary)
             } else {
                 Button {
                     Task { await createInvite() }
@@ -136,15 +136,8 @@ struct HouseholdView: View {
         }
     }
 
-    @ViewBuilder
     private var eventsSection: some View {
-        if !events.isEmpty {
-            Section("Recent Activity") {
-                ForEach(events, id: \.id) { event in
-                    Text(eventLabel(event)).font(.footnote).foregroundStyle(Color.secondary)
-                }
-            }
-        }
+        HouseholdEventsSection(events: events)
     }
 
     @ViewBuilder
@@ -164,14 +157,6 @@ struct HouseholdView: View {
 
     private func memberLabel(_ member: PublicSchema.HouseholdMembersSelect) -> String {
         member.userId == session.profile?.id ? "You" : "Household member"
-    }
-
-    private func eventLabel(_ event: PublicSchema.HouseholdEventsSelect) -> String {
-        switch event.kind {
-        case .memberJoined: return "A member joined"
-        case .memberLeft: return "A member left"
-        case .memberErased: return "A member erased their data"
-        }
     }
 
     private func sharedBinding(for accountId: UUID) -> Binding<Bool> {
@@ -277,5 +262,33 @@ struct HouseholdView: View {
             errorMessage = UserFacingError.describe(error)
         }
         isErasing = false
+    }
+}
+
+/// The household's activity log, as its own view rather than a section of
+/// `HouseholdView`'s body — the screen already carries create, share, invite,
+/// join, leave and erase, and the log is the one part of it that reads on its
+/// own.
+private struct HouseholdEventsSection: View {
+    let events: [PublicSchema.HouseholdEventsSelect]
+
+    var body: some View {
+        if !events.isEmpty {
+            Section("Recent Activity") {
+                ForEach(events, id: \.id) { event in
+                    Text(label(event))
+                }
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+            }
+        }
+    }
+
+    private func label(_ event: PublicSchema.HouseholdEventsSelect) -> String {
+        switch event.kind {
+        case .memberJoined: return "A member joined"
+        case .memberLeft: return "A member left"
+        case .memberErased: return "A member erased their data"
+        }
     }
 }

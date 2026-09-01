@@ -28,12 +28,22 @@ struct KeepoTabBar: View {
     let needsReviewCount: Int
     let onAdd: () -> Void
 
+    @State private var addTick = 0
+
     var body: some View {
         HStack(spacing: KeepoTabBarMetrics.gap) {
             destinations
             addButton
         }
         .padding(.horizontal, KeepoTabBarMetrics.margin)
+        // The bar is a fixed-height capsule sized to the display's corner
+        // (`KeepoTabBarMetrics`), so it is the one place in the app that
+        // cannot let Dynamic Type run all the way up: measured on device, the
+        // label starts truncating past `.xxLarge` because 54pt has to hold a
+        // 23pt glyph box and a caption under it. Everything the bar navigates
+        // *to* scales without a cap — this is furniture, not content, and the
+        // three labels are backed by icons and an accessibility trait.
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 
     private var destinations: some View {
@@ -45,7 +55,7 @@ struct KeepoTabBar: View {
         .frame(height: KeepoTabBarMetrics.height)
         .frame(maxWidth: .infinity)
         .liquidGlass(in: Capsule())
-        .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+        .elevation(.resting)
     }
 
     private func tabButton(_ destination: AppNavigation.Tab) -> some View {
@@ -54,9 +64,9 @@ struct KeepoTabBar: View {
             guard !isSelected else { return }
             tab = destination
         } label: {
-            VStack(spacing: 2) {
+            VStack(spacing: AppTheme.Spacing.xxs) {
                 Image(systemName: isSelected ? destination.selectedIcon : destination.icon)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(AppTheme.Typography.cardTitle)
                     // A fixed box, because these three glyphs are not the
                     // same height: `list.bullet.rectangle.portrait` is taller
                     // than `creditcard`, so laid out naturally each label sat
@@ -69,34 +79,44 @@ struct KeepoTabBar: View {
                     .overlay(alignment: .topTrailing) {
                         if destination == .transactions && needsReviewCount > 0 {
                             Circle()
-                                .fill(Color(hex: "#FF9F1C"))
-                                .frame(width: 7, height: 7)
+                                .fill(AppTheme.Palette.brandSecondary)
+                                .frame(width: AppTheme.Size.dot, height: AppTheme.Size.dot)
                                 .offset(x: 6, y: -2)
                         }
                     }
                 Text(destination.label)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                    .font(isSelected ? AppTheme.Typography.nanoEmphasis : AppTheme.Typography.nano)
             }
-            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+            .foregroundStyle(isSelected ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
             .frame(maxWidth: .infinity)
             .frame(height: KeepoTabBarMetrics.height)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .animation(.snappy(duration: 0.22), value: isSelected)
+        .animation(AppTheme.Motion.quick, value: isSelected)
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
     }
 
     private var addButton: some View {
-        Button(action: onAdd) {
+        Button {
+            addTick += 1
+            onAdd()
+        } label: {
             Image(systemName: "plus")
-                .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.sectionTitle)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
                 .frame(width: KeepoTabBarMetrics.height, height: KeepoTabBarMetrics.height)
                 .liquidGlass(in: Circle())
-                .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+                .elevation(.resting)
         }
         .buttonStyle(.pressableCard)
+        // The only button in the app that gets a haptic, and it earns it:
+        // it is the primary action, it opens a sheet over whatever you were
+        // reading, and it is the one control here that *changes* something
+        // rather than moving between screens. The three destinations beside
+        // it stay silent — a bar that buzzed on every tab would make this
+        // one stop meaning anything.
+        .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: addTick)
         .accessibilityLabel(tab.addLabel)
     }
 }
@@ -145,7 +165,7 @@ private extension View {
             glassEffect(.regular, in: shape)
         } else {
             background(.regularMaterial, in: shape)
-                .overlay(shape.stroke(Color.primary.opacity(0.06), lineWidth: 0.5))
+                .overlay(shape.stroke(AppTheme.Palette.textPrimary.opacity(0.06), lineWidth: 0.5))
         }
     }
 }
@@ -167,7 +187,7 @@ private extension View {
 /// to move.
 enum KeepoTabBarMetrics {
     static let height: CGFloat = 54
-    static let gap: CGFloat = 16
+    static let gap = AppTheme.Spacing.l
     /// The same on the sides and the bottom — a uniform margin is half of
     /// what makes the corners concentric; matching radii are the other half.
     static let margin: CGFloat = 30
@@ -176,5 +196,5 @@ enum KeepoTabBarMetrics {
     /// (`FadingEdges`).
     static let topEdge: CGFloat = margin + height
     /// How much room a scrolling view must leave below its last row.
-    static let clearance: CGFloat = topEdge + 10
+    static let clearance: CGFloat = topEdge + AppTheme.Spacing.s
 }

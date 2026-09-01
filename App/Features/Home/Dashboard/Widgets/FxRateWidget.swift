@@ -83,7 +83,7 @@ struct FxRateWidget: View {
     /// widget is expanded, where there is room for it and a chart for it to
     /// describe.
     private var collapsed: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
             pair
             MetricHeadline(value: .rate(series.highlightedPoint?.value), size: WidgetStyle.metric)
             Spacer(minLength: 0)
@@ -91,7 +91,7 @@ struct FxRateWidget: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(alignment: .bottom) {
             WidgetSparkline(points: series.points, color: trendColor, height: 44)
-                .opacity(0.5)
+                .opacity(AppTheme.Opacity.muted)
                 .padding(.horizontal, -WidgetStyle.padding)
         }
         // The rate has four decimal places and the trajectory runs under all
@@ -118,11 +118,11 @@ struct FxRateWidget: View {
     /// a *ratio* and not a list, and at caption size between two 22pt discs
     /// it read as a stray mark.
     private var pair: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: AppTheme.Spacing.s) {
             quotePicker
             Text("/")
-                .font(.title3)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.cardTitle)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
             basePill
         }
     }
@@ -145,8 +145,8 @@ struct FxRateWidget: View {
                 }
             }
         } label: {
-            CurrencyBadge(code: series.config.quoteCurrency, diameter: 22)
-                .currencyPill(stroke: Color.secondary.opacity(0.4))
+            CurrencyBadge(code: series.config.quoteCurrency, diameter: AppTheme.Size.glyph)
+                .currencyPill(stroke: AppTheme.Palette.fillStrong)
                 .hitTarget()
         }
         .buttonStyle(.plain)
@@ -172,9 +172,9 @@ struct FxRateWidget: View {
         Button {
             isShowingBaseNote = true
         } label: {
-            CurrencyBadge(code: currency?.code, diameter: 22)
-                .opacity(0.6)
-                .currencyPill(stroke: Color.secondary.opacity(0.18))
+            CurrencyBadge(code: currency?.code, diameter: AppTheme.Size.glyph)
+                .opacity(AppTheme.Opacity.muted)
+                .currencyPill(stroke: AppTheme.Palette.fillStrong)
                 .hitTarget()
         }
         .buttonStyle(.plain)
@@ -200,31 +200,31 @@ struct FxRateWidget: View {
     /// instead, the bubble sized itself from the first measuring pass and the
     /// text then ran out of the top and bottom of it.
     private var baseNote: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             // "Base currency", the exact words Preferences uses for the
             // row this links to. One name for one thing: a popover that
             // said "default" and a settings screen that said "base" would
             // read as two different settings.
             Text("\(currency?.code ?? "—") is your base currency")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
             Button {
                 isShowingBaseNote = false
                 navigation?.openProfile(.preferences)
             } label: {
                 // The chevron is the promise that this pushes a screen
                 // rather than opening another layer on top of this one.
-                HStack(spacing: 4) {
+                HStack(spacing: AppTheme.Spacing.xs) {
                     Text("Go to settings")
                     Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.bold))
+                        .font(AppTheme.Typography.nanoEmphasis)
                 }
-                .font(.subheadline.weight(.semibold))
+                .font(AppTheme.Typography.labelEmphasis)
             }
             .buttonStyle(.plain)
             .disabled(navigation == nil)
         }
-        .padding(16)
+        .padding(AppTheme.Spacing.l)
         .fixedSize()
         .presentationCompactAdaptation(.popover)
     }
@@ -239,7 +239,7 @@ struct FxRateWidget: View {
     /// part that says *what the number is being compared to*, so losing it
     /// to an ellipsis costs more than the vertical line it takes to keep.
     private var expanded: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             pair
             MetricHeadlineBlock(
                 value: .rate(series.highlightedPoint?.value), size: WidgetStyle.metricExpanded,
@@ -289,9 +289,9 @@ private struct CurrencyPill: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .padding(.leading, 4)
-            .padding(.trailing, 8)
-            .padding(.vertical, 4)
+            .padding(.leading, AppTheme.Spacing.xs)
+            .padding(.trailing, AppTheme.Spacing.s)
+            .padding(.vertical, AppTheme.Spacing.xs)
             .overlay(Capsule().stroke(stroke, lineWidth: 1))
     }
 }

@@ -13,23 +13,23 @@ struct ProfileView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
             List {
                 Section {
-                    HStack(spacing: 16) {
-                        ProfileAvatarView(email: session.userEmail, size: 64)
-                        VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: AppTheme.Spacing.l) {
+                        ProfileAvatarView(email: session.userEmail, size: AppTheme.Size.avatar)
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                             Text(session.userEmail ?? "—")
-                                .font(.headline)
-                                .foregroundStyle(Color.primary)
+                                .font(AppTheme.Typography.rowTitle)
+                                .foregroundStyle(AppTheme.Palette.textPrimary)
                             if let currency = session.profile?.baseCurrency {
                                 Text("Base currency: \(currency)")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.secondary)
+                                    .font(AppTheme.Typography.label)
+                                    .foregroundStyle(AppTheme.Palette.textSecondary)
                             }
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, AppTheme.Spacing.xs)
                 }
 
                 Section {
@@ -65,8 +65,8 @@ struct ProfileView: View {
                     .disabled(isSigningOut)
                     if let signOutError {
                         Text(signOutError)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
+                            .font(AppTheme.Typography.caption)
+                            .foregroundStyle(AppTheme.Palette.statusNegative)
                     }
                 }
             }

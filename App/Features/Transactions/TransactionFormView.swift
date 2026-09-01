@@ -101,17 +101,17 @@ struct TransactionFormView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+                AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
-                VStack(spacing: 14) {
+                VStack(spacing: AppTheme.Spacing.m) {
                     KindTabBar(selection: $kind, title: \.rawValue, isEnabled: !isEditing)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 4)
+                        .padding(.horizontal, AppTheme.Spacing.l)
+                        .padding(.top, AppTheme.Spacing.xs)
 
                     ScrollView {
                         detailCard
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 24)
+                            .padding(.horizontal, AppTheme.Spacing.l)
+                            .padding(.bottom, AppTheme.Spacing.xl)
                     }
                     .scrollDismissesKeyboard(.interactively)
                     // basedOnSize: content this short shouldn't rubber-band —
@@ -149,7 +149,7 @@ struct TransactionFormView: View {
     // MARK: - The card
 
     private var detailCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
             HStack {
                 datePill
                 Spacer()
@@ -174,21 +174,19 @@ struct TransactionFormView: View {
             // 20260904100000 gave `create_transfer`/`update_transfer` a
             // `p_notes` that writes to both legs.
             TextField("Add a note…", text: $notes, axis: .vertical)
-                .font(.subheadline)
+                .font(AppTheme.Typography.label)
                 .lineLimit(1...4)
 
             recurringLine
 
             if addedByHouseholdMember {
                 Text("Added by your household member")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.micro)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
 
             if let errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                FormErrorText(message: errorMessage)
             }
 
             // Standard practice whenever a swipe-action exists elsewhere
@@ -198,12 +196,12 @@ struct TransactionFormView: View {
                 DestructiveActionButton(title: "Delete Transaction", isEnabled: !isSaving) {
                     Task { await deleteTransaction() }
                 }
-                .padding(.top, 4)
+                .padding(.top, AppTheme.Spacing.xs)
             }
         }
-        .padding(18)
+        .padding(AppTheme.Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
+        .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
     }
 
     /// Outlined rather than filled: it sits on the card's own surface, and a
@@ -215,17 +213,17 @@ struct TransactionFormView: View {
         Button {
             isPickingDate = true
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 Image(systemName: "calendar")
-                    .font(.caption)
+                    .font(AppTheme.Typography.micro)
                 Text(dateLabel)
-                    .font(.subheadline)
+                    .font(AppTheme.Typography.label)
             }
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .foregroundStyle(AppTheme.Palette.textPrimary)
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .padding(.vertical, AppTheme.Spacing.s)
             .overlay {
-                Capsule().strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1)
+                Capsule().strokeBorder(AppTheme.Palette.fillStrong, lineWidth: 1)
             }
             .contentShape(Capsule())
         }
@@ -262,9 +260,9 @@ struct TransactionFormView: View {
                 // statements of fact, not buttons — giving all three the same
                 // pill would promise a tap that two of them do not honour.
                 recurringLabel("Make recurring", icon: "arrow.trianglehead.2.clockwise.rotate.90")
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(Color(.tertiarySystemGroupedBackground), in: Capsule())
+                    .padding(.horizontal, AppTheme.Spacing.m)
+                    .padding(.vertical, AppTheme.Spacing.s)
+                    .background(AppTheme.Palette.bgSurfaceRaised, in: Capsule())
                     .contentShape(Capsule())
             }
             .buttonStyle(.pressableCard)
@@ -272,12 +270,12 @@ struct TransactionFormView: View {
     }
 
     private func recurringLabel(_ title: String, icon: String) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: AppTheme.Spacing.xs) {
             Image(systemName: icon)
             Text(title)
         }
-        .font(.caption)
-        .foregroundStyle(Color.secondary)
+        .font(AppTheme.Typography.micro)
+        .foregroundStyle(AppTheme.Palette.textSecondary)
     }
 
     private var datePickerSheet: some View {

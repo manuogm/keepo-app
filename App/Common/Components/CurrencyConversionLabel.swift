@@ -27,8 +27,8 @@ struct CurrencyConversionLabel: View {
     var body: some View {
         if let text {
             Text(text)
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.micro)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
         }
     }
 

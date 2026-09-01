@@ -8,15 +8,15 @@ struct OfflineInfoSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
                     Label("You're offline", systemImage: "wifi.slash")
-                        .font(.headline)
+                        .font(AppTheme.Typography.rowTitle)
                     Text(
                         "Changes you make now are saved on this device and sync automatically "
                             + "once you're back online."
                     )
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
 
                     group(
                         title: "Works offline",
@@ -69,12 +69,12 @@ struct OfflineInfoSheet: View {
     }
 
     private func group(title: String, icon: String, color: Color, items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.subheadline).fontWeight(.semibold)
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
+            Text(title).font(AppTheme.Typography.label).fontWeight(.semibold)
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                 ForEach(items, id: \.self) { item in
                     Label(item, systemImage: icon)
-                        .font(.footnote)
+                        .font(AppTheme.Typography.caption)
                         .foregroundStyle(color)
                 }
             }

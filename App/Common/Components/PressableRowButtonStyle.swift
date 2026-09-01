@@ -32,10 +32,8 @@ struct PressableRowButtonStyle: ButtonStyle {
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.55 : 1)
             .scaleEffect(scale(isPressed: configuration.isPressed))
-            // Fast in, gentle out: the press must register instantly, but a
-            // snap back on release looks twitchy.
             .animation(
-                configuration.isPressed ? .easeOut(duration: 0.08) : .easeOut(duration: 0.18),
+                AppTheme.Motion.press(isPressed: configuration.isPressed),
                 value: configuration.isPressed
             )
     }

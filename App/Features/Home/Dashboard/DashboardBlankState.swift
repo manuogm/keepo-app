@@ -8,16 +8,16 @@ struct DashboardBlankState: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppTheme.Spacing.l) {
             Button(action: action) {
                 Image(systemName: "plus")
-                    .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(Color.secondary)
-                    .frame(width: 96, height: 96)
+                    .font(AppTheme.Typography.screenTitle.weight(.light))
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
                     .background(
                         RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
                             .strokeBorder(
-                                Color.secondary.opacity(0.5),
+                                AppTheme.Palette.fillStrong,
                                 style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
                             )
                     )
@@ -25,12 +25,12 @@ struct DashboardBlankState: View {
             }
             .buttonStyle(.pressableCard)
 
-            VStack(spacing: 4) {
+            VStack(spacing: AppTheme.Spacing.xs) {
                 Text("Your dashboard is empty")
-                    .font(.headline)
+                    .font(AppTheme.Typography.rowTitle)
                 Text("Add widgets to track what matters to you.")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .multilineTextAlignment(.center)
             }
         }
@@ -57,13 +57,13 @@ struct AddWidgetTile: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "plus")
-                .font(.system(size: 22, weight: .light))
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.sectionTitle.weight(.light))
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous)
                         .strokeBorder(
-                            Color.secondary.opacity(0.35),
+                            AppTheme.Palette.fillStrong,
                             style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
                         )
                 )

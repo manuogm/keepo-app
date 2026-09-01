@@ -6,14 +6,13 @@ import SwiftUI
 /// scope can never be coral on one screen and teal on the next.
 ///
 /// One flat colour each, never a gradient (the user's call — the app stays
-/// minimal). They are literals rather than `Assets.xcassets` colour sets and
-/// deliberately so: brand accents with no light/dark variant, saturated
-/// enough to carry white text in both appearances, exactly like
-/// `keepo-brand-identity.md` §1's `BrandPrimary`/`BrandSecondary`. Total *is*
-/// `BrandPrimary`; the other two are the cool and green counterparts that
-/// keep the three cards distinguishable at a glance for a colour-vision-
-/// deficient user — the same test `app-architecture.md` §5 applies to the
-/// chart palette.
+/// minimal). All three are `Assets.xcassets` colour sets with a single
+/// appearance: brand accents saturated enough to carry white text in both
+/// light and dark, exactly like `keepo-brand-identity.md` §1's
+/// `BrandPrimary`/`BrandSecondary`. Total is `BrandPrimary` pulled back;
+/// the other two are the cool and green counterparts that keep the three
+/// cards distinguishable at a glance for a colour-vision-deficient user —
+/// the same test `app-architecture.md` §5 applies to the chart palette.
 extension PublicSchema.AccountScope {
     /// Left to right in the banner's carousel, and the order the page dots
     /// are drawn in. Total leads because it is the default; **Household
@@ -68,15 +67,15 @@ extension PublicSchema.AccountScope {
     ///
     /// Pulled back from the brand values rather than restated as new hex:
     /// at full saturation a whole screen's worth of `BrandPrimary` shouted
-    /// at everything on it. The literals stay the brand's, and the one place
-    /// they are softened says so.
-    var tint: Color { baseTint.shifted(saturation: -0.09) }
-
-    private var baseTint: Color {
+    /// at everything on it. The softening used to be a `.shifted(saturation:
+    /// -0.09)` recomputed on every render; it is baked into the colour set
+    /// now, which is the same result without asking `UIColor` to resolve a
+    /// dynamic colour mid-body.
+    var tint: Color {
         switch self {
-        case .total: return Color(hex: "#FF5A5F")
-        case .me: return Color(hex: "#5B5BD6")
-        case .household: return Color(hex: "#0F9B8E")
+        case .total: return AppTheme.Palette.scopeTotal
+        case .me: return AppTheme.Palette.scopePrivate
+        case .household: return AppTheme.Palette.scopeHousehold
         }
     }
 }

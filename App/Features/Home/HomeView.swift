@@ -38,7 +38,7 @@ struct HomeView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 ScopeBannerView(
@@ -47,7 +47,7 @@ struct HomeView: View {
                     onOpenProfile: { navigation?.openProfileRoot() },
                     accessory: { doneButton }
                 )
-                .padding(.bottom, 10)
+                .padding(.bottom, AppTheme.Spacing.s)
                 // The deck's cards tilt past their own bounds mid-swipe, and
                 // nothing clips them — so the banner has to win against the
                 // content underneath it.
@@ -60,9 +60,7 @@ struct HomeView: View {
             if let errorMessage {
                 VStack {
                     Spacer()
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    FormErrorText(message: errorMessage)
                         .padding()
                 }
             }
@@ -87,13 +85,13 @@ struct HomeView: View {
     private var doneButton: some View {
         if isEditing {
             Button("Done") {
-                withAnimation(.snappy(duration: 0.24)) { isEditing = false }
+                withAnimation(AppTheme.Motion.standard) { isEditing = false }
             }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Color.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.white.opacity(0.22), in: Capsule())
+            .font(AppTheme.Typography.labelEmphasis)
+            .foregroundStyle(AppTheme.Palette.textOnAccent)
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .padding(.vertical, AppTheme.Spacing.xs)
+            .background(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule())
             .buttonStyle(.plain)
         }
     }

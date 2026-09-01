@@ -52,13 +52,15 @@ struct NeedsReviewPanel: View {
     /// to reminders and benchmarks and `BrandPrimary` to data and actions.
     /// An inbox is a reminder — it should catch the eye without reading as
     /// an error.
-    private var accent: Color { Color(hex: "#FF9F1C") }
+    private var accent: Color { AppTheme.Palette.brandSecondary }
 
     private enum Metrics {
         /// The drawer's bottom radius, and equally the distance it hides
         /// behind the banner — the two are the same number because the
-        /// hidden part *is* the top corners nobody should see.
-        static let radius: CGFloat = 24
+        /// hidden part *is* the top corners nobody should see. One token, so
+        /// the drawer's corner can never drift away from the sheets and
+        /// widgets it sits among.
+        static let radius = AppTheme.Radius.surface
     }
 
     var body: some View {
@@ -79,7 +81,7 @@ struct NeedsReviewPanel: View {
             showSuccess = true
             Task {
                 try? await Task.sleep(for: .seconds(2))
-                withAnimation(.snappy(duration: 0.3)) {
+                withAnimation(AppTheme.Motion.standard) {
                     showSuccess = false
                     isExpanded = false
                 }
@@ -120,22 +122,22 @@ struct NeedsReviewPanel: View {
             } else {
                 header
                 if isExpanded {
-                    Divider().padding(.leading, 56)
+                    Divider().padding(.leading, AppTheme.Size.dividerInset(icon: AppTheme.Size.icon))
                     itemList
                 }
             }
         }
         .background(
-            Color(.secondarySystemGroupedBackground),
+            AppTheme.Palette.bgSurface,
             in: UnevenRoundedRectangle(
                 bottomLeadingRadius: Metrics.radius, bottomTrailingRadius: Metrics.radius, style: .continuous
             )
         )
-        .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
+        .elevation(.resting)
         .padding(.top, -Metrics.radius)
         .frame(maxHeight: isExpanded ? .infinity : nil, alignment: .top)
-        .animation(.snappy(duration: 0.28), value: isExpanded)
-        .animation(.snappy(duration: 0.28), value: items.count)
+        .animation(AppTheme.Motion.standard, value: isExpanded)
+        .animation(AppTheme.Motion.standard, value: items.count)
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
@@ -147,18 +149,18 @@ struct NeedsReviewPanel: View {
                 ForEach(items, id: \.itemId) { item in
                     row(item)
                     if item.itemId != items.last?.itemId {
-                        Divider().padding(.leading, 56)
+                        Divider().padding(.leading, AppTheme.Size.dividerInset(icon: AppTheme.Size.icon))
                     }
                 }
             }
 
             if let actionErrorMessage {
                 Text(actionErrorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.Palette.statusNegative)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
+                    .padding(.horizontal, AppTheme.Spacing.l)
+                    .padding(.top, AppTheme.Spacing.m)
             }
         }
         .scrollBounceBehavior(.basedOnSize)
@@ -174,49 +176,49 @@ struct NeedsReviewPanel: View {
     }
 
     private var successState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: AppTheme.Spacing.m) {
             Image(systemName: "checkmark")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Color.white)
-                .frame(width: 64, height: 64)
+                .font(AppTheme.Typography.sectionTitle)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .frame(width: AppTheme.Size.avatar, height: AppTheme.Size.avatar)
                 .background(accent, in: Circle())
-            VStack(spacing: 4) {
+            VStack(spacing: AppTheme.Spacing.xs) {
                 Text("All caught up")
-                    .font(.headline)
+                    .font(AppTheme.Typography.rowTitle)
                 Text("Nothing else needs your review.")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 40)
+        .padding(.vertical, AppTheme.Spacing.xxl)
         .transition(.opacity.combined(with: .scale(scale: 0.92)))
     }
 
     private var header: some View {
         Button {
-            withAnimation(.snappy(duration: 0.3)) { isExpanded.toggle() }
+            withAnimation(AppTheme.Motion.standard) { isExpanded.toggle() }
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: AppTheme.Spacing.m) {
                 Image(systemName: "tray.full.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(AppTheme.Typography.labelEmphasis)
                     .foregroundStyle(accent)
-                    .frame(width: 28, height: 28)
-                    .background(accent.opacity(0.15), in: Circle())
+                    .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                    .background(accent.opacity(AppTheme.Opacity.fill), in: Circle())
 
                 Text(headline)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.primary)
+                    .font(AppTheme.Typography.labelEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
 
                 Spacer()
 
                 Image(systemName: "chevron.down")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.microEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .rotationEffect(.degrees(isExpanded ? 180 : 0))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
+            .padding(.horizontal, AppTheme.Spacing.l)
+            .padding(.vertical, AppTheme.Spacing.m)
         }
         .buttonStyle(.pressableRow)
         .accessibilityHint(isExpanded ? "Collapses the list" : "Expands the list")
@@ -233,25 +235,25 @@ struct NeedsReviewPanel: View {
     /// inside a scrolling screen, not a `List`, so there is no swipe gesture
     /// to attach them to.
     private func row(_ item: PublicSchema.NeedsReviewSelect) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: AppTheme.Spacing.s) {
             Button {
                 open(item)
             } label: {
                 NeedsReviewRow(item: item, minorUnit: minorUnit(for: item.currency))
-                    .padding(.vertical, 10)
-                    .padding(.leading, 16)
+                    .padding(.vertical, AppTheme.Spacing.s)
+                    .padding(.leading, AppTheme.Spacing.l)
             }
             .buttonStyle(.pressableRow)
 
             if let quick = quickAction(item) {
                 Button(quick.title) { perform(quick.kind, on: item) }
-                    .font(.caption.weight(.semibold))
+                    .font(AppTheme.Typography.microEmphasis)
                     .foregroundStyle(accent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(accent.opacity(0.14), in: Capsule())
+                    .padding(.horizontal, AppTheme.Spacing.s)
+                    .padding(.vertical, AppTheme.Spacing.xs)
+                    .background(accent.opacity(AppTheme.Opacity.fill), in: Capsule())
                     .buttonStyle(.plain)
-                    .padding(.trailing, 16)
+                    .padding(.trailing, AppTheme.Spacing.l)
             }
         }
         .contextMenu {
@@ -272,27 +274,27 @@ struct NeedsReviewRow: View {
     let minorUnit: Int
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: AppTheme.Spacing.m) {
             Image(systemName: iconName)
-                .font(.system(size: 14))
-                .foregroundStyle(Color.secondary)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .frame(width: AppTheme.Size.icon)
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                 Text(item.title ?? "—")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.primary)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                 if let subtitle = item.subtitle {
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.micro)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: AppTheme.Spacing.s)
             if let amount = item.amountE4, let currencyCode = item.currency {
                 Text(MoneyFormatter.format(amount, currency: CurrencyInfo(code: currencyCode, minorUnit: minorUnit)))
-                    .font(.subheadline)
+                    .font(AppTheme.Typography.label)
                     .monospacedDigit()
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
             }
         }
         .lineLimit(1)

@@ -20,10 +20,10 @@ struct AddAccountFlowView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
                 Text("What are you tracking?")
-                    .font(.title3.weight(.semibold))
-                    .padding(.top, 4)
+                    .font(AppTheme.Typography.cardTitle)
+                    .padding(.top, AppTheme.Spacing.xs)
 
                 AccountKindPicker { kind in
                     selectedKind = kind
@@ -32,8 +32,8 @@ struct AddAccountFlowView: View {
                 Spacer()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(20)
-            .background(Color(.systemGroupedBackground))
+            .padding(AppTheme.Spacing.l)
+            .background(AppTheme.Palette.bgCanvas)
             .navigationTitle("New Account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -67,7 +67,7 @@ struct AccountKindPicker: View {
     let onSelect: (PublicSchema.AccountKind) -> Void
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: AppTheme.Spacing.m) {
             kindCard(
                 kind: .regular,
                 title: "Everyday",
@@ -89,30 +89,30 @@ struct AccountKindPicker: View {
         Button {
             onSelect(kind)
         } label: {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(Color.primary)
-                    .frame(width: 56, height: 56)
-                    .background(Color(.tertiarySystemGroupedBackground), in: Circle())
+                    .font(AppTheme.Typography.sectionTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                    .frame(width: AppTheme.Size.avatar, height: AppTheme.Size.avatar)
+                    .background(AppTheme.Palette.bgSurfaceRaised, in: Circle())
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                     Text(title)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color.primary)
+                        .font(AppTheme.Typography.cardTitle)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
                     Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.label)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(20)
+            .padding(AppTheme.Spacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+            .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
         }
         .buttonStyle(.pressableCard)
-        .sensoryFeedback(.selection, trigger: title)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: title)
         .accessibilityLabel("\(title). \(subtitle)")
     }
 }

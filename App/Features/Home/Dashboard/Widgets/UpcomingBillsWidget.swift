@@ -80,7 +80,7 @@ struct UpcomingBillsWidget: View {
     /// instead. Expanded keeps them on the headline's line, where the rings
     /// are followed immediately by a list that needs the width.
     private func collapsed(_ metrics: UpcomingTransactionsMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             MetricHeadline(value: .money(metrics.totalE4, currency), size: WidgetStyle.metric)
             carousel(metrics, isInteractive: false)
             counts(metrics)
@@ -90,7 +90,7 @@ struct UpcomingBillsWidget: View {
     }
 
     private func counts(_ metrics: UpcomingTransactionsMetrics) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: AppTheme.Spacing.s) {
             if metrics.inboundCount > 0 {
                 countLabel(metrics.inboundCount, "in", CashflowPalette.income)
             }
@@ -101,11 +101,11 @@ struct UpcomingBillsWidget: View {
     }
 
     private func countLabel(_ count: Int, _ noun: String, _ color: Color) -> some View {
-        HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 8, height: 8)
+        HStack(spacing: AppTheme.Spacing.xs) {
+            Circle().fill(color).frame(width: AppTheme.Size.dot, height: AppTheme.Size.dot)
             Text("\(count) \(noun)")
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.micro)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .monospacedDigit()
         }
         .lineLimit(1)
@@ -114,10 +114,10 @@ struct UpcomingBillsWidget: View {
     // MARK: - Expanded
 
     private func expanded(_ metrics: UpcomingTransactionsMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
+            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
                 MetricHeadline(value: .money(metrics.totalE4, currency), size: WidgetStyle.metricExpanded)
-                Spacer(minLength: 4)
+                Spacer(minLength: AppTheme.Spacing.xs)
                 counts(metrics)
             }
             carousel(metrics, isInteractive: true)
@@ -140,7 +140,7 @@ struct UpcomingBillsWidget: View {
 
     private func carousel(_ metrics: UpcomingTransactionsMetrics, isInteractive: Bool) -> some View {
         ScrollView(.horizontal) {
-            HStack(spacing: 8) {
+            HStack(spacing: AppTheme.Spacing.s) {
                 ForEach(metrics.days(from: today, calendar: utcCalendar), id: \.self) { day in
                     let items = metrics.items(on: day, calendar: utcCalendar)
                     let ring = DaySplitRing(
@@ -150,7 +150,7 @@ struct UpcomingBillsWidget: View {
                     )
                     if isInteractive {
                         Button {
-                            withAnimation(.snappy(duration: 0.2)) {
+                            withAnimation(AppTheme.Motion.quick) {
                                 selectedDay = selectedDay == day ? nil : day
                             }
                         } label: {
@@ -167,10 +167,10 @@ struct UpcomingBillsWidget: View {
                     }
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, AppTheme.Spacing.xs)
         }
         .scrollIndicators(.hidden)
-        .sensoryFeedback(.selection, trigger: selectedDay)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: selectedDay)
     }
 
     /// One arc per occurrence, coloured by direction. `share` is unused by
@@ -194,8 +194,8 @@ struct UpcomingBillsWidget: View {
         return Group {
             if items.isEmpty {
                 Text("Nothing due this day.")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView {
@@ -203,7 +203,11 @@ struct UpcomingBillsWidget: View {
                         ForEach(items) { item in
                             row(item)
                             if item.id != items.last?.id {
-                                Divider().padding(.leading, 40)
+                                Divider()
+                                    .padding(
+                                        .leading,
+                                        AppTheme.Size.dividerInset(icon: AppTheme.Size.icon, leading: 0)
+                                    )
                             }
                         }
                     }
@@ -225,25 +229,25 @@ struct UpcomingBillsWidget: View {
         Button {
             openRule(item.ruleId)
         } label: {
-            HStack(spacing: 12) {
-                CategoryIconView(icon: item.categoryIcon, color: Color(hex: item.categoryColor), diameter: 28)
+            HStack(spacing: AppTheme.Spacing.m) {
+                CategoryIconView(icon: item.categoryIcon, color: Color(hex: item.categoryColor))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(item.categoryName)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.primary)
+                        .font(AppTheme.Typography.label)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
                         .lineLimit(1)
                     Text("\(dueLabel(item.dueOn)) · \(item.accountName)")
-                        .font(.caption2)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.nano)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                         .lineLimit(1)
                 }
-                Spacer(minLength: 6)
+                Spacer(minLength: AppTheme.Spacing.xs)
                 PrivateText(amountLabel(item.amountBaseE4))
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(item.isInbound ? CashflowPalette.income : Color.primary)
+                    .font(AppTheme.Typography.labelEmphasis)
+                    .foregroundStyle(item.isInbound ? CashflowPalette.income : AppTheme.Palette.textPrimary)
             }
             // Opens the recurring rule's form — worth HIG's full 44pt.
-            .padding(.vertical, 4)
+            .padding(.vertical, AppTheme.Spacing.xs)
             .frame(minHeight: WidgetStyle.minimumTarget)
             .contentShape(Rectangle())
         }

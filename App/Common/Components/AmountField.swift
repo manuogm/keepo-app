@@ -31,14 +31,23 @@ struct AmountField: View {
     /// symbol is part of the figure, not a label attached to it.
     var showsCurrencySymbol = true
     var isEnabled = true
-    /// Point size of the whole part. The fraction and the symbol derive from
-    /// it, so a caller only ever picks one number.
-    var size: CGFloat = 40
+    /// Point size of the whole part, from `AppTheme.Typography.Number`. The
+    /// fraction and the symbol derive from it, so a caller only ever picks
+    /// one number.
+    var size: CGFloat = AppTheme.Typography.Number.balance
 
+    /// Same reason as `BalanceHeaderView`'s: the figure is the largest text
+    /// on the form, so it is the text that most needs to grow with the
+    /// user's type size.
+    @ScaledMetric(relativeTo: .largeTitle) private var typeScale: CGFloat = 1
     @FocusState private var isFocused: Bool
     @State private var isCalculatorPresented = false
 
     private var minorUnit: Int { currency?.minorUnit ?? 2 }
+
+    private func figureFont(_ points: CGFloat) -> Font {
+        AppTheme.Typography.Number.display(points, weight: .semibold, scale: typeScale)
+    }
 
     /// The minus belongs in FRONT of the symbol — "-$840.00", not "$-840.00",
     /// which is what you get if the sign is left inside the number while the
@@ -72,13 +81,13 @@ struct AmountField: View {
         // "$" belongs to the number. The keypad button is not part of the
         // figure, so it centres on the row instead — hung off a baseline it
         // sat level with the digits' feet.
-        HStack(spacing: 8) {
+        HStack(spacing: AppTheme.Spacing.s) {
             figure
             if isEnabled {
                 calculatorButton
             }
         }
-        .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
+        .foregroundStyle(isEnabled ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
         .animation(nil, value: isFocused)
         .sheet(isPresented: $isCalculatorPresented) {
             CalculatorSheet(minorUnit: minorUnit, initialText: text) { amount in
@@ -88,16 +97,16 @@ struct AmountField: View {
     }
 
     private var figure: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
+        HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.xs) {
             if let symbol {
                 Text(symbol)
-                    .font(.system(size: size, weight: .semibold))
-                    .foregroundStyle(text.isEmpty ? Color.secondary.opacity(0.5) : Color.primary)
+                    .font(figureFont(size))
+                    .foregroundStyle(text.isEmpty ? AppTheme.Palette.fillStrong : AppTheme.Palette.textPrimary)
             }
 
             ZStack(alignment: .leading) {
                 TextField("", text: $text)
-                    .font(.system(size: size, weight: .semibold))
+                    .font(figureFont(size))
                     .monospacedDigit()
                     .keyboardType(.decimalPad)
                     .focused($isFocused)
@@ -112,7 +121,7 @@ struct AmountField: View {
                     // it. At full opacity with clear text the field is a
                     // real touch target again, and tapping mid-string still
                     // lands the caret where the finger went.
-                    .foregroundStyle(isFocused ? Color.primary : Color.clear)
+                    .foregroundStyle(isFocused ? AppTheme.Palette.textPrimary : Color.clear)
 
                 if !isFocused {
                     display.allowsHitTesting(false)
@@ -136,10 +145,10 @@ struct AmountField: View {
             // candidate, a keypad — is a sibling of the Dashboard tab's
             // `square.grid.2x2`.
             Image(systemName: "function")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.secondary)
-                .frame(width: 34, height: 34)
-                .background(Color(.quaternarySystemFill), in: Circle())
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                .background(AppTheme.Palette.fillSubtle, in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Work the amount out on a calculator")
@@ -149,9 +158,9 @@ struct AmountField: View {
     private var display: some View {
         if text.isEmpty {
             Text(placeholder)
-                .font(.system(size: size, weight: .semibold))
+                .font(figureFont(size))
                 .monospacedDigit()
-                .foregroundStyle(Color.secondary.opacity(0.5))
+                .foregroundStyle(AppTheme.Palette.fillStrong)
         } else {
             splitText
                 .monospacedDigit()
@@ -167,15 +176,15 @@ struct AmountField: View {
         let split = MoneyFormatter.split(
             displayText, separator: MoneyFormatter.decimalSeparator(), minorUnit: minorUnit
         )
-        return Text(split.whole).font(.system(size: size, weight: .semibold))
-            + Text(split.fraction).font(.system(size: fractionSize, weight: .semibold))
+        return Text(split.whole).font(figureFont(size))
+            + Text(split.fraction).font(figureFont(fractionSize))
     }
 }
 
 #Preview {
     @Previewable @State var empty = ""
     @Previewable @State var filled = "1250.75"
-    return VStack(alignment: .leading, spacing: 24) {
+    return VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
         AmountField(text: $empty, currency: CurrencyInfo(code: "USD", minorUnit: 2))
         AmountField(text: $filled, currency: CurrencyInfo(code: "USD", minorUnit: 2))
         AmountField(text: $filled, currency: CurrencyInfo(code: "JPY", minorUnit: 0), isEnabled: false)

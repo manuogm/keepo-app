@@ -83,8 +83,8 @@ struct CurrencyExposureWidget: View {
     /// so one figure leads and the row below names as many of the rest as
     /// will honestly fit — the expanded tile is where the full list lives.
     private func collapsed(_ metrics: CurrencyExposureMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            CurrencyBadge(code: metrics.largest?.currency, diameter: 26)
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+            CurrencyBadge(code: metrics.largest?.currency, diameter: AppTheme.Size.glyph)
             MetricHeadline(value: .percent(metrics.largestShare), size: WidgetStyle.metric)
             Spacer(minLength: 0)
             // The gap under the minority row is deliberately wider than the
@@ -92,7 +92,7 @@ struct CurrencyExposureWidget: View {
             // with 4 points between them they read as one block and the row
             // looked like a label *on* the bar rather than a list beside it.
             minorRow(minorCurrencies(metrics))
-                .padding(.bottom, 6)
+                .padding(.bottom, AppTheme.Spacing.xs)
             // Along the bottom edge, under everything it explains.
             WidgetFillBar(segments: shareSegments(metrics), thickness: 8)
         }
@@ -173,7 +173,7 @@ struct CurrencyExposureWidget: View {
                         Text(shareLabel(entry.share))
                             .font(isCrowded ? .caption2 : .caption)
                             .monospacedDigit()
-                            .foregroundStyle(Color.secondary)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
                     }
                 }
                 Spacer(minLength: 0)

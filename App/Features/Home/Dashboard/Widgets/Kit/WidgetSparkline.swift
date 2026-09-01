@@ -61,7 +61,7 @@ struct WidgetSparkline: View {
                 )
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [color.opacity(0.25), color.opacity(0)],
+                        colors: [color.opacity(AppTheme.Opacity.fillStrong), color.opacity(0)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )

@@ -19,13 +19,13 @@ struct DestructiveActionButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(Color.red.opacity(isEnabled ? 1 : 0.4))
+                .font(AppTheme.Typography.bodyEmphasis)
+                .foregroundStyle(AppTheme.Palette.statusNegative.opacity(isEnabled ? 1 : 0.4))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, AppTheme.Spacing.m)
                 .overlay {
                     Capsule()
-                        .strokeBorder(Color.red.opacity(isEnabled ? 0.55 : 0.25), lineWidth: 1.5)
+                        .strokeBorder(AppTheme.Palette.statusNegative.opacity(isEnabled ? 0.55 : 0.25), lineWidth: 1.5)
                 }
                 .contentShape(Capsule())
         }
@@ -50,11 +50,11 @@ struct IconPickerButton: View {
             CategoryIconView(icon: icon, color: color, diameter: diameter)
                 .overlay(alignment: .bottomTrailing) {
                     Image(systemName: "pencil")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.primary)
-                        .frame(width: 28, height: 28)
-                        .background(Color(.secondarySystemGroupedBackground), in: Circle())
-                        .overlay(Circle().strokeBorder(Color(.systemGroupedBackground), lineWidth: 2))
+                        .font(AppTheme.Typography.microEmphasis)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
+                        .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                        .background(AppTheme.Palette.bgSurface, in: Circle())
+                        .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
                 }
         }
         .buttonStyle(.pressableCard)
@@ -68,8 +68,8 @@ struct IconPickerButton: View {
 struct SharedWithHouseholdIcon: View {
     var body: some View {
         Image(systemName: "person.2.fill")
-            .font(.caption)
-            .foregroundStyle(Color.secondary)
+            .font(AppTheme.Typography.micro)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
             .accessibilityLabel("Shared with your household")
     }
 }
@@ -80,8 +80,8 @@ struct SharedWithHouseholdIcon: View {
 struct MappedCardIcon: View {
     var body: some View {
         Image(systemName: "creditcard.fill")
-            .font(.caption)
-            .foregroundStyle(Color.secondary)
+            .font(AppTheme.Typography.micro)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
             .accessibilityLabel("Has a linked card")
     }
 }
@@ -90,13 +90,31 @@ struct MappedCardIcon: View {
 /// own card surface. The redesigned forms are not `Form`s any more, so the
 /// inset-grouped row look has to be built rather than inherited.
 struct FormCard<Content: View>: View {
-    var padding: CGFloat = 16
+    var padding = AppTheme.Spacing.l
     @ViewBuilder var content: Content
 
     var body: some View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+            .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
+    }
+}
+
+/// The one way a screen tells the user something went wrong.
+///
+/// Fifteen screens each wrote `Text(message)` with their own font and their
+/// own red, and they had already drifted: two of them set no font at all, so
+/// the same failure read at body size on Export and at footnote size on the
+/// screen beside it. An error is one thing, so it looks like one thing.
+///
+/// Not for an error drawn on a tinted surface (the Mapped Card sheet) or one
+/// that is deliberately quiet (the offline bar's last-sync note) — those are
+/// saying something else and are styled where they are said.
+struct FormErrorText: View {
+    let message: String
+
+    var body: some View {
+        FormErrorText(message: message)
     }
 }

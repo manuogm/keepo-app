@@ -26,9 +26,9 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
-            VStack(spacing: 24) {
+            VStack(spacing: AppTheme.Spacing.xl) {
                 switch step {
                 case .currency:
                     currencyStep
@@ -41,12 +41,10 @@ struct OnboardingView: View {
                 }
 
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    FormErrorText(message: errorMessage)
                 }
             }
-            .padding(24)
+            .padding(AppTheme.Spacing.xl)
         }
         .task {
             currencies = (try? await session.dbQueue.read { database in
@@ -56,13 +54,13 @@ struct OnboardingView: View {
     }
 
     private var currencyStep: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppTheme.Spacing.l) {
             Text("Welcome to Keepo")
-                .font(.title).fontWeight(.bold)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
             Text("What's your base currency? Every balance converts into this.")
-                .font(.callout)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.body)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
 
             // Currency picker is restricted to `currencies` — the ECB set —
@@ -76,19 +74,19 @@ struct OnboardingView: View {
 
             Button("Continue") { step = .accountKind }
                 .buttonStyle(.borderedProminent)
-                .tint(Color.primary)
+                .tint(AppTheme.Palette.textPrimary)
                 .disabled(currencies.isEmpty)
         }
     }
 
     private var accountKindStep: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppTheme.Spacing.l) {
             Text("Add your first account")
-                .font(.title2).fontWeight(.bold)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
             Text("What kind of account is this?")
-                .font(.callout)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.body)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
 
             AccountKindPicker { kind in
                 accountKind = kind
@@ -98,10 +96,10 @@ struct OnboardingView: View {
     }
 
     private var firstAccountStep: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppTheme.Spacing.l) {
             Text(accountKind == .investment ? "Name your investment account" : "Name your account")
-                .font(.title2).fontWeight(.bold)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
 
             TextField("Account name (e.g. Checking)", text: $accountName)
                 .textFieldStyle(.roundedBorder)
@@ -111,8 +109,8 @@ struct OnboardingView: View {
                 .keyboardType(.decimalPad)
 
             Text("Required — without it, the first Sync Ritual would have nothing to reconcile against.")
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.micro)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
 
             Button {
@@ -125,7 +123,7 @@ struct OnboardingView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.primary)
+            .tint(AppTheme.Palette.textPrimary)
             .disabled(isFinishDisabled)
         }
     }
@@ -160,15 +158,15 @@ struct OnboardingView: View {
     }
 
     private var captureWalkthroughStep: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppTheme.Spacing.l) {
             Text("Log Apple Pay purchases automatically")
-                .font(.title2).fontWeight(.bold)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
                 .multilineTextAlignment(.center)
 
             Text("Optional — set it up now, or skip and find it later in Settings.")
-                .font(.callout)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.body)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
 
             NavigationStack {
@@ -183,7 +181,7 @@ struct OnboardingView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.primary)
+            .tint(AppTheme.Palette.textPrimary)
         }
     }
 

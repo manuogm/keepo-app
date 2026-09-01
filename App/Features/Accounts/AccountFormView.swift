@@ -111,28 +111,26 @@ struct AccountFormView: View {
     @ViewBuilder
     private var formContent: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
             if isLoading {
                 ProgressView()
             } else {
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: AppTheme.Spacing.l) {
                         IconPickerButton(icon: icon, color: color) { isPickingIcon = true }
-                            .padding(.top, 8)
+                            .padding(.top, AppTheme.Spacing.s)
 
                         identityAndBalanceCard
                         mappedCardsStrip
                         togglesCard
 
                         if let errorMessage {
-                            Text(errorMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
+                            FormErrorText(message: errorMessage)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
+                    .padding(.horizontal, AppTheme.Spacing.l)
+                    .padding(.bottom, AppTheme.Spacing.xl)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 // basedOnSize: content this short shouldn't rubber-band —
@@ -147,15 +145,15 @@ struct AccountFormView: View {
                 // grouped background rather than a separate bar.
                 .safeAreaInset(edge: .bottom) {
                     if isEditing {
-                        VStack(spacing: 8) {
+                        VStack(spacing: AppTheme.Spacing.s) {
                             metaText
                             DestructiveActionButton(title: "Delete Account", isEnabled: !isSaving) {
                                 showDeleteOptions = true
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
+                        .padding(.horizontal, AppTheme.Spacing.l)
+                        .padding(.top, AppTheme.Spacing.s)
+                        .padding(.bottom, AppTheme.Spacing.m)
                     }
                 }
             }
@@ -215,10 +213,10 @@ struct AccountFormView: View {
     /// already said so.
     private var identityAndBalanceCard: some View {
         FormCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
+                HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
                     TextField("Account Name", text: $name)
-                        .font(.title3.weight(.medium))
+                        .font(AppTheme.Typography.cardTitle)
                         .textInputAutocapitalization(.words)
                     if editingKind == .investment {
                         InvestmentBadge()
@@ -228,8 +226,8 @@ struct AccountFormView: View {
                     }
                 }
 
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    AmountField(text: $balanceText, currency: selectedCurrencyInfo, size: 44)
+                HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.m) {
+                    AmountField(text: $balanceText, currency: selectedCurrencyInfo, size: AppTheme.Size.touchTarget)
                     // Create only. An account's currency is immutable once it
                     // exists (no RPC changes it), so on edit there is nothing
                     // to offer — the symbol in front of the figure already
@@ -247,16 +245,16 @@ struct AccountFormView: View {
         Button {
             isPickingCurrency = true
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 Text(currency)
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppTheme.Typography.labelEmphasis)
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption2.weight(.semibold))
+                    .font(AppTheme.Typography.nanoEmphasis)
             }
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Color(.tertiarySystemGroupedBackground), in: Capsule())
+            .foregroundStyle(AppTheme.Palette.textPrimary)
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .padding(.vertical, AppTheme.Spacing.s)
+            .background(AppTheme.Palette.bgSurfaceRaised, in: Capsule())
         }
         .buttonStyle(.pressableCard)
     }
@@ -268,11 +266,11 @@ struct AccountFormView: View {
         FormCard(padding: 0) {
             VStack(spacing: 0) {
                 Toggle("Include in Balance", isOn: $includeInTotal)
-                    .tint(.green)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .sensoryFeedback(.selection, trigger: includeInTotal)
-                Divider().padding(.leading, 16)
+                    .tint(AppTheme.Palette.statusPositive)
+                    .padding(.horizontal, AppTheme.Spacing.l)
+                    .padding(.vertical, AppTheme.Spacing.m)
+                    .sensoryFeedback(AppTheme.Feedback.selection, trigger: includeInTotal)
+                Divider().padding(.leading, AppTheme.Spacing.l)
                 shareToggleRow
             }
         }
@@ -285,18 +283,18 @@ struct AccountFormView: View {
     /// an undo, and it says so before it happens.
     @ViewBuilder
     private var shareToggleRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
             Toggle("Share with Household", isOn: shareBinding)
-                .tint(.green)
+                .tint(AppTheme.Palette.statusPositive)
                 .disabled(!hasHousehold || isSaving)
             if !hasHousehold {
                 Text("Create a household in Profile first.")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.micro)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, AppTheme.Spacing.l)
+        .padding(.vertical, AppTheme.Spacing.m)
     }
 
     /// Provenance, not a control — grey and out of the way, right above the
@@ -304,7 +302,7 @@ struct AccountFormView: View {
     /// attention.
     @ViewBuilder
     private var metaText: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
             if let createdAt, let date = PostgresDate.date(fromTimestamp: createdAt) {
                 Text("Created on \(date.formatted(date: .abbreviated, time: .omitted))")
             }
@@ -312,8 +310,8 @@ struct AccountFormView: View {
                 Text("Shared on \(date.formatted(date: .abbreviated, time: .omitted))")
             }
         }
-        .font(.caption)
-        .foregroundStyle(Color.secondary)
+        .font(AppTheme.Typography.micro)
+        .foregroundStyle(AppTheme.Palette.textSecondary)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

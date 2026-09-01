@@ -36,7 +36,7 @@ struct WidgetFillBar: View {
             let extent = axis == .horizontal ? proxy.size.width : proxy.size.height
             ZStack(alignment: axis == .horizontal ? .leading : .bottom) {
                 if showsTrack {
-                    Capsule().fill(Color.secondary.opacity(0.16))
+                    Capsule().fill(AppTheme.Palette.fillSubtle)
                 }
                 stack(extent: extent)
             }
@@ -50,8 +50,8 @@ struct WidgetFillBar: View {
     @ViewBuilder
     private func stack(extent: CGFloat) -> some View {
         let layout = axis == .horizontal
-            ? AnyLayout(HStackLayout(spacing: 1))
-            : AnyLayout(VStackLayout(spacing: 1))
+            ? AnyLayout(HStackLayout(spacing: AppTheme.Spacing.xxs))
+            : AnyLayout(VStackLayout(spacing: AppTheme.Spacing.xxs))
         layout {
             if axis == .vertical { Spacer(minLength: 0) }
             ForEach(segments) { segment in

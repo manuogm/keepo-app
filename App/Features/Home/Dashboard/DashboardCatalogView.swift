@@ -64,13 +64,13 @@ struct DashboardCatalogView: View {
         VStack(spacing: 0) {
             header
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 20, pinnedViews: []) {
+                LazyVStack(alignment: .leading, spacing: AppTheme.Spacing.l, pinnedViews: []) {
                     ForEach(CatalogGroup.allCases) { group in
                         section(group)
                     }
                 }
                 .padding(.horizontal, inset)
-                .padding(.top, 8)
+                .padding(.top, AppTheme.Spacing.s)
                 .padding(.bottom, 24 + KeepoTabBarMetrics.clearance)
             }
             .scrollIndicators(.hidden)
@@ -83,8 +83,8 @@ struct DashboardCatalogView: View {
         // panel still reads as anchored rather than hovering.
         .background {
             UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
-                .fill(Color(.systemGroupedBackground))
-                .shadow(color: .black.opacity(0.18), radius: 20, y: -6)
+                .fill(AppTheme.Palette.bgCanvas)
+                .elevation(.floating)
                 .ignoresSafeArea(edges: .bottom)
         }
         .sheet(item: $explaining) { kind in
@@ -97,21 +97,21 @@ struct DashboardCatalogView: View {
     private var header: some View {
         HStack {
             Text("Add Widget")
-                .font(.headline)
+                .font(AppTheme.Typography.rowTitle)
             Spacer()
             Button(action: onClose) {
                 Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(Color.secondary)
-                    .frame(width: 28, height: 28)
-                    .background(Color.secondary.opacity(0.15), in: Circle())
+                    .font(AppTheme.Typography.captionEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                    .background(AppTheme.Palette.fillSubtle, in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
         }
         .padding(.horizontal, inset)
-        .padding(.top, 16)
-        .padding(.bottom, 4)
+        .padding(.top, AppTheme.Spacing.l)
+        .padding(.bottom, AppTheme.Spacing.xs)
     }
 
     // MARK: - Groups
@@ -166,17 +166,17 @@ struct DashboardCatalogView: View {
     @ViewBuilder
     private func section(_ group: CatalogGroup) -> some View {
         let members = kinds(in: group)
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
             sectionHeader(group, count: members.count)
             if !collapsed.contains(group) {
                 if members.isEmpty {
                     Text(group.blankState)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.label)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, AppTheme.Spacing.m)
                 } else {
-                    VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
                         ForEach(members, id: \.self) { kind in
                             entry(kind, isPlaced: group == .used)
                         }
@@ -189,24 +189,24 @@ struct DashboardCatalogView: View {
 
     private func sectionHeader(_ group: CatalogGroup, count: Int) -> some View {
         Button {
-            withAnimation(.snappy(duration: 0.24)) {
+            withAnimation(AppTheme.Motion.standard) {
                 if collapsed.contains(group) { collapsed.remove(group) } else { collapsed.insert(group) }
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: AppTheme.Spacing.s) {
                 Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.captionEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .rotationEffect(.degrees(collapsed.contains(group) ? 0 : 90))
                 Text(group.title)
-                    .font(.headline)
-                    .foregroundStyle(Color.primary)
+                    .font(AppTheme.Typography.rowTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                 // The count is what makes a shut group readable: "Used
                 // Widgets 0" and "Used Widgets 4" are different situations
                 // and the chevron alone cannot tell them apart.
                 Text(verbatim: "\(count)")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.labelEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .monospacedDigit()
                 Spacer(minLength: 0)
             }
@@ -241,18 +241,18 @@ struct DashboardCatalogView: View {
         // fix — the group it is sitting in already says why it can't be
         // added again.
         let reason = isPlaced ? nil : unavailable[kind]
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 4) {
+        return VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 Text(kind.title)
-                    .font(.headline)
-                    .foregroundStyle(Color.primary)
+                    .font(AppTheme.Typography.rowTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                 infoButton(kind)
                 Spacer(minLength: 0)
             }
             if let reason {
                 Text(reason)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.orange)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.brandSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if reason == nil, !isPlaced {
@@ -262,7 +262,7 @@ struct DashboardCatalogView: View {
                 // is being shown what they would get, and told what it
                 // needs. It simply can't be picked up.
                 preview(kind)
-                    .opacity(0.4)
+                    .opacity(AppTheme.Opacity.dim)
                     .saturation(0)
             }
         }
@@ -279,8 +279,8 @@ struct DashboardCatalogView: View {
             explaining = kind
         } label: {
             Image(systemName: "info.circle")
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .hitTarget()
         }
         .buttonStyle(.plain)

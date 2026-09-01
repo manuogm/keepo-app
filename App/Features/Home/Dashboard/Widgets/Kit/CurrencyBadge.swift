@@ -18,12 +18,12 @@ struct CurrencyBadge: View {
     var label: String?
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: AppTheme.Spacing.xs) {
             disc
             if showsCode {
                 Text(label ?? code ?? "—")
                     .font(.system(size: diameter * 0.55, weight: .semibold))
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                     .lineLimit(1)
                     // A currency code is three letters and must never be
                     // one of them plus an ellipsis. Without this, sharing a
@@ -55,10 +55,10 @@ struct CurrencyBadge: View {
                 .accessibilityHidden(true)
         } else {
             ZStack {
-                Circle().fill(Color.secondary.opacity(0.16))
+                Circle().fill(AppTheme.Palette.fillSubtle)
                 Image(systemName: "globe")
                     .font(.system(size: diameter * 0.52, weight: .medium))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
             .frame(width: diameter, height: diameter)
         }

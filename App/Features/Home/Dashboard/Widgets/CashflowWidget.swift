@@ -91,7 +91,7 @@ struct CashflowWidget: View {
     /// and Cashflow's net was visibly smaller than every other tile's
     /// headline while nominally being the same size.
     private func collapsed(_ metrics: CashflowMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             MetricHeadlineBlock(
                 value: .money(metrics.totals.netE4, currency), size: WidgetStyle.metric,
                 percentChange: metrics.percentChange, caption: TrendCaption.expanded(.month)
@@ -111,10 +111,10 @@ struct CashflowWidget: View {
     /// The two left-aligned bars this replaces shared a start point, which
     /// made "which was bigger" a comparison of two lengths instead.
     private func directions(_ metrics: CashflowMetrics) -> some View {
-        VStack(spacing: 4) {
-            HStack(alignment: .bottom, spacing: 8) {
+        VStack(spacing: AppTheme.Spacing.xs) {
+            HStack(alignment: .bottom, spacing: AppTheme.Spacing.s) {
                 directionTotal(.moneyIn, amountE4: amount(metrics.totals, .moneyIn), alignment: .leading)
-                Spacer(minLength: 8)
+                Spacer(minLength: AppTheme.Spacing.s)
                 directionTotal(.moneyOut, amountE4: amount(metrics.totals, .moneyOut), alignment: .trailing)
             }
             divergingBar(metrics)
@@ -132,10 +132,10 @@ struct CashflowWidget: View {
     ) -> some View {
         VStack(alignment: alignment, spacing: 0) {
             Text(side.title)
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.micro)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
             PrivateText(compactLabel(amountE4))
-                .font(.subheadline.weight(.semibold))
+                .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(side.color)
         }
         .lineLimit(1)
@@ -151,7 +151,7 @@ struct CashflowWidget: View {
     /// both sides — a hand-rolled trailing-aligned twin would be free to
     /// drift from all three.
     private func divergingBar(_ metrics: CashflowMetrics) -> some View {
-        HStack(spacing: 2) {
+        HStack(spacing: AppTheme.Spacing.xxs) {
             WidgetFillBar(
                 share: metrics.fill(of: metrics.totals.moneyInE4),
                 color: CashflowDirection.moneyIn.color, thickness: 8
@@ -178,7 +178,7 @@ struct CashflowWidget: View {
     // MARK: - Expanded
 
     private var expanded: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             MetricHeadlineBlock(
                 value: .money(series.highlightedPoint?.amountE4, currency), size: WidgetStyle.metricExpanded,
                 percentChange: series.percentChange, caption: badgeCaption
@@ -204,17 +204,17 @@ struct CashflowWidget: View {
     /// unlike an overlay it is still laid out, so an unusually long figure
     /// pushes the buttons apart rather than drawing over them.
     private var directionNav: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: AppTheme.Spacing.s) {
             segment(.moneyIn)
                 .frame(maxWidth: .infinity, alignment: .leading)
             PrivateText(directionTotalLabel)
-                .font(.subheadline.weight(.medium))
+                .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(direction.color)
                 .lineLimit(1)
             segment(.moneyOut)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .sensoryFeedback(.selection, trigger: direction)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: direction)
     }
 
     /// In and Out keep their own colours here rather than taking the neutral
@@ -239,7 +239,7 @@ struct CashflowWidget: View {
         WidgetSegment(isSelected: direction == side, tint: side.color, action: {
             direction = side
         }, label: {
-            Text(side.title).font(.caption)
+            Text(side.title).font(AppTheme.Typography.micro)
         })
     }
 
@@ -254,7 +254,7 @@ struct CashflowWidget: View {
                 id: side.rawValue,
                 points: series.series(side.metric),
                 visualization: .bar,
-                color: side == direction ? side.color : side.color.opacity(0.3)
+                color: side == direction ? side.color : side.color.opacity(AppTheme.Opacity.dim)
             )
         } + [
             ChartSeries(

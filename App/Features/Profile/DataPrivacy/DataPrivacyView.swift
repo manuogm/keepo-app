@@ -20,7 +20,7 @@ struct DataPrivacyView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
             List {
                 Section {
                     NavigationLink("Import CSV") {
@@ -54,20 +54,20 @@ struct DataPrivacyView: View {
                                     for: lastSyncedAt, relativeTo: Date()
                                 )
                                 Text("Last synced \(relative)")
-                                    .font(.footnote)
-                                    .foregroundStyle(Color.secondary)
+                                    .font(AppTheme.Typography.caption)
+                                    .foregroundStyle(AppTheme.Palette.textSecondary)
                             }
                         }
                     }
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                     .disabled(isSyncingFX)
                     if let fxSyncMessage {
                         Text(fxSyncMessage)
-                            .font(.footnote)
+                            .font(AppTheme.Typography.caption)
                             .foregroundStyle(
                                 fxSyncMessage.hasPrefix("Failed")
-                                    ? Color.red
-                                    : Color.secondary
+                                    ? AppTheme.Palette.statusNegative
+                                    : AppTheme.Palette.textSecondary
                             )
                     }
                 } footer: {
@@ -97,8 +97,8 @@ struct DataPrivacyView: View {
                     .disabled(isDeletingAccount)
                     if let deleteErrorMessage {
                         Text(deleteErrorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
+                            .font(AppTheme.Typography.caption)
+                            .foregroundStyle(AppTheme.Palette.statusNegative)
                     }
                 } footer: {
                     Text("Permanently deletes your account and all financial data. This cannot be undone.")

@@ -93,12 +93,12 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
                 filtersPanel
             }
         }
-        .shadow(color: .black.opacity(0.13), radius: 10, y: 5)
-        .animation(.snappy(duration: 0.28), value: isFiltersExpanded)
+        .elevation(.resting)
+        .animation(AppTheme.Motion.standard, value: isFiltersExpanded)
         // The one moment worth a bump: the card breaking free. Not the
         // finger touching down, not the spring settling — the instant the
         // drag stops being reversible.
-        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.8), trigger: hapticTick)
+        .sensoryFeedback(AppTheme.Feedback.swipeCommit, trigger: hapticTick)
     }
 
     // MARK: - Carousel
@@ -126,17 +126,17 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     }
 
     private func card(_ scope: PublicSchema.AccountScope) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: AppTheme.Spacing.m) {
             Button(action: onOpenProfile) {
-                ProfileAvatarView(email: session.userEmail, size: 40, onColor: true)
+                ProfileAvatarView(email: session.userEmail, onColor: true)
             }
             .buttonStyle(.pressableCard)
             .accessibilityLabel("Open profile")
 
-            HStack(spacing: 6) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 Text(title)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(Color.white)
+                    .font(AppTheme.Typography.cardTitle)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
                 if let badge = scope.badgeTitle {
                     ScopeBadge(title: badge, icon: scope.icon)
                 }
@@ -144,17 +144,17 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
 
-            Spacer(minLength: 4)
+            Spacer(minLength: AppTheme.Spacing.xs)
 
             accessory
             PrivacyToggleButton(session: session, tint: .white, font: .body)
-                .frame(width: 32, height: 32)
+                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, AppTheme.Spacing.l)
         .padding(.top, topSafeAreaInset + topOvershoot + 12)
         // Leaves the room the page dots are drawn into, so they sit inside
         // the card rather than on a strip of their own below it.
-        .padding(.bottom, 26)
+        .padding(.bottom, AppTheme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         // A shade darker at the top. Small enough that the card still reads
         // as one colour — it is depth, not decoration, and the flat-colour
@@ -174,16 +174,16 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     /// what reads as "you are here" at a glance, where a size difference
     /// between two dots has to be compared to be seen.
     private var pageDots: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: AppTheme.Spacing.xs) {
             ForEach(scopes, id: \.self) { scope in
                 let isCurrent = scope == session.scope
                 Capsule()
-                    .fill(Color.white.opacity(isCurrent ? 0.95 : 0.38))
-                    .frame(width: isCurrent ? 18 : 6, height: 6)
+                    .fill(AppTheme.Palette.textOnAccent.opacity(isCurrent ? 0.95 : 0.38))
+                    .frame(width: isCurrent ? AppTheme.Spacing.xl : AppTheme.Size.dot, height: AppTheme.Size.dot)
             }
         }
-        .padding(.bottom, 10)
-        .animation(.snappy(duration: 0.25), value: session.scope)
+        .padding(.bottom, AppTheme.Spacing.s)
+        .animation(AppTheme.Motion.standard, value: session.scope)
         .accessibilityHidden(true)
     }
 
@@ -194,15 +194,15 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     /// tall block and the card stopped being a card.
     private var filtersPanel: some View {
         VStack(spacing: 0) {
-            Color.clear.frame(height: 24)
+            Color.clear.frame(height: AppTheme.Spacing.xl)
             filters
-                .padding(.horizontal, 16)
+                .padding(.horizontal, AppTheme.Spacing.l)
                 // Breathing room under the card's edge — without it the
                 // first row of controls sits flush against the header and
                 // the panel reads as a continuation of it rather than as a
                 // drawer it opened.
-                .padding(.top, 10)
-                .padding(.bottom, 14)
+                .padding(.top, AppTheme.Spacing.s)
+                .padding(.bottom, AppTheme.Spacing.m)
         }
         .frame(maxWidth: .infinity)
         .background(
@@ -319,16 +319,16 @@ struct ScopeBadge: View {
     let icon: String
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: AppTheme.Spacing.xxs) {
             Image(systemName: icon)
-                .font(.system(size: 9, weight: .bold))
+                .font(AppTheme.Typography.nanoEmphasis)
             Text(title.uppercased())
-                .font(.system(size: 10, weight: .bold))
+                .font(AppTheme.Typography.nanoEmphasis)
                 .tracking(0.4)
         }
-        .foregroundStyle(Color.white)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background(Color.white.opacity(0.22), in: Capsule())
+        .foregroundStyle(AppTheme.Palette.textOnAccent)
+        .padding(.horizontal, AppTheme.Spacing.s)
+        .padding(.vertical, AppTheme.Spacing.xxs)
+        .background(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule())
     }
 }

@@ -37,11 +37,11 @@ struct CategoriesView: View {
         selectedTab == .expense ? expenseCategories : incomeCategories
     }
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.m), count: 3)
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Picker("Kind", selection: $selectedTab) {
@@ -49,7 +49,7 @@ struct CategoriesView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding()
-                .sensoryFeedback(.selection, trigger: selectedTab)
+                .sensoryFeedback(AppTheme.Feedback.selection, trigger: selectedTab)
 
                 if isLoading {
                     Spacer()
@@ -57,7 +57,7 @@ struct CategoriesView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 12) {
+                        LazyVGrid(columns: columns, spacing: AppTheme.Spacing.m) {
                             ForEach(visibleCategories, id: \.id) { category in
                                 Button {
                                     editingCategoryId = category.id
@@ -76,9 +76,7 @@ struct CategoriesView: View {
             if let errorMessage {
                 VStack {
                     Spacer()
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    FormErrorText(message: errorMessage)
                         .padding()
                 }
             }
@@ -133,20 +131,20 @@ private struct CategoryTile: View {
     let category: PublicSchema.CategoriesSelect
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AppTheme.Spacing.s) {
             Image(systemName: category.icon)
-                .font(.title2)
-                .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
+                .font(AppTheme.Typography.sectionTitle)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .frame(width: AppTheme.Size.touchTarget, height: AppTheme.Size.touchTarget)
                 .background(Color(hex: category.color))
                 .clipShape(Circle())
             Text(category.name)
-                .font(.footnote)
-                .foregroundStyle(Color.primary)
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
                 .lineLimit(1)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, AppTheme.Spacing.s)
     }
 }

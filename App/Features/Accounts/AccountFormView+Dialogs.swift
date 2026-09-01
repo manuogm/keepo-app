@@ -87,16 +87,16 @@ struct CurrencyPickerSheet: View {
                 } label: {
                     HStack {
                         Text(currency.code)
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(Color.primary)
+                            .font(AppTheme.Typography.bodyEmphasis)
+                            .foregroundStyle(AppTheme.Palette.textPrimary)
                         Text(MoneyFormatter.symbol(for: CurrencyInfo(
                             code: currency.code, minorUnit: Int(currency.minorUnit)
                         )))
-                            .foregroundStyle(Color.secondary)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
                         Spacer()
                         if selection == currency.code {
                             Image(systemName: "checkmark")
-                                .font(.body.weight(.semibold))
+                                .font(AppTheme.Typography.bodyEmphasis)
                         }
                     }
                 }

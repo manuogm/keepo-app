@@ -33,7 +33,7 @@ struct NotificationSettingsView: View {
             if isSystemPermissionDenied {
                 Section {
                     Button("Notifications are off in iPhone Settings — tap to fix") { openSystemSettings() }
-                        .foregroundStyle(Color.red)
+                        .foregroundStyle(AppTheme.Palette.statusNegative)
                 }
             }
             Section {
@@ -43,17 +43,17 @@ struct NotificationSettingsView: View {
                         Task { await sync(option) }
                     } label: {
                         HStack {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                                 Text(option.label)
-                                    .foregroundStyle(Color.primary)
+                                    .foregroundStyle(AppTheme.Palette.textPrimary)
                                 Text(option.detail)
-                                    .font(.footnote)
-                                    .foregroundStyle(Color.secondary)
+                                    .font(AppTheme.Typography.caption)
+                                    .foregroundStyle(AppTheme.Palette.textSecondary)
                             }
                             Spacer()
                             if level == option {
                                 Image(systemName: "checkmark")
-                                    .foregroundStyle(Color.primary)
+                                    .foregroundStyle(AppTheme.Palette.textPrimary)
                             }
                         }
                     }

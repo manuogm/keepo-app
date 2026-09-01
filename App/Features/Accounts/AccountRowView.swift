@@ -16,21 +16,23 @@ struct AccountRowView: View {
     @Environment(\.isPrivacyMode) private var isPrivacyMode
 
     var body: some View {
-        HStack(spacing: 12) {
-            CategoryIconView(icon: row.icon, color: Color(hex: row.color), diameter: 36)
+        HStack(spacing: AppTheme.Spacing.m) {
+            CategoryIconView(icon: row.icon, color: Color(hex: row.color))
 
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 5) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
+                HStack(spacing: AppTheme.Spacing.xs) {
                     Text(row.name)
-                        .font(.body)
-                        .foregroundStyle(row.archivedAt == nil ? Color.primary : Color.secondary)
+                        .font(AppTheme.Typography.body)
+                        .foregroundStyle(
+                            row.archivedAt == nil ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary
+                        )
                         .lineLimit(1)
                     if row.kind == .investment {
                         InvestmentBadge(compact: true)
                     }
                 }
                 if row.hasMappedCard || row.isShared {
-                    HStack(spacing: 6) {
+                    HStack(spacing: AppTheme.Spacing.xs) {
                         if row.hasMappedCard {
                             MappedCardIcon()
                         }
@@ -41,13 +43,13 @@ struct AccountRowView: View {
                 }
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: AppTheme.Spacing.s)
 
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: AppTheme.Spacing.xxs) {
                 PrivateText(formattedBalance)
-                    .font(.body.weight(.medium))
+                    .font(AppTheme.Typography.bodyEmphasis)
                     .monospacedDigit()
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
                     .contentTransition(.numericText())
                 if !isPrivacyMode {
                     CurrencyConversionLabel(
@@ -59,7 +61,7 @@ struct AccountRowView: View {
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppTheme.Spacing.xs)
     }
 
     private var formattedBalance: String {
@@ -83,24 +85,24 @@ struct AccountGroupHeaderRow: View {
 
     var body: some View {
         Button {
-            withAnimation(.snappy(duration: 0.25)) { isExpanded.toggle() }
+            withAnimation(AppTheme.Motion.standard) { isExpanded.toggle() }
         } label: {
             HStack {
                 Text(title)
-                    .font(.headline)
+                    .font(AppTheme.Typography.rowTitle)
                 Spacer()
                 PrivateText(subtitle)
-                    .font(.subheadline)
+                    .font(AppTheme.Typography.label)
                     .monospacedDigit()
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                 Image(systemName: "chevron.down")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.microEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                     .rotationEffect(.degrees(isExpanded ? 0 : -90))
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, AppTheme.Spacing.xxs)
         }
         .buttonStyle(.pressableRow)
-        .sensoryFeedback(.selection, trigger: isExpanded)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: isExpanded)
     }
 }

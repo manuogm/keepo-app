@@ -168,7 +168,7 @@ struct TransactionsListView: View {
 
     private var listContent: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 ScopeBannerView(
@@ -193,7 +193,7 @@ struct TransactionsListView: View {
 
                 if !isInboxExpanded {
                     ledger
-                        .padding(.top, 4)
+                        .padding(.top, AppTheme.Spacing.xs)
                         .fadingEdges()
                         .transition(.opacity)
                 }
@@ -212,15 +212,15 @@ struct TransactionsListView: View {
         } else if transactions.isEmpty {
             Spacer()
             Text("No transactions in this period")
-                .foregroundStyle(Color.secondary)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
             Spacer()
         } else {
             transactionList
 
             if let loadErrorMessage {
                 Text(loadErrorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.Palette.statusNegative)
                     .padding()
             }
         }
@@ -257,7 +257,7 @@ struct TransactionsListView: View {
                                 Button("Confirm") {
                                     Task { await confirmCapture(transaction) }
                                 }
-                                .tint(Color.primary)
+                                .tint(AppTheme.Palette.textPrimary)
                             }
                         }
                     }

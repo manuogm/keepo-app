@@ -66,31 +66,29 @@ struct CategoryFormView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+                AppTheme.Palette.bgCanvas.ignoresSafeArea()
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: AppTheme.Spacing.l) {
                         IconPickerButton(icon: icon, color: color) { isPickingIcon = true }
-                            .padding(.top, 8)
+                            .padding(.top, AppTheme.Spacing.s)
 
                         identityCard
 
                         if isDefaultCategory {
                             Text("The default category can't be renamed or deleted.")
-                                .font(.footnote)
-                                .foregroundStyle(Color.secondary)
+                                .font(AppTheme.Typography.caption)
+                                .foregroundStyle(AppTheme.Palette.textSecondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         if let errorMessage {
-                            Text(errorMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
+                            FormErrorText(message: errorMessage)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
+                    .padding(.horizontal, AppTheme.Spacing.l)
+                    .padding(.bottom, AppTheme.Spacing.xl)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 // basedOnSize: content this short shouldn't rubber-band —
@@ -111,12 +109,12 @@ struct CategoryFormView: View {
                         }
                         .overlay(alignment: .trailing) {
                             if isCheckingDelete {
-                                ProgressView().controlSize(.small).padding(.trailing, 20)
+                                ProgressView().controlSize(.small).padding(.trailing, AppTheme.Spacing.l)
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
+                        .padding(.horizontal, AppTheme.Spacing.l)
+                        .padding(.top, AppTheme.Spacing.s)
+                        .padding(.bottom, AppTheme.Spacing.m)
                     }
                 }
             }
@@ -164,10 +162,10 @@ struct CategoryFormView: View {
     private var identityCard: some View {
         FormCard {
             TextField("Category Name", text: $name)
-                .font(.title3.weight(.medium))
+                .font(AppTheme.Typography.cardTitle)
                 .textInputAutocapitalization(.words)
                 .disabled(isDefaultCategory)
-                .foregroundStyle(isDefaultCategory ? Color.secondary : Color.primary)
+                .foregroundStyle(isDefaultCategory ? AppTheme.Palette.textSecondary : AppTheme.Palette.textPrimary)
                 // Only while creating, and only until the user picks
                 // something themselves — typing "Groceries" suggesting a
                 // cart is helpful; silently reverting a chosen icon on the

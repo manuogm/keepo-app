@@ -57,13 +57,13 @@ struct AccountsListView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 ScopeBannerView(
                     title: "Accounts", session: session, onOpenProfile: { navigation?.openProfileRoot() }
                 )
-                .padding(.bottom, 6)
+                .padding(.bottom, AppTheme.Spacing.xs)
                 // The deck's cards tilt past their own bounds mid-swipe, and
                 // nothing clips them — so the banner has to win against the
                 // content underneath it.
@@ -77,8 +77,8 @@ struct AccountsListView: View {
                 VStack {
                     Spacer()
                     Text(actionErrorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.statusNegative)
                         .padding()
                 }
             }
@@ -180,11 +180,11 @@ struct AccountsListView: View {
                 editingAccountId = row.id
             } label: {
                 AccountRowView(row: row)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, AppTheme.Spacing.m)
+                    .padding(.vertical, AppTheme.Spacing.s)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
-                        Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16)
+                        AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card)
                     )
             }
             .buttonStyle(.pressableRow)
@@ -193,7 +193,7 @@ struct AccountsListView: View {
             // a full-bleed, square-cornered slab that looks nothing like the
             // card the user grabbed. `.dragPreview` clips it to the same
             // rounded rectangle the row draws.
-            .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 16))
+            .contentShape(.dragPreview, RoundedRectangle(cornerRadius: AppTheme.Radius.card))
             .swipeActions(edge: .trailing) {
                 Button(role: .destructive) {
                     archiveCandidate = row
@@ -215,12 +215,12 @@ struct AccountsListView: View {
     private var archivedRow: some View {
         ZStack {
             NavigationLink("", destination: ArchiveAccountsView(session: session)).opacity(0)
-            HStack(spacing: 4) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 Text("Archived (\(archived.count))")
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.micro)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                 Spacer()
             }
         }

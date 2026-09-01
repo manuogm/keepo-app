@@ -35,6 +35,6 @@ struct PrivateText: View {
         Text(isPrivacyMode ? PrivacyMask.hidden : text)
             .monospacedDigit()
             .contentTransition(.numericText())
-            .animation(.easeInOut(duration: 0.2), value: isPrivacyMode)
+            .animation(AppTheme.Motion.colorSafe, value: isPrivacyMode)
     }
 }

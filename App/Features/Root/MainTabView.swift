@@ -48,7 +48,7 @@ struct MainTabView: View {
             .toolbar(.hidden, for: .tabBar)
             .tag(AppNavigation.Tab.transactions)
         }
-        .tint(Color.primary)
+        .tint(AppTheme.Palette.textPrimary)
         .environment(navigation)
         .environment(scopeContext)
         .environment(\.isPrivacyMode, session.isPrivacyMode)

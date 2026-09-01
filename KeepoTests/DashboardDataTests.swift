@@ -61,8 +61,8 @@ struct DashboardDataTests {
 
     @Test("Trend colour never makes an uncomputable change look like good news")
     func uncomputableTrendIsNeverGreen() {
-        #expect(DashboardTrend.color(for: nil) == .secondary)
-        #expect(DashboardTrend.color(for: 1) == .green)
-        #expect(DashboardTrend.color(for: -1) == .red)
+        #expect(DashboardTrend.color(for: nil) == AppTheme.Palette.textSecondary)
+        #expect(DashboardTrend.color(for: 1) == AppTheme.Palette.statusPositive)
+        #expect(DashboardTrend.color(for: -1) == AppTheme.Palette.statusNegative)
     }
 }

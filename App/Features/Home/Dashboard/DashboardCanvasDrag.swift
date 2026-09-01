@@ -98,7 +98,7 @@ extension DashboardCanvasView {
             return
         }
         previewCell = cell
-        withAnimation(.snappy(duration: 0.25)) { dragPreview = preview }
+        withAnimation(AppTheme.Motion.standard) { dragPreview = preview }
     }
 
     /// Commits whatever is in hand at the cell the preview last settled on.
@@ -110,7 +110,7 @@ extension DashboardCanvasView {
             clearDrag()
             return
         }
-        withAnimation(.snappy(duration: 0.3)) {
+        withAnimation(AppTheme.Motion.layout) {
             if let incoming {
                 store.insert(kind: incoming.kind, id: incoming.id, atRow: cell.row, column: cell.column)
             } else if let drag {

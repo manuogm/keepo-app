@@ -61,15 +61,15 @@ struct CreditCardFace {
         ZStack {
             LinearGradient(
                 stops: [
-                    .init(color: .white.opacity(0), location: 0.0),
-                    .init(color: .white.opacity(0.16), location: 0.42),
-                    .init(color: .white.opacity(0), location: 0.62)
+                    .init(color: AppTheme.Palette.textOnAccent.opacity(0), location: 0.0),
+                    .init(color: AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fill), location: 0.42),
+                    .init(color: AppTheme.Palette.textOnAccent.opacity(0), location: 0.62)
                 ],
                 startPoint: seed.isMultiple(of: 2) ? .topLeading : .bottomLeading,
                 endPoint: seed.isMultiple(of: 2) ? .bottomTrailing : .topTrailing
             )
             RadialGradient(
-                colors: [.white.opacity(0.20), .clear],
+                colors: [AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), .clear],
                 center: seed.isMultiple(of: 3) ? .topTrailing : .topLeading,
                 startRadius: 2,
                 endRadius: 150
@@ -79,10 +79,10 @@ struct CreditCardFace {
     }
 
     /// Text and glyphs sit on a saturated field, so they are always the light
-    /// end of the scale rather than `Color.primary` — which would vanish
+    /// end of the scale rather than `AppTheme.Palette.textPrimary` — which would vanish
     /// against a bright card in light mode and against a dark one in dark
     /// mode. Deliberately not pure white: slightly translucent reads as ink
     /// on the card rather than a sticker over it.
     var foreground: Color { .white }
-    var secondaryForeground: Color { .white.opacity(0.75) }
+    var secondaryForeground: Color { AppTheme.Palette.textOnAccent.opacity(0.75) }
 }

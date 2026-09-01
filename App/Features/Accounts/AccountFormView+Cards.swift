@@ -29,24 +29,24 @@ extension AccountFormView {
     @ViewBuilder
     var mappedCardsStrip: some View {
         if case .edit(let accountId) = mode {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
+                HStack(spacing: AppTheme.Spacing.xs) {
                     Text("Linked Cards")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.labelEmphasis)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                     Button {
                         isShowingCardHelp = true
                     } label: {
                         Image(systemName: "questionmark.circle")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.secondary)
+                            .font(AppTheme.Typography.label)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
                     }
                     .buttonStyle(.pressableCard)
                     .accessibilityLabel("What are linked cards?")
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
+                    LazyHStack(spacing: AppTheme.Spacing.m) {
                         ForEach(cardMappings, id: \.id) { mapping in
                             Button {
                                 editingCard = MappedCardEditor(accountId: accountId, existing: mapping)
@@ -70,15 +70,15 @@ extension AccountFormView {
                         .buttonStyle(.pressableCard)
                         .accessibilityLabel("Map a new card to this account")
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, AppTheme.Spacing.l)
+                    .padding(.vertical, AppTheme.Spacing.xs)
                 }
                 // Negative inset so the strip bleeds to the screen edges
                 // while the rest of the form stays inset — a scrolling row
                 // that stops short of the edge reads as if it has ended.
                 .padding(.horizontal, -20)
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, AppTheme.Spacing.s)
         }
     }
 
@@ -107,7 +107,7 @@ struct CreditCardTile: View {
         VStack(alignment: .leading) {
             HStack {
                 Image(systemName: "wave.3.right")
-                    .font(.caption)
+                    .font(AppTheme.Typography.micro)
                     .foregroundStyle(face.secondaryForeground)
                 Spacer()
                 if source == .automatic {
@@ -116,33 +116,33 @@ struct CreditCardTile: View {
             }
             Spacer()
             Text(name)
-                .font(.subheadline.weight(.semibold))
+                .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(face.foreground)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
         }
-        .padding(14)
+        .padding(AppTheme.Spacing.m)
         .frame(width: Self.size.width, height: Self.size.height, alignment: .leading)
-        .background(face.gradient, in: RoundedRectangle(cornerRadius: 14))
-        .overlay { face.sheen.clipShape(RoundedRectangle(cornerRadius: 14)) }
+        .background(face.gradient, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
+        .overlay { face.sheen.clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.card)) }
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppTheme.Radius.card)
+                .strokeBorder(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
+        .elevation(.resting)
     }
 
     /// The empty state, kept as the strip's last item rather than shown only
     /// when there are no cards — an account can have more than one card
     /// mapped, so "none yet" is never the only moment this is useful.
     static var addPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 14)
-            .strokeBorder(Color.secondary.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+        RoundedRectangle(cornerRadius: AppTheme.Radius.card)
+            .strokeBorder(AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
             .frame(width: size.width, height: size.height)
             .overlay {
                 Image(systemName: "plus")
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.cardTitle)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
     }
 }
@@ -156,7 +156,7 @@ struct AutomaticMarker: View {
 
     var body: some View {
         Image(systemName: "cpu")
-            .font(.caption)
+            .font(AppTheme.Typography.micro)
             .foregroundStyle(tint)
             .accessibilityLabel("Mapped automatically")
     }
@@ -172,12 +172,12 @@ struct LinkedCardsHelpSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
                     Text(
                         "When you pay with a card, Keepo can file the purchase against this account "
                             + "for you — no typing."
                     )
-                    .font(.body)
+                    .font(AppTheme.Typography.body)
 
                     point(
                         icon: "creditcard.fill",
@@ -202,10 +202,10 @@ struct LinkedCardsHelpSheet: View {
                         "Removing a link never deletes anything you have already recorded — future "
                             + "purchases on that card just need reviewing again."
                     )
-                    .font(.footnote)
-                    .foregroundStyle(Color.secondary)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
-                .padding(20)
+                .padding(AppTheme.Spacing.l)
             }
             .navigationTitle("Linked Cards")
             .navigationBarTitleDisplayMode(.inline)
@@ -219,14 +219,14 @@ struct LinkedCardsHelpSheet: View {
     }
 
     private func point(icon: String, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.m) {
             Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(Color.secondary)
-                .frame(width: 26)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(detail).font(.footnote).foregroundStyle(Color.secondary)
+                .font(AppTheme.Typography.body)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .frame(width: AppTheme.Size.glyph)
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
+                Text(title).font(AppTheme.Typography.labelEmphasis)
+                Text(detail).font(AppTheme.Typography.caption).foregroundStyle(AppTheme.Palette.textSecondary)
             }
         }
     }

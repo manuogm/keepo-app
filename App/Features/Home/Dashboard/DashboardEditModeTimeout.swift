@@ -31,7 +31,7 @@ extension DashboardCanvasView {
             // so checking that alone timed edit mode out from under a user
             // who was still deciding where to put it.
             guard !Task.isCancelled, isEditing, drag == nil, incoming == nil else { return }
-            withAnimation(.snappy(duration: 0.24)) { isEditing = false }
+            withAnimation(AppTheme.Motion.standard) { isEditing = false }
         }
     }
 

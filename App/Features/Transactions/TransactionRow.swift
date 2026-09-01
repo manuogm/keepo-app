@@ -58,32 +58,32 @@ struct TransactionRow: View {
     private var isRecurring: Bool { transaction.recurringRuleId != nil }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: AppTheme.Spacing.m) {
             if isTransfer {
-                CategoryIconView(icon: "arrow.left.arrow.right", color: Color.gray, diameter: 36)
+                CategoryIconView(icon: "arrow.left.arrow.right", color: AppTheme.Palette.textSecondary)
             } else {
-                CategoryIconView(category: category, diameter: 36)
+                CategoryIconView(category: category)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
+                HStack(spacing: AppTheme.Spacing.xs) {
                     Text(isTransfer ? "Transfer" : (transaction.categoryName ?? "—"))
-                        .foregroundStyle(Color.primary)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
                         .lineLimit(1)
                     if isPendingReview {
                         PendingBadge()
                     }
                     if isPendingUpdate {
                         Image(systemName: "icloud.slash")
-                            .font(.caption2)
-                            .foregroundStyle(Color.secondary)
+                            .font(AppTheme.Typography.nano)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
                     }
                 }
 
-                HStack(spacing: 5) {
+                HStack(spacing: AppTheme.Spacing.xs) {
                     Text(accountLine)
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.micro)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                         .lineLimit(1)
                     // How this row came to exist, when it wasn't the user
                     // typing it. Glyph-only and grey: it is provenance, and
@@ -91,31 +91,31 @@ struct TransactionRow: View {
                     // account name, which is what people actually scan for.
                     if isCaptured {
                         Image(systemName: "cpu")
-                            .font(.caption2)
-                            .foregroundStyle(Color.secondary)
+                            .font(AppTheme.Typography.nano)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
                             .accessibilityLabel("Captured automatically")
                     }
                     if isRecurring {
                         Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                            .font(.caption2)
-                            .foregroundStyle(Color.secondary)
+                            .font(AppTheme.Typography.nano)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
                             .accessibilityLabel("Part of a recurring payment")
                     }
                 }
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: AppTheme.Spacing.s)
 
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: AppTheme.Spacing.xxs) {
                 PrivateText(formattedAmount)
-                    .font(.body.weight(.medium))
+                    .font(AppTheme.Typography.bodyEmphasis)
                     .monospacedDigit()
                     .foregroundStyle(amountColor)
                 if let arrivingAmount {
                     PrivateText("→ " + arrivingAmount)
-                        .font(.caption)
+                        .font(AppTheme.Typography.micro)
                         .monospacedDigit()
-                        .foregroundStyle(Color.secondary)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 } else if !isPrivacyMode {
                     CurrencyConversionLabel(
                         nativeCurrency: displayed.currency,
@@ -128,7 +128,7 @@ struct TransactionRow: View {
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppTheme.Spacing.xs)
     }
 
     /// Both accounts when the row is a whole transfer, one when it is a leg
@@ -159,8 +159,10 @@ struct TransactionRow: View {
     /// A combined transfer is exempt: green would say money arrived, and
     /// across the pair nothing did.
     private var amountColor: Color {
-        guard !isCombinedTransfer, let amount = transaction.amountE4, amount > 0 else { return Color.primary }
-        return Color.green
+        guard !isCombinedTransfer, let amount = transaction.amountE4, amount > 0 else {
+            return AppTheme.Palette.textPrimary
+        }
+        return AppTheme.Palette.statusPositive
     }
 }
 
@@ -169,10 +171,10 @@ struct TransactionRow: View {
 struct PendingBadge: View {
     var body: some View {
         Text("Pending")
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(Color.orange)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.orange.opacity(0.15), in: Capsule())
+            .font(AppTheme.Typography.nanoEmphasis)
+            .foregroundStyle(AppTheme.Palette.brandSecondary)
+            .padding(.horizontal, AppTheme.Spacing.xs)
+            .padding(.vertical, AppTheme.Spacing.xxs)
+            .background(AppTheme.Palette.brandSecondary.opacity(AppTheme.Opacity.fill), in: Capsule())
     }
 }

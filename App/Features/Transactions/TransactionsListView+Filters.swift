@@ -19,21 +19,21 @@ extension TransactionsListView {
     /// The funnel, for the banner's accessory slot.
     var filterToggle: some View {
         Button {
-            withAnimation(.snappy(duration: 0.28)) {
+            withAnimation(AppTheme.Motion.standard) {
                 isFiltersExpanded.toggle()
                 if !isFiltersExpanded { isSearching = false }
             }
         } label: {
             Image(systemName: "slider.horizontal.3")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(Color.white)
-                .frame(width: 32, height: 32)
-                .background(Color.white.opacity(isFiltersExpanded ? 0.28 : 0), in: Circle())
+                .font(AppTheme.Typography.bodyEmphasis)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                .background(AppTheme.Palette.textOnAccent.opacity(isFiltersExpanded ? 0.28 : 0), in: Circle())
                 .overlay(alignment: .topTrailing) {
                     if hasActiveFilter {
                         Circle()
-                            .fill(Color.white)
-                            .frame(width: 7, height: 7)
+                            .fill(AppTheme.Palette.textOnAccent)
+                            .frame(width: AppTheme.Size.dot, height: AppTheme.Size.dot)
                             .offset(x: 1, y: -1)
                     }
                 }
@@ -50,18 +50,18 @@ extension TransactionsListView {
     }
 
     var filterPanel: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: AppTheme.Spacing.s) {
             if isSearching {
                 searchField
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: AppTheme.Spacing.s) {
                     // Three menus and a button do not fit one 402pt row at
                     // any font this panel should be using, and an account
                     // called "Joint Current Account" makes it worse. The
                     // pills scroll; the search button stays put, because a
                     // control you have to scroll to find is not a control.
                     ScrollView(.horizontal) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: AppTheme.Spacing.s) {
                             accountFilterMenu
                             categoryFilterMenu
                             kindFilterMenu
@@ -72,10 +72,12 @@ extension TransactionsListView {
                         isSearching = true
                     } label: {
                         Image(systemName: "magnifyingglass")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.white)
-                            .frame(width: 34, height: 30)
-                            .background(Color.white.opacity(0.18), in: Capsule())
+                            .font(AppTheme.Typography.labelEmphasis)
+                            .foregroundStyle(AppTheme.Palette.textOnAccent)
+                            .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                            .background(
+                                AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule()
+                            )
                     }
                     .buttonStyle(.plain)
                 }
@@ -83,7 +85,7 @@ extension TransactionsListView {
             periodTrack
             periodStepper
         }
-        .animation(.snappy(duration: 0.22), value: isSearching)
+        .animation(AppTheme.Motion.quick, value: isSearching)
     }
 
     /// Expense / Income / Transfers. The raw values are
@@ -193,18 +195,23 @@ extension TransactionsListView {
     /// last one being sliced by the scroll edge, and no less clear next to
     /// a chevron.
     private func pillLabel(_ title: String, isActive: Bool) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: AppTheme.Spacing.xs) {
             Text(title)
-                .font(.subheadline)
+                .font(AppTheme.Typography.label)
                 .fontWeight(isActive ? .semibold : .regular)
                 .lineLimit(1)
             Image(systemName: "chevron.down")
-                .font(.caption2.weight(.semibold))
+                .font(AppTheme.Typography.nanoEmphasis)
         }
-        .foregroundStyle(isActive ? session.scope.panelTint : Color.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(isActive ? Color.white : Color.white.opacity(0.18), in: Capsule())
+        .foregroundStyle(isActive ? session.scope.panelTint : AppTheme.Palette.textOnAccent)
+        .padding(.horizontal, AppTheme.Spacing.m)
+        .padding(.vertical, AppTheme.Spacing.xs)
+        .background(
+            isActive
+                ? AppTheme.Palette.textOnAccent
+                : AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong),
+            in: Capsule()
+        )
     }
 
     private var selectedAccountName: String {
@@ -213,34 +220,35 @@ extension TransactionsListView {
     }
 
     private var searchField: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 6) {
+        HStack(spacing: AppTheme.Spacing.s) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 Image(systemName: "magnifyingglass")
-                    .font(.caption)
+                    .font(AppTheme.Typography.micro)
                 Text(filter.search.map { _ in "" } ?? "")
                     .hidden()
                     .frame(width: 0)
                 TextField(
                     "",
                     text: searchBinding,
-                    prompt: Text("Merchant, category, or account").foregroundColor(.white.opacity(0.6))
+                    prompt: Text("Merchant, category, or account")
+                        .foregroundStyle(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.muted))
                 )
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .font(.subheadline)
+                .font(AppTheme.Typography.label)
             }
-            .foregroundStyle(Color.white)
-            .tint(Color.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Color.white.opacity(0.18), in: Capsule())
+            .foregroundStyle(AppTheme.Palette.textOnAccent)
+            .tint(AppTheme.Palette.textOnAccent)
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .padding(.vertical, AppTheme.Spacing.s)
+            .background(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule())
 
             Button("Cancel") {
                 filter.search = nil
                 isSearching = false
             }
-            .font(.subheadline)
-            .foregroundStyle(Color.white)
+            .font(AppTheme.Typography.label)
+            .foregroundStyle(AppTheme.Palette.textOnAccent)
         }
     }
 
@@ -263,21 +271,21 @@ extension TransactionsListView {
                     periodBinding.wrappedValue = option
                 } label: {
                     Text(option.rawValue)
-                        .font(.caption)
+                        .font(AppTheme.Typography.micro)
                         .fontWeight(isSelected ? .bold : .regular)
-                        .foregroundStyle(isSelected ? session.scope.panelTint : Color.white)
+                        .foregroundStyle(isSelected ? session.scope.panelTint : AppTheme.Palette.textOnAccent)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 5)
-                        .background(isSelected ? Color.white : Color.clear, in: Capsule())
+                        .padding(.vertical, AppTheme.Spacing.xs)
+                        .background(isSelected ? AppTheme.Palette.textOnAccent : Color.clear, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(4)
-        .background(Color.white.opacity(0.12), in: Capsule())
-        .overlay(Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1))
-        .animation(.snappy(duration: 0.2), value: period)
-        .sensoryFeedback(.selection, trigger: period)
+        .padding(AppTheme.Spacing.xs)
+        .background(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fill), in: Capsule())
+        .overlay(Capsule().stroke(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.dim), lineWidth: 1))
+        .animation(AppTheme.Motion.quick, value: period)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: period)
     }
 
     private var periodStepper: some View {
@@ -287,8 +295,8 @@ extension TransactionsListView {
                     isCustomRangePresented = true
                 } label: {
                     Text(rangeLabel)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.white)
+                        .font(AppTheme.Typography.label)
+                        .foregroundStyle(AppTheme.Palette.textOnAccent)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
@@ -296,21 +304,21 @@ extension TransactionsListView {
                 stepButton("chevron.left", by: -1)
                 Spacer()
                 Text(rangeLabel)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color.white)
+                    .font(AppTheme.Typography.labelEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
                 Spacer()
                 stepButton("chevron.right", by: 1)
             }
         }
-        .padding(.top, 2)
+        .padding(.top, AppTheme.Spacing.xxs)
     }
 
     private func stepButton(_ systemName: String, by direction: Int) -> some View {
         Button { step(direction) } label: {
             Image(systemName: systemName)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.white)
-                .frame(width: 30, height: 26)
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.glyph)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

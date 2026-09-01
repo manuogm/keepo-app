@@ -178,7 +178,7 @@ struct HighlightableChart: View {
             .onChange(of: selectedPosition) { _, position in
                 select(position)
             }
-                .sensoryFeedback(.selection, trigger: highlighted)
+                .sensoryFeedback(AppTheme.Feedback.selection, trigger: highlighted)
         }
     }
 
@@ -259,7 +259,7 @@ struct HighlightableChart: View {
     /// when its bucket is the highlighted one. Colouring it like the value
     /// would make two bars compete to be the answer.
     private func colour(_ series: ChartSeries, bucket: Date, isBackdrop: Bool) -> Color {
-        guard !isBackdrop else { return series.color.opacity(0.14) }
+        guard !isBackdrop else { return series.color.opacity(AppTheme.Opacity.fill) }
         return WidgetPalette.mark(series.color, isHighlighted: isHighlighted(bucket))
     }
 
@@ -298,7 +298,7 @@ struct HighlightableChart: View {
             let index = value.as(Double.self).map { Int($0.rounded()) }
             if showsGridLines, let index, index.isMultiple(of: gridStride) {
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-                    .foregroundStyle(Color.secondary.opacity(0.28))
+                    .foregroundStyle(AppTheme.Palette.fillStrong)
             }
             // `anchor: .top` — UnitPoint(0.5, 0) — is what actually centres
             // the label on its tick.
@@ -319,8 +319,8 @@ struct HighlightableChart: View {
             AxisValueLabel(anchor: .top) {
                 if let index, labels.indices.contains(index) {
                     Text(labels[index])
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.micro)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                         .lineLimit(1)
                         // **No `fixedSize()`.** It is what put every label
                         // half its own width to the right of the bar it
@@ -396,5 +396,5 @@ struct HighlightableChart: View {
     /// rolls its digits through `contentTransition(.numericText())`, which
     /// needs a transaction, and a line's point mark really does change size
     /// here. Both want a curve; neither wants bounce.
-    private static let highlightAnimation: Animation = .easeInOut(duration: 0.2)
+    private static let highlightAnimation = AppTheme.Motion.colorSafe
 }

@@ -14,19 +14,19 @@ struct OfflineStatusBar: View {
         Button {
             showInfo = true
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: AppTheme.Spacing.xs) {
                 Image(systemName: "wifi.slash")
                 Text("You are offline")
                 if let lastSyncedAt {
                     Text("· Last synced \(lastSyncedAt.formatted(.relative(presentation: .named)))")
                 }
             }
-            .font(.caption2)
-            .foregroundStyle(Color.red.opacity(0.85))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .font(AppTheme.Typography.nano)
+            .foregroundStyle(AppTheme.Palette.statusNegative.opacity(0.85))
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .padding(.vertical, AppTheme.Spacing.s)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
+            .elevation(.resting)
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showInfo) {
@@ -64,8 +64,8 @@ struct PendingSyncStatusBar: View {
                 isRetrying = false
             }
         } label: {
-            VStack(spacing: 2) {
-                HStack(spacing: 6) {
+            VStack(spacing: AppTheme.Spacing.xxs) {
+                HStack(spacing: AppTheme.Spacing.xs) {
                     if isRetrying {
                         ProgressView().controlSize(.mini)
                     } else {
@@ -78,18 +78,18 @@ struct PendingSyncStatusBar: View {
                 // RPC mismatch through five rounds of testing.
                 if let errorMessage {
                     Text(errorMessage)
-                        .font(.caption2)
-                        .foregroundStyle(Color.secondary)
+                        .font(AppTheme.Typography.nano)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
                 }
             }
-            .font(.caption2)
-            .foregroundStyle(Color.orange.opacity(0.9))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .font(AppTheme.Typography.nano)
+            .foregroundStyle(AppTheme.Palette.brandSecondary.opacity(0.9))
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .padding(.vertical, AppTheme.Spacing.s)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
+            .elevation(.resting)
         }
         .buttonStyle(.plain)
         .disabled(isRetrying)
