@@ -24,7 +24,7 @@ extension TransactionsListView {
                 if !isFiltersExpanded { isSearching = false }
             }
         } label: {
-            Image(systemName: "line.3.horizontal.decrease")
+            Image(systemName: "slider.horizontal.3")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.white)
                 .frame(width: 32, height: 32)

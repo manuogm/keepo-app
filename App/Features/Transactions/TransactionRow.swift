@@ -15,11 +15,40 @@ import SwiftUI
 struct TransactionRow: View {
     let transaction: PublicSchema.TransactionsWithDetailsSelect
     var category: PublicSchema.CategoriesSelect?
+    /// The transfer's other leg, when the ledger has folded both into this
+    /// one row (`TransactionEntry`). Its presence is what turns the row from
+    /// "money left Checking" into "money moved Checking → Savings".
+    var counterpart: PublicSchema.TransactionsWithDetailsSelect?
     var isPendingUpdate: Bool = false
 
     @Environment(\.isPrivacyMode) private var isPrivacyMode
 
     private var isTransfer: Bool { transaction.kind == "transfer" }
+
+    /// Source and destination, worked out from the signs rather than from
+    /// which leg the list happened to reach first — the ledger keeps
+    /// whichever came first, and that can be either one.
+    private var legs: (from: PublicSchema.TransactionsWithDetailsSelect,
+                       to: PublicSchema.TransactionsWithDetailsSelect)? {
+        guard let counterpart else { return nil }
+        return (transaction.amountE4 ?? 0) < 0 ? (transaction, counterpart) : (counterpart, transaction)
+    }
+
+    /// The leg every figure on this row is drawn from: the outgoing one for
+    /// a combined transfer, so the amount shown is the amount that left.
+    private var displayed: PublicSchema.TransactionsWithDetailsSelect { legs?.from ?? transaction }
+
+    /// A transfer between two currencies does not have "an amount" — it has
+    /// one on each side. Only then is the far side worth a second line.
+    private var arrivingAmount: String? {
+        guard let legs, legs.from.currency != legs.to.currency else { return nil }
+        guard let code = legs.to.currency, let minorUnit = legs.to.minorUnit else { return nil }
+        let currency = CurrencyInfo(code: code, minorUnit: Int(minorUnit))
+        return MoneyFormatter.format(legs.to.amountE4, currency: currency, signStyle: .magnitude)
+    }
+
+    private var isCombinedTransfer: Bool { counterpart != nil }
+
     // `status == .pending` — an automatic capture still waiting on review,
     // never true for a manually-entered transaction (those are created
     // already `confirmed`). Distinct from `isPendingUpdate` (unsynced
@@ -52,7 +81,7 @@ struct TransactionRow: View {
                 }
 
                 HStack(spacing: 5) {
-                    Text(transaction.accountName ?? "—")
+                    Text(accountLine)
                         .font(.caption)
                         .foregroundStyle(Color.secondary)
                         .lineLimit(1)
@@ -82,13 +111,18 @@ struct TransactionRow: View {
                     .font(.body.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(amountColor)
-                if !isPrivacyMode {
+                if let arrivingAmount {
+                    PrivateText("→ " + arrivingAmount)
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(Color.secondary)
+                } else if !isPrivacyMode {
                     CurrencyConversionLabel(
-                        nativeCurrency: transaction.currency,
-                        amountBase: transaction.amountBaseE4,
-                        baseCurrency: transaction.baseCurrency,
-                        baseMinorUnit: transaction.baseMinorUnit,
-                        hasMissingRate: transaction.hasMissingRate ?? false,
+                        nativeCurrency: displayed.currency,
+                        amountBase: displayed.amountBaseE4,
+                        baseCurrency: displayed.baseCurrency,
+                        baseMinorUnit: displayed.baseMinorUnit,
+                        hasMissingRate: displayed.hasMissingRate ?? false,
                         signStyle: .ledger
                     )
                 }
@@ -97,10 +131,23 @@ struct TransactionRow: View {
         .padding(.vertical, 4)
     }
 
+    /// Both accounts when the row is a whole transfer, one when it is a leg
+    /// or an ordinary transaction. The arrow is the row's statement of
+    /// direction, which is why the amount beside it needs no sign.
+    private var accountLine: String {
+        guard let legs else { return transaction.accountName ?? "—" }
+        return "\(legs.from.accountName ?? "—") → \(legs.to.accountName ?? "—")"
+    }
+
     private var formattedAmount: String {
-        guard let currencyCode = transaction.currency, let minorUnit = transaction.minorUnit else { return "—" }
+        guard let currencyCode = displayed.currency, let minorUnit = displayed.minorUnit else { return "—" }
         let currency = CurrencyInfo(code: currencyCode, minorUnit: Int(minorUnit))
-        return MoneyFormatter.format(transaction.amountE4, currency: currency, signStyle: .ledger)
+        // `.magnitude`, not `.ledger`: a combined transfer is neither an
+        // inflow nor an outflow — the money is still the user's — so the
+        // row draws the figure alone and lets the arrow say the rest.
+        return MoneyFormatter.format(
+            displayed.amountE4, currency: currency, signStyle: isCombinedTransfer ? .magnitude : .ledger
+        )
     }
 
     /// Green means "money arrived", by sign rather than by kind — which also
@@ -109,8 +156,10 @@ struct TransactionRow: View {
     /// is. Outflows stay in the primary text colour rather than going red:
     /// spending is the normal case, and colouring every expense as an alert
     /// makes the colour mean nothing.
+    /// A combined transfer is exempt: green would say money arrived, and
+    /// across the pair nothing did.
     private var amountColor: Color {
-        guard let amount = transaction.amountE4, amount > 0 else { return Color.primary }
+        guard !isCombinedTransfer, let amount = transaction.amountE4, amount > 0 else { return Color.primary }
         return Color.green
     }
 }

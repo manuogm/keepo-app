@@ -19,13 +19,20 @@ extension DashboardCanvasView {
 
     // MARK: - Catalogue
 
+    /// Invisible on purpose: it exists only to catch a tap outside the
+    /// panel. This used to dim the screen behind the catalogue, back when
+    /// the catalogue was the only thing floating over a flat page. It now
+    /// slides up under a coloured banner and a glass tab bar, and a black
+    /// wash across both read as the screen having gone wrong rather than
+    /// quiet. The panel's own shadow and its rounded top edge are what
+    /// separate it from the dashboard.
     @ViewBuilder
     var catalogueBackdrop: some View {
         if isPickingWidget {
-            Color.black.opacity(0.25)
+            Color.clear
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
                 .onTapGesture { isPickingWidget = false }
-                .transition(.opacity)
         }
     }
 

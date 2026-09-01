@@ -89,14 +89,18 @@ struct TransactionsListView: View {
     /// heavy on a busy month.
     struct DayGroup: Identifiable {
         let day: Date
-        let items: [PublicSchema.TransactionsWithDetailsSelect]
+        let items: [TransactionEntry]
         var id: Date { day }
     }
 
     func regroup() {
-        let groups = Dictionary(grouping: transactions) { transaction -> Date in
+        // Transfer legs are folded into one entry BEFORE the day grouping,
+        // not inside it — both legs carry the same `occurred_at`, but the
+        // pairing is a property of the transfer, not of the day it landed on.
+        let groups = Dictionary(grouping: TransactionEntry.collapsingTransfers(transactions)) { entry -> Date in
             guard
-                let occurredAt = transaction.occurredAt, let date = PostgresDate.date(fromTimestamp: occurredAt)
+                let occurredAt = entry.transaction.occurredAt,
+                let date = PostgresDate.date(fromTimestamp: occurredAt)
             else { return .distantPast }
             return calendar.startOfDay(for: date)
         }
@@ -226,7 +230,8 @@ struct TransactionsListView: View {
         List {
             ForEach(groupedByDay) { group in
                 Section {
-                    ForEach(group.items, id: \.transactionId) { transaction in
+                    ForEach(group.items) { entry in
+                        let transaction = entry.transaction
                         // A `Button`, not `.onTapGesture`: a bare tap
                         // gesture inside a `List` loses races with the
                         // scroll recogniser (the "first tap does nothing
@@ -234,7 +239,11 @@ struct TransactionsListView: View {
                         Button {
                             handleTap(on: transaction)
                         } label: {
-                            TransactionRow(transaction: transaction, category: category(for: transaction))
+                            TransactionRow(
+                                transaction: transaction,
+                                category: category(for: transaction),
+                                counterpart: entry.counterpart
+                            )
                         }
                         .buttonStyle(.pressableRow)
                         .swipeActions(edge: .trailing) {
@@ -253,7 +262,7 @@ struct TransactionsListView: View {
                         }
                     }
                     .onDelete { offsets in
-                        Task { await delete(at: offsets, in: group.items) }
+                        Task { await delete(at: offsets, in: group.items.map(\.transaction)) }
                     }
                 } header: {
                     Text(group.day.formatted(date: .abbreviated, time: .omitted))

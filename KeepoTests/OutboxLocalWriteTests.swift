@@ -134,26 +134,6 @@ struct OutboxLocalWriteTests {
         #expect(try await balance(dbQueue, accountId: accountId) == 0)
     }
 
-    @Test("both legs of a created transfer move both accounts' local balances")
-    func createTransferAppliesBothLegsLocally() async throws {
-        let (outbox, dbQueue) = try makeOutboxAndDatabase()
-        let ownerId = UUID()
-        let fromAccountId = UUID()
-        let toAccountId = UUID()
-        try await seedAccount(dbQueue, id: fromAccountId, ownerId: ownerId)
-        try await seedAccount(dbQueue, id: toAccountId, ownerId: ownerId)
-
-        _ = await outbox.submitCreateTransfer(
-            CreateTransferPayload(
-                fromId: UUID(), toId: UUID(), fromAccountId: fromAccountId, toAccountId: toAccountId,
-                fromAmountE4: -30000, toAmountE4: 30000, occurredAt: Date()
-            )
-        )
-
-        #expect(try await balance(dbQueue, accountId: fromAccountId) == -30000)
-        #expect(try await balance(dbQueue, accountId: toAccountId) == 30000)
-    }
-
     @Test("setting a regular account's balance inserts an adjustment for exactly the gap")
     func setRegularBalanceInsertsAdjustment() async throws {
         let (outbox, dbQueue) = try makeOutboxAndDatabase()

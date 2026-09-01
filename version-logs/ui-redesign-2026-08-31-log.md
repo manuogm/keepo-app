@@ -82,9 +82,31 @@ Two things worth knowing before touching this again: `.ignoresSafeArea` **reposi
 - The Needs Review drawer's item list gets the bottom ramp too (`fadingEdges(top: 0)`) — expanded it reaches the display's bottom like the ledger it replaces. On the **rows only**: masking the whole drawer would dissolve its own surface with them.
 - **Tab bar icons went from 17pt to 20pt** (and their fixed box from 20 to 23). The plus was tried thinner and put back at 21pt semibold on the user's call.
 
+## Sixth pass (same day, user feedback)
+
+- **The amount field could not be typed into at all.** `AmountField` hid its `TextField` behind `.opacity(isFocused ? 1 : 0)`, with a comment claiming it stayed "hit-testable at zero opacity". UIKit does the opposite: `hitTest` skips any view whose alpha is at or below 0.01, so the field was never a touch target in its resting state — every money input in the app showed its "$0.00" placeholder and swallowed the tap. It is hidden by **text colour** now (`.foregroundStyle(.clear)`), which keeps the view opaque and tappable and still lands the caret where the finger went. Reproduced and fixed both ways in an isolated harness before touching the app.
+- **The widget catalogue's black wash is gone.** It made sense when the catalogue floated over a flat page; under a coloured banner and glass tab bar it read as the screen having gone wrong. The backdrop is now a `Color.clear` that exists only to catch a tap outside, and the panel is separated by its own shadow and rounded top edge.
+- **A calculator behind every `AmountField`** (`CalculatorSheet` + `CalculatorEngine`). Arithmetic is pure logic in KeepoCore and unit-tested: `Decimal` throughout, real operator precedence (`2 + 3 × 4` is 14), left-associative within a precedence level, and `nil` — never `0` — for an incomplete expression or a division by zero. Not a breach of "all money arithmetic in SQL": nothing here derives a balance or a conversion, it is the user's scratch arithmetic, and the result re-enters the form as typed text through `AmountParser` like any other amount. The sheet takes the form's own ✗/✓ header, with ✓ disabled until the expression is whole.
+- **`AmountFormatter.editableString(decimal:)` needs its label.** Added unlabelled, it beat the `Int64` e4 overload at every integer-literal call site — `Decimal` is `ExpressibleByIntegerLiteral` too — and reinterpreted e4 amounts as plain numbers (`-425_000` → "-425000.00" instead of "42.50"). The existing formatter tests caught it. Two overloads separated only by numeric type are a trap; there are now tests pinning both.
+- **A transfer is one row, not two.** `TransactionEntry.collapsingTransfers` folds the two legs into a single ledger entry showing the transfer icon, `Checking → Brokerage`, and the amount unsigned in the primary colour — a transfer is neither an inflow nor an outflow, so no `+` and no green. Pairing is conditional: filter to one account and its sibling is not loaded, so the lone leg still renders signed, which from that account's side is the truth. Cross-currency transfers show the arriving amount on the second line, where the base-currency conversion normally sits.
+- Filter icon changed to `slider.horizontal.3`; the calculator button is `function` (ƒx) — SF Symbols has no calculator glyph, `plus.forwardslash.minus` reads as a sign toggle, and `square.grid.3x3` collides with the Dashboard tab's `square.grid.2x2`.
+
+## Transfer write-through fix (same day)
+
+Found while verifying the combined transfer row, fixed on the user's say-so. `OutboxLocalWrite.createTransfer` — the optimistic write that stands in for `create_transfer` until the next pull — disagreed with the function it mirrors in two ways:
+
+- **The sending leg was stored with the wrong sign.** `fromAmountE4` is a positive magnitude, exactly as the RPC declares it ("from_amount must be a positive magnitude"); the server writes `-p_from_amount`. The mirror wrote the magnitude verbatim, so until a pull corrected it a brand-new transfer read as **income** on the account the money had just left — green `+`, and the balance moved upwards.
+- **Same-currency transfers wrote only one leg.** `toAmountE4` is `nil` when both accounts share a currency (the form does not ask for a figure they already agree on). The old code bailed out of the receiving leg on that `nil`, with a comment claiming the server "leaves it pending" — it does not: it `coalesce`s to `p_from_amount` when the currencies match and **raises** when they differ. The mirror now does the same, and writes both legs or neither, so where the server would reject the transfer no half of one is left behind describing something that never happened.
+
+Non-positive magnitudes are rejected rather than coerced — the server raises on them, and a mirror that quietly repaired a payload would be describing a transfer that is about to fail.
+
+The `transfer_group_id` stays a placeholder (`fromId`): the real one is `gen_random_uuid()` inside the function body and is unknowable offline. Both legs share it, so they pair locally, and the pull upserts each leg by its own client-supplied id — replacing the placeholder in place, never duplicating. Confirmed against both databases.
+
+**The existing test encoded the bug.** `createTransferAppliesBothLegsLocally` hand-built a payload with `fromAmountE4: -30000` — already negative, which no caller produces (`saveTransfer` passes `magnitude`) — and asserted the write stored it verbatim. That is how a wrong sign survived in a codebase whose first money rule is about signs. The test now uses the real contract, and `TransferLocalWriteTests` covers the sign, the derived same-currency amount, the shared group id, and both cross-currency cases. Four of the five fail against the old implementation.
+
 ## Tests
 
-`KeepoTests/ScopeFilteringTests.swift` — scope filtering on the transactions read path (total/private/household), `scopeAvailability` counts (including that an archived account counts towards no scope), and the whole `ScopeEmptiness` decision table. 147 unit tests in 33 suites pass; SwiftLint clean.
+`KeepoTests/ScopeFilteringTests.swift` — scope filtering on the transactions read path (total/private/household), `scopeAvailability` counts (including that an archived account counts towards no scope), and the whole `ScopeEmptiness` decision table. 156 app tests in 35 suites and 192 KeepoCore tests in 29 suites pass; SwiftLint clean.
 
 ## Open
 

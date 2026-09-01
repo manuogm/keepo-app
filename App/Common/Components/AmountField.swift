@@ -9,18 +9,18 @@ import SwiftUI
 /// labelling it.
 ///
 /// **On the split rendering.** `TextField` cannot render two font sizes in
-/// one field — SwiftUI has no attributed-text field. Overlaying a styled
-/// `Text` on a transparent `TextField` was tried and rejected: the two lay
-/// out at different widths (that is the whole point of the smaller
-/// fraction), so the real caret drifts away from the drawn digits as soon
-/// as the user taps to move it mid-string.
+/// one field — SwiftUI has no attributed-text field. So the field always
+/// defines the layout at the full size, and the styled `Text` is drawn over
+/// it *only while unfocused*: focusing swaps to a plain uniform field — no
+/// reflow, since the field was the layout driver all along — and the split
+/// styling returns on blur. The user sees the designed treatment whenever
+/// they are reading, and an ordinary, completely predictable text field
+/// whenever they are typing.
 ///
-/// Instead the `TextField` always defines the layout at the full size, and
-/// the styled `Text` is drawn over it only while unfocused. Focusing swaps
-/// to a plain uniform field — no reflow, since the field was the layout
-/// driver all along — and the split styling returns on blur. The user sees
-/// the designed treatment whenever they are reading, and an ordinary,
-/// completely predictable text field whenever they are typing.
+/// The overlay and the caret must never coexist. The two lay out at
+/// different widths (that is the whole point of the smaller fraction), so a
+/// caret drawn under the styled text drifts away from the digits the user
+/// is aiming at. Swapping on focus is what keeps that from happening.
 struct AmountField: View {
     @Binding var text: String
     /// Drives the placeholder's decimal places and the split point. `nil`
@@ -36,6 +36,7 @@ struct AmountField: View {
     var size: CGFloat = 40
 
     @FocusState private var isFocused: Bool
+    @State private var isCalculatorPresented = false
 
     private var minorUnit: Int { currency?.minorUnit ?? 2 }
 
@@ -67,6 +68,26 @@ struct AmountField: View {
     }
 
     var body: some View {
+        // Two levels: the symbol and the figure share a baseline, because
+        // "$" belongs to the number. The keypad button is not part of the
+        // figure, so it centres on the row instead — hung off a baseline it
+        // sat level with the digits' feet.
+        HStack(spacing: 8) {
+            figure
+            if isEnabled {
+                calculatorButton
+            }
+        }
+        .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
+        .animation(nil, value: isFocused)
+        .sheet(isPresented: $isCalculatorPresented) {
+            CalculatorSheet(minorUnit: minorUnit, initialText: text) { amount in
+                text = amount
+            }
+        }
+    }
+
+    private var figure: some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             if let symbol {
                 Text(symbol)
@@ -81,17 +102,47 @@ struct AmountField: View {
                     .keyboardType(.decimalPad)
                     .focused($isFocused)
                     .disabled(!isEnabled)
-                    // Still hit-testable at zero opacity, which is what makes
-                    // tapping the styled overlay focus the real field.
-                    .opacity(isFocused ? 1 : 0)
+                    // Hidden by TEXT COLOUR, never by opacity. This carried
+                    // `.opacity(isFocused ? 1 : 0)` and the comment "still
+                    // hit-testable at zero opacity" — which is exactly what
+                    // UIKit does not do: `hitTest` skips any view whose
+                    // alpha is at or below 0.01. The field was therefore
+                    // untappable in its resting state, so the amount showed
+                    // its "$0.00" placeholder and no tap could ever focus
+                    // it. At full opacity with clear text the field is a
+                    // real touch target again, and tapping mid-string still
+                    // lands the caret where the finger went.
+                    .foregroundStyle(isFocused ? Color.primary : Color.clear)
 
                 if !isFocused {
                     display.allowsHitTesting(false)
                 }
             }
         }
-        .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
-        .animation(nil, value: isFocused)
+    }
+
+    /// Deliberately quiet — grey on a grey fill, no larger than the fields
+    /// it sits beside. It is a convenience for the times an amount needs
+    /// working out, not a second thing competing with the figure for
+    /// attention on a screen whose whole point is that figure.
+    private var calculatorButton: some View {
+        Button {
+            isCalculatorPresented = true
+        } label: {
+            // `function` (ƒx), not `plus.forwardslash.minus`: ± is the
+            // calculator's own negate key, so on the outside it reads as
+            // "flip the sign" rather than "work this out". SF Symbols has
+            // no calculator glyph, and `square.grid.3x3` — the other honest
+            // candidate, a keypad — is a sibling of the Dashboard tab's
+            // `square.grid.2x2`.
+            Image(systemName: "function")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.secondary)
+                .frame(width: 34, height: 34)
+                .background(Color(.quaternarySystemFill), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Work the amount out on a calculator")
     }
 
     @ViewBuilder

@@ -52,16 +52,6 @@ struct HomeView: View {
                 // nothing clips them — so the banner has to win against the
                 // content underneath it.
                 .zIndex(1)
-                // The canvas dims itself behind the widget catalogue, and
-                // that dim cannot reach up here — it lives inside the
-                // canvas, one `VStack` cell below. Matching it keeps the
-                // screen looking like one surface going quiet rather than
-                // two halves disagreeing.
-                .overlay {
-                    Color.black.opacity(isPickingWidget ? 0.25 : 0)
-                        .allowsHitTesting(false)
-                }
-                .animation(.easeInOut(duration: 0.2), value: isPickingWidget)
 
                 content
                     .fadingEdges()

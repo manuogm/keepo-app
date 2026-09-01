@@ -92,3 +92,22 @@ public enum AmountFormatter {
         return formatter.string(from: value as NSDecimalNumber) ?? "\(value)"
     }
 }
+
+public extension AmountFormatter {
+    /// Field text for a value that is still a `Decimal` — the pop-up
+    /// calculator's running expression and its result, which never become an
+    /// e4 amount here. The form the result lands in parses it back through
+    /// `AmountParser` on save like any typed string, so the round trip is
+    /// the same one every other amount takes.
+    ///
+    /// The `decimal:` label is load-bearing. Unlabelled, this overload wins
+    /// against the `Int64` one for every literal call site — `Decimal` is
+    /// `ExpressibleByIntegerLiteral` too — and silently reinterprets an e4
+    /// amount as a plain number: `editableString(-425_000, minorUnit: 2)`
+    /// would return "-425000.00" instead of "42.50". Two overloads that
+    /// differ only in a numeric type are a trap; a label is the fix.
+    static func editableString(decimal value: Decimal, minorUnit: Int, locale: Locale = .current) -> String {
+        let formatter = FormatterCache.editable(minorUnit: minorUnit, locale: locale)
+        return formatter.string(from: value as NSDecimalNumber) ?? "\(value)"
+    }
+}

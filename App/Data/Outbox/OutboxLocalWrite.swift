@@ -120,30 +120,56 @@ enum OutboxLocalWrite {
 
     /// Both legs get an explicit id from the payload (`fromId`/`toId`) —
     /// unlike edit/delete, a create never has to guess which existing row is
-    /// which. `toAmountE4` can be `nil` (a cross-currency transfer whose
-    /// receiving-side amount isn't known yet); a leg this file can't price
-    /// is simply not written, exactly like the server-side create leaves it
-    /// pending — nothing here decides an amount the server itself hasn't.
+    /// which.
+    ///
+    /// **`fromAmountE4` is a positive magnitude**, exactly as the server
+    /// declares it ("from_amount must be a positive magnitude"). The signs
+    /// belong to the write path, and this one has to apply the same ones
+    /// `create_transfer` will or the mirror contradicts the row it stands
+    /// in for: it used to store the magnitude verbatim, so until the next
+    /// pull corrected it a brand-new transfer read as **income** on the
+    /// account the money had just left, green `+` and all, and moved that
+    /// balance the wrong way.
+    ///
+    /// **Both legs or neither.** `toAmountE4` is `nil` for a same-currency
+    /// transfer — the form does not ask for a figure the two accounts
+    /// already agree on — and the server coalesces it to `p_from_amount` in
+    /// exactly that case, raising when the currencies differ. This mirrors
+    /// that `coalesce`. It previously wrote the sending leg and then bailed
+    /// out of the receiving one, which is what left every same-currency
+    /// transfer as a lone half until it synced; and where the server would
+    /// have raised, that half described a transfer the server never made.
     static func createTransfer(_ payload: CreateTransferPayload, in database: Database) throws {
         guard
             let ownerId = try accountOwnerId(database, accountId: payload.fromAccountId.uuidString),
-            let fromCurrency = try accountCurrency(database, accountId: payload.fromAccountId.uuidString)
+            let fromCurrency = try accountCurrency(database, accountId: payload.fromAccountId.uuidString),
+            let toCurrency = try accountCurrency(database, accountId: payload.toAccountId.uuidString)
         else { return }
+        let mirroredAmountE4: Int64? = fromCurrency == toCurrency ? payload.fromAmountE4 : nil
+        // Non-positive magnitudes are rejected rather than corrected: the
+        // server raises on them, and a mirror that quietly fixed up a
+        // payload would be describing a transfer that is about to fail.
+        guard let toAmountE4 = payload.toAmountE4 ?? mirroredAmountE4,
+              payload.fromAmountE4 > 0, toAmountE4 > 0
+        else { return }
+
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         let occurredAt = PostgresDate.sqliteTimestampBoundaryString(payload.occurredAt)
+        // A placeholder: the real group id is `gen_random_uuid()` inside the
+        // function body, unknowable offline. Both legs share this one so
+        // they pair up locally, and the next pull upserts each leg BY ITS
+        // OWN id — those are client-supplied and stable — replacing the
+        // placeholder in place rather than duplicating anything.
         let groupId = payload.fromId.uuidString
 
         try SyncApply.upsertRow(
             transferLegRow(
-                id: payload.fromId, ownerId: ownerId, accountId: payload.fromAccountId, amountE4: payload.fromAmountE4,
+                id: payload.fromId, ownerId: ownerId, accountId: payload.fromAccountId,
+                amountE4: -payload.fromAmountE4,
                 currency: fromCurrency, occurredAt: occurredAt, groupId: groupId, now: now, notes: payload.notes
             ),
             table: "transactions", in: database
         )
-        guard
-            let toAmountE4 = payload.toAmountE4,
-            let toCurrency = try accountCurrency(database, accountId: payload.toAccountId.uuidString)
-        else { return }
         try SyncApply.upsertRow(
             transferLegRow(
                 id: payload.toId, ownerId: ownerId, accountId: payload.toAccountId, amountE4: toAmountE4,
