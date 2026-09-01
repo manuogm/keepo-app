@@ -284,13 +284,19 @@ public enum LocalSchemaV1 {
             table.column("kind", .text).notNull()
             table.column("payload_json", .blob).notNull()
             table.column("expected_version", .integer)
-            // `.double`, not `.text` — this column carries a `timeIntervalSince1970`
-            // (see `OutboxItemRecord`'s own comment), and TEXT column affinity
-            // would round-trip that Double through a 15-significant-digit
-            // text cast, occasionally rounding it forward past a `Date()`
-            // read a moment later (confirmed empirically — flaked
-            // `hasStalePending(threshold: 0)` roughly 1 run in 5). `.double`
-            // stores the exact IEEE 754 bits, no cast involved.
+            // Declared `.double`, but what actually lands here is GRDB's
+            // default TEXT timestamp: REAL affinity cannot coerce
+            // `"yyyy-MM-dd HH:mm:ss.SSS"` to a number, so SQLite keeps the
+            // string. The declaration is left as it is deliberately — the
+            // stored value is identical either way, and changing it to
+            // `.text` would need its own migration purely so that fresh
+            // installs and upgraded devices stop declaring different
+            // affinities for a column that behaves the same in both.
+            //
+            // See `OutboxItemRecord` for why the TEXT format is correct for
+            // this column's two jobs (chronological `ORDER BY`, exact
+            // round-trip), and for the inert date-strategy declarations that
+            // used to claim a `timeIntervalSince1970` this never held.
             table.column("created_at", .double).notNull()
             table.column("attempts", .integer).notNull()
             table.column("last_error", .text)

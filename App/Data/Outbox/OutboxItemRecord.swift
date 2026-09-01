@@ -7,38 +7,42 @@ import GRDB
 /// other id column across this store.
 struct OutboxItemRecord: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "outbox_items"
-    // `created_at` here is purely local bookkeeping (FIFO ordering,
-    // staleness checks) — never compared against a server-issued timestamp —
-    // so unlike every synced table's `TEXT` date columns, this one was meant
-    // to be encoded as a `timeIntervalSince1970` number: full sub-second
-    // precision, no ISO 8601 whole-second truncation that could round a
-    // just-inserted row's timestamp into the future relative to `Date()`
-    // read a moment later (confirmed empirically — `.iso8601`'s truncation
-    // made `hasStalePending(threshold: 0)` flaky immediately after `enqueue`).
+    // `created_at` is purely local bookkeeping — FIFO ordering, and the
+    // staleness check behind the pending-sync banner. It is never compared
+    // against a server-issued timestamp, so unlike every synced table's date
+    // columns it carries no format contract with Postgres.
     //
-    // **These two declarations are inert, and the column holds TEXT.** GRDB 7
-    // takes the strategy as a static *function* — `databaseDateEncodingStrategy
-    // (for column: String)` — not the static property GRDB 5 took. These
-    // properties therefore satisfy no protocol requirement; they are two
-    // unused constants, and GRDB falls back to its default, which writes a
-    // `"yyyy-MM-dd HH:mm:ss.SSS"` string. `LocalSchemaV1`'s `.double` column
-    // affinity can't coerce that to a number, so it is stored as TEXT.
+    // It is stored as GRDB's default: the TEXT `"yyyy-MM-dd HH:mm:ss.SSS"`,
+    // in UTC. That is correct for both jobs this column has, and neither is
+    // obvious enough to leave unsaid:
     //
-    // Nothing is *wrong* today: encoding and decoding both take the same
-    // default, so the round trip is symmetric and the sub-second precision
-    // the flake needed is present in the string. It only bit when
-    // `Outbox+Retry.refreshCounts()` read the raw column with an aggregate
-    // instead of decoding a record — that crashed on launch, which is how
-    // this was found. That reader no longer cares about the storage type.
+    //  - **Ordering.** The format is fixed-width, zero-padded and UTC, so a
+    //    lexicographic `ORDER BY` over it *is* chronological. `drainAll`'s
+    //    FIFO replay rests on that: a dependent write (a confirm, an update,
+    //    a delete) must never replay before the create it needs.
+    //  - **Round-trip.** Encoding and decoding both take the same default,
+    //    so a `Date` written here comes back equal to the millisecond.
     //
-    // Fixing it properly means switching both to the function form AND
-    // migrating the rows already on disk: `ORDER BY created_at` and
-    // `MIN(created_at)` would otherwise sort every new REAL row before every
-    // existing TEXT one (SQLite orders REAL before TEXT), silently
-    // reordering the FIFO drain. That is a schema change with a migration,
-    // deliberately not slipped into a performance pass.
-    static let databaseDateEncodingStrategy: DatabaseDateEncodingStrategy = .timeIntervalSince1970
-    static let databaseDateDecodingStrategy: DatabaseDateDecodingStrategy = .timeIntervalSince1970
+    // This type used to declare `databaseDateEncodingStrategy` /
+    // `databaseDateDecodingStrategy` as static *properties* asking for
+    // `.timeIntervalSince1970`. GRDB 7 takes them as static *functions*
+    // (`databaseDateEncodingStrategy(for:)`), so those declarations satisfied
+    // no protocol requirement and never did anything — and this project has
+    // only ever used GRDB 7, so the column has always held TEXT, never a
+    // mix. They are deleted rather than corrected, on purpose:
+    //
+    // Switching to the function form changes the storage type, which needs a
+    // migration of the rows already queued on devices, and a half-applied one
+    // leaves REAL and TEXT in the same column. SQLite sorts REAL before TEXT,
+    // so that would silently invert the drain order on the one table holding
+    // unsent financial writes — exactly the failure `Outbox.enqueue` exists
+    // to prevent. All it would buy is sub-millisecond precision, which
+    // nothing needs (one test sleeps 1ms around the quantization and says so).
+    // Revisit only if something genuinely requires finer ordering.
+    //
+    // Read `createdAt` through this record, never as a raw column value: an
+    // aggregate over `created_at` read as a `Double` is what crashed the app
+    // on launch once already (see `Outbox+Retry.refreshCounts`).
 
     var id: UUID
     var kind: String

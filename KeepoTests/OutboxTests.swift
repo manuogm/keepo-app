@@ -236,9 +236,11 @@ struct OutboxTests {
 
         #expect(outbox.hasStalePending(threshold: 0) == false)
         _ = await outbox.submitCreateTransaction(payload).value
-        // A real clock tick between `enqueue`'s `Date()` and this one — on a
-        // fast in-memory GRDB write, both can otherwise land in the same
-        // clock tick and make a `threshold: 0` comparison flake at the
+        // One millisecond, because that is the resolution `created_at` is
+        // kept at: GRDB's default TEXT timestamp carries `.SSS` and no more
+        // (see `OutboxItemRecord`). Without the sleep, `enqueue`'s `Date()`
+        // and this one can quantize into the same millisecond on a fast
+        // in-memory write and make a `threshold: 0` comparison flake at the
         // boundary; this isn't testing anything about that boundary itself.
         try await Task.sleep(nanoseconds: 1_000_000)
         #expect(outbox.hasStalePending(threshold: 0) == true)
