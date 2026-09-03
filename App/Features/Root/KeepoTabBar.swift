@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// The app's own floating tab bar: three icon-only destinations in one
+/// The app's own floating tab bar: four icon-only destinations in one
 /// capsule, and the Add button as a **separate** object beside it.
 ///
 /// It is hand-built rather than a styled `TabView` bar for one reason the
 /// system bar cannot give: the Add button is not a tab. It has no selected
 /// state, it never navigates, and what it adds depends on where you are —
 /// a widget, an account, a transaction. Putting it inside the tab bar would
-/// have made it look like a fourth destination; putting it outside says
+/// have made it look like a fifth destination; putting it outside says
 /// "this acts on the screen you're on", which is exactly what it does.
 ///
 /// Both the bar and the button are **neutral**: selection is weight and
@@ -58,7 +58,7 @@ struct KeepoTabBar: View {
         } label: {
             // Icon-only — the label lives on the button as an accessibility
             // string, not on screen. `KeepoIcon`'s square frame keeps the
-            // three glyphs on one baseline despite differing natural heights.
+            // four glyphs on one baseline despite differing natural heights.
             KeepoIcon(
                 name: isSelected ? destination.selectedIcon : destination.icon,
                 size: AppTheme.Size.icon
@@ -103,7 +103,7 @@ struct KeepoTabBar: View {
         // The only button in the app that gets a haptic, and it earns it:
         // it is the primary action, it opens a sheet over whatever you were
         // reading, and it is the one control here that *changes* something
-        // rather than moving between screens. The three destinations beside
+        // rather than moving between screens. The four destinations beside
         // it stay silent — a bar that buzzed on every tab would make this
         // one stop meaning anything.
         .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: addTick)
@@ -120,6 +120,7 @@ extension AppNavigation.Tab {
         case .home: return "icon-dashboard"
         case .accounts: return "icon-account"
         case .transactions: return "icon-transaction"
+        case .categories: return "icon-tag"
         }
     }
 
@@ -128,6 +129,7 @@ extension AppNavigation.Tab {
         case .home: return "icon-dashboard-filled"
         case .accounts: return "icon-account-filled"
         case .transactions: return "icon-transaction-filled"
+        case .categories: return "icon-tag-filled"
         }
     }
 
@@ -136,6 +138,7 @@ extension AppNavigation.Tab {
         case .home: return "Dashboard"
         case .accounts: return "Accounts"
         case .transactions: return "Transactions"
+        case .categories: return "Categories"
         }
     }
 
@@ -144,6 +147,7 @@ extension AppNavigation.Tab {
         case .home: return "Add a widget"
         case .accounts: return "Add an account"
         case .transactions: return "Add a transaction"
+        case .categories: return "Add a category"
         }
     }
 }

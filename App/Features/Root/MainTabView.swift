@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// The signed-in app shell — three icon-only tabs, the Add button beside
+/// The signed-in app shell — four icon-only tabs, the Add button beside
 /// them, the Profile sheet, and the offline/pending-sync status overlay.
 /// Extracted from `RootView` so the root router stays a thin traffic
 /// controller; this owns everything specific to the `.ready` session phase.
@@ -15,9 +15,10 @@ struct MainTabView: View {
     /// a widget four layers into Home can ask for a tab switch without every
     /// signature between here and it carrying a navigation parameter.
     @State private var navigation = AppNavigation()
-    /// Loaded here, once, for the same reason: all three screens render the
-    /// identical "this scope is empty" answer, and the read behind it is
-    /// the same read whichever screen asks.
+    /// Loaded here, once, for the same reason: the three money screens all
+    /// render the identical "this scope is empty" answer, and the read
+    /// behind it is the same read whichever screen asks. Categories is not
+    /// among them — a category is not scoped money.
     @State private var scopeContext = ScopeContext()
     /// Measured here and handed down, because this is the last view that
     /// still sees it — see `EnvironmentValues.topSafeAreaInset`.
@@ -47,6 +48,12 @@ struct MainTabView: View {
             }
             .toolbar(.hidden, for: .tabBar)
             .tag(AppNavigation.Tab.transactions)
+
+            NavigationStack {
+                CategoriesView(session: session)
+            }
+            .toolbar(.hidden, for: .tabBar)
+            .tag(AppNavigation.Tab.categories)
         }
         .tint(AppTheme.Palette.textPrimary)
         .environment(navigation)

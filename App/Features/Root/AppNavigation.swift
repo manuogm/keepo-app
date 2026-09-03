@@ -17,14 +17,21 @@ import KeepoCore
 @Observable
 @MainActor
 final class AppNavigation {
-    /// Three destinations, icon-only (`KeepoTabBar`). Profile is no longer
-    /// among them: it is reached by tapping the avatar on the scope banner,
-    /// which is on every one of these three screens, and presents as a
-    /// sheet over whichever tab asked for it.
+    /// Four destinations, icon-only (`KeepoTabBar`). Profile is no longer
+    /// among them: it is reached by tapping the avatar on the header of
+    /// every one of these screens, and presents as a sheet over whichever
+    /// tab asked for it.
+    ///
+    /// Categories became a tab rather than staying a row inside
+    /// Profile → Preferences because tags now hang off it: a category is no
+    /// longer a setting you configure once at signup, it is the thing the
+    /// user organises their spending with and returns to. Two levels of
+    /// navigation inside a settings screen is the wrong depth for that.
     enum Tab: Hashable, CaseIterable {
         case home
         case accounts
         case transactions
+        case categories
     }
 
     /// A screen inside the Profile tab that some other screen has asked to

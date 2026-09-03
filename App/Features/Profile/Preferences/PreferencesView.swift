@@ -35,14 +35,6 @@ struct PreferencesView: View {
                 }
 
                 Section {
-                    NavigationLink("Categories") {
-                        CategoriesView(session: session)
-                    }
-                } footer: {
-                    Text("Organise your spending with custom categories.")
-                }
-
-                Section {
                     Picker("Appearance", selection: $appearanceMode) {
                         ForEach(AppearanceMode.allCases, id: \.self) { mode in
                             Text(mode.label).tag(mode)
