@@ -27,44 +27,80 @@ Decision: colors are **Color Sets in `Assets.xcassets/Colors/`**, each carrying 
 
 Referenced only through `AppTheme.Palette`, which names each set exactly once. A view writes `AppTheme.Palette.textSecondary`, never `Color("TextSecondary")` and never `Color.secondary`.
 
-### Brand Accents (single value — no dark variant)
-*   **`BrandPrimary`** (Electric Coral): `#FF5A5F` → `Palette.brandPrimary`
-    *   *Usage:* Main data lines/curves, analytics progress rings, interactive buttons, primary microcopy keywords.
-*   **`BrandSecondary`** (Mango Fizz): `#FF9F1C` → `Palette.brandSecondary`
-    *   *Usage:* Budget limit reminders, currency categorization chips, goal benchmarks, the Needs Review inbox. A reminder should catch the eye **without reading as an error** — that is what separates it from `StatusNegative`.
+### The neutral ramp
+
+Every non-semantic colour comes off one zero-chroma ramp:
+
+`#FFFFFF · #FAFAFA · #F5F5F5 · #EBEBEB · #E0E0E0 · #CCCCCC · #A3A3A3 · #8A8A8A · #737373 · #6B6B6B · #525252 · #3B3B3B · #333333 · #303030 · #262626`
+
+**`#262626` is the floor: nothing in the app is darker, and nothing is pure black** — not primary text, not the dark canvas, not a shadow. The previous palette's warm cream (`#FAF9F6`) and blue-slate dark (`#0B0F19` / `#1E293B` / `#334155`) are both gone. The app is neutral so that its one accent has the screen to itself.
+
+### Brand accent — one colour
+
+*   **`BrandPrimary`** (Mango) — `#A05C00` / Dark `#FF9F1C` / HC `#8A5200` / Dark+HC `#FFB347` → `Palette.brandPrimary`
+    *   *Usage:* the Needs Review inbox, the Pending badge, budget and goal benchmarks, the offline bar, the tab bar's unreviewed-count dot. Anything that should catch the eye **without reading as an error** — that is what separates it from `StatusNegative`.
+
+**There is no `BrandSecondary`.** The Electric Coral `#FF5A5F` that used to be the primary is gone from the app: mango is the whole accent.
+
+**Why the accent is not one value.** Mango is a light hue. `#FF9F1C` measures **2.05:1 on white** — it fails as text at any size — and **7.37:1 on `#262626`**. Nearly every use of the accent is ink at caption sizes, so the light value has to be a deep amber and the dark value the true mango. That is one accent at the two lightnesses its two grounds require, not two accents. `ScopeTotal` is the same hue on the fill side, where dark ink would sit on it instead.
 
 ### Surface & Text
-*   **`BGCanvas`** — `#FAF9F6` (Warm Clean Cream) / Dark `#0B0F19` (Deep Velvet Night) — overall app canvas
-*   **`BGSurface`** — `#FFFFFF` (Pure White) / Dark `#1E293B` (Slate Gray) — cards, transaction rows, floating asset blocks
-*   **`BGSurfaceRaised`** — `#F1F0EC` / Dark `#334155` — a surface sitting *on* `BGSurface`: a well inside a card, a selected row
-*   **`TextPrimary`** — `#0B0F19` (Deep Velvet Charcoal) / Dark `#FAF9F6` (Warm Off-White) — balance values, core typography
-*   **`TextSecondary`** — `#64748B` (Slate Steel) / Dark `#94A3B8` (Muted Steel) — metadata, timestamps, subtext
-*   **`TextOnAccent`** — `#FFFFFF` — text and glyphs drawn on a saturated fill (a scope banner, a tinted circle)
+
+| Token | Light | Dark | HC Light | HC Dark |
+|---|---|---|---|---|
+| `BGCanvas` | `#F5F5F5` | `#262626` | `#EDEDED` | `#262626` |
+| `BGSurface` | `#FFFFFF` | `#303030` | `#FFFFFF` | `#333333` |
+| `BGSurfaceRaised` | `#EBEBEB` | `#3B3B3B` | `#DCDCDC` | `#424242` |
+| `TextPrimary` | `#262626` | `#F5F5F5` | `#262626` | `#FFFFFF` |
+| `TextSecondary` | `#6B6B6B` | `#A3A3A3` | `#525252` | `#CCCCCC` |
+| `TextOnAccent` | `#FFFFFF` — single value, all appearances | | | |
+
+`BGSurfaceRaised` is a surface sitting *on* `BGSurface`: a well inside a card, a selected row. It recesses in light and lifts in dark.
+
+`TextSecondary` clears 4.5:1 on canvas, surface **and** raised in all four appearances (worst case 4.51). `TextPrimary` runs 12.9–15.1:1. **High Contrast light keeps canvas and surface visibly apart** rather than flattening both to white as it used to — this app separates cards with shadow, not hairlines, so collapsing that step removed the only edge a card had.
 
 ### Neutral fills
 Prefer these over `.opacity()` on a neutral: an asset gets a high-contrast variant, an alpha never can.
-*   **`FillSubtle`** — `#64748B` @ 12% / Dark `#94A3B8` @ 16% — a wash behind a chip or an icon well
-*   **`FillStrong`** — `#64748B` @ 22% / Dark `#94A3B8` @ 28% — its selected or pressed state
+*   **`FillSubtle`** — `#737373` @12% / Dark `#A3A3A3` @16% / HC @22% / Dark+HC @28% — a wash behind a chip or an icon well
+*   **`FillStrong`** — `#737373` @22% / Dark `#A3A3A3` @28% / HC @34% / Dark+HC @42% — its selected or pressed state
 
 ### Status
-*   **`StatusPositive`** — `#1E8E3E` / Dark `#4CD97B` — a trend up, a toggle on, a finished sync
-*   **`StatusNegative`** — `#D92D20` / Dark `#FF6B66` — an error, a destructive action, a trend down
 
-Deliberately **not** the system `.green`/`.red`: both are too light to read as text on either canvas. Warnings have no token of their own — they use `BrandSecondary`, per the mango rule above.
+| Token | Light | Dark | HC Light | HC Dark |
+|---|---|---|---|---|
+| `StatusPositive` | `#177A33` | `#4CD97B` | `#116326` | `#7BE8A2` |
+| `StatusNegative` | `#C4271B` | `#FF6B66` | `#A81E15` | `#FF9C99` |
+
+Deliberately **not** the system `.green`/`.red`. Both were deepened when the canvas went neutral: the previous `#1E8E3E` measures 3.86:1 on `#F5F5F5` and failed. Warnings have no token of their own — they use `BrandPrimary`, per the mango rule above.
 
 ### Money
-*   **`CashflowIncome`** — `#2A78D6` / Dark `#3987E5`
-*   **`CashflowExpense`** — `#FF5A5F` / Dark `#F04A50`
-*   **`ChartNeutral`** — `#262626` / Dark `#D9D9D9` — the default series colour, for anything that is neither a verdict nor a user-chosen identity
 
-**Income is blue, not green.** Coral-vs-green is the canonical red-green colour-vision failure (ΔE 7.6); coral-vs-blue clears it (ΔE 19.5). Validated against CVD tooling rather than picked by eye — see `app-architecture.md` §5. This overrides the several places the widget spec asks for green income.
+| Token | Light | Dark | HC Light | HC Dark |
+|---|---|---|---|---|
+| `CashflowIncome` | `#1F6BC7` | `#5B9FEF` | `#155FB5` | `#7CB4F2` |
+| `CashflowExpense` | `#CC2E28` | `#FF7A75` | `#AD2119` | `#FFA9A4` |
+| `ChartNeutral` | `#262626` | `#D4D4D4` | `#262626` | `#FFFFFF` |
+
+**Income is blue, not green.** Warm-vs-green is the canonical red-green colour-vision failure (ΔE 7.6 for the original coral pair); warm-vs-blue clears it (ΔE 19.5). Validated against CVD tooling rather than picked by eye — see `app-architecture.md` §5. This overrides the several places the widget spec asks for green income.
+
+Expense is a **deep red**, not the old coral: coral *was* `BrandPrimary`, and removing the one meant retiring the other. It stays warm rather than folding into `ChartNeutral` so a cashflow chart still reads as two opposed quantities; it is deliberately a shade off `StatusNegative`, which is a verdict rather than a direction. Re-checked on the new values: income and expense separate by ΔE 120 in CIELAB under simulated deuteranopia, against a working floor of 30.
 
 ### Scope
-*   **`ScopeTotal`** `#FF7175` · **`ScopePrivate`** `#6E6ED6` · **`ScopeHousehold`** `#1D9B8F`
 
-`BrandPrimary` pulled back, plus its cool and green counterparts — a whole screen of full-saturation coral shouted at everything on it. The three stay distinguishable to a colour-vision-deficient user, the same test the chart palette passes. The softening is baked into the asset, not recomputed per render.
+| Token | Light | Dark | HC Light | HC Dark |
+|---|---|---|---|---|
+| `ScopeTotal` | `#FF9F1C` | `#F0940F` | `#AA6000` | `#A25C00` |
+| `ScopePrivate` | `#5B5BC7` | `#5252BE` | `#4A4AB5` | `#4A4AB5` |
+| `ScopeHousehold` | `#148075` | `#127268` | `#0E6F66` | `#0E6F66` |
 
----
+Total is **mango** — `BrandPrimary`'s hue on the fill side — with the cool and green counterparts that keep the three banner cards distinguishable to a colour-vision-deficient user (worst pair ΔE 53 under deuteranopia, against the same floor of 30). **Dark mode deepens every card one step** to cut glare on a `#262626` ground.
+
+All three carry `TextOnAccent` (white), and **Total does not clear AA in its default appearances: white on `#FF9F1C` is 2.05:1.** That is a deliberate call — the mango card is to be judged on a real device before the ink question is reopened — and it is recorded here, in `Palette.scopeTotal` and in `ScopeStyle` so nobody later reads it as an oversight. **High Contrast is where it is made good:** each card deepens until white clears 4.5:1 (Total 4.79, Private 7.15, Household 6.03), Total furthest of the three because it starts furthest away. If the card turns out to read badly on device, the fix is a per-scope foreground (`scope.onTint` returning `#262626` for Total), not a darker mango — a mango dark enough for white text is brown.
+
+### Elevation tint
+*   **`ShadowTint`** — `#262626` / Dark `#4A4A4A` / HC `#262626` / Dark+HC `#5C5C5C` — the colour every `AppTheme.Elevation` shadow is drawn in
+
+Not `.black`, which the palette no longer contains and which was in any case appearance-blind. On a `#262626` dark canvas a black shadow is invisible, so every surface in dark mode floated on nothing; the asset inverts to a grey **lighter** than the canvas — the only direction left once `#262626` is the floor — and elevation reads there as ambient lift rather than a void beneath.
 
 ## 2. Typography — System Font (SF Pro)
 
@@ -133,7 +169,7 @@ Three, because the app only ever meant three things:
 
 Three shadows — `resting`, `floating`, `lifted` — applied through `.elevation(_:isActive:)`, never a raw `.shadow`.
 
-**Open:** the original spec called for a dark-mode-only brand glow (`BrandPrimary` @ 45%, radius 12). It has never been implemented; all three elevations are black in both appearances. Left open rather than dropped — it would need to be a fourth elevation gated on `colorScheme`, and nobody has asked for it on a real screen yet.
+**Closed.** All three used to be `.black` in both appearances, and the original spec asked for a dark-mode-only brand glow (`BrandPrimary` @ 45%, radius 12) to compensate. Neither survives. The colour is now `Palette.shadowTint`, a colour *set* — so the appearance switch happens in the asset, not in a `colorScheme` branch here, and no fourth elevation was needed. The glow is grey rather than mango: a brand-tinted halo on every card is exactly the noise a neutral palette exists to remove. See §1's Elevation tint.
 
 ### Motion — `AppTheme.Motion`
 

@@ -48,11 +48,10 @@ struct NeedsReviewPanel: View {
     /// see `isVisible`.
     @State private var showSuccess = false
 
-    /// Mango, not coral: `keepo-brand-identity.md` §1 gives `BrandSecondary`
-    /// to reminders and benchmarks and `BrandPrimary` to data and actions.
-    /// An inbox is a reminder — it should catch the eye without reading as
-    /// an error.
-    private var accent: Color { AppTheme.Palette.brandSecondary }
+    /// The app's one accent. An inbox is a reminder, so it must catch the
+    /// eye *without* reading as an error — which is why this is mango and
+    /// not `statusNegative`, the only other colour that would pull a glance.
+    private var accent: Color { AppTheme.Palette.brandPrimary }
 
     private enum Metrics {
         /// The drawer's bottom radius, and equally the distance it hides

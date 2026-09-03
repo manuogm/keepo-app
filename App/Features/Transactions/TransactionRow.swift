@@ -170,9 +170,9 @@ struct PendingBadge: View {
     var body: some View {
         Text("Pending")
             .font(AppTheme.Typography.nanoEmphasis)
-            .foregroundStyle(AppTheme.Palette.brandSecondary)
+            .foregroundStyle(AppTheme.Palette.brandPrimary)
             .padding(.horizontal, AppTheme.Spacing.xs)
             .padding(.vertical, AppTheme.Spacing.xxs)
-            .background(AppTheme.Palette.brandSecondary.opacity(AppTheme.Opacity.fill), in: Capsule())
+            .background(AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill), in: Capsule())
     }
 }

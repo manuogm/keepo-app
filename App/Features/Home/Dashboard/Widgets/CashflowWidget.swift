@@ -218,7 +218,7 @@ struct CashflowWidget: View {
     }
 
     /// In and Out keep their own colours here rather than taking the neutral
-    /// selected-state treatment: those two words are blue and coral everywhere
+    /// selected-state treatment: those two words are blue and red everywhere
     /// else on this dashboard, and a toggle is the last place they should stop
     /// being.
     /// Switching direction is **not** animated, and that is the fix for a

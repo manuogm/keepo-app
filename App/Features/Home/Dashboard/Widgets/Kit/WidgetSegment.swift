@@ -10,7 +10,7 @@ import SwiftUI
 /// insets — is decided here.
 ///
 /// `tint` exists for the one case where a segment's label already carries a
-/// meaning colour: Cashflow's In and Out are blue and coral everywhere else on
+/// meaning colour: Cashflow's In and Out are blue and red everywhere else on
 /// the dashboard, and a toggle that greyed them would be the only place those
 /// two words aren't those two colours.
 struct WidgetSegment<Label: View>: View {

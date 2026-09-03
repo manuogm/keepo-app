@@ -10,7 +10,8 @@ import SwiftUI
 /// isn't on it is a value nobody should be reaching for.
 ///
 /// Colours live in `AppTheme.Palette` (asset catalogue), type in
-/// `AppTheme.Typography`. Nothing here is a colour or a font.
+/// `AppTheme.Typography`. Nothing here names a colour or a font — the one
+/// member that carries one, `Elevation`, takes it from `Palette`.
 enum AppTheme {}
 
 // MARK: - Spacing
@@ -163,12 +164,23 @@ extension AppTheme {
 
         /// A surface resting on the canvas: the scope banner, the Needs
         /// Review drawer, the offline bar.
-        static let resting = Elevation(color: .black.opacity(0.12), radius: 10, y: 4)
+        static let resting = Elevation(color: tint.opacity(0.12), radius: 10, y: 4)
         /// A surface floating over content: the tab bar, a sheet's grabber
         /// deck, a card face.
-        static let floating = Elevation(color: .black.opacity(0.18), radius: 20, y: 8)
+        static let floating = Elevation(color: tint.opacity(0.18), radius: 20, y: 8)
         /// A tile the finger is currently holding.
-        static let lifted = Elevation(color: .black.opacity(0.28), radius: 28, y: 10)
+        static let lifted = Elevation(color: tint.opacity(0.28), radius: 28, y: 10)
+
+        /// The one colour all three are drawn in — `Palette.shadowTint`, so
+        /// the appearance switch happens in the asset and not here.
+        ///
+        /// It used to be `.black`, which the palette no longer contains and
+        /// which was in any case appearance-blind: on a `#262626` dark canvas
+        /// a black shadow is invisible, so every surface in dark mode was
+        /// floating on nothing. The asset inverts to a grey *lighter* than
+        /// the canvas there — the only direction left once `#262626` is the
+        /// floor — and elevation reads as ambient lift rather than a void.
+        private static let tint = Palette.shadowTint
     }
 }
 

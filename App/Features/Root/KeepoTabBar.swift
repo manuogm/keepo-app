@@ -12,7 +12,7 @@ import SwiftUI
 ///
 /// Both the bar and the button are **neutral**: selection is weight and
 /// contrast, not a colour fill. The screens themselves are now colour —
-/// each one wears its scope's — so a coral pill down here was a second
+/// each one wears its scope's — so a tinted pill down here was a second
 /// thing competing to say where you are.
 ///
 /// `TabView` still owns selection and keeps each tab's state alive; its own
@@ -63,13 +63,13 @@ struct KeepoTabBar: View {
                 name: isSelected ? destination.selectedIcon : destination.icon,
                 size: AppTheme.Size.icon
             )
-            // Sits *outside* the icon, and mango rather than coral — this is
-            // the one thing in the bar allowed a colour, because it is the one
+            // Sits *outside* the icon, in the app's one accent — this is the
+            // one thing in the bar allowed a colour, because it is the one
             // thing reporting a fact rather than a location.
             .overlay(alignment: .topTrailing) {
                 if destination == .transactions && needsReviewCount > 0 {
                     Circle()
-                        .fill(AppTheme.Palette.brandSecondary)
+                        .fill(AppTheme.Palette.brandPrimary)
                         .frame(width: AppTheme.Size.dot, height: AppTheme.Size.dot)
                         .offset(x: 6, y: -2)
                 }

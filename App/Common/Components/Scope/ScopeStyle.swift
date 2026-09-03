@@ -3,16 +3,23 @@ import SwiftUI
 
 /// How a scope looks and reads, in one place — the banner card, the title
 /// badge, the page dots and every blank state all draw from here, so a
-/// scope can never be coral on one screen and teal on the next.
+/// scope can never be mango on one screen and teal on the next.
 ///
 /// One flat colour each, never a gradient (the user's call — the app stays
-/// minimal). All three are `Assets.xcassets` colour sets with a single
-/// appearance: brand accents saturated enough to carry white text in both
-/// light and dark, exactly like `keepo-brand-identity.md` §1's
-/// `BrandPrimary`/`BrandSecondary`. Total is `BrandPrimary` pulled back;
-/// the other two are the cool and green counterparts that keep the three
-/// cards distinguishable at a glance for a colour-vision-deficient user —
-/// the same test `app-architecture.md` §5 applies to the chart palette.
+/// minimal). All three are `Assets.xcassets` colour sets carrying four
+/// appearances apiece — light, dark, and both High Contrast variants — so
+/// the banner honours Increase Contrast with no `colorScheme` branch here.
+/// Total is **mango**, the fill side of `BrandPrimary`; the other two are
+/// the cool and green counterparts that keep the three cards
+/// distinguishable at a glance for a colour-vision-deficient user — the
+/// same test `app-architecture.md` §5 applies to the chart palette.
+///
+/// All three carry `TextOnAccent` (white), and mango does not clear AA
+/// against it: 2.05:1. That is a **deliberate call to judge the mango card
+/// on a real device**, recorded in `keepo-brand-identity.md` §1 and in
+/// `Palette.scopeTotal` — not a value anybody forgot to check. Increase
+/// Contrast is where it is made good: every card deepens until white
+/// clears 4.5:1, Total furthest of the three.
 extension PublicSchema.AccountScope {
     /// Left to right in the banner's carousel, and the order the page dots
     /// are drawn in. Total leads because it is the default; **Household
@@ -69,12 +76,12 @@ extension PublicSchema.AccountScope {
     /// The scope's colour — the banner card's fill, and the accent anywhere
     /// else the scope needs naming (an empty-state icon, a badge).
     ///
-    /// Pulled back from the brand values rather than restated as new hex:
-    /// at full saturation a whole screen's worth of `BrandPrimary` shouted
-    /// at everything on it. The softening used to be a `.shifted(saturation:
-    /// -0.09)` recomputed on every render; it is baked into the colour set
-    /// now, which is the same result without asking `UIColor` to resolve a
-    /// dynamic colour mid-body.
+    /// Listed in the colour set, never derived here: the softening used to
+    /// be a `.shifted(saturation: -0.09)` recomputed on every render, and
+    /// baking it into the asset is the same result without asking `UIColor`
+    /// to resolve a dynamic colour mid-body. It is also what lets each scope
+    /// carry a High Contrast variant at all, which an arithmetic shift on a
+    /// resolved colour never could.
     var tint: Color {
         switch self {
         case .total: return AppTheme.Palette.scopeTotal

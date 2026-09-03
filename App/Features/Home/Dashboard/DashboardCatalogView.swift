@@ -252,7 +252,7 @@ struct DashboardCatalogView: View {
             if let reason {
                 Text(reason)
                     .font(AppTheme.Typography.label)
-                    .foregroundStyle(AppTheme.Palette.brandSecondary)
+                    .foregroundStyle(AppTheme.Palette.brandPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if reason == nil, !isPlaced {

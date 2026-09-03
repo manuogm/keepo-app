@@ -55,12 +55,14 @@ enum WidgetPalette {
 
 /// Income and expense, everywhere either appears on the dashboard.
 ///
-/// **Income is blue, not green.** Coral-vs-green is the canonical red-green
-/// colour-vision failure (ΔE 7.6); coral-vs-blue clears it (ΔE 19.5). Both
-/// values were validated against actual CVD tooling rather than picked by
-/// eye — see app-architecture.md §5 — so they are carried forward rather
-/// than re-derived. Each has a lighter dark-mode variant, because the light
-/// values sit too dark against a dark surface.
+/// **Income is blue, not green.** Warm-vs-green is the canonical red-green
+/// colour-vision failure; warm-vs-blue clears it. That finding is carried
+/// forward from the original coral pair (ΔE 7.6 against green, 19.5 against
+/// blue — see app-architecture.md §5) and re-checked when the expense colour
+/// moved off coral to a deep red: the current pair separates by ΔE 120 in
+/// CIELAB under simulated deuteranopia, against a working floor of 30. Each
+/// has a lighter dark-mode variant, because the light values sit too dark
+/// against a dark surface.
 ///
 /// This is not the trend palette: `DashboardTrend` stays green/red, because
 /// there "up" genuinely is good news, whereas income and expense are

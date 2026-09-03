@@ -85,7 +85,7 @@ struct PendingSyncStatusBar: View {
                 }
             }
             .font(AppTheme.Typography.nano)
-            .foregroundStyle(AppTheme.Palette.brandSecondary.opacity(0.9))
+            .foregroundStyle(AppTheme.Palette.brandPrimary.opacity(0.9))
             .padding(.horizontal, AppTheme.Spacing.m)
             .padding(.vertical, AppTheme.Spacing.s)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
