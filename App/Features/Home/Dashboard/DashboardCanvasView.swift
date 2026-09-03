@@ -247,7 +247,7 @@ struct DashboardCanvasView: View {
         // card — which read as a bug, not a decoration.
         .overlay(alignment: .topTrailing) {
             if isEditing {
-                WidgetRemoveBadge { remove(resolved.id) }
+                RemoveBadge(label: "Remove widget") { remove(resolved.id) }
                     .offset(x: 8, y: -8)
                     .transition(.scale.combined(with: .opacity))
             }

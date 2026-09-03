@@ -12,10 +12,13 @@ import SwiftUI
 ///
 /// Everything is edited **in place**. Tapping a pill puts the caret in it —
 /// there is nothing else a tag has, so a form containing one text field
-/// would be a sheet over a screen already showing that field. Deleting is a
-/// long-press context menu rather than a swipe: a flow of pills has no rows
-/// to swipe, the same reason the Categories grid moved delete into its edit
-/// sheet.
+/// would be a sheet over a screen already showing that field.
+///
+/// That same tap reveals the `RemoveBadge` that deletes it, the way a
+/// dashboard tile wears one in edit mode. A tag has exactly two things you
+/// can do to it and both belong to one "working on this one" state, so one
+/// tap opens both rather than making delete a separate long-press nobody can
+/// see is there.
 struct TagsListView: View {
     let session: SessionStore
 
@@ -75,7 +78,7 @@ struct TagsListView: View {
                     tags.isEmpty
                         ? "Tags track a thing across transactions — a coffee habit, a trip, a side income. "
                             + "A tag can go on any transaction, whatever its category."
-                        : "Tap a tag to rename it. Press and hold to delete."
+                        : "Tap a tag to rename it. The red minus deletes it."
                 )
                 .font(AppTheme.Typography.caption)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
@@ -86,11 +89,24 @@ struct TagsListView: View {
         .scrollBounceBehavior(.basedOnSize)
     }
 
+    @ViewBuilder
+    private func pill(_ tag: PublicSchema.TagsSelect) -> some View {
+        if isOwn(tag) {
+            editablePill(tag)
+        } else {
+            // A household member's shared tag. It is visible here because it
+            // is on a transaction in a shared account, but `tags_update` is
+            // owner-only — a caret and a minus would be offering two writes
+            // the server refuses.
+            TagChip(name: tag.name)
+        }
+    }
+
     /// The pill *is* the text field. `fixedSize` makes it hug its own
     /// content so the capsule grows with the name as it is typed, which is
     /// what keeps it reading as the same object it was before the tap rather
     /// than an input that replaced it.
-    private func pill(_ tag: PublicSchema.TagsSelect) -> some View {
+    private func editablePill(_ tag: PublicSchema.TagsSelect) -> some View {
         TextField(
             "Tag",
             text: Binding(
@@ -115,11 +131,19 @@ struct TagsListView: View {
         .onChange(of: focusedField) { previous, _ in
             if previous == .existing(tag.id) { Task { await commitRename(tag) } }
         }
-        .contextMenu {
-            Button("Delete", systemImage: "trash", role: .destructive) {
-                Task { await delete(tag) }
+        .overlay(alignment: .topTrailing) {
+            if focusedField == .existing(tag.id) {
+                RemoveBadge(label: "Delete tag \(tag.name)", diameter: AppTheme.Size.glyphSmall) {
+                    Task { await delete(tag) }
+                }
+                // Straddling the corner, not tucked inside it: a capsule's
+                // corner is empty space, so the badge sits over nothing and
+                // covers no part of the name it belongs to.
+                .offset(x: AppTheme.Spacing.m, y: -AppTheme.Spacing.m)
+                .transition(.scale.combined(with: .opacity))
             }
         }
+        .animation(AppTheme.Motion.standard, value: focusedField)
     }
 
     /// Dashed, like the transaction form's own add affordance, because a
@@ -184,19 +208,28 @@ struct TagsListView: View {
         session.refresh.bump()
     }
 
+    /// Drops the draft before the focus, so the blur this causes has nothing
+    /// left to commit — a rename racing the delete of the same tag would
+    /// otherwise queue an update for a row already tombstoned.
     private func delete(_ tag: PublicSchema.TagsSelect) async {
+        drafts[tag.id] = nil
+        focusedField = nil
+        errorMessage = nil
         await session.outbox.submitDeleteTag(DeleteTagPayload(id: tag.id))
         session.refresh.bump()
+    }
+
+    private func isOwn(_ tag: PublicSchema.TagsSelect) -> Bool {
+        tag.ownerId == session.profile?.id
     }
 
     /// Only the user's **own** tags can collide: the unique index is
     /// `(owner_id, lower(name))`, and this screen can also hold a household
     /// member's shared tag, which is free to share a name with one of theirs.
     private func isDuplicate(_ name: String, excluding tagId: UUID?) -> Bool {
-        guard let ownerId = session.profile?.id else { return false }
-        return tags.contains { tag in
+        tags.contains { tag in
             tag.id != tagId
-                && tag.ownerId == ownerId
+                && isOwn(tag)
                 && tag.name.trimmingCharacters(in: .whitespaces).lowercased() == name.lowercased()
         }
     }

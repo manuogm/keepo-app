@@ -1,11 +1,12 @@
 import KeepoCore
 import SwiftUI
 
-/// Edit mode's visual language: the jiggle, the minus badge that removes a
-/// widget, and the two slots that stand in for one — where an arriving widget
-/// would land, and where it goes instead if the user changes their mind. They
-/// live here rather than inline in the canvas so the canvas file stays about
-/// *arranging*, not about how arranging looks.
+/// Edit mode's visual language: the jiggle, and the two slots that stand in
+/// for a widget — where an arriving one would land, and where it goes instead
+/// if the user changes their mind. They live here rather than inline in the
+/// canvas so the canvas file stays about *arranging*, not about how arranging
+/// looks. The minus badge that removes a tile is `RemoveBadge`, shared with
+/// the Tags screen.
 
 /// The iOS home-screen wobble. Two things make it read as the real thing
 /// rather than as a synchronised metronome:
@@ -51,33 +52,6 @@ struct JiggleModifier: ViewModifier {
 extension View {
     func jiggling(_ isActive: Bool, seed: UUID) -> some View {
         modifier(JiggleModifier(isActive: isActive, seed: seed))
-    }
-}
-
-/// The remove affordance — top-right, per the design. Sized and padded to be
-/// comfortably tappable at 1×1: the badge itself is small, but its hit area
-/// is not, because a tile that is actively wobbling is a hard target.
-struct WidgetRemoveBadge: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "minus")
-                .font(AppTheme.Typography.nanoEmphasis)
-                .foregroundStyle(AppTheme.Palette.textOnAccent)
-                // Red, because this is the one destructive control on the
-                // dashboard and it sits on a card the user is about to drag
-                // — it has to read as "remove", not as another handle.
-                .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.glyph)
-                .background(AppTheme.Palette.statusNegative, in: Circle())
-                .overlay(Circle().strokeBorder(AppTheme.Palette.bgSurface, lineWidth: 1.5))
-                // The badge straddles the tile's corner, so the tap target
-                // has to extend past the card's own bounds to feel right.
-                .padding(AppTheme.Spacing.xs)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Remove widget")
     }
 }
 
