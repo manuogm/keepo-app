@@ -37,6 +37,13 @@ public protocol OutboxSending: Sendable {
     /// No conflict concept either — `map_card` is an upsert keyed by
     /// (owner, card_identifier), same "last write wins" reasoning as rename/unmap.
     func mapCard(_ payload: MapCardPayload) async throws
+    /// Tags have no conflict concept at all — a rename is last-write-wins
+    /// (see `UpdateTagPayload`), and applying a tag is an upsert keyed by
+    /// (transaction, tag), so replaying one twice is the same as once.
+    func createTag(_ payload: CreateTagPayload) async throws
+    func updateTag(_ payload: UpdateTagPayload) async throws
+    func deleteTag(_ payload: DeleteTagPayload) async throws
+    func setTransactionTag(_ payload: SetTransactionTagPayload) async throws
     func confirmCaptureTransaction(_ payload: ConfirmCaptureTransactionPayload) async throws -> Bool
     func reviewCaptureTransaction(_ payload: ReviewCaptureTransactionPayload) async throws -> Bool
 }

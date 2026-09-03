@@ -29,6 +29,10 @@ final class AlwaysFailingSender: OutboxSending, @unchecked Sendable {
     func setAccountKind(_ payload: SetAccountKindPayload) async throws -> Bool { throw StubError.alwaysFails }
     func createCategory(_ payload: CreateCategoryPayload) async throws { throw StubError.alwaysFails }
     func updateCategory(_ payload: UpdateCategoryPayload) async throws { throw StubError.alwaysFails }
+    func createTag(_ payload: CreateTagPayload) async throws { throw StubError.alwaysFails }
+    func updateTag(_ payload: UpdateTagPayload) async throws { throw StubError.alwaysFails }
+    func deleteTag(_ payload: DeleteTagPayload) async throws { throw StubError.alwaysFails }
+    func setTransactionTag(_ payload: SetTransactionTagPayload) async throws { throw StubError.alwaysFails }
     func renameCardMapping(_ payload: RenameCardMappingPayload) async throws { throw StubError.alwaysFails }
     func unmapCard(_ payload: UnmapCardPayload) async throws { throw StubError.alwaysFails }
     func mapCard(_ payload: MapCardPayload) async throws { throw StubError.alwaysFails }

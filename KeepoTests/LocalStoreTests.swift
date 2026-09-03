@@ -19,7 +19,7 @@ struct LocalStoreTests {
 
         let expectedTables = [
             "accounts", "transactions", "categories", "currencies", "fx_rates",
-            "recurring_rules", "card_mappings", "merchant_category_map",
+            "tags", "transaction_tags", "recurring_rules", "card_mappings", "merchant_category_map",
             "sync_conflicts", "households", "household_members", "household_accounts", "profiles",
             "outbox_items"
         ]

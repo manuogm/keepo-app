@@ -287,6 +287,8 @@ public final class Outbox {
             return try await replayAccountOrCategory(kind, data: item.payloadJSON)
         case .renameCardMapping, .unmapCard, .mapCard:
             return try await replayCardMapping(kind, data: item.payloadJSON)
+        case .createTag, .updateTag, .deleteTag, .setTransactionTag:
+            return try await replayTag(kind, data: item.payloadJSON)
         }
     }
 

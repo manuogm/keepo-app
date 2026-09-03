@@ -14,17 +14,75 @@ extension TransactionFormView {
             let loaded = try? await session.dbQueue.read { database in
                 (
                     try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency),
-                    try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
+                    try LocalTableQueries.categories(database, ownerId: ownerId.uuidString),
+                    try LocalTableQueries.tags(database)
                 )
             }
             accounts = loaded?.0 ?? []
             categories = loaded?.1 ?? []
+            tagsById = Dictionary(uniqueKeysWithValues: (loaded?.2 ?? []).map { ($0.id, $0) })
         }
 
         if case .edit(let transaction, let sibling) = mode {
             apply(transaction: transaction, sibling: sibling)
+            await loadAppliedTags()
         } else {
             seedCreateDefaults()
+        }
+    }
+
+    /// Read after `apply(transaction:sibling:)`, which is what sets
+    /// `editingId`. `originalTagIds` is the baseline Save diffs against, so
+    /// re-saving a transaction nobody re-tagged writes nothing at all.
+    private func loadAppliedTags() async {
+        guard let id = editingId else { return }
+        let dbQueue = session.dbQueue
+        let ids = (try? await dbQueue.read { database in
+            try LocalTableQueries.tagIds(database, transactionId: id.uuidString)
+        }) ?? []
+        originalTagIds = Set(ids.compactMap(UUID.init(uuidString:)))
+        selectedTagIds = originalTagIds
+    }
+
+    /// Writes only what changed, as one outbox item per added or removed
+    /// tag, once `after` (the transaction's own network delivery, on a
+    /// create) has finished.
+    ///
+    /// **Waiting is the whole point.** `submitCreateTransaction` returns as
+    /// soon as the LOCAL write lands, with the POST still in flight, so a
+    /// tag link sent immediately after it reaches the server before the
+    /// transaction does and is rejected by `transaction_tags`' foreign key.
+    /// The outbox retried and converged, so nothing was lost — but the
+    /// failed attempt recorded an error the app-wide pending-sync banner
+    /// then showed, for a save that had in fact worked. Observed live: a 400
+    /// followed by a 201 thirty seconds later.
+    ///
+    /// Detached, so the sheet still dismisses immediately; the local
+    /// write-through inside each submit is what the reopened form reads, and
+    /// the refresh bump at the end is what tells the rest of the app.
+    ///
+    /// A **transfer is tagged on its outflow leg only**. Both legs are real
+    /// rows, so tagging both would make any future sum over a tag count one
+    /// $100 transfer as $200 — the leg carrying the money out is the one
+    /// that represents the movement.
+    func applyTagChanges(to transactionId: UUID, after delivery: Task<OutboxSubmitResult, Never>?) {
+        guard let ownerId = session.profile?.id else { return }
+        let added = selectedTagIds.subtracting(originalTagIds)
+        let removed = originalTagIds.subtracting(selectedTagIds)
+        guard !added.isEmpty || !removed.isEmpty else { return }
+        let outbox = session.outbox
+        let refresh = session.refresh
+
+        Task {
+            _ = await delivery?.value
+            for (tagId, isApplied) in added.map({ ($0, true) }) + removed.map({ ($0, false) }) {
+                await outbox.submitSetTransactionTag(
+                    SetTransactionTagPayload(
+                        transactionId: transactionId, tagId: tagId, ownerId: ownerId, isApplied: isApplied
+                    )
+                )
+            }
+            refresh.bump()
         }
     }
 
@@ -124,19 +182,28 @@ extension TransactionFormView {
         isSaving = true
         errorMessage = nil
         do {
+            var taggedTransactionId: UUID?
             switch (isEditing, kind) {
             case (false, .expense), (false, .income):
-                try await saveLedgerTransaction(accountId: accountId, magnitude: magnitude)
+                taggedTransactionId = try await saveLedgerTransaction(accountId: accountId, magnitude: magnitude)
             case (false, .transfer):
-                try await saveTransfer(accountId: accountId, magnitude: magnitude)
+                taggedTransactionId = try await saveTransfer(accountId: accountId, magnitude: magnitude)
             case (true, .expense), (true, .income):
                 if isConfirmingCapture {
                     try await reviewCaptureTransaction(accountId: accountId, magnitude: magnitude)
                 } else {
                     try await updateLedgerTransaction(accountId: accountId, magnitude: magnitude)
                 }
+                taggedTransactionId = editingId
             case (true, .transfer):
                 try await updateTransfer(magnitude: magnitude)
+                taggedTransactionId = editingId
+            }
+
+            // Skipped when a divergence warning stopped the write — there is
+            // no transaction to tag, and the user has not confirmed yet.
+            if let taggedTransactionId, divergenceWarning == nil {
+                applyTagChanges(to: taggedTransactionId, after: pendingDelivery)
             }
             // A: the local write already landed by the time submitX
             // returns — the network delivery keeps running in the
@@ -156,10 +223,11 @@ extension TransactionFormView {
     /// Every write below goes through `session.outbox` (Phase 11), never
     /// `TransactionRepository` directly — an offline save queues instead of
     /// erroring; the app-wide stale-pending banner surfaces that, not this.
-    func saveLedgerTransaction(accountId: UUID, magnitude: Int64) async throws {
+    @discardableResult
+    func saveLedgerTransaction(accountId: UUID, magnitude: Int64) async throws -> UUID? {
         guard let userId = session.profile?.id, let categoryId = selectedCategoryId, let account = fromAccount else {
             errorMessage = "Choose a category."
-            return
+            return nil
         }
         // Sign applied here, once, from the kind the user picked — never
         // re-derived elsewhere (money rule: never re-sign in application
@@ -171,7 +239,8 @@ extension TransactionFormView {
             amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
             notes: notes.isEmpty ? nil : notes
         )
-        await session.outbox.submitCreateTransaction(payload)
+        pendingDelivery = await session.outbox.submitCreateTransaction(payload)
+        return payload.id
     }
 
     func updateLedgerTransaction(accountId: UUID, magnitude: Int64) async throws {

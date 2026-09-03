@@ -34,4 +34,31 @@ public enum StableSeed {
         guard upperBound > 0 else { return 0 }
         return Int(hash(string).magnitude % UInt(upperBound))
     }
+
+    /// A UUID derived from a string, the same one every time.
+    ///
+    /// For a row whose identity is a **composite key** rather than a `uuid`
+    /// column, where something downstream still wants one id — the outbox
+    /// keys each queued item by UUID, and `transaction_tags` is keyed by
+    /// (transaction_id, tag_id). Deriving the key means toggling one tag on
+    /// one transaction repeatedly collapses to a single queued item holding
+    /// the latest intent, instead of a pile of them that replay in order to
+    /// the same end state.
+    ///
+    /// Two FNV-1a passes over different prefixes of the same input, giving
+    /// 128 bits. **Not** a UUIDv5 — no namespace, no SHA-1, and no claim of
+    /// cryptographic distribution; this is an internal dedup key, and the
+    /// only property it needs is that the same string always yields the same
+    /// UUID.
+    public static func uuid(from string: String) -> UUID {
+        let high = UInt64(bitPattern: Int64(hash("hi:" + string)))
+        let low = UInt64(bitPattern: Int64(hash("lo:" + string)))
+        var bytes = [UInt8]()
+        for shift in stride(from: 56, through: 0, by: -8) { bytes.append(UInt8((high >> UInt64(shift)) & 0xFF)) }
+        for shift in stride(from: 56, through: 0, by: -8) { bytes.append(UInt8((low >> UInt64(shift)) & 0xFF)) }
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
 }

@@ -48,4 +48,21 @@ struct StableSeedTests {
             #expect(StableSeed.index(identifier, upperBound: 997) == Int(expected.magnitude % 997))
         }
     }
+
+    @Test("The same string always derives the same UUID")
+    func uuidIsStable() {
+        let key = "a1b2c3:d4e5f6"
+        #expect(StableSeed.uuid(from: key) == StableSeed.uuid(from: key))
+    }
+
+    @Test("Different strings derive different UUIDs, including a swapped pair")
+    func uuidDistinguishesInputs() {
+        // The outbox keys a transaction_tags item by "<transaction>:<tag>".
+        // Swapping the two halves must not collide, or un-tagging one row
+        // would silently replace a queued write on a different one.
+        let forward = StableSeed.uuid(from: "aaaa:bbbb")
+        let reversed = StableSeed.uuid(from: "bbbb:aaaa")
+        #expect(forward != reversed)
+        #expect(StableSeed.uuid(from: "aaaa:bbbb") != StableSeed.uuid(from: "aaaa:bbbc"))
+    }
 }

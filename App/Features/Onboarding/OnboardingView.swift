@@ -108,7 +108,7 @@ struct OnboardingView: View {
                 .textFieldStyle(.roundedBorder)
                 .keyboardType(.decimalPad)
 
-            Text("Required — without it, the first Sync Ritual would have nothing to reconcile against.")
+            Text("Required — every balance is this figure plus everything you log after it.")
                 .font(AppTheme.Typography.micro)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)

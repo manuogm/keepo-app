@@ -9,4 +9,5 @@ enum OutboxKind: String {
     case renameCardMapping, unmapCard, mapCard
     case confirmCaptureTransaction
     case reviewCapture
+    case createTag, updateTag, deleteTag, setTransactionTag
 }

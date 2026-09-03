@@ -19,6 +19,7 @@ import KeepoCore
 /// as ordinary upserted rows (L5's sync applies a tombstone the same way as
 /// any other write), so a local read has to filter for itself.
 extension PublicSchema.CategoriesSelect: @retroactive FetchableRecord {}
+extension PublicSchema.TagsSelect: @retroactive FetchableRecord {}
 extension PublicSchema.RecurringRulesSelect: @retroactive FetchableRecord {}
 extension PublicSchema.CurrenciesSelect: @retroactive FetchableRecord {}
 extension PublicSchema.AccountsSelect: @retroactive FetchableRecord {}
@@ -52,6 +53,31 @@ enum LocalTableQueries {
     static func recurringRule(_ database: Database, id: String) throws -> PublicSchema.RecurringRulesSelect? {
         try PublicSchema.RecurringRulesSelect.fetchOne(
             database, sql: "SELECT * FROM recurring_rules WHERE id = ?", arguments: [id]
+        )
+    }
+
+    /// Every tag the local mirror holds for this owner.
+    ///
+    /// **Not** owner-scoped the way `categories` is, deliberately: `tags`'
+    /// own RLS is `can_read_tag`, which also admits a household member's tag
+    /// once it has been applied to a transaction on a shared account. Scoping
+    /// this read to `owner_id = me` would hide exactly those rows — the ones
+    /// the sharing rule exists to surface — so it mirrors the server's
+    /// visibility by not filtering at all, and lets the pull decide what is
+    /// in the table.
+    static func tags(_ database: Database) throws -> [PublicSchema.TagsSelect] {
+        try PublicSchema.TagsSelect.fetchAll(
+            database,
+            sql: "SELECT * FROM tags WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE"
+        )
+    }
+
+    /// The tag ids currently on one transaction.
+    static func tagIds(_ database: Database, transactionId: String) throws -> [String] {
+        try String.fetchAll(
+            database,
+            sql: "SELECT tag_id FROM transaction_tags WHERE transaction_id = ? AND deleted_at IS NULL",
+            arguments: [transactionId]
         )
     }
 

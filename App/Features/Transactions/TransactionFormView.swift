@@ -67,6 +67,19 @@ struct TransactionFormView: View {
     @State var isPendingReview = false
     @State var isCaptured = false
 
+    /// The tags on this transaction. Applied on Save, not as they are
+    /// tapped — a tag toggled on a transaction the user then cancels out of
+    /// must not have been written.
+    @State var selectedTagIds: Set<UUID> = []
+    /// What the transaction had when the sheet opened, so Save can write
+    /// only the difference rather than re-upserting every chip.
+    @State var originalTagIds: Set<UUID> = []
+    @State var tagsById: [UUID: PublicSchema.TagsSelect] = [:]
+    /// The in-flight network delivery of a *newly created* transaction, so
+    /// the tag links can wait for it. See `applyTagChanges(to:after:)`.
+    @State var pendingDelivery: Task<OutboxSubmitResult, Never>?
+    @State var isPickingTags = false
+
     @State var isSaving = false
     @State var errorMessage: String?
     @State var divergenceWarning: RateDivergence?
@@ -136,6 +149,9 @@ struct TransactionFormView: View {
                 Task { await save() }
             }
             .sheet(isPresented: $isPickingDate) { datePickerSheet }
+            .sheet(isPresented: $isPickingTags) {
+                TagPickerSheet(session: session, selectedTagIds: $selectedTagIds)
+            }
             .navigationDestination(isPresented: $isCreatingRecurringRule) {
                 RecurringRuleFormView(session: session, mode: recurringSeedMode) {
                     session.refresh.bump()
@@ -164,6 +180,9 @@ struct TransactionFormView: View {
                 categoryId: $selectedCategoryId,
                 amountText: $amountText,
                 receivedAmountText: $receivedAmountText,
+                selectedTagIds: $selectedTagIds,
+                tagsById: tagsById,
+                onEditTags: { isPickingTags = true },
                 accounts: accounts,
                 categories: categoriesForKind,
                 isTransfer: kind == .transfer,

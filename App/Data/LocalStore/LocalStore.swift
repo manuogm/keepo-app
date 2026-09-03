@@ -37,6 +37,7 @@ public enum LocalSchemaV1 {
     static func createSyncableTables(_ database: Database) throws {
         try createAccountAndTransactionTables(database)
         try createCategoryTables(database)
+        try createTagTables(database)
         try createPlanningTables(database)
         try createReferenceTables(database)
         try createHouseholdTables(database)
@@ -348,6 +349,17 @@ public enum LocalStore {
         // rows of the user's financial data sitting on disk after the
         // feature was removed, which is the one thing a mirror must not do.
         migrator.registerMigration("v8_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260907100000 adds tags and
+        // transaction_tags server-side. Additive, so a stale device would not
+        // hard-fail; it would silently drop both tables from every pull
+        // (SyncApply skips a table the local schema does not have), leaving
+        // the Tags screen permanently empty with no error anywhere.
+        migrator.registerMigration("v9_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260908100000 drops
+        // tags.category_id server-side. A stale device keeps the column and
+        // every pulled tag row loses nothing, but the column would sit there
+        // holding a category link the product no longer has.
+        migrator.registerMigration("v10_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)

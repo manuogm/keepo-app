@@ -35,6 +35,7 @@ struct CategoriesView: View {
     @State private var errorMessage: String?
     @State private var isAddingCategory = false
     @State private var editingCategoryId: UUID?
+    @State private var isShowingAllTags = false
     @State private var selectedTab: KindTab = .expense
 
     @Environment(AppNavigation.self) private var navigation: AppNavigation?
@@ -88,6 +89,10 @@ struct CategoriesView: View {
                             }
                         }
                         .padding(.horizontal)
+
+                        allTagsLink
+                            .padding(.horizontal)
+                            .padding(.top, AppTheme.Spacing.l)
                     }
                     // The bar floats over the content rather than reserving a
                     // strip, so the last row of tiles has to stop short of it.
@@ -121,6 +126,9 @@ struct CategoriesView: View {
                 session.refresh.bump()
             }
         }
+        .sheet(isPresented: $isShowingAllTags) {
+            TagsListView(session: session)
+        }
         .sheet(item: $editingCategoryId) { id in
             if let category = categories.first(where: { $0.id == id }) {
                 CategoryFormView(session: session, mode: .edit(category)) {
@@ -129,6 +137,33 @@ struct CategoriesView: View {
             }
         }
         .task(id: session.refresh.token) { await load() }
+    }
+
+    /// Below the grid rather than in the toolbar: tags are a *second*
+    /// thing this screen is about, reached after looking at the categories,
+    /// not a competing primary action next to "+" — which on this tab
+    /// already means "new category".
+    private var allTagsLink: some View {
+        Button {
+            isShowingAllTags = true
+        } label: {
+            HStack(spacing: AppTheme.Spacing.s) {
+                KeepoIcon(name: "icon-tag", size: AppTheme.Size.glyphSmall)
+                Text("All Tags")
+                    .font(AppTheme.Typography.label)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(AppTheme.Typography.micro)
+            }
+            .foregroundStyle(AppTheme.Palette.textPrimary)
+            .padding(AppTheme.Spacing.l)
+            .background(
+                AppTheme.Palette.bgSurface,
+                in: RoundedRectangle(cornerRadius: AppTheme.Radius.card)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: AppTheme.Radius.card))
+        }
+        .buttonStyle(.pressableCard)
     }
 
     private func load() async {

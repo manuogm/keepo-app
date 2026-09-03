@@ -109,6 +109,21 @@ extension AppTheme {
         static let scopePrivate = Color("ScopePrivate")
         static let scopeHousehold = Color("ScopeHousehold")
 
+        // MARK: Tags
+        /// **Every tag is this one colour.** Categories are the colourful
+        /// layer — the user picks an icon and a hue per category — so tags
+        /// are deliberately uniform: a screen where both carried identity
+        /// colour would have two competing colour systems and no way to tell
+        /// at a glance which kind of thing a chip is.
+        ///
+        /// A mid-neutral off the palette's own ramp, carrying `textOnAccent`
+        /// (white) in all four appearances. It does not follow the usual
+        /// light-recedes/dark-lifts pattern: the chip is a *fill* with white
+        /// ink on it, so every variant has to stay dark enough for white to
+        /// clear 4.5:1 — 7.5:1 light, 5.3:1 dark, 11.6:1 and 7.5:1 in the two
+        /// High Contrast appearances.
+        static let tagTint = Color("TagTint")
+
         // MARK: Elevation
         /// The colour every shadow is drawn in — see `AppTheme.Elevation`.
         ///

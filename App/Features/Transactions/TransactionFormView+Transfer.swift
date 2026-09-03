@@ -6,15 +6,20 @@ import KeepoCore
 // same precedent as TransactionFormView+Delete.swift.
 
 extension TransactionFormView {
-    func saveTransfer(accountId: UUID, magnitude: Int64) async throws {
+    /// Returns the **outflow leg's** id, which is the one a tag goes on.
+    /// Both legs are real rows, so tagging both would make any future sum
+    /// over a tag count one $100 transfer as $200; the leg carrying the
+    /// money out is the one that represents the movement.
+    @discardableResult
+    func saveTransfer(accountId: UUID, magnitude: Int64) async throws -> UUID? {
         guard let toAccountId = selectedToAccountId else {
             errorMessage = "Choose a destination account."
-            return
+            return nil
         }
         let receivedAmount = needsReceivedAmount ? AmountParser.parse(receivedAmountText) : nil
         if needsReceivedAmount && receivedAmount == nil {
             errorMessage = "Enter a valid received amount."
-            return
+            return nil
         }
 
         if !transferDivergenceConfirmed, needsReceivedAmount, let toAmount = receivedAmount,
@@ -23,7 +28,7 @@ extension TransactionFormView {
                 client: session.client, sourceCurrency: source.currency, destinationCurrency: destination.currency,
                 fromAmountE4: magnitude, toAmountE4: toAmount, occurredAt: occurredAt
             )
-            if divergenceWarning != nil { return }
+            if divergenceWarning != nil { return nil }
         }
         transferDivergenceConfirmed = false
 
@@ -32,7 +37,8 @@ extension TransactionFormView {
             fromAmountE4: magnitude, toAmountE4: receivedAmount, occurredAt: occurredAt,
             notes: notes.isEmpty ? nil : notes
         )
-        await session.outbox.submitCreateTransfer(payload)
+        pendingDelivery = await session.outbox.submitCreateTransfer(payload)
+        return payload.fromId
     }
 
     func updateTransfer(magnitude: Int64) async throws {

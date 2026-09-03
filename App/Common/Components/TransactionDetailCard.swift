@@ -4,8 +4,11 @@ import SwiftUI
 /// The bulk of a transaction, as one component with three shapes.
 ///
 /// Expense and Income are structurally identical — an account + amount
-/// block, then a category and tag row; only which categories are offered
-/// differs. A transfer is two of the same account+amount blocks with the
+/// block, then a category row and a wrapping row of tag chips; only which
+/// categories are offered differs. A transfer gets the tag row too, under
+/// its two legs: a transfer carries no category, so only an all-categories
+/// tag can reach it, but that is the picker's rule to state rather than a
+/// control to hide here. A transfer is two of the same account+amount blocks with the
 /// direction of travel drawn down the left, because that is literally what
 /// a transfer is: the same money leaving one container and arriving in
 /// another. Building it out of the same subcomponent rather than a separate
@@ -16,6 +19,12 @@ struct TransactionDetailCard: View {
     @Binding var categoryId: UUID?
     @Binding var amountText: String
     @Binding var receivedAmountText: String
+
+    /// The tags currently on this transaction, and the way into the picker.
+    /// Held by the form (it is what Save writes), rendered here.
+    @Binding var selectedTagIds: Set<UUID>
+    let tagsById: [UUID: PublicSchema.TagsSelect]
+    let onEditTags: () -> Void
 
     let accounts: [LocalAccountRow]
     let categories: [PublicSchema.CategoriesSelect]
@@ -34,6 +43,31 @@ struct TransactionDetailCard: View {
         }
     }
 
+    /// One row of chips plus the add button, wrapping onto as many lines as
+    /// it needs. Shown for **every** kind, transfers included — a transfer
+    /// can carry an all-categories tag, and the picker is where that rule
+    /// gets expressed rather than by hiding the control here.
+    private var tagRow: some View {
+        TagFlowLayout(spacing: AppTheme.Spacing.s) {
+            ForEach(orderedSelectedTags, id: \.id) { tag in
+                Button(action: onEditTags) { TagChip(name: tag.name) }
+                    .buttonStyle(.pressableCard)
+            }
+            Button(action: onEditTags) { AddTagButton() }
+                .buttonStyle(.pressableCard)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Resolved through `tagsById` and sorted by name, so the chips keep a
+    /// stable order — a `Set` has none, and rendering it directly made the
+    /// chips jump around every time one was toggled.
+    private var orderedSelectedTags: [PublicSchema.TagsSelect] {
+        selectedTagIds
+            .compactMap { tagsById[$0] }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     // MARK: - Expense / Income
 
     private var ledgerBody: some View {
@@ -47,9 +81,10 @@ struct TransactionDetailCard: View {
 
             HStack(spacing: AppTheme.Spacing.s) {
                 CategoryPickerRow(selection: $categoryId, categories: categories)
-                AddTagPlaceholder()
                 Spacer(minLength: 0)
             }
+
+            tagRow
         }
     }
 
@@ -59,6 +94,13 @@ struct TransactionDetailCard: View {
     /// sitting between them: a glyph in the gap reads as a divider, while a
     /// line that starts at one block and ends at the other reads as flow.
     private var transferBody: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
+            transferLegs
+            tagRow
+        }
+    }
+
+    private var transferLegs: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.s) {
             FlowRail()
             VStack(spacing: AppTheme.Spacing.m) {
@@ -132,28 +174,5 @@ private struct FlowRail: View {
         }
         .padding(.vertical, AppTheme.Spacing.l)
         .accessibilityLabel("Money moves from the first account to the second")
-    }
-}
-
-/// Tags do not exist in the schema yet — this is the placeholder the design
-/// calls for, rendered as a genuinely inert chip rather than a button that
-/// does nothing. A tappable control that silently no-ops is worse than an
-/// obviously-not-ready one.
-struct AddTagPlaceholder: View {
-    var body: some View {
-        HStack(spacing: AppTheme.Spacing.xs) {
-            Image(systemName: "plus")
-                .font(AppTheme.Typography.microEmphasis)
-            Text("Add Tag")
-                .font(AppTheme.Typography.label)
-        }
-        .foregroundStyle(AppTheme.Palette.fillStrong)
-        .padding(.horizontal, AppTheme.Spacing.m)
-        .padding(.vertical, AppTheme.Spacing.m)
-        .background {
-            RoundedRectangle(cornerRadius: AppTheme.Radius.card)
-                .strokeBorder(AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-        }
-        .accessibilityHidden(true)
     }
 }

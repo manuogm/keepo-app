@@ -1261,6 +1261,120 @@ public enum PublicSchema {
       case nextTicket = "next_ticket"
     }
   }
+  public struct TagsSelect: Codable, Hashable, Sendable {
+    public let createdAt: String
+    public let deletedAt: String?
+    public let id: UUID
+    public let name: String
+    public let ownerId: UUID
+    public let syncSeq: Int64
+    public let updatedAt: String
+    public let version: Int32
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case id = "id"
+      case name = "name"
+      case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct TagsInsert: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let deletedAt: String?
+    public let id: UUID?
+    public let name: String
+    public let ownerId: UUID
+    public let syncSeq: Int64?
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case id = "id"
+      case name = "name"
+      case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct TagsUpdate: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let deletedAt: String?
+    public let id: UUID?
+    public let name: String?
+    public let ownerId: UUID?
+    public let syncSeq: Int64?
+    public let updatedAt: String?
+    public let version: Int32?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case id = "id"
+      case name = "name"
+      case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
+      case updatedAt = "updated_at"
+      case version = "version"
+    }
+  }
+  public struct TransactionTagsSelect: Codable, Hashable, Sendable {
+    public let createdAt: String
+    public let deletedAt: String?
+    public let ownerId: UUID
+    public let syncSeq: Int64
+    public let tagId: UUID
+    public let transactionId: UUID
+    public let updatedAt: String
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
+      case tagId = "tag_id"
+      case transactionId = "transaction_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct TransactionTagsInsert: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let deletedAt: String?
+    public let ownerId: UUID
+    public let syncSeq: Int64?
+    public let tagId: UUID
+    public let transactionId: UUID
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
+      case tagId = "tag_id"
+      case transactionId = "transaction_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct TransactionTagsUpdate: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let deletedAt: String?
+    public let ownerId: UUID?
+    public let syncSeq: Int64?
+    public let tagId: UUID?
+    public let transactionId: UUID?
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case ownerId = "owner_id"
+      case syncSeq = "sync_seq"
+      case tagId = "tag_id"
+      case transactionId = "transaction_id"
+      case updatedAt = "updated_at"
+    }
+  }
   public struct TransactionsSelect: Codable, Hashable, Sendable {
     public let accountId: UUID?
     public let amountE4: Int64

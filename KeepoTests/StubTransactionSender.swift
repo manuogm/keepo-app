@@ -102,6 +102,27 @@ final class StubTransactionSender: OutboxSending, @unchecked Sendable {
         try updateCategoryResult.get()
     }
 
+    var createTagResult: Result<Void, Error> = .success(())
+    var updateTagResult: Result<Void, Error> = .success(())
+    var deleteTagResult: Result<Void, Error> = .success(())
+    var setTransactionTagResult: Result<Void, Error> = .success(())
+
+    func createTag(_ payload: CreateTagPayload) async throws {
+        try createTagResult.get()
+    }
+
+    func updateTag(_ payload: UpdateTagPayload) async throws {
+        try updateTagResult.get()
+    }
+
+    func deleteTag(_ payload: DeleteTagPayload) async throws {
+        try deleteTagResult.get()
+    }
+
+    func setTransactionTag(_ payload: SetTransactionTagPayload) async throws {
+        try setTransactionTagResult.get()
+    }
+
     var renameCardMappingResult: Result<Void, Error> = .success(())
     var unmapCardResult: Result<Void, Error> = .success(())
     var mapCardResult: Result<Void, Error> = .success(())
