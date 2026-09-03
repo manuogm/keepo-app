@@ -52,15 +52,6 @@ struct RunningTotal {
 
 // MARK: - result types
 
-struct BudgetProgressLocal {
-    let budgetId: String
-    let categoryId: String?
-    let categoryName: String?
-    let budgetedE4: Int64?
-    let spentE4: Int64?
-    let currency: String
-}
-
 // MARK: - fx memo
 
 /// A memo over `fx_rates`, for the lifetime of one read.

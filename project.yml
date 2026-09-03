@@ -47,6 +47,12 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.manuogm.keepo
         PRODUCT_NAME: Keepo
+        # Lives here, not in the generated .xcodeproj. Xcode writes the team
+        # into the project file when you pick it in the Signing pane, and the
+        # next `xcodegen generate` throws it away again — signing then breaks
+        # on the next device build with no obvious cause. project.yml is the
+        # only place a setting survives regeneration.
+        DEVELOPMENT_TEAM: K46X3FA9HH
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_CFBundleDisplayName: Keepo

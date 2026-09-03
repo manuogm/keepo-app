@@ -18,11 +18,11 @@ import KeepoCore
 /// does so at exactly the granularity Postgres itself rounds at:
 ///
 ///  - a value that is *itself* single-currency (an account balance, a
-///    budget's own amount) is summed natively in SQL, then converted ONCE
+///    row's own amount) is summed natively in SQL, then converted ONCE
 ///    in Swift — Postgres does the same, so this is exact by construction.
 ///  - a value built by summing across transactions that can carry
-///    *different* currencies/dates (spending, income/expense, a budget's
-///    spent side) is fetched here as individual native rows, and converted
+///    *different* currencies/dates (spending, income/expense) is fetched
+///    here as individual native rows, and converted
 ///    + rounded ROW BY ROW in `LocalMoneyConversion` before summing —
 ///    matching Postgres's `sum(fx_convert(...))`, which rounds inside the
 ///    aggregate, once per row. Grouping natively by currency and converting

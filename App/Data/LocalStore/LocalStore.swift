@@ -150,20 +150,6 @@ public enum LocalSchemaV1 {
             table.column("updated_at", .text).notNull()
             table.column("sync_seq", .integer).notNull()
         }
-
-        try database.create(table: "budgets") { table in
-            table.column("id", .text).primaryKey().collate(.nocase)
-            table.column("owner_id", .text).notNull().collate(.nocase)
-            table.column("category_id", .text).collate(.nocase)
-            table.column("period_month", .text).notNull()
-            table.column("amount_e4", .integer).notNull()
-            table.column("currency", .text).notNull()
-            table.column("version", .integer).notNull()
-            table.column("deleted_at", .text)
-            table.column("created_at", .text).notNull()
-            table.column("updated_at", .text).notNull()
-            table.column("sync_seq", .integer).notNull()
-        }
     }
 
     private static func createReferenceTables(_ database: Database) throws {
@@ -356,6 +342,12 @@ public enum LocalStore {
         // lands with a NOT NULL violation. The rename carries no data change,
         // so a drop-and-repull costs nothing but the pull itself.
         migrator.registerMigration("v7_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260906100000 drops the budgets
+        // table server-side. A stale device keeps its local copy forever:
+        // harmless for reads (nothing queries it any more) but it is dead
+        // rows of the user's financial data sitting on disk after the
+        // feature was removed, which is the one thing a mirror must not do.
+        migrator.registerMigration("v8_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)

@@ -3,9 +3,8 @@ import GRDB
 import KeepoCore
 
 /// Cashflow and Investing Ratio's reads — split from `LocalDashboardQueries`
-/// purely to stay under this project's file-length lint, same convention as
-/// `LocalMoneyConversionBudget`. See that file's header for the rules these
-/// follow.
+/// purely to stay under this project's file-length lint. See
+/// `LocalMoneyQueries`' header for the convert-then-sum rules these follow.
 extension LocalDashboardQueries {
     // MARK: - Cashflow
 

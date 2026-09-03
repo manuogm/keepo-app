@@ -40,7 +40,6 @@ enum RefereeFixture {
         try seedAccounts(database)
         try seedFxRates(database)
         try seedTransactions(database)
-        try seedBudget(database)
     }
 
     private static func seedCurrencies(_ database: Database) throws {
@@ -190,19 +189,6 @@ enum RefereeFixture {
                 transaction.categoryKind, transaction.amount, transaction.currency, transaction.occurredAt,
                 transaction.occurredAt, transaction.occurredAt
             ]
-        )
-    }
-
-    private static func seedBudget(_ database: Database) throws {
-        try database.execute(
-            sql: """
-            INSERT INTO budgets (
-                id, owner_id, category_id, period_month, amount_e4, currency, version, created_at, updated_at, sync_seq
-            )
-            VALUES ('dddddddd-0000-0000-0000-000000000001', ?, ?, '2026-07-01', 1000000, 'EUR', 1,
-                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
-            """,
-            arguments: [ownerId, groceries]
         )
     }
 }

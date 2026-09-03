@@ -73,20 +73,4 @@ struct LocalMoneyRefereeTests {
             #expect(totalWorth == nil)
         }
     }
-
-    // MARK: - budget_progress
-
-    @Test("budget_progress: budgeted converts cleanly (EUR-to-EUR), spent is nil (GBP in period)")
-    func budgetProgressMatchesPostgres() throws {
-        let dbQueue = try makeDatabase()
-        let periodMonth = utcCalendar.date(from: DateComponents(year: 2026, month: 7, day: 1)) ?? Self.today
-        let rows = try dbQueue.read { database in
-            try LocalMoneyConversion.budgetProgress(
-                database, ownerId: RefereeFixture.ownerId, baseCurrency: "EUR", periodMonth: periodMonth
-            )
-        }
-        #expect(rows.count == 1)
-        #expect(rows.first?.budgetedE4 == 1_000_000)
-        #expect(rows.first?.spentE4 == nil)
-    }
 }

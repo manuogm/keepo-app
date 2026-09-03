@@ -40,10 +40,6 @@ enum SyncApply {
             "id", "owner_id", "created_by", "account_id", "category_id", "amount_e4", "currency", "frequency",
             "next_due_at", "last_materialized_at", "active", "version", "created_at", "updated_at", "sync_seq"
         ],
-        "budgets": [
-            "id", "owner_id", "category_id", "period_month", "amount_e4", "currency", "version", "deleted_at",
-            "created_at", "updated_at", "sync_seq"
-        ],
         "currencies": ["code", "minor_unit", "sync_seq"],
         "fx_rates": ["currency", "rate_date", "units_per_eur", "source", "fetched_at", "sync_seq"],
         "card_mappings": [
@@ -67,7 +63,7 @@ enum SyncApply {
 
     private static let primaryKeys: [String: [String]] = [
         "accounts": ["id"], "transactions": ["id"], "categories": ["id"],
-        "recurring_rules": ["id"], "budgets": ["id"], "currencies": ["code"],
+        "recurring_rules": ["id"], "currencies": ["code"],
         "fx_rates": ["currency", "rate_date"], "card_mappings": ["id"],
         "merchant_category_map": ["owner_id", "merchant_pattern"], "sync_conflicts": ["id"], "households": ["id"],
         "household_members": ["household_id", "user_id"], "household_accounts": ["household_id", "account_id"],

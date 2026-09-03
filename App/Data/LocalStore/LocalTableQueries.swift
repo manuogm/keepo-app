@@ -7,7 +7,7 @@ import KeepoCore
 /// `keepo-local-first-plan.md`) — unlike `LocalMoneyQueries`/
 /// `LocalMoneyConversion` (L4), which port *computed* views/functions and so
 /// need their own result types, these are the plain-table screens (category
-/// list, budget list, recurring rules, currencies, a single account or
+/// list, recurring rules, currencies, a single account or
 /// transaction, household membership) where the generated Codable struct
 /// already IS the row shape. Conforming it to `FetchableRecord` here (GRDB's
 /// default `Decodable`-based decoder) reuses that struct instead of writing
@@ -19,7 +19,6 @@ import KeepoCore
 /// as ordinary upserted rows (L5's sync applies a tombstone the same way as
 /// any other write), so a local read has to filter for itself.
 extension PublicSchema.CategoriesSelect: @retroactive FetchableRecord {}
-extension PublicSchema.BudgetsSelect: @retroactive FetchableRecord {}
 extension PublicSchema.RecurringRulesSelect: @retroactive FetchableRecord {}
 extension PublicSchema.CurrenciesSelect: @retroactive FetchableRecord {}
 extension PublicSchema.AccountsSelect: @retroactive FetchableRecord {}
@@ -40,16 +39,6 @@ enum LocalTableQueries {
         try PublicSchema.CategoriesSelect.fetchAll(
             database,
             sql: "SELECT * FROM categories WHERE owner_id = ? AND deleted_at IS NULL ORDER BY kind, name",
-            arguments: [ownerId]
-        )
-    }
-
-    static func budgets(_ database: Database, ownerId: String) throws -> [PublicSchema.BudgetsSelect] {
-        try PublicSchema.BudgetsSelect.fetchAll(
-            database,
-            sql: """
-            SELECT * FROM budgets WHERE owner_id = ? AND deleted_at IS NULL ORDER BY period_month DESC
-            """,
             arguments: [ownerId]
         )
     }
