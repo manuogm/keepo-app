@@ -64,6 +64,17 @@ targets:
         INFOPLIST_KEY_NSCameraUsageDescription: >-
           Keepo uses the camera only to take your profile photo. The picture
           stays in your own private storage.
+        # StepUpAuthenticator's LAContext.evaluatePolicy — the biometric
+        # re-check before export, account deletion and leaving/erasing a
+        # household — is a hard crash without this key on a real device.
+        # StubAuthProvider (the local-dev-stack auth path, `SessionStore
+        # .isLocal`) never calls it, so nothing in the Simulator, where every
+        # session in this build has run so far, ever exercised the real
+        # LAContext call that needs it.
+        INFOPLIST_KEY_NSFaceIDUsageDescription: >-
+          Keepo asks for Face ID right before a sensitive action — leaving or
+          erasing a household, exporting your data, or deleting your account
+          — to confirm it's really you.
         # App/Info.plist is a partial plist merged into the auto-generated
         # one — INFOPLIST_KEY_* only recognizes well-known Apple keys, so
         # arbitrary custom keys (SupabaseURL/SupabaseAnonKey) go here instead,

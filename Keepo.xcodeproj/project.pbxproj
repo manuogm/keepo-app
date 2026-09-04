@@ -1575,6 +1575,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Keepo uses the camera only to take your profile photo. The picture stays in your own private storage.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Keepo asks for Face ID right before a sensitive action — leaving or erasing a household, exporting your data, or deleting your account — to confirm it's really you.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1618,6 +1619,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Keepo uses the camera only to take your profile photo. The picture stays in your own private storage.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Keepo asks for Face ID right before a sensitive action — leaving or erasing a household, exporting your data, or deleting your account — to confirm it's really you.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
