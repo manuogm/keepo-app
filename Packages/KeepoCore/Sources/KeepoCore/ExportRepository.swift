@@ -32,8 +32,10 @@ public enum ExportRepository {
     }
 
     /// One field per column, comma-joined, quoting any field that itself
-    /// contains a comma or quote — the write side of the same RFC 4180
-    /// subset `CSVImportParser` reads.
+    /// contains a comma or quote — an RFC 4180 subset. It had a reader
+    /// (`CSVImportParser`) until CSV import was removed; this is now the
+    /// only direction data crosses this format, which is the point of
+    /// keeping export while import went.
     public static func csv(from rows: [PublicSchema.TransactionsWithDetailsSelect]) -> String {
         var lines = ["Date,Account,Category,Merchant,Amount,Currency"]
         for row in rows {

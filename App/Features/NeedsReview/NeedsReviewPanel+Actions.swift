@@ -11,8 +11,6 @@ import SwiftUI
 enum NeedsReviewActionKind {
     case confirmCapture
     case resolveConflict
-    case acceptImport
-    case rejectImport
     case dismissCard
 }
 
@@ -31,7 +29,6 @@ extension NeedsReviewPanel {
         case "sync_conflict": return RowAction(title: "Resolve", kind: .resolveConflict)
         case "pending_capture":
             return item.accountId == nil ? nil : RowAction(title: "Confirm", kind: .confirmCapture)
-        case "csv_import_candidate": return RowAction(title: "Accept", kind: .acceptImport)
         default: return nil
         }
     }
@@ -43,7 +40,6 @@ extension NeedsReviewPanel {
         // account — soft-deletes the `card_mappings` placeholder, same as
         // "Remove Mapping" in the Account edit sheet's card list.
         case "ambiguous_card": return RowAction(title: "Dismiss", kind: .dismissCard)
-        case "csv_import_candidate": return RowAction(title: "Reject", kind: .rejectImport)
         default: return nil
         }
     }
@@ -53,8 +49,6 @@ extension NeedsReviewPanel {
             switch kind {
             case .confirmCapture: await confirmCapture(item)
             case .resolveConflict: await resolve(item)
-            case .acceptImport: await acceptImportCandidate(item)
-            case .rejectImport: await rejectImportCandidate(item)
             case .dismissCard: await dismissUnmappedCard(item)
             }
         }
@@ -104,17 +98,19 @@ extension NeedsReviewPanel {
     /// is known to have changed — never waiting on `session.refresh.bump()`'s
     /// own full reload, which is what made every action here feel laggy
     /// before (the whole list stayed frozen until a network round trip
-    /// finished). `thenBump` still runs the app-wide refresh after, for the
-    /// tab bar's own badge — safe only when the local mirror already
-    /// reflects the change, or the reload it triggers would just resurrect
-    /// the row this just animated away.
-    private func removeLocally(_ id: UUID, thenBump: Bool = true) {
+    /// finished). The bump still follows, for the tab bar's own badge.
+    ///
+    /// It used to be optional (`thenBump: false`), for the one caller whose
+    /// change had no local mirror to reload from — a CSV import candidate,
+    /// where the refresh read still-stale local state and resurrected the
+    /// row this had just animated away. That caller went with CSV import;
+    /// every remaining action writes through the local store first, so the
+    /// reload can only ever agree with what this already did.
+    private func removeLocally(_ id: UUID) {
         withAnimation {
             items.removeAll { $0.itemId == id }
         }
-        if thenBump {
-            session.refresh.bump()
-        }
+        session.refresh.bump()
     }
 
     private func dismissUnmappedCard(_ item: PublicSchema.NeedsReviewSelect) async {
@@ -185,31 +181,4 @@ extension NeedsReviewPanel {
         }
     }
 
-    /// No local write-through exists for CSV import candidates (a
-    /// server-only concept, no local mirror table for it) — `thenBump:
-    /// false` skips the app-wide reload that would otherwise read the
-    /// still-stale local state and resurrect the row this just animated
-    /// away; the next real sync pull is what actually clears it everywhere
-    /// else.
-    private func acceptImportCandidate(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId else { return }
-        actionErrorMessage = nil
-        do {
-            try await ImportRepository.accept(client: session.client, id: id)
-            removeLocally(id, thenBump: false)
-        } catch {
-            actionErrorMessage = UserFacingError.describe(error)
-        }
-    }
-
-    private func rejectImportCandidate(_ item: PublicSchema.NeedsReviewSelect) async {
-        guard let id = item.itemId else { return }
-        actionErrorMessage = nil
-        do {
-            try await ImportRepository.reject(client: session.client, id: id)
-            removeLocally(id, thenBump: false)
-        } catch {
-            actionErrorMessage = UserFacingError.describe(error)
-        }
-    }
 }

@@ -279,14 +279,13 @@ enum LocalTransactionRow {
     }
 
     /// Same reuse rationale as `build` above, for `needs_review`'s stable
-    /// column contract — `LocalMoneyQueries.needsReview` already computes
-    /// the three locally-derivable branches (`sync_conflict`,
+    /// column contract — `LocalMoneyQueries.needsReview` computes the same
+    /// three branches the server view has (`sync_conflict`,
     /// `pending_capture`, `ambiguous_card`); this just re-shapes each row
     /// into the exact type `NeedsReviewRow`/`MapCardSheet` already render.
-    /// The server view's fourth branch, `csv_import_candidate`, never
-    /// appears here — CSV import stays server-side entirely (the plan's own
-    /// documented scope), so a local-only read has nothing to derive it
-    /// from.
+    /// The view had a fourth, `csv_import_candidate`, which this could never
+    /// derive locally — it went with CSV import itself, so the two sides
+    /// now agree by construction rather than by exception.
     static func needsReviewSelect(from row: NeedsReviewLocalRow) throws -> PublicSchema.NeedsReviewSelect {
         let columns: [String: (any DatabaseValueConvertible)?] = [
             "kind": row.kind, "item_id": row.itemId,

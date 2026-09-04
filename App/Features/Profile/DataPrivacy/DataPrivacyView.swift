@@ -23,9 +23,6 @@ struct DataPrivacyView: View {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
             List {
                 Section {
-                    NavigationLink("Import CSV") {
-                        CSVImportView(session: session)
-                    }
                     NavigationLink("Export") {
                         ExportView(session: session)
                     }
@@ -35,7 +32,7 @@ struct DataPrivacyView: View {
                 } header: {
                     Text("Data")
                 } footer: {
-                    Text("Bring in a bank statement or take everything with you.")
+                    Text("Take everything with you, whenever you want.")
                 }
 
                 Section {

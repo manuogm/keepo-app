@@ -304,7 +304,6 @@ struct NeedsReviewRow: View {
         case "sync_conflict": return "exclamationmark.arrow.triangle.2.circlepath"
         case "pending_capture": return "wallet.pass"
         case "ambiguous_card": return "creditcard.trianglebadge.exclamationmark"
-        case "csv_import_candidate": return "doc.text.magnifyingglass"
         default: return "questionmark.circle"
         }
     }

@@ -56,7 +56,6 @@ Every write reaches Postgres through PostgREST/RPC, never a direct table write f
 | Sync Ritual | Per-account freshness, enter-balance flow, unlogged adjustment |
 | Needs Review | One inbox, one row type per §3's `needs_review` view — surfaced from Home's bell, not its own tab |
 | Household | Members, invite, leave (with the fork confirmation) |
-| Import | CSV upload → match-and-review |
 | Settings | Base currency, appearance, security (export, delete), household |
 
 **Home dashboard.** A 2-column grid of widgets the user adds, removes, and drags into place — absolute `(row, column)` placement (`DashboardArrangement`, `KeepoCore`), not flow-packed, so a lone 1×1 can sit in the right column with the left deliberately blank, and a hole between two wide tiles is preserved rather than auto-filled. **A grid row is half a widget** (`DashboardLayout.rowsPerWidget`), sized so two rows measure exactly one column width: every widget is two rows tall and therefore still square (1×1) or full-width-square (1×2), and the split exists only so a one-row tile — a spacer — can open half a widget of breathing room, which a full-height row could not express without leaving a widget-sized hole. Expanded sizes are always full width (2×2, or 3×2 for Cashflow's category breakdown, counted in widget-heights) — one tile expands at a time, and edit mode (long-press, jiggle, minus badges) always compacts back to base sizes first. Dashboards saved before the split decode into overlapping positions and are repaired by normalization into the layout they had, which `DashboardArrangementTests` pins.
@@ -102,7 +101,7 @@ Insights (category breakdowns, savings rate, FI metrics) and its backing `spendi
 
 ### Enums (money rule 4 — enums, not `text` + `CHECK`)
 
-`account_kind` (regular, investment) · `category_kind` (expense, income) · `transaction_source` (manual, capture, recurring, adjustment, csv_import) · `transaction_status` (pending, confirmed) · `fx_source` (ecb) · `household_invite_status` (pending, accepted, revoked, expired) · `import_candidate_status` (pending, accepted, rejected) · `recurring_frequency` (weekly, monthly, yearly)
+`account_kind` (regular, investment) · `category_kind` (expense, income) · `transaction_source` (manual, capture, recurring, adjustment, csv_import — the last is unreachable since CSV import was removed, and kept because transactions accepted from an import before that still carry it) · `transaction_status` (pending, confirmed) · `fx_source` (ecb) · `household_invite_status` (pending, accepted, revoked, expired) · `recurring_frequency` (weekly, monthly, yearly)
 
 `transaction_kind` (expense, income, transfer) is **not** an input enum, and **not a stored `GENERATED ALWAYS` column either** — that was the original plan, revised once building it: generation expressions require an `IMMUTABLE` cast, and `enum_in` is only `STABLE` (confirmed via `pg_proc` before writing the migration). Instead `kind` is derived in `transactions_with_details` (§ below) from `transfer_group_id IS NOT NULL` and the sign of `amount` — same can-never-disagree guarantee, no stored denormalization, no fragile generation expression.
 
@@ -124,7 +123,6 @@ Insights (category breakdowns, savings rate, FI metrics) and its backing `spendi
 - **`household_invites`** — `id`, `household_id`, `invited_by`, `token_hash`, `status` (`household_invite_status`), `expires_at`, `created_at`. Single-use, expiring, revocable per the parked security design.
 - **`sync_conflicts`** — `id`, `table_name`, `row_id`, `owner_id`, `client_version`, `server_version`, `created_at`, `resolved_at`. Populated when a push's `version` doesn't match — feeds Needs Review.
 - **`card_mappings`** — `id` (uuid, PK — every other Needs Review item source has one to hand back as `item_id`; amended from this doc's original `(owner_id, card_identifier)` composite PK once Phase 12 actually wired it into Needs Review), `owner_id`, `card_identifier` (raw Shortcuts card string), `account_id` (nullable — null means unmapped, routes to Needs Review), `source` (`card_mapping_source`: `manual` when the user named the card themselves via `map_card`, `automatic` when the capture pipeline linked it for them via `link_card_to_account`; presentational only, decided by whoever first attaches a real `account_id` and never rewritten afterwards), `unique (owner_id, card_identifier)`.
-- **`csv_import_batches`** / **`csv_import_candidates`** — batch: `id`, `owner_id`, `account_id`, `filename`, `created_at`. candidate: `batch_id`, `raw_row` (jsonb), `matched_transaction_id` (nullable), `status` (`import_candidate_status`).
 - **`ops_events`** — `occurred_at`, `source`, `level`, `code`, `detail`. RLS **on, no policies** — nothing readable by `authenticated`, matching the parked ops design. No PII, ever.
 
 - **`reorder_accounts(p_account_ids uuid[])`** RPC — the Accounts list's drag-to-reorder write. Takes the full ordered id list for ONE kind group and sets each row's `sort_order` from its place in the array: one statement, one round trip, however many rows shifted. Deliberately **not** version-checked, and deliberately does not bump `version` or `updated_at` — it opts into the pre-existing `keepo.restamp_only` flag that `bump_version()`/`set_updated_at()` already honour (the same mechanism `restamp_account_for_sync` uses). Ordering is not a value two clients can meaningfully disagree about, and a drag that bumped versions would turn every subsequent genuine edit into a phantom `sync_conflicts` row.
@@ -213,7 +211,7 @@ Client-only; the server-side functions this ports (`account_balance_on`, `net_wo
 - **The referee (`KeepoTests/LocalMoneyRefereeTests.swift` + `LocalMoneyRefereeFixture.swift`)**: one fixture (two currencies with a resolvable rate, one — GBP — deliberately with none, a JPY account, a valuation account with an unrealized gain), asserted against real Postgres output captured once via `docker exec ... psql` against the local dev stack (`version-logs/phase-L4-log.md` has the exact command). **This is a pinned comparison, not a live cross-process one** — the iOS test target has no Postgres wire-protocol driver, so "the referee" means the SQLite port reproduces numbers Postgres actually produced in that capture, not Postgres answering live at every test run. The pinned values need regenerating (rerun the capture) if the ported SQL changes on either side. All 9 assertions pass, including the full money-rule-5 propagation chain (one missing-rate GBP transaction correctly poisons `net_worth` to `nil`, never `0`).
 
 - **RLS + GRANTs, every table, no exceptions.** RLS narrows access a `GRANT` already gave; it grants nothing itself — without the `GRANT` a query fails before RLS is even consulted. Nothing is granted to `anon`. One policy per command, always `(select auth.uid())` (the bare form re-evaluates per row), and every `UPDATE` policy carries both `USING` and `WITH CHECK` — `USING` alone lets a user reassign a row's ownership to someone else. **Supabase's local cluster grants `TRUNCATE`/`REFERENCES`/`TRIGGER`/`MAINTAIN` to `anon` and `authenticated` on every table by default** (visible via `pg_default_acl`; confirmed `anon` could actually issue `TRUNCATE`, which bypasses RLS entirely) — closed once, schema-wide, with `ALTER DEFAULT PRIVILEGES ... REVOKE ...` before the first `CREATE TABLE`, so every future table is clean automatically rather than needing a per-table fix.
-- **`needs_review`** is a **view**, not a table — `UNION ALL` over: `transactions WHERE status = 'pending'` (unconfirmed captures), `card_mappings WHERE account_id IS NULL` (ambiguous cards), `sync_conflicts WHERE resolved_at IS NULL`, `reconciliations` gaps, `csv_import_candidates WHERE status = 'pending'`, and low-confidence category suggestions from `merchant_category_map`. One inbox, one query, no duplicated review-tracking table per feature.
+- **`needs_review`** is a **view**, not a table — `UNION ALL` over: `transactions WHERE status = 'pending'` (unconfirmed captures), `card_mappings WHERE account_id IS NULL` (ambiguous cards), and `sync_conflicts WHERE resolved_at IS NULL`. A fourth arm over `csv_import_candidates` went with CSV import (`20260909100000_remove_csv_import.sql`). One inbox, one query, no duplicated review-tracking table per feature.
 
 ### Sync engine on device (L5, `keepo-local-first-plan.md`)
 
@@ -274,10 +272,6 @@ rebuild exists to remove).
   so `HouseholdViewLoader` reads `household`/`members`/`myAccounts`/`sharedAccountIds` locally and
   fetches `events` best-effort over the network, never blocking the rest of the screen if that call
   fails.
-- **`needs_review`'s `csv_import_candidate` branch never appears via the local read** —
-  `LocalMoneyQueries.needsReview` only derives the three locally-computable branches; CSV import
-  stays server-side entirely (a decision already on record — see the plan's open questions), so those
-  review items are only reachable from `CSVImportView` itself while online.
 - **`OfflineStatusBar`'s "Last synced …" moved from `PayloadCache.latestFetchedAt()` to
   `SyncCursorStore.lastSyncedAt(for:)`**, persisted in `UserDefaults` alongside the cursor/epoch on
   every successful pull — the same namespaced-by-user-id pattern that store already used, so this
@@ -319,10 +313,6 @@ Shortcuts automation on the Wallet trigger → App Intent, payload `Transaction;
 4. `external_id = hash(card + amount + merchant_normalized + time_bucket)`, enforced by the partial unique index in §3 — a re-fired automation is a no-op, not a duplicate.
 5. Row is inserted `status = 'pending', source = 'capture'`. A local notification prompts review; confirming sets `status = 'confirmed'`.
 6. The App Intent (declared in the **app target**, not an extension — see Phase 11/12) **only ever inserts this pending stub** — it never reads a balance or existing transaction, since it executes outside the biometric lock (parked security design).
-
-### CSV import
-
-Client parses the file; each row becomes a `csv_import_candidates` row matched against existing transactions (exact amount, ±3 days, same account). No `external_id` exists for CSV (no bank-assigned id), so nothing is ever blind-inserted — every candidate surfaces in Needs Review for accept/reject.
 
 ### Household leave / fork
 
