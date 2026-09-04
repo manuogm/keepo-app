@@ -56,7 +56,7 @@ struct TagsListView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Image(systemName: "xmark") }
                 }
-                ToolbarItem(placement: .primaryAction) { infoButton }
+                ToolbarItem(placement: .principal) { titleWithInfo }
             }
             .task(id: session.refresh.token) { await load() }
         }
@@ -82,17 +82,37 @@ struct TagsListView: View {
         .scrollBounceBehavior(.basedOnSize)
     }
 
-    /// The screen's instructions, behind an ⓘ beside the title rather than
-    /// printed under the pills. They are read once and in the way from then
-    /// on — and the pills are the content, so a paragraph sitting under two
-    /// of them made the screen look like a page about tags instead of the
-    /// tags themselves.
+    /// The title and its ⓘ as one object, which is why this is a `principal`
+    /// item and not a trailing button: the question it answers is "what is
+    /// this screen", so it belongs against the screen's name. In the
+    /// trailing corner it sat where every other screen puts an *action* on
+    /// the content, and read as one.
+    ///
+    /// `navigationTitle` stays for VoiceOver and for anything that pushes
+    /// this — a principal item replaces the title's view, not its name.
+    private var titleWithInfo: some View {
+        HStack(spacing: AppTheme.Spacing.xs) {
+            Text("All Tags")
+                .font(AppTheme.Typography.rowTitle)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+            infoButton
+        }
+    }
+
+    /// The screen's instructions, behind an ⓘ rather than printed under the
+    /// pills. They are read once and in the way from then on — and the pills
+    /// are the content, so a paragraph sitting under two of them made the
+    /// screen look like a page about tags instead of the tags themselves.
     private var infoButton: some View {
         Button {
             isShowingGuide = true
         } label: {
             Image(systemName: "info.circle")
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .hitTarget()
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("About tags")
         .popover(isPresented: $isShowingGuide) { guide }
     }
