@@ -106,6 +106,12 @@ extension AppTheme {
         static let avatar: CGFloat = 56
         /// 80 — the mark an empty state is built around.
         static let illustration: CGFloat = 80
+        /// 280 — how wide a bubble of wrapping prose may be: an info
+        /// popover. The one member here that is not a square, and it earns
+        /// its place for the same reason as the rest — the alternative is
+        /// the number being retyped, differently, at every screen that
+        /// explains itself.
+        static let proseWidth: CGFloat = 280
 
         /// The leading inset that lines a `Divider` up with the text beside
         /// a row's leading icon, rather than with the icon itself.

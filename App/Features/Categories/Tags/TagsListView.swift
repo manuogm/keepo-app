@@ -32,6 +32,7 @@ struct TagsListView: View {
     /// pill). Committed on return or blur; discarded if it would collide.
     @State private var drafts: [UUID: String] = [:]
     @State private var newTagName = ""
+    @State private var isShowingGuide = false
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
@@ -55,6 +56,7 @@ struct TagsListView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Image(systemName: "xmark") }
                 }
+                ToolbarItem(placement: .primaryAction) { infoButton }
             }
             .task(id: session.refresh.token) { await load() }
         }
@@ -73,20 +75,51 @@ struct TagsListView: View {
                 if let errorMessage {
                     FormErrorText(message: errorMessage)
                 }
-
-                Text(
-                    tags.isEmpty
-                        ? "Tags track a thing across transactions — a coffee habit, a trip, a side income. "
-                            + "A tag can go on any transaction, whatever its category."
-                        : "Tap a tag to rename it. The red minus deletes it."
-                )
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppTheme.Spacing.l)
         }
         .scrollBounceBehavior(.basedOnSize)
+    }
+
+    /// The screen's instructions, behind an ⓘ beside the title rather than
+    /// printed under the pills. They are read once and in the way from then
+    /// on — and the pills are the content, so a paragraph sitting under two
+    /// of them made the screen look like a page about tags instead of the
+    /// tags themselves.
+    private var infoButton: some View {
+        Button {
+            isShowingGuide = true
+        } label: {
+            Image(systemName: "info.circle")
+        }
+        .accessibilityLabel("About tags")
+        .popover(isPresented: $isShowingGuide) { guide }
+    }
+
+    /// A popover rather than a sheet: it answers a question about the screen
+    /// underneath, so covering that screen would be the wrong move — and
+    /// this one is already a sheet, which a second sheet would stack on.
+    ///
+    /// A fixed width with `fixedSize` vertical, not `fixedSize` in both
+    /// directions the way `FxRateWidget`'s note does it: that one is two
+    /// short lines that never wrap, and this is prose, which without a width
+    /// would lay itself out in a single line wider than the phone — and
+    /// wider still at accessibility text sizes.
+    private var guide: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
+            Text(
+                "A tag is a name that cuts across categories — a coffee habit, a trip, "
+                    + "a side income. It can go on any transaction, whatever its category."
+            )
+            Text("Tap a tag to rename it. The red minus deletes it.")
+        }
+        .font(AppTheme.Typography.caption)
+        .foregroundStyle(AppTheme.Palette.textSecondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(AppTheme.Spacing.l)
+        .frame(width: AppTheme.Size.proseWidth)
+        .presentationCompactAdaptation(.popover)
     }
 
     @ViewBuilder
@@ -146,34 +179,53 @@ struct TagsListView: View {
         .animation(AppTheme.Motion.standard, value: focusedField)
     }
 
-    /// Dashed, like the transaction form's own add affordance, because a
-    /// dashed outline reads as "a slot, not a thing" — it is the one pill
-    /// here that is not a tag. A minimum width so an empty field is still a
-    /// target; `fixedSize` alone would collapse it to the caret.
+    /// Dashed until it is tapped, because a dashed outline reads as "a
+    /// slot, not a thing" — it is the one pill here that is not yet a tag.
+    /// The moment the caret lands in it, it **fills**: from then on the user
+    /// is typing a tag, and a hollow outline that only became a tag on
+    /// return made the thing they were naming look like it wasn't there yet.
+    ///
+    /// The plus and the placeholder go with the outline. Both say "start
+    /// something"; the caret already says it, and keeping them would leave a
+    /// filled tag with a `+` inside it.
+    ///
+    /// A minimum width so an empty field is still a target; `fixedSize`
+    /// alone would collapse it to the caret.
     private var newTagPill: some View {
         HStack(spacing: AppTheme.Spacing.xs) {
-            Image(systemName: "plus")
-                .font(AppTheme.Typography.microEmphasis)
-            TextField("Add Tag", text: $newTagName)
+            if !isNamingNewTag {
+                Image(systemName: "plus")
+                    .font(AppTheme.Typography.microEmphasis)
+            }
+            TextField(isNamingNewTag ? "" : "Add Tag", text: $newTagName)
                 .font(AppTheme.Typography.label)
                 .textInputAutocapitalization(.words)
                 .submitLabel(.done)
                 .focused($focusedField, equals: .new)
+                .tint(AppTheme.Palette.textOnAccent)
                 .fixedSize()
                 .frame(minWidth: AppTheme.Size.illustration, alignment: .leading)
+                .accessibilityLabel("New tag name")
                 .onSubmit { Task { await commitCreate() } }
                 .onChange(of: focusedField) { previous, _ in
                     if previous == .new { Task { await commitCreate() } }
                 }
         }
-        .foregroundStyle(AppTheme.Palette.fillStrong)
+        .foregroundStyle(isNamingNewTag ? AppTheme.Palette.textOnAccent : AppTheme.Palette.fillStrong)
         .padding(.horizontal, AppTheme.Spacing.m)
         .padding(.vertical, AppTheme.Spacing.s)
         .background {
-            Capsule()
-                .strokeBorder(AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            if isNamingNewTag {
+                Capsule().fill(AppTheme.Palette.tagTint)
+            } else {
+                Capsule()
+                    .strokeBorder(AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            }
         }
+        .animation(AppTheme.Motion.standard, value: isNamingNewTag)
     }
+
+    private var isNamingNewTag: Bool { focusedField == .new }
 
     // MARK: - Writes
 
