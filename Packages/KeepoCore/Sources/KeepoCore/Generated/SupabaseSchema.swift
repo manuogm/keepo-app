@@ -252,6 +252,7 @@ public enum PublicSchema {
     public let kind: CategoryKind
     public let name: String
     public let ownerId: UUID
+    public let sharedGroupId: UUID?
     public let syncSeq: Int64
     public let updatedAt: String
     public let version: Int32
@@ -265,6 +266,7 @@ public enum PublicSchema {
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
+      case sharedGroupId = "shared_group_id"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
@@ -280,6 +282,7 @@ public enum PublicSchema {
     public let kind: CategoryKind
     public let name: String
     public let ownerId: UUID
+    public let sharedGroupId: UUID?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
@@ -293,6 +296,7 @@ public enum PublicSchema {
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
+      case sharedGroupId = "shared_group_id"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
@@ -308,6 +312,7 @@ public enum PublicSchema {
     public let kind: CategoryKind?
     public let name: String?
     public let ownerId: UUID?
+    public let sharedGroupId: UUID?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public let version: Int32?
@@ -321,6 +326,7 @@ public enum PublicSchema {
       case kind = "kind"
       case name = "name"
       case ownerId = "owner_id"
+      case sharedGroupId = "shared_group_id"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
       case version = "version"
@@ -354,6 +360,36 @@ public enum PublicSchema {
       case code = "code"
       case minorUnit = "minor_unit"
       case syncSeq = "sync_seq"
+    }
+  }
+  public struct DeletionHandledColumnsSelect: Codable, Hashable, Sendable {
+    public let columnName: String
+    public let handling: String
+    public let tableName: String
+    public enum CodingKeys: String, CodingKey {
+      case columnName = "column_name"
+      case handling = "handling"
+      case tableName = "table_name"
+    }
+  }
+  public struct DeletionHandledColumnsInsert: Codable, Hashable, Sendable {
+    public let columnName: String
+    public let handling: String
+    public let tableName: String
+    public enum CodingKeys: String, CodingKey {
+      case columnName = "column_name"
+      case handling = "handling"
+      case tableName = "table_name"
+    }
+  }
+  public struct DeletionHandledColumnsUpdate: Codable, Hashable, Sendable {
+    public let columnName: String?
+    public let handling: String?
+    public let tableName: String?
+    public enum CodingKeys: String, CodingKey {
+      case columnName = "column_name"
+      case handling = "handling"
+      case tableName = "table_name"
     }
   }
   public struct ExportAuditLogSelect: Codable, Hashable, Sendable {
@@ -513,7 +549,7 @@ public enum PublicSchema {
     }
   }
   public struct HouseholdEventsSelect: Codable, Hashable, Sendable {
-    public let actorId: UUID
+    public let actorId: UUID?
     public let createdAt: String
     public let householdId: UUID
     public let id: UUID
@@ -527,7 +563,7 @@ public enum PublicSchema {
     }
   }
   public struct HouseholdEventsInsert: Codable, Hashable, Sendable {
-    public let actorId: UUID
+    public let actorId: UUID?
     public let createdAt: String?
     public let householdId: UUID
     public let id: UUID?
@@ -560,6 +596,8 @@ public enum PublicSchema {
     public let householdId: UUID
     public let id: UUID
     public let invitedBy: UUID
+    public let sharedAccountIds: [UUID]
+    public let sharedCategoryIds: [UUID]
     public let status: HouseholdInviteStatus
     public let tokenHash: String
     public enum CodingKeys: String, CodingKey {
@@ -568,6 +606,8 @@ public enum PublicSchema {
       case householdId = "household_id"
       case id = "id"
       case invitedBy = "invited_by"
+      case sharedAccountIds = "shared_account_ids"
+      case sharedCategoryIds = "shared_category_ids"
       case status = "status"
       case tokenHash = "token_hash"
     }
@@ -578,6 +618,8 @@ public enum PublicSchema {
     public let householdId: UUID
     public let id: UUID?
     public let invitedBy: UUID
+    public let sharedAccountIds: [UUID]?
+    public let sharedCategoryIds: [UUID]?
     public let status: HouseholdInviteStatus?
     public let tokenHash: String
     public enum CodingKeys: String, CodingKey {
@@ -586,6 +628,8 @@ public enum PublicSchema {
       case householdId = "household_id"
       case id = "id"
       case invitedBy = "invited_by"
+      case sharedAccountIds = "shared_account_ids"
+      case sharedCategoryIds = "shared_category_ids"
       case status = "status"
       case tokenHash = "token_hash"
     }
@@ -596,6 +640,8 @@ public enum PublicSchema {
     public let householdId: UUID?
     public let id: UUID?
     public let invitedBy: UUID?
+    public let sharedAccountIds: [UUID]?
+    public let sharedCategoryIds: [UUID]?
     public let status: HouseholdInviteStatus?
     public let tokenHash: String?
     public enum CodingKeys: String, CodingKey {
@@ -604,6 +650,8 @@ public enum PublicSchema {
       case householdId = "household_id"
       case id = "id"
       case invitedBy = "invited_by"
+      case sharedAccountIds = "shared_account_ids"
+      case sharedCategoryIds = "shared_category_ids"
       case status = "status"
       case tokenHash = "token_hash"
     }

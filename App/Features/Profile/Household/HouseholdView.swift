@@ -14,15 +14,14 @@ struct HouseholdView: View {
     @State private var events: [PublicSchema.HouseholdEventsSelect] = []
     @State private var isLoading = true
     @State private var isCreatingHousehold = false
-    @State private var isCreatingInvite = false
-    @State private var generatedToken: String?
-    @State private var joinTokenText = ""
-    @State private var isJoining = false
+    @State var myCategories: [PublicSchema.CategoriesSelect] = []
+    @State private var isInviting = false
+    @State private var isJoiningFlow = false
     @State private var isLeaving = false
     @State private var isErasing = false
     @State private var showLeaveConfirm = false
     @State private var showEraseConfirm = false
-    @State private var errorMessage: String?
+    @State var errorMessage: String?
 
     var body: some View {
         ZStack {
@@ -35,6 +34,7 @@ struct HouseholdView: View {
                     householdSection
                     if household != nil {
                         shareSection
+                        shareCategoriesSection
                         inviteSection
                         eventsSection
                         leaveSection
@@ -52,7 +52,18 @@ struct HouseholdView: View {
         }
         .navigationTitle("Household")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        // Keyed on the refresh token like every list in the app, so a
+        // pull triggered from anywhere else lands here too.
+        .task(id: session.refresh.token) { await load() }
+        .sheet(isPresented: $isInviting) {
+            InviteFlowView(session: session) { Task { await load() } }
+        }
+        .sheet(isPresented: $isJoiningFlow) {
+            JoinFlowView(session: session) {
+                session.refresh.bump()
+                Task { await load() }
+            }
+        }
         .confirmationDialog(
             "Leave this household?", isPresented: $showLeaveConfirm, titleVisibility: .visible
         ) {
@@ -101,38 +112,34 @@ struct HouseholdView: View {
         }
     }
 
+    /// A door into the flow rather than a button that produces a code on the
+    /// spot. Choosing what to share and handing over the code are one act,
+    /// and the old screen split them: it made a code immediately and left
+    /// sharing to a row of toggles further down the same screen.
     @ViewBuilder
     private var inviteSection: some View {
         Section {
-            if let generatedToken {
-                Text(generatedToken).font(.system(.body, design: .monospaced)).textSelection(.enabled)
-                Text("Share this code — it expires in 7 days and works once.")
-                    .font(AppTheme.Typography.caption).foregroundStyle(AppTheme.Palette.textSecondary)
-            } else {
-                Button {
-                    Task { await createInvite() }
-                } label: {
-                    if isCreatingInvite { ProgressView() } else { Text("Invite a Partner") }
-                }
-                .disabled(isCreatingInvite || members.count >= 2)
-            }
+            Button("Invite a Partner") { isInviting = true }
+                .disabled(members.count >= 2)
         } header: {
             Text("Invite")
+        } footer: {
+            Text(
+                members.count >= 2
+                    ? "Your household is full — two members is the limit."
+                    : "You'll choose what they can see before the code is created."
+            )
         }
     }
 
     @ViewBuilder
     private var joinSection: some View {
         Section {
-            TextField("Invite code", text: $joinTokenText).autocorrectionDisabled()
-            Button {
-                Task { await join() }
-            } label: {
-                if isJoining { ProgressView() } else { Text("Join Household") }
-            }
-            .disabled(isJoining || joinTokenText.isEmpty)
+            Button("Join a Household") { isJoiningFlow = true }
         } header: {
             Text("Join a Household")
+        } footer: {
+            Text("You'll see exactly what you're being given before you join.")
         }
     }
 
@@ -168,7 +175,7 @@ struct HouseholdView: View {
         )
     }
 
-    private func load() async {
+    func load() async {
         errorMessage = nil
         do {
             let state = try await HouseholdViewLoader.load(session: session)
@@ -177,6 +184,11 @@ struct HouseholdView: View {
             myAccounts = state.myAccounts
             sharedAccountIds = state.sharedAccountIds
             events = state.events
+            if let ownerId = session.profile?.id.uuidString {
+                myCategories = (try? await session.dbQueue.read { database in
+                    try LocalTableQueries.categories(database, ownerId: ownerId)
+                }) ?? []
+            }
         } catch {
             // Offline is ambient state, surfaced by the persistent status
             // indicator elsewhere on screen — not a per-fetch red error.
@@ -190,7 +202,13 @@ struct HouseholdView: View {
         errorMessage = nil
         do {
             try await HouseholdRepository.create(client: session.client)
-            session.refresh.bump()
+            // The household exists on the server; this screen reads the local
+            // mirror, so without the pull it keeps rendering "Create
+            // Household" and the tap looks like it did nothing. Every other
+            // write on this screen already does this — creation was the one
+            // that only bumped.
+            await session.syncNow()
+            await load()
         } catch {
             errorMessage = UserFacingError.describe(error)
         }
@@ -209,31 +227,6 @@ struct HouseholdView: View {
         } catch {
             errorMessage = UserFacingError.describe(error)
         }
-    }
-
-    private func createInvite() async {
-        isCreatingInvite = true
-        errorMessage = nil
-        do {
-            generatedToken = try await HouseholdRepository.createInvite(client: session.client)
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
-        isCreatingInvite = false
-    }
-
-    private func join() async {
-        isJoining = true
-        errorMessage = nil
-        do {
-            try await HouseholdRepository.acceptInvite(client: session.client, token: joinTokenText)
-            joinTokenText = ""
-            session.refresh.bump()
-            await load()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
-        isJoining = false
     }
 
     private func leave() async {

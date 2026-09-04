@@ -54,13 +54,16 @@ select is(
   'B is now in the same household as A'
 );
 
--- 5. merge_household_categories gave B a copy of A's "Groceries" (exact
--- name+kind match, since B never had one) without duplicating B's own
--- pre-existing "Coffee".
+-- 5. Joining a household copies **nothing** on its own. This used to assert
+-- the opposite: `merge_household_categories` mirrored every category both
+-- ways the moment anyone accepted, which meant joining a household silently
+-- rewrote both members' category lists. 20260912100000 replaced it with a
+-- selection carried on the invite — this invite chose nothing, so nothing
+-- crosses, and B's list is exactly what it was.
 select is(
   (select count(*) from categories where owner_id = auth.uid() and kind = 'expense' and lower(name) = 'groceries'),
-  1::bigint,
-  'B received a category matching A''s "Groceries" at formation'
+  0::bigint,
+  'joining a household copies no category that was not deliberately shared'
 );
 
 select is(

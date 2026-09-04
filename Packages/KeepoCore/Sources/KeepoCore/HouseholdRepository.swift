@@ -7,14 +7,47 @@ public enum HouseholdRepository {
     /// The plaintext token, returned exactly once — never stored, never
     /// retrievable again. The caller is responsible for putting it in front
     /// of the invitee (share sheet, copy button, ...).
-    public static func createInvite(client: SupabaseClient) async throws -> String {
-        try await client.rpc("create_invite").execute().value
+    /// The selections travel **with the invite**, not as writes made when it
+    /// is created: until somebody accepts there is nobody to share with, and
+    /// an invite that quietly changed the inviter's data before anyone used
+    /// it would be a surprise the day it expired unused.
+    public static func createInvite(
+        client: SupabaseClient, accountIds: [UUID] = [], categoryIds: [UUID] = []
+    ) async throws -> String {
+        try await client.rpc(
+            "create_invite",
+            params: InviteSelectionParams(accountIds: accountIds, categoryIds: categoryIds)
+        ).execute().value
     }
 
-    /// Returns the household id the caller just joined.
+    /// What the invitee is about to receive, by name, holding nothing but the
+    /// token — so "join this household" is a decision made with the answer in
+    /// front of them rather than after the fact.
+    public static func previewInvite(client: SupabaseClient, token: String) async throws -> [InvitePreviewRow] {
+        try await client.rpc("preview_invite", params: TokenParam(token: token)).execute().value
+    }
+
+    /// Returns the household id the caller just joined. Both members' choices
+    /// are applied here, in one transaction: the inviter's from the invite,
+    /// the invitee's from these arguments.
     @discardableResult
-    public static func acceptInvite(client: SupabaseClient, token: String) async throws -> UUID {
-        try await client.rpc("accept_invite", params: TokenParam(token: token)).execute().value
+    public static func acceptInvite(
+        client: SupabaseClient, token: String, accountIds: [UUID] = [], categoryIds: [UUID] = []
+    ) async throws -> UUID {
+        try await client.rpc(
+            "accept_invite",
+            params: AcceptInviteParams(token: token, accountIds: accountIds, categoryIds: categoryIds)
+        ).execute().value
+    }
+
+    /// A category becomes shared, or stops being. Same shape as `share`/
+    /// `unshare` above so the Household screen can offer both identically.
+    public static func shareCategory(client: SupabaseClient, categoryId: UUID) async throws {
+        try await client.rpc("share_category", params: CategoryIdParam(categoryId: categoryId)).execute()
+    }
+
+    public static func unshareCategory(client: SupabaseClient, categoryId: UUID) async throws {
+        try await client.rpc("unshare_category", params: CategoryIdParam(categoryId: categoryId)).execute()
     }
 
     /// Forks every account shared in the caller's household into two fresh,
@@ -184,5 +217,48 @@ private struct NetWorthSeriesParams: Encodable {
         case scope = "p_scope"
         case from = "p_from"
         case through = "p_to"
+    }
+}
+
+/// One line of `preview_invite`: an account name, or a category name and its
+/// kind. Exactly one of the two is non-nil per row — the RPC unions two
+/// selects, because "what am I being given" is one list to the person reading
+/// it even though it comes from two tables.
+public struct InvitePreviewRow: Decodable, Hashable, Sendable {
+    public let accountName: String?
+    public let categoryName: String?
+    public let categoryKind: PublicSchema.CategoryKind?
+
+    enum CodingKeys: String, CodingKey {
+        case accountName = "account_name"
+        case categoryName = "category_name"
+        case categoryKind = "category_kind"
+    }
+}
+
+private struct InviteSelectionParams: Encodable {
+    let accountIds: [UUID]
+    let categoryIds: [UUID]
+    enum CodingKeys: String, CodingKey {
+        case accountIds = "p_share_account_ids"
+        case categoryIds = "p_share_category_ids"
+    }
+}
+
+private struct AcceptInviteParams: Encodable {
+    let token: String
+    let accountIds: [UUID]
+    let categoryIds: [UUID]
+    enum CodingKeys: String, CodingKey {
+        case token = "p_token"
+        case accountIds = "p_share_account_ids"
+        case categoryIds = "p_share_category_ids"
+    }
+}
+
+private struct CategoryIdParam: Encodable {
+    let categoryId: UUID
+    enum CodingKeys: String, CodingKey {
+        case categoryId = "p_category_id"
     }
 }

@@ -30,3 +30,79 @@ extension LocalStore {
         SyncCursorStore.resetAll()
     }
 }
+
+extension LocalStore {
+    /// Every migration this store has ever run, in order, split out of
+    /// `LocalStore.swift` for the project's file-length lint. They belong
+    /// beside `rebuildSyncableTables`, which is what all but the first of
+    /// them call.
+    static func registerMigrations(_ migrator: inout DatabaseMigrator) {
+        migrator.registerMigration("v1") { database in try LocalSchemaV1.migrate(database) }
+        // Recovers a device whose local schema predates a `LocalSchemaV1`
+        // column change — see `rebuildSyncableTables`'s own header comment
+        // (`LocalStore+SchemaMigration.swift`) for why this is needed.
+        migrator.registerMigration("v2_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild, re-run under a new name so a device that already
+        // completed v2 still picks up C-07's new partial unique index on
+        // transactions(owner_id, source, external_id) — GRDB never re-runs
+        // a migration name that already succeeded.
+        migrator.registerMigration("v3_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — items 2/3's new unique index on
+        // card_mappings(owner_id, card_identifier); also purges any
+        // duplicate row already on disk, since the fresh re-pull runs
+        // through `SyncApply`'s new natural-key reconciliation.
+        migrator.registerMigration("v4_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — the unify-account-kinds migration dropped
+        // accounts.subtype, transactions.account_kind, and balance_snapshots
+        // entirely server-side; a device that already completed v4 needs
+        // this rebuild to drop them locally too, or every pull row omitting
+        // those columns hits an INSERT NOT NULL violation.
+        migrator.registerMigration("v5_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260903100000 adds accounts.sort_order
+        // and card_mappings.source server-side. Unlike the v5 case these are
+        // additive, so a stale device would not hard-fail on them; it would
+        // silently drop both columns from every pulled row (SyncApply's
+        // whitelist is intersected with the local schema), leaving the
+        // Accounts list unable to remember its own order. Same rebuild, same
+        // self-heal.
+        migrator.registerMigration("v6_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260905100000 renames
+        // fx_rates.rate_to_eur to units_per_eur server-side. A stale device
+        // keeps the old column, so every pulled fx row loses its rate to
+        // `SyncApply`'s whitelist-intersected-with-local-schema step and
+        // lands with a NOT NULL violation. The rename carries no data change,
+        // so a drop-and-repull costs nothing but the pull itself.
+        migrator.registerMigration("v7_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260906100000 drops the budgets
+        // table server-side. A stale device keeps its local copy forever:
+        // harmless for reads (nothing queries it any more) but it is dead
+        // rows of the user's financial data sitting on disk after the
+        // feature was removed, which is the one thing a mirror must not do.
+        migrator.registerMigration("v8_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260907100000 adds tags and
+        // transaction_tags server-side. Additive, so a stale device would not
+        // hard-fail; it would silently drop both tables from every pull
+        // (SyncApply skips a table the local schema does not have), leaving
+        // the Tags screen permanently empty with no error anywhere.
+        migrator.registerMigration("v9_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260908100000 drops
+        // tags.category_id server-side. A stale device keeps the column and
+        // every pulled tag row loses nothing, but the column would sit there
+        // holding a category link the product no longer has.
+        migrator.registerMigration("v10_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260910100000 adds
+        // profiles.display_name and profiles.avatar_path server-side.
+        // Additive, so nothing hard-fails; a stale device would silently drop
+        // both from every pulled profile row (`SyncApply` intersects its
+        // whitelist with the local schema), which reads as a user who set a
+        // name and a photo on one device and has neither on the other.
+        migrator.registerMigration("v11_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260912100000 adds
+        // categories.shared_group_id server-side. Additive, so nothing
+        // hard-fails; a stale device would silently drop it from every pulled
+        // category (`SyncApply` intersects its whitelist with the local
+        // schema), leaving a shared category indistinguishable from a private
+        // one on that device alone.
+        migrator.registerMigration("v12_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+    }
+}
