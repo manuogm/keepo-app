@@ -42,6 +42,14 @@ public enum ProfileRepository {
         try await client.from("profiles").update(patch).eq("id", value: userId).execute()
     }
 
+    /// `nil` clears it. The column's own CHECK requires any non-nil value to
+    /// start with the profile's id, so this cannot record another user's
+    /// object even if a caller tried.
+    public static func updateAvatarPath(client: SupabaseClient, userId: UUID, avatarPath: String?) async throws {
+        let patch = ProfileAvatarPathPatch(avatarPath: avatarPath)
+        try await client.from("profiles").update(patch).eq("id", value: userId).execute()
+    }
+
     /// A plain RLS-scoped update — `profiles_update`'s policy already
     /// allows this. Changing `base_currency` fires
     /// `profiles_backfill_fx_on_base_currency_change` (Phase 13) server-side
@@ -67,6 +75,13 @@ private struct ProfileDisplayNamePatch: Encodable {
     let displayName: String
     enum CodingKeys: String, CodingKey {
         case displayName = "display_name"
+    }
+}
+
+private struct ProfileAvatarPathPatch: Encodable {
+    let avatarPath: String?
+    enum CodingKeys: String, CodingKey {
+        case avatarPath = "avatar_path"
     }
 }
 

@@ -27,9 +27,17 @@ alter table profiles
 -- never loads rather than as a write that was refused. Path shape is
 -- `{user_id}/{uuid}.jpg`, which is exactly what `storage.foldername(name)[1]`
 -- reads.
+--
+-- **Case-insensitive on purpose.** Postgres renders `uuid::text` lowercase;
+-- Swift's `UUID.uuidString` is uppercase. Compared literally, this refused
+-- every upload the iOS client made, as a bare "new row violates row-level
+-- security policy" with nothing naming case as the reason. A uuid means the
+-- same uuid in either spelling, so the comparison should too — the client
+-- sends the canonical lowercase form anyway, making this the backstop rather
+-- than the mechanism.
 alter table profiles
   add constraint profiles_avatar_path_is_own
-  check (avatar_path is null or avatar_path like id::text || '/%');
+  check (avatar_path is null or lower(avatar_path) like lower(id::text) || '/%');
 
 -- `profiles`' UPDATE grant is **column-scoped** (S-06,
 -- 20260827100000_close_direct_write_gaps.sql): a client may set
@@ -72,18 +80,22 @@ on conflict (id) do nothing;
 -- One rule, four verbs: the object's first path segment is the caller's own
 -- id. `select auth.uid()` rather than a bare call so the planner hoists it
 -- out of the row loop, the same form every policy in `public` uses.
+--
+-- `lower(...)` on the path segment for the same reason as the CHECK above:
+-- `auth.uid()::text` is lowercase, `UUID.uuidString` is uppercase, and the
+-- literal comparison rejected every upload the client made.
 create policy avatars_select on storage.objects
   for select to authenticated
   using (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and lower((storage.foldername(name))[1]) = (select auth.uid())::text
   );
 
 create policy avatars_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and lower((storage.foldername(name))[1]) = (select auth.uid())::text
   );
 
 -- Replacing an avatar is an upsert to a new key plus a delete of the old one,
@@ -93,16 +105,16 @@ create policy avatars_update on storage.objects
   for update to authenticated
   using (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and lower((storage.foldername(name))[1]) = (select auth.uid())::text
   )
   with check (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and lower((storage.foldername(name))[1]) = (select auth.uid())::text
   );
 
 create policy avatars_delete on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and lower((storage.foldername(name))[1]) = (select auth.uid())::text
   );

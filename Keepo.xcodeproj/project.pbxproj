@@ -70,6 +70,7 @@
 		4BD95C79F8BB1817A98FC35C /* CaptureNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5128E2B3C07029D4C8598446 /* CaptureNotify.swift */; };
 		4C27DB33415AF4D03D91EEE8 /* KeepoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */; };
 		4CE0E5F8EC4BC76E76D070C6 /* TransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82CCCE4FCBDBDE32D9845EC2 /* TransactionRow.swift */; };
+		4D19968A2A19CD70644154B0 /* AvatarPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B81EA0691D95EE39E4461BC /* AvatarPicker.swift */; };
 		4D4B21765F18EC539476C3B5 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBD451A5BFFF556CC60CE3C /* NotificationSettingsView.swift */; };
 		4D60CD7CFF2C75EA35FD537F /* SeriesWidgetState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C8BE6B253E7496D8A8F487 /* SeriesWidgetState.swift */; };
 		4D69ED1097531B57B400F82C /* DashboardDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC080B33FA837D6D4D0F61A7 /* DashboardDataLoader.swift */; };
@@ -101,6 +102,7 @@
 		69B1888E257D5B11AED76F54 /* CategoryFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD818205E37EA232A324077C /* CategoryFormView.swift */; };
 		6D136EF3E95EB5BD256F22C7 /* KeepoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA14030637CFFD08A547224 /* KeepoUITests.swift */; };
 		6ED447E86A5FFA53C5AC3C60 /* BalanceReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0FAAB5B77568D01ADFCCDA7 /* BalanceReminderScheduler.swift */; };
+		720897F8D137E6761E836C80 /* AvatarStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC04F25F3E87CBB7240E1BC6 /* AvatarStore.swift */; };
 		740E6573623946DF9C219E5F /* CaptureQuickActionRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D622D3BC234133CBEBEA83 /* CaptureQuickActionRegistry.swift */; };
 		740F18DE2C4B1A6D52882358 /* NotificationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5597232F1DF84A5AC9F1058F /* NotificationRouter.swift */; };
 		7453B3F21C072B008B7C4E67 /* ThirdPartyLicenses in Resources */ = {isa = PBXBuildFile; fileRef = 2EC49551604711746D0B4870 /* ThirdPartyLicenses */; };
@@ -300,6 +302,7 @@
 		2A1CF50053339F613C77014E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		2ABD39DFAF1B6C4FA58FC42B /* DashboardExpansionScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExpansionScroll.swift; sourceTree = "<group>"; };
 		2ADACFF6B4E83FE909AC4361 /* AmountField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmountField.swift; sourceTree = "<group>"; };
+		2B81EA0691D95EE39E4461BC /* AvatarPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarPicker.swift; sourceTree = "<group>"; };
 		2BABE6052DACA04EA139DE0A /* TagFlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagFlowLayout.swift; sourceTree = "<group>"; };
 		2BDB2561E46C43731887DBA5 /* TagPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagPickerSheet.swift; sourceTree = "<group>"; };
 		2C826F8EB1CECA41DDF5D02A /* OfflineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStore.swift; sourceTree = "<group>"; };
@@ -438,6 +441,7 @@
 		C80AB872EF3B66A5C757E62D /* DashboardGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardGeometryTests.swift; sourceTree = "<group>"; };
 		C91440E871E1BD48AB796B63 /* Keepo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Keepo.entitlements; sourceTree = "<group>"; };
 		C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxCaptureRecoveryTests.swift; sourceTree = "<group>"; };
+		CC04F25F3E87CBB7240E1BC6 /* AvatarStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarStore.swift; sourceTree = "<group>"; };
 		CD818205E37EA232A324077C /* CategoryFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryFormView.swift; sourceTree = "<group>"; };
 		CDE7A41A7D4B5DF222FAD946 /* CaptureNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationScheduler.swift; sourceTree = "<group>"; };
 		D01EFD57C883787366864BB5 /* SyncApplyCardMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncApplyCardMappingTests.swift; sourceTree = "<group>"; };
@@ -706,6 +710,7 @@
 		74BC9B5B820623D331253951 /* Profile */ = {
 			isa = PBXGroup;
 			children = (
+				2B81EA0691D95EE39E4461BC /* AvatarPicker.swift */,
 				FD124F353024A73375A9AF82 /* ProfileView.swift */,
 				14C5A444304241F495436350 /* ProfileView+Sections.swift */,
 				765EAD6AC925F7E5AC653A3A /* Automations */,
@@ -982,6 +987,7 @@
 		E3BDB4569FBD8C825D1CA022 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				CC04F25F3E87CBB7240E1BC6 /* AvatarStore.swift */,
 				B0FAAB5B77568D01ADFCCDA7 /* BalanceReminderScheduler.swift */,
 				EC330CD2BD135E7B857838F3 /* CaptureEnvironment.swift */,
 				E3A3543E6EF9E4AA8A2E59C5 /* CaptureIntent.swift */,
@@ -1234,6 +1240,8 @@
 				88796F518B9348A6021B3ED2 /* AppTheme.swift in Sources */,
 				5492F80D5A1C99F245A83D9C /* ArchiveAccountsView.swift in Sources */,
 				877B54C94EA6A8D5F6FB4C56 /* AutomationsView.swift in Sources */,
+				4D19968A2A19CD70644154B0 /* AvatarPicker.swift in Sources */,
+				720897F8D137E6761E836C80 /* AvatarStore.swift in Sources */,
 				3890CD13DBCAF86536329008 /* BalanceHeaderView.swift in Sources */,
 				6ED447E86A5FFA53C5AC3C60 /* BalanceReminderScheduler.swift in Sources */,
 				C5C8E83A9D173103582CEBFF /* CalculatorSheet.swift in Sources */,
@@ -1546,6 +1554,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Keepo uses the camera only to take your profile photo. The picture stays in your own private storage.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1588,6 +1597,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Keepo;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Keepo uses the camera only to take your profile photo. The picture stays in your own private storage.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

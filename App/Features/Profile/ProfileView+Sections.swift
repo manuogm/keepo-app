@@ -104,6 +104,70 @@ extension ProfileView {
         isSyncingFX = false
     }
 
+    var exits: some View {
+        Section {
+            Button(role: .destructive) {
+                Task { await signOut() }
+            } label: {
+                HStack {
+                    Text("Sign Out")
+                    Spacer()
+                    if isSigningOut { ProgressView() }
+                }
+            }
+            .disabled(isSigningOut)
+
+            Button(role: .destructive) {
+                isShowingDeleteConfirmation = true
+            } label: {
+                HStack {
+                    Text("Delete Account")
+                    Spacer()
+                    if isDeletingAccount { ProgressView() }
+                }
+            }
+            .disabled(isDeletingAccount)
+        } footer: {
+            Text("Deleting your account permanently removes your financial data. This cannot be undone.")
+        }
+        .confirmationDialog(
+            "Delete your account?",
+            isPresented: $isShowingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Account", role: .destructive) { Task { await deleteAccount() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "This permanently deletes all your financial data, accounts, and transactions. "
+                    + "You will be signed out immediately. This cannot be undone."
+            )
+        }
+    }
+
+    func signOut() async {
+        isSigningOut = true
+        errorMessage = nil
+        do {
+            try await session.signOut()
+        } catch {
+            errorMessage = UserFacingError.describe(error)
+            isSigningOut = false
+        }
+    }
+
+    func deleteAccount() async {
+        isDeletingAccount = true
+        errorMessage = nil
+        do {
+            try await session.stepUp(reason: "Confirm account deletion")
+            try await session.deleteAccount()
+        } catch {
+            errorMessage = UserFacingError.describe(error)
+            isDeletingAccount = false
+        }
+    }
+
     func loadLastFXSyncedAt() async {
         lastFXSyncedAt = try? await FxRateRepository.latestFetchedAt(client: session.client)
     }

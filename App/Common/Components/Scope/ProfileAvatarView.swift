@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import UIKit
 
 /// The user's face, wherever it appears — the scope banner's tap target
 /// into Profile, and Profile's own header. One view so the two can't drift
@@ -10,6 +11,10 @@ struct ProfileAvatarView: View {
     /// address they may never have chosen. Nil until they have set one.
     var name: String?
     let email: String?
+    /// The uploaded picture, when one has been loaded. The initial below is
+    /// not a placeholder for a slow image — it is what the avatar *is* until
+    /// the user sets a photo, and what it goes back to if they remove one.
+    var image: UIImage?
     var size = AppTheme.Size.icon
     /// Drawn on a saturated gradient card (`onColor: true`) or on the app's
     /// own neutral surface. Only the two fill/foreground colours differ, so
@@ -17,6 +22,29 @@ struct ProfileAvatarView: View {
     var onColor = false
 
     var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    // Fill, not fit: the source is already a centre-cropped
+                    // square (`AvatarStore.downscaledJPEG`), so this only has
+                    // to cover rounding, and `fit` would leave hairline gaps
+                    // at the circle's edge.
+                    .scaledToFill()
+            } else {
+                initialFace
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay {
+            if onColor {
+                Circle().strokeBorder(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.muted), lineWidth: 1)
+            }
+        }
+    }
+
+    private var initialFace: some View {
         ZStack {
             Circle().fill(
                 onColor
@@ -26,12 +54,6 @@ struct ProfileAvatarView: View {
             Text(initial)
                 .font(.system(size: size * 0.42, weight: .bold))
                 .foregroundStyle(onColor ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textPrimary)
-        }
-        .frame(width: size, height: size)
-        .overlay {
-            if onColor {
-                Circle().strokeBorder(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.muted), lineWidth: 1)
-            }
         }
     }
 

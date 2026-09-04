@@ -20,6 +20,11 @@ struct MainTabView: View {
     /// behind it is the same read whichever screen asks. Categories is not
     /// among them — a category is not scoped money.
     @State private var scopeContext = ScopeContext()
+    /// Also owned here, and for the third time the same reason: two views
+    /// draw the avatar — this tab's scope banner and the Profile sheet — and
+    /// a store per view would download and cache the same image twice, then
+    /// disagree the moment one of them changed it.
+    @State private var avatars = AvatarStore()
     /// Measured here and handed down, because this is the last view that
     /// still sees it — see `EnvironmentValues.topSafeAreaInset`.
     @State private var topSafeAreaInset: CGFloat = 0
@@ -58,6 +63,7 @@ struct MainTabView: View {
         .tint(AppTheme.Palette.textPrimary)
         .environment(navigation)
         .environment(scopeContext)
+        .environment(avatars)
         .environment(\.isPrivacyMode, session.isPrivacyMode)
         .environment(\.topSafeAreaInset, topSafeAreaInset)
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets in
@@ -84,7 +90,7 @@ struct MainTabView: View {
         .captureDeepLink(session: session)
         .sheet(isPresented: $navigation.isProfilePresented) {
             NavigationStack(path: $navigation.profilePath) {
-                ProfileView(session: session)
+                ProfileView(session: session, avatars: avatars)
                     .navigationDestination(for: AppNavigation.ProfileDestination.self) { destination in
                         profileDestination(destination)
                     }
@@ -93,6 +99,7 @@ struct MainTabView: View {
         .task(id: session.refresh.token) {
             await loadNeedsReviewCount()
             await scopeContext.reload(session: session)
+            await avatars.load(path: session.profile?.avatarPath, client: session)
         }
         // Also an overlay — a transient floating notice must not reflow the
         // screen under it every time connectivity blips. It rides above the

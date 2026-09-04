@@ -116,7 +116,16 @@ struct FormCard<Content: View>: View {
 struct FormErrorText: View {
     let message: String
 
+    // `Text`, not `FormErrorText`. It returned itself from `body` — introduced
+    // in f95e163 and shipped since — which is infinite recursion: every screen
+    // that actually rendered an error overflowed the stack and took the app
+    // down. It survived because an error message is the one view a screen
+    // almost never draws, so nothing exercised it until the avatar upload
+    // started failing and tried to say so.
     var body: some View {
-        FormErrorText(message: message)
+        Text(message)
+            .font(AppTheme.Typography.caption)
+            .foregroundStyle(AppTheme.Palette.statusNegative)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

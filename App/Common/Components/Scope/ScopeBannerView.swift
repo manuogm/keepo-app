@@ -39,6 +39,11 @@ import SwiftUI
 /// cannot travel with it, and would leave a seam of the outgoing colour
 /// across the status bar for the whole length of a swipe.
 struct ScopeBannerView<Accessory: View, Filters: View>: View {
+    /// Optional so the banner still renders in a preview or any context that
+    /// never installed the store — the avatar falls back to the initial,
+    /// which is what it draws until a photo exists anyway.
+    @Environment(AvatarStore.self) private var avatars: AvatarStore?
+
     let title: String
     let session: SessionStore
     /// Whether the caller's `filters` panel is showing. The panel is drawn
@@ -128,7 +133,10 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     private func card(_ scope: PublicSchema.AccountScope) -> some View {
         HStack(spacing: AppTheme.Spacing.m) {
             Button(action: onOpenProfile) {
-                ProfileAvatarView(name: session.profile?.displayName, email: session.userEmail, onColor: true)
+                ProfileAvatarView(
+                    name: session.profile?.displayName, email: session.userEmail,
+                    image: avatars?.image, onColor: true
+                )
             }
             .buttonStyle(.pressableCard)
             .accessibilityLabel("Open profile")

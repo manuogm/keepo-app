@@ -88,23 +88,31 @@ select throws_ok(
   'an avatar_path under another user''s id is refused'
 );
 
--- 8. Under one's own, it is fine.
+-- 8. Under one's own, it is fine — **written in uppercase**, which is the
+-- case that actually mattered. Postgres renders `uuid::text` lowercase and
+-- Swift's `UUID.uuidString` is uppercase, so a literal comparison here
+-- rejected every avatar the iOS client ever tried to record. Written in
+-- lowercase, as this assertion first was, the constraint looks correct and
+-- the app still cannot upload.
 update profiles
-set avatar_path = '11111111-1111-1111-1111-111111111111/a1b2.jpg'
+set avatar_path = '11111111-1111-1111-1111-111111111111/A1B2.jpg'
 where id = auth.uid();
 select is(
   (select avatar_path from profiles where id = auth.uid()),
-  '11111111-1111-1111-1111-111111111111/a1b2.jpg',
-  'an avatar_path under the profile''s own id is accepted'
+  '11111111-1111-1111-1111-111111111111/A1B2.jpg',
+  'an avatar_path under the profile''s own id is accepted whatever its case'
 );
 
 -- ----------------------------------------------------------------------------
 -- The objects
 -- ----------------------------------------------------------------------------
 
--- 9. A writes into their own folder.
+-- 9. A writes into their own folder — uppercased for the same reason as 8.
+-- This is the assertion the shipped policy failed: `(storage.foldername
+-- (name))[1] = auth.uid()::text` compared 'B31BD8CD-...' against
+-- 'b31bd8cd-...' and refused the row.
 insert into storage.objects (bucket_id, name, owner)
-values ('avatars', '11111111-1111-1111-1111-111111111111/a1b2.jpg', auth.uid());
+values ('avatars', '11111111-1111-1111-1111-111111111111/A1B2.jpg', auth.uid());
 select is(
   (select count(*) from storage.objects where bucket_id = 'avatars'),
   1::bigint,

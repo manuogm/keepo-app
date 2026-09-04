@@ -56,6 +56,14 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_CFBundleDisplayName: Keepo
+        # The camera is the only system resource the app asks for by name.
+        # There is deliberately no NSPhotoLibraryUsageDescription: the
+        # library goes through `PhotosPicker`, which runs out of process —
+        # the user picking a photo IS the grant, so the app never gets, or
+        # needs, library access.
+        INFOPLIST_KEY_NSCameraUsageDescription: >-
+          Keepo uses the camera only to take your profile photo. The picture
+          stays in your own private storage.
         # App/Info.plist is a partial plist merged into the auto-generated
         # one — INFOPLIST_KEY_* only recognizes well-known Apple keys, so
         # arbitrary custom keys (SupabaseURL/SupabaseAnonKey) go here instead,

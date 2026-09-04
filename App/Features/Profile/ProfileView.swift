@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import UIKit
 
 /// Everything about *you*, in one screen: who you are at the top, then what
 /// the app does on your behalf, in widening circles — your household, your
@@ -17,15 +18,22 @@ import SwiftUI
 /// every other modal in the app.
 struct ProfileView: View {
     let session: SessionStore
+    /// Passed in rather than read from the environment. A sheet's hosting
+    /// controller does not inherit `.environment(_:)` applied to the
+    /// presenting `TabView` — a non-optional `@Environment(AvatarStore.self)`
+    /// here trapped inside `EnvironmentValues.subscript` the instant the
+    /// sheet was presented, taking the app down every time the avatar was
+    /// tapped. The same reason `ScopeBannerView` reads `AppNavigation` as an
+    /// optional; this view is built in exactly one place, so a parameter is
+    /// both simpler and impossible to get wrong.
+    let avatars: AvatarStore
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var draftName = ""
     @State private var currencies: [PublicSchema.CurrenciesSelect] = []
-    @State private var isSigningOut = false
-    @State private var isShowingDeleteConfirmation = false
-    @State private var isDeletingAccount = false
+    @State private var isPickingAvatar = false
     @FocusState private var isNamingSelf: Bool
 
     @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
@@ -36,6 +44,9 @@ struct ProfileView: View {
     @State var errorMessage: String?
     @State var isSyncingFX = false
     @State var lastFXSyncedAt: Date?
+    @State var isSigningOut = false
+    @State var isShowingDeleteConfirmation = false
+    @State var isDeletingAccount = false
     @AppStorage(AppSettingsKeys.isFaceIDEnabled) var isFaceIDEnabled = true
     @AppStorage(AppSettingsKeys.isHideBalanceEnabled) var isHideBalanceEnabled = true
 
@@ -79,6 +90,12 @@ struct ProfileView: View {
         }
         .task(id: session.refresh.token) { await load() }
         .task { await loadLastFXSyncedAt() }
+        .avatarPicker(
+            isPresentingOptions: $isPickingAvatar,
+            canRemove: session.profile?.avatarPath != nil,
+            onPicked: { image in Task { _ = await avatars.replace(with: image, session: session) } },
+            onRemove: { Task { await avatars.removeAvatar(session: session) } }
+        )
     }
 
     // MARK: - Who you are
@@ -91,10 +108,33 @@ struct ProfileView: View {
     private var identity: some View {
         Section {
             VStack(spacing: AppTheme.Spacing.s) {
-                ProfileAvatarView(
-                    name: session.profile?.displayName, email: session.userEmail,
-                    size: AppTheme.Size.illustration
-                )
+                Button {
+                    isPickingAvatar = true
+                } label: {
+                    ProfileAvatarView(
+                        name: session.profile?.displayName, email: session.userEmail,
+                        image: avatars.image, size: AppTheme.Size.illustration
+                    )
+                    // The one affordance saying the circle is tappable at
+                    // all. Overlaid rather than placed beside it, because a
+                    // camera button next to an avatar reads as a second
+                    // control rather than as this one's verb.
+                    .overlay(alignment: .bottomTrailing) {
+                        if avatars.isBusy {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "camera.fill")
+                                .font(AppTheme.Typography.nanoEmphasis)
+                                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                                .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.glyph)
+                                .background(AppTheme.Palette.textPrimary, in: Circle())
+                                .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(avatars.isBusy)
+                .accessibilityLabel("Change profile photo")
 
                 TextField("Add your name", text: $draftName)
                     .font(AppTheme.Typography.cardTitle)
@@ -120,8 +160,8 @@ struct ProfileView: View {
                     .font(AppTheme.Typography.micro)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
 
-                if let errorMessage {
-                    FormErrorText(message: errorMessage)
+                if let message = errorMessage ?? avatars.lastError {
+                    FormErrorText(message: message)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -214,6 +254,7 @@ struct ProfileView: View {
         if !isNamingSelf {
             draftName = session.profile?.displayName ?? ""
         }
+        await avatars.load(path: session.profile?.avatarPath, client: session)
     }
 
     // MARK: - Settings
@@ -239,69 +280,5 @@ struct ProfileView: View {
             get: { appearanceMode == .dark || (appearanceMode == .system && colorScheme == .dark) },
             set: { appearanceMode = $0 ? .dark : .light }
         )
-    }
-
-    private var exits: some View {
-        Section {
-            Button(role: .destructive) {
-                Task { await signOut() }
-            } label: {
-                HStack {
-                    Text("Sign Out")
-                    Spacer()
-                    if isSigningOut { ProgressView() }
-                }
-            }
-            .disabled(isSigningOut)
-
-            Button(role: .destructive) {
-                isShowingDeleteConfirmation = true
-            } label: {
-                HStack {
-                    Text("Delete Account")
-                    Spacer()
-                    if isDeletingAccount { ProgressView() }
-                }
-            }
-            .disabled(isDeletingAccount)
-        } footer: {
-            Text("Deleting your account permanently removes your financial data. This cannot be undone.")
-        }
-        .confirmationDialog(
-            "Delete your account?",
-            isPresented: $isShowingDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete Account", role: .destructive) { Task { await deleteAccount() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(
-                "This permanently deletes all your financial data, accounts, and transactions. "
-                    + "You will be signed out immediately. This cannot be undone."
-            )
-        }
-    }
-
-    private func signOut() async {
-        isSigningOut = true
-        errorMessage = nil
-        do {
-            try await session.signOut()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-            isSigningOut = false
-        }
-    }
-
-    private func deleteAccount() async {
-        isDeletingAccount = true
-        errorMessage = nil
-        do {
-            try await session.stepUp(reason: "Confirm account deletion")
-            try await session.deleteAccount()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-            isDeletingAccount = false
-        }
     }
 }
