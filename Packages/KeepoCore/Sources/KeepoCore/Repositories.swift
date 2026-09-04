@@ -15,9 +15,17 @@ public enum ProfileRepository {
     /// Sets base_currency and onboarded_at together — the DB's
     /// onboarded_requires_base_currency CHECK constraint means these can
     /// never be split into two calls without a moment of invalid state.
-    public static func completeOnboarding(client: SupabaseClient, userId: UUID, baseCurrency: String) async throws {
+    ///
+    /// The name rides along in the same patch rather than being written when
+    /// the user typed it, several steps earlier: onboarding can be abandoned
+    /// at any step, and a profile carrying a name but no base currency is a
+    /// half-signed-up user the rest of the app has no shape for.
+    public static func completeOnboarding(
+        client: SupabaseClient, userId: UUID, baseCurrency: String, displayName: String
+    ) async throws {
         let patch = ProfileOnboardingPatch(
             baseCurrency: baseCurrency,
+            displayName: displayName,
             onboardedAt: PostgresDate.timestampString(Date())
         )
         try await client.from("profiles").update(patch).eq("id", value: userId).execute()
@@ -35,9 +43,11 @@ public enum ProfileRepository {
 
 private struct ProfileOnboardingPatch: Encodable {
     let baseCurrency: String
+    let displayName: String
     let onboardedAt: String
     enum CodingKeys: String, CodingKey {
         case baseCurrency = "base_currency"
+        case displayName = "display_name"
         case onboardedAt = "onboarded_at"
     }
 }

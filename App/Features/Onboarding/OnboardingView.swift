@@ -2,20 +2,27 @@ import KeepoCore
 import SwiftUI
 import UserNotifications
 
-/// Base currency → first account → opening balance → the Wallet-automation
-/// walkthrough, per keepo-v1-feature-spec.md §Onboarding.
+/// Name → base currency → first account → opening balance → the
+/// Wallet-automation walkthrough, per keepo-v1-feature-spec.md §Onboarding.
+///
+/// The name comes first because everything after it can use it. It is asked
+/// rather than derived: the app knows the user's email address and could
+/// split a name out of the local part, but "fam.samper.ona" is not what
+/// anyone calls themselves, and a wrong name is worse than no name.
 struct OnboardingView: View {
     let session: SessionStore
     var onComplete: () -> Void
 
     private enum Step {
+        case name
         case currency
         case accountKind
         case firstAccount
         case captureWalkthrough
     }
 
-    @State private var step: Step = .currency
+    @State private var step: Step = .name
+    @State private var displayName = ""
     @State private var currencies: [PublicSchema.CurrenciesSelect] = []
     @State private var selectedCurrency: String = "USD"
     @State private var accountName = ""
@@ -30,6 +37,8 @@ struct OnboardingView: View {
 
             VStack(spacing: AppTheme.Spacing.xl) {
                 switch step {
+                case .name:
+                    nameStep
                 case .currency:
                     currencyStep
                 case .accountKind:
@@ -46,18 +55,62 @@ struct OnboardingView: View {
             }
             .padding(AppTheme.Spacing.xl)
         }
-        .task {
+        // Keyed on the refresh token, like every list screen in the app, and
+        // for a reason this screen feels harder than they do: on a **fresh
+        // install** the first sync pull has not landed when this view
+        // appears, so a one-shot read finds no currencies and leaves the
+        // picker empty with `Continue` disabled forever — onboarding
+        // dead-ending on its own second step, recoverable only by relaunching.
+        // `syncNow` bumps the token once the pull completes, which re-fires
+        // this.
+        .task(id: session.refresh.token) {
             currencies = (try? await session.dbQueue.read { database in
                 try LocalTableQueries.currencies(database)
             }) ?? []
         }
     }
 
-    private var currencyStep: some View {
+    /// The one screen in onboarding with nothing to explain: a single field,
+    /// and the greeting it feeds appears on the very next step, so the user
+    /// sees what it was for immediately rather than being told.
+    ///
+    /// 60 characters is `profiles_display_name_length`'s own ceiling, checked
+    /// here so the constraint is a backstop rather than the error message.
+    private var nameStep: some View {
         VStack(spacing: AppTheme.Spacing.l) {
-            Text("Welcome to Keepo")
+            Text("What should we call you?")
                 .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
+                .multilineTextAlignment(.center)
+
+            TextField("Your name", text: $displayName)
+                .textFieldStyle(.roundedBorder)
+                .textContentType(.givenName)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.continue)
+                .onSubmit { if !isNameInvalid { step = .currency } }
+
+            Button("Continue") { step = .currency }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.Palette.textPrimary)
+                .disabled(isNameInvalid)
+        }
+    }
+
+    private var trimmedName: String {
+        displayName.trimmingCharacters(in: .whitespaces)
+    }
+
+    private var isNameInvalid: Bool {
+        trimmedName.isEmpty || trimmedName.count > 60
+    }
+
+    private var currencyStep: some View {
+        VStack(spacing: AppTheme.Spacing.l) {
+            Text("Nice to meet you, \(trimmedName)")
+                .font(AppTheme.Typography.sectionTitle).fontWeight(.bold)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+                .multilineTextAlignment(.center)
             Text("What's your base currency? Every balance converts into this.")
                 .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
@@ -65,12 +118,22 @@ struct OnboardingView: View {
 
             // Currency picker is restricted to `currencies` — the ECB set —
             // so an unpriceable account can never be created (spec: FX Rate History).
-            Picker("Base currency", selection: $selectedCurrency) {
-                ForEach(currencies, id: \.code) { currency in
-                    Text(currency.code).tag(currency.code)
+            //
+            // A spinner rather than an empty wheel while the list is still
+            // arriving: an unexplained blank picker over a dead Continue
+            // button reads as a broken app, which is exactly what it looked
+            // like before the task above was keyed on the refresh token.
+            if currencies.isEmpty {
+                ProgressView()
+                    .frame(maxHeight: .infinity)
+            } else {
+                Picker("Base currency", selection: $selectedCurrency) {
+                    ForEach(currencies, id: \.code) { currency in
+                        Text(currency.code).tag(currency.code)
+                    }
                 }
+                .pickerStyle(.wheel)
             }
-            .pickerStyle(.wheel)
 
             Button("Continue") { step = .accountKind }
                 .buttonStyle(.borderedProminent)
@@ -149,7 +212,9 @@ struct OnboardingView: View {
                 icon: AccountAppearance.defaultIcon(forKind: accountKind), color: CategoryAppearance.randomColor()
             )
             await session.outbox.submitCreateAccount(payload)
-            try await session.completeOnboarding(baseCurrency: selectedCurrency)
+            try await session.completeOnboarding(
+                baseCurrency: selectedCurrency, displayName: trimmedName
+            )
             step = .captureWalkthrough
         } catch {
             errorMessage = UserFacingError.describe(error)
