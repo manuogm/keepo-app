@@ -5,6 +5,10 @@ import SwiftUI
 /// into Profile, and Profile's own header. One view so the two can't drift
 /// apart the day a real uploaded photo replaces the initial.
 struct ProfileAvatarView: View {
+    /// Preferred over `email` for the initial: a user who told the app their
+    /// name should see that name's letter, not the first character of an
+    /// address they may never have chosen. Nil until they have set one.
+    var name: String?
     let email: String?
     var size = AppTheme.Size.icon
     /// Drawn on a saturated gradient card (`onColor: true`) or on the app's
@@ -31,7 +35,15 @@ struct ProfileAvatarView: View {
         }
     }
 
+    /// The first letter of the name, falling back to the email, falling back
+    /// to "?" — never a blank circle, which reads as a failed image load
+    /// rather than as an account without a picture. `trimmingCharacters`
+    /// because a name stored with leading space would otherwise render its
+    /// space.
     private var initial: String {
-        String((email ?? "?").prefix(1)).uppercased()
+        let source = [name, email]
+            .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
+        return String((source ?? "?").prefix(1)).uppercased()
     }
 }

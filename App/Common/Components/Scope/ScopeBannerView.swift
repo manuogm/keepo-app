@@ -128,7 +128,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     private func card(_ scope: PublicSchema.AccountScope) -> some View {
         HStack(spacing: AppTheme.Spacing.m) {
             Button(action: onOpenProfile) {
-                ProfileAvatarView(email: session.userEmail, onColor: true)
+                ProfileAvatarView(name: session.profile?.displayName, email: session.userEmail, onColor: true)
             }
             .buttonStyle(.pressableCard)
             .accessibilityLabel("Open profile")

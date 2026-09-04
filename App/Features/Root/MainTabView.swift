@@ -124,8 +124,9 @@ struct MainTabView: View {
         switch destination {
         case .household: HouseholdView(session: session)
         case .automations: AutomationsView(session: session)
-        case .preferences: PreferencesView(session: session)
-        case .dataPrivacy: DataPrivacyView(session: session)
+        case .notifications: NotificationSettingsView()
+        case .export: ExportView(session: session)
+        case .archive: ArchiveAccountsView(session: session)
         }
     }
 

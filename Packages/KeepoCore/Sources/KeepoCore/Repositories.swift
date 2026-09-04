@@ -31,6 +31,17 @@ public enum ProfileRepository {
         try await client.from("profiles").update(patch).eq("id", value: userId).execute()
     }
 
+    /// Online-only, deliberately, and the same for `updateBaseCurrency`
+    /// below: the app reads `session.profile` from the **server**, not from
+    /// the local mirror, so an offline write queued through the outbox would
+    /// land in a table nothing renders from while the name on screen stayed
+    /// stale. Both of a profile's editable fields behave the same way rather
+    /// than one of them being quietly special.
+    public static func updateDisplayName(client: SupabaseClient, userId: UUID, displayName: String) async throws {
+        let patch = ProfileDisplayNamePatch(displayName: displayName)
+        try await client.from("profiles").update(patch).eq("id", value: userId).execute()
+    }
+
     /// A plain RLS-scoped update — `profiles_update`'s policy already
     /// allows this. Changing `base_currency` fires
     /// `profiles_backfill_fx_on_base_currency_change` (Phase 13) server-side
@@ -49,6 +60,13 @@ private struct ProfileOnboardingPatch: Encodable {
         case baseCurrency = "base_currency"
         case displayName = "display_name"
         case onboardedAt = "onboarded_at"
+    }
+}
+
+private struct ProfileDisplayNamePatch: Encodable {
+    let displayName: String
+    enum CodingKeys: String, CodingKey {
+        case displayName = "display_name"
     }
 }
 

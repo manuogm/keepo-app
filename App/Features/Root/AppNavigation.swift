@@ -41,17 +41,21 @@ final class AppNavigation {
     enum ProfileDestination: Hashable {
         case household
         case automations
-        case preferences
-        case dataPrivacy
+        case notifications
+        case export
+        case archive
     }
 
     var tab: Tab = .home
 
     /// The Profile sheet's navigation stack. Driven by a path so a push can
-    /// come from somewhere other than a tap on the row itself — the FX
-    /// widget's "this is your base currency" note links straight to
-    /// Preferences, and the scope banner's "Create Household" blank state
-    /// links straight to Household.
+    /// come from somewhere other than a tap on the row itself — the scope
+    /// banner's "Create Household" blank state links straight to Household.
+    ///
+    /// Preferences and Data & Privacy were both in here until the Profile
+    /// redesign dissolved them: every setting they held is now a row or a
+    /// toggle on the root, so the things left to push are the four screens
+    /// that genuinely are screens.
     var profilePath: [ProfileDestination] = []
 
     /// Whether the Profile sheet is up. Profile stopped being a tab when

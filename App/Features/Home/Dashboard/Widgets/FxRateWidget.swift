@@ -220,16 +220,17 @@ struct FxRateWidget: View {
     /// text then ran out of the top and bottom of it.
     private var baseNote: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            // "Base currency", the exact words Preferences uses for the
-            // row this links to. One name for one thing: a popover that
-            // said "default" and a settings screen that said "base" would
-            // read as two different settings.
+            // "Base currency", the exact words Profile uses for the row
+            // this links to. One name for one thing: a popover that said
+            // "default" and a settings screen that said "base" would read as
+            // two different settings. It opens Profile's root rather than
+            // pushing a screen, because that is where the row now lives.
             Text("\(currency?.code ?? "—") is your base currency")
                 .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
             Button {
                 isShowingBaseNote = false
-                navigation?.openProfile(.preferences)
+                navigation?.openProfileRoot()
             } label: {
                 // The chevron is the promise that this pushes a screen
                 // rather than opening another layer on top of this one.
