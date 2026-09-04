@@ -89,16 +89,22 @@ struct CategoriesView: View {
                             }
                         }
                         .padding(.horizontal)
-
-                        allTagsLink
-                            .padding(.horizontal)
-                            .padding(.top, AppTheme.Spacing.l)
                     }
-                    // The bar floats over the content rather than reserving a
-                    // strip, so the last row of tiles has to stop short of it.
-                    .contentMargins(.bottom, KeepoTabBarMetrics.clearance, for: .scrollContent)
+                    // Pinned below rather than the tab bar's own distance: the
+                    // grid now hands off to the "All Tags" row sitting right
+                    // under it, not to the physical bottom of the display.
+                    .contentMargins(.bottom, AppTheme.Spacing.l, for: .scrollContent)
                     .refreshable { await load() }
-                    .fadingEdges()
+                    .fadingEdges(bottom: 22)
+
+                    // Pinned below the grid instead of scrolling with it, so
+                    // it stays reachable at a glance instead of being the
+                    // last thing after however many categories exist — and
+                    // the grid gets the rest of the screen to itself.
+                    allTagsLink
+                        .padding(.horizontal)
+                        .padding(.top, AppTheme.Spacing.s)
+                        .padding(.bottom, KeepoTabBarMetrics.clearance)
                 }
             }
 
@@ -143,6 +149,11 @@ struct CategoriesView: View {
     /// thing this screen is about, reached after looking at the categories,
     /// not a competing primary action next to "+" — which on this tab
     /// already means "new category".
+    ///
+    /// Pinned to the bottom of the screen rather than scrolling with the
+    /// grid: a household with a long category list would otherwise push it
+    /// past however many tiles exist, and the grid above it gets the whole
+    /// scroll area to itself instead of giving up its last slot to this row.
     private var allTagsLink: some View {
         Button {
             isShowingAllTags = true
