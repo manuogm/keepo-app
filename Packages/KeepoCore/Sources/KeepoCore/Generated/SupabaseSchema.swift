@@ -867,18 +867,22 @@ public enum PublicSchema {
     }
   }
   public struct ProfilesSelect: Codable, Hashable, Sendable {
+    public let avatarPath: String?
     public let baseCurrency: String?
     public let createdAt: String
     public let deletedAt: String?
+    public let displayName: String?
     public let id: UUID
     public let onboardedAt: String?
     public let syncEpoch: Int64
     public let syncSeq: Int64
     public let updatedAt: String
     public enum CodingKeys: String, CodingKey {
+      case avatarPath = "avatar_path"
       case baseCurrency = "base_currency"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
+      case displayName = "display_name"
       case id = "id"
       case onboardedAt = "onboarded_at"
       case syncEpoch = "sync_epoch"
@@ -887,18 +891,22 @@ public enum PublicSchema {
     }
   }
   public struct ProfilesInsert: Codable, Hashable, Sendable {
+    public let avatarPath: String?
     public let baseCurrency: String?
     public let createdAt: String?
     public let deletedAt: String?
+    public let displayName: String?
     public let id: UUID
     public let onboardedAt: String?
     public let syncEpoch: Int64?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
+      case avatarPath = "avatar_path"
       case baseCurrency = "base_currency"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
+      case displayName = "display_name"
       case id = "id"
       case onboardedAt = "onboarded_at"
       case syncEpoch = "sync_epoch"
@@ -907,18 +915,22 @@ public enum PublicSchema {
     }
   }
   public struct ProfilesUpdate: Codable, Hashable, Sendable {
+    public let avatarPath: String?
     public let baseCurrency: String?
     public let createdAt: String?
     public let deletedAt: String?
+    public let displayName: String?
     public let id: UUID?
     public let onboardedAt: String?
     public let syncEpoch: Int64?
     public let syncSeq: Int64?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
+      case avatarPath = "avatar_path"
       case baseCurrency = "base_currency"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
+      case displayName = "display_name"
       case id = "id"
       case onboardedAt = "onboarded_at"
       case syncEpoch = "sync_epoch"

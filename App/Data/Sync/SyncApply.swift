@@ -63,7 +63,8 @@ enum SyncApply {
         "household_members": ["household_id", "user_id", "joined_at", "deleted_at", "sync_seq"],
         "household_accounts": ["household_id", "account_id", "shared_at", "deleted_at", "sync_seq"],
         "profiles": [
-            "id", "base_currency", "onboarded_at", "created_at", "updated_at", "deleted_at", "sync_epoch", "sync_seq"
+            "id", "base_currency", "display_name", "avatar_path", "onboarded_at",
+            "created_at", "updated_at", "deleted_at", "sync_epoch", "sync_seq"
         ]
     ]
 

@@ -252,6 +252,8 @@ public enum LocalSchemaV1 {
         try database.create(table: "profiles") { table in
             table.column("id", .text).primaryKey().collate(.nocase)
             table.column("base_currency", .text)
+            table.column("display_name", .text)
+            table.column("avatar_path", .text)
             table.column("onboarded_at", .text)
             table.column("created_at", .text).notNull()
             table.column("updated_at", .text).notNull()
@@ -360,6 +362,13 @@ public enum LocalStore {
         // every pulled tag row loses nothing, but the column would sit there
         // holding a category link the product no longer has.
         migrator.registerMigration("v10_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260910100000 adds
+        // profiles.display_name and profiles.avatar_path server-side.
+        // Additive, so nothing hard-fails; a stale device would silently drop
+        // both from every pulled profile row (`SyncApply` intersects its
+        // whitelist with the local schema), which reads as a user who set a
+        // name and a photo on one device and has neither on the other.
+        migrator.registerMigration("v11_rebuild_syncable_tables", migrate: rebuildSyncableTables)
 
         let queue = try DatabaseQueue(path: storeURL.path)
         try migrator.migrate(queue)
