@@ -286,6 +286,10 @@ public final class SessionStore {
     public func signOut() async throws {
         try await client.auth.signOut()
         try? await dbQueue.write { database in try SyncApply.wipeAllLocalData(database) }
+        // Same reasoning as the store wipe above, for the one piece of the
+        // user's data that does not live in it: a cached photo of their face,
+        // on disk, for whoever signs in on this device next.
+        AvatarStore.clearAllCached()
         SyncCursorStore.resetAll()
         SyncCursorStore.clearLocalOwner()
         userId = nil
@@ -295,11 +299,27 @@ public final class SessionStore {
         phase = .needsSignIn
     }
 
-    /// Deletes all of the user's data server-side and signs out locally.
-    /// Requires a step-up auth challenge before being called.
+    /// Deletes the account — every row, the avatar object, and the identity
+    /// itself — then signs out locally.
+    ///
+    /// Goes through the `delete-account` Edge Function rather than calling
+    /// the RPC directly: the RPC cannot remove the `auth.users` row, and a
+    /// client that deleted every row but left the identity behind would leave
+    /// the user able to sign in to an account with nothing in it and no way
+    /// to finish the job. **No user id is sent.** The function reads it from
+    /// the JWT and the RPC re-derives it from `auth.uid()`.
+    ///
+    /// It used to call `delete_own_account` with a `p_user` parameter — a
+    /// function that did not exist, with an argument the one that does would
+    /// refuse. Requires a step-up auth challenge before being called.
     public func deleteAccount() async throws {
-        guard let userId else { return }
-        try await client.rpc("delete_own_account", params: ["p_user": userId.uuidString]).execute()
+        try await client.functions.invoke("delete-account")
+        // Device-local state the server knows nothing about, and which
+        // `signOut` deliberately keeps for a user who may sign back in. This
+        // user will not: the dashboard they arranged and the photo of their
+        // face are theirs, and this is the last moment anything can remove
+        // them.
+        UserDefaults.standard.removeObject(forKey: AppSettingsKeys.dashboardArrangement)
         try await signOut()
     }
 

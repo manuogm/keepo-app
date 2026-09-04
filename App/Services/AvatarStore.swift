@@ -185,6 +185,17 @@ final class AvatarStore {
         guard let url = cacheURL(for: path) else { return }
         try? FileManager.default.removeItem(at: url)
     }
+
+    /// Every cached avatar, for sign-out and deletion. Not keyed on a path,
+    /// because the point is to leave nothing behind for the next person to
+    /// use this device — including the photo belonging to a session whose
+    /// path this process no longer remembers.
+    static func clearAllCached() {
+        guard let directory = try? FileManager.default.url(
+            for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
+        ) else { return }
+        try? FileManager.default.removeItem(at: directory.appendingPathComponent("Avatars", isDirectory: true))
+    }
 }
 
 /// The one thing `AvatarStore.load` needs from a session, so a preview or a

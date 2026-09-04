@@ -405,6 +405,14 @@ verify_jwt = false
 [functions.notify-household]
 verify_jwt = false
 
+# delete-account is the one function whose caller IS a signed-in user, so it
+# keeps the platform's `verify_jwt = true` default — stated rather than
+# inherited, because the three blocks above exist precisely because an
+# unstated default was wrong for them, and "no block" should not be the only
+# thing distinguishing this function's security posture from theirs.
+[functions.delete-account]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327
