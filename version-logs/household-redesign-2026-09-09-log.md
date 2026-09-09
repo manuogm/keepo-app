@@ -160,12 +160,12 @@ So it is recorded at the one moment anybody knows it. An enum
 (`category_merge_origin`), not `text` + CHECK, per CLAUDE.md rule 4 — a CHECK
 generates as a plain `String` in codegen.
 
-**This meant hand-editing `Generated/SupabaseSchema.swift`**, because Docker
-was down and `supabase gen types swift` could not run. The three
-`Categories{Select,Insert,Update}` structs each gained
-`mergeOrigin: CategoryMergeOrigin?` and a CodingKeys case, in the alphabetical
-position codegen uses, plus the enum among its peers. **Re-run codegen and
-diff before trusting it.**
+This meant hand-editing `Generated/SupabaseSchema.swift` at first, because
+Docker was down and `supabase gen types swift` could not run. **That hand-edit
+was wrong**, in a way that compiled: see the verification section below. Real
+codegen has since replaced it. The lesson stands on its own — *never* pattern-
+replace inside a generated file on an anchor that is a prefix of a longer
+valid token, and never trust a hand-edit to one that you have not diffed.
 
 Also wired: `SyncApply`'s categories column whitelist, `LocalStore`'s
 `categories` table, and a `v13_rebuild_syncable_tables` local migration.
@@ -269,23 +269,37 @@ what "shared" means.
 
 ## Verification status
 
+All green as of 2026-09-09, after Docker came back.
+
 | | |
 |---|---|
+| `supabase db reset` | ✅ all 61 migrations apply from scratch |
+| `supabase test db --local` | ✅ **403 tests, 27 files, PASS** (23 new) |
+| `supabase db push` | ✅ pushed to `fmogwbadhimwfhhibrau`; local/hosted in sync |
+| `supabase gen types swift` | ✅ re-run; diff reviewed (see below) |
 | `xcodebuild -scheme Keepo build` | ✅ clean |
-| `xcodebuild ... test` (KeepoTests + UITests) | ✅ TEST SUCCEEDED |
-| `swift test` (KeepoCore, 199 tests) | ✅ green, incl. 11 new matcher tests |
-| `swiftlint` | ✅ 0 violations in 292 files |
-| `supabase test db --local` | ❌ **not run — Docker down** |
-| `supabase db push` | ❌ **not run** |
-| Simulator walkthrough | ❌ **not run** — app cannot sign in without the local stack |
-| Two-device pairing | ❌ **not possible on this hardware** |
+| `xcodebuild ... test` | ✅ TEST SUCCEEDED |
+| `swift test` (KeepoCore, 199) | ✅ green |
+| `swiftlint` | ✅ 0 violations, 293 files |
+| Simulator walkthrough | ⚠️ not done — the interesting half needs two devices |
+| Two-device pairing | ❌ **still the outstanding item** (= human review stop #4) |
 
-**Before anything else, next session:** start Docker, `supabase db reset`,
-`supabase test db --local`, then **re-run `supabase gen types swift --local
---lang swift --swift-access-control public` and diff `SupabaseSchema.swift`**
-against the hand-edit described above.
+### Two things the verification caught
 
----
+1. **The pgTAP fixture invented `transactions.kind`.** There is no such
+   column: direction is the sign of `amount_e4` (money rule 1),
+   `category_kind` is set by trigger, and `currency` must travel with
+   `account_id` because `account_currency_together` is
+   `(account_id IS NULL) = (currency IS NULL)`.
+2. **The hand-edit to `SupabaseSchema.swift` had silently corrupted an
+   unrelated field.** See the `merge_origin` section above — the anchor
+   `public let kind: CategoryKind` also matches the *prefix* of
+   `public let kind: CategoryKind?`, so the replace ate the `?`. That is
+   where the stray `CategoryMergeOrigin??` came from, and "fixing" the `??`
+   moved the optionality onto the wrong field. It compiled because nothing
+   constructs `CategoriesUpdate`. Real codegen output replaced it wholesale
+   and independently emits `merge_origin` in all six places, which is the
+   confirmation that the column landed as intended.
 
 ## Gotchas for the next agent
 
