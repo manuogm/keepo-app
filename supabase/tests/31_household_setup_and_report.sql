@@ -90,11 +90,17 @@ insert into tags (id, owner_id, name) values
   ('7a900000-0000-0000-0000-00000000d001', auth.uid(), 'Holidays'),
   ('7a900000-0000-0000-0000-00000000d002', auth.uid(), 'Holiday');
 
-insert into transactions (id, owner_id, created_by, account_id, category_id, kind, amount_e4, occurred_at)
+-- No `kind` column on `transactions`: direction is the **sign** of
+-- `amount_e4` (money rule 1), and `category_kind`/`currency` are set by
+-- `set_transaction_derived_columns()` from the category and the account.
+-- `currency` travels with `account_id` — the `account_currency_together`
+-- CHECK is `(account_id IS NULL) = (currency IS NULL)`, so a transaction on an
+-- account must state the currency it happened in. USD, matching B Current.
+insert into transactions (id, owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
 values (
   '77000000-0000-0000-0000-00000000d001', auth.uid(), auth.uid(),
   'b2000000-0000-0000-0000-00000000d001', 'c2000000-0000-0000-0000-00000000d001',
-  'expense', -250000, now()
+  -250000, 'USD', now()
 );
 
 insert into transaction_tags (transaction_id, tag_id, owner_id)

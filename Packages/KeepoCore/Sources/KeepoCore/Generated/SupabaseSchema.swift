@@ -317,7 +317,7 @@ public enum PublicSchema {
     public let icon: String?
     public let id: UUID?
     public let isDefault: Bool?
-    public let kind: CategoryKind
+    public let kind: CategoryKind?
     public let mergeOrigin: CategoryMergeOrigin?
     public let name: String?
     public let ownerId: UUID?
