@@ -34,6 +34,7 @@ struct ProfileView: View {
     @State private var draftName = ""
     @State private var currencies: [PublicSchema.CurrenciesSelect] = []
     @State private var isPickingAvatar = false
+    @State private var isPickingCurrency = false
     @FocusState private var isNamingSelf: Bool
 
     @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
@@ -61,12 +62,14 @@ struct ProfileView: View {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
             List {
                 identity
-                baseCurrencySection
                 Section {
                     NavigationLink("My Household", value: AppNavigation.ProfileDestination.household)
                     NavigationLink("Automations", value: AppNavigation.ProfileDestination.automations)
                 } footer: {
-                    Text("Invite a partner, share accounts, or leave — your data is always yours.")
+                    Text(
+                        "Build a household with someone nearby and share the accounts you choose. "
+                            + "Every balance and chart converts into your base currency above."
+                    )
                 }
                 general
                 dataAndPrivacy
@@ -90,6 +93,9 @@ struct ProfileView: View {
         }
         .task(id: session.refresh.token) { await load() }
         .task { await loadLastFXSyncedAt() }
+        .sheet(isPresented: $isPickingCurrency) {
+            BaseCurrencySheet(currencies: currencies, selection: baseCurrency)
+        }
         .avatarPicker(
             isPresentingOptions: $isPickingAvatar,
             canRemove: session.profile?.avatarPath != nil,
@@ -156,9 +162,7 @@ struct ProfileView: View {
                     .font(AppTheme.Typography.caption)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
 
-                Text("Keepo member since \(memberSince)")
-                    .font(AppTheme.Typography.micro)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                metrics
 
                 if let message = errorMessage ?? avatars.lastError {
                     FormErrorText(message: message)
@@ -180,16 +184,35 @@ struct ProfileView: View {
         return date.formatted(.dateTime.month(.wide).year())
     }
 
-    private var baseCurrencySection: some View {
-        Section {
-            Picker("Base Currency", selection: baseCurrency) {
-                ForEach(currencies, id: \.code) { currency in
-                    Text(currency.code).tag(currency.code)
-                }
+    /// The two facts about the account that are worth reading rather than
+    /// configuring: when you joined, and what everything in the app is
+    /// converted into. Side by side under the name, as cards, because a
+    /// settings row is the shape of something you change and the join date
+    /// is not — and the base currency, which *is* a setting, is the single
+    /// one that changes the meaning of every number on every other screen.
+    private var metrics: some View {
+        HStack(spacing: AppTheme.Spacing.m) {
+            ProfileMetricCard(title: "Keepo member since:") {
+                Text(memberSince)
+                    .font(AppTheme.Typography.cardTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
             }
-        } footer: {
-            Text("Every balance and chart converts into your chosen base currency.")
+
+            ProfileMetricCard(
+                title: "Base currency",
+                action: { isPickingCurrency = true },
+                content: {
+                    if let code = session.profile?.baseCurrency, !code.isEmpty {
+                        CurrencyBadge(code: code, diameter: AppTheme.Size.glyph)
+                    } else {
+                        Text("—")
+                            .font(AppTheme.Typography.cardTitle)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
+                    }
+                }
+            )
         }
+        .padding(.top, AppTheme.Spacing.s)
     }
 
     // MARK: - Writes

@@ -1,27 +1,39 @@
 import KeepoCore
 import SwiftUI
 
-/// Phase 7 built create/share/unshare; Phase 19 adds the lifecycle — invite,
-/// accept, leave (fork), erase. Leave/erase require a fresh step-up check
-/// immediately before the RPC, same rule Phase 17 applies to export.
+/// The Household screen: a blank state with two doors, or the household you
+/// already have.
+///
+/// Reached from the avatar, through Profile. One screen with two entirely
+/// different bodies rather than two screens, because "do I have a household"
+/// is a fact about the user rather than a place they navigate to — and the
+/// day they build one, the screen they were looking at should become the
+/// screen that describes it, in place.
 struct HouseholdView: View {
     let session: SessionStore
+    let avatars: AvatarStore
 
-    @State private var household: PublicSchema.HouseholdsSelect?
-    @State private var members: [PublicSchema.HouseholdMembersSelect] = []
-    @State private var myAccounts: [PublicSchema.AccountsSelect] = []
-    @State private var sharedAccountIds: Set<UUID> = []
-    @State private var events: [PublicSchema.HouseholdEventsSelect] = []
+    @State private var snapshot = HouseholdSnapshot()
+    @State private var peerAvatar: UIImage?
     @State private var isLoading = true
-    @State private var isCreatingHousehold = false
-    @State var myCategories: [PublicSchema.CategoriesSelect] = []
-    @State private var isInviting = false
-    @State private var isJoiningFlow = false
+    @State private var setupRole: HouseholdPairingIdentity.Role?
+    @State private var isShowingInfo = false
+    @State private var isShowingMember = false
+    @State private var isShowingLeaveConfirm = false
+    /// Removing the other member and leaving are the **same operation**:
+    /// `leave_household()` forks every shared account into two private copies
+    /// and drops the caller's membership, leaving the other member alone in a
+    /// single-member household. From either side the household ends and both
+    /// people keep everything.
+    ///
+    /// So this is only a wording flag — which of the two sentences the
+    /// confirmation shows. Presenting "Remove from Household" as something
+    /// other than what it is, a mutual split rather than a one-sided eviction
+    /// that leaves the remover in possession, would be a promise the schema
+    /// does not make.
+    @State private var isRemoving = false
     @State private var isLeaving = false
-    @State private var isErasing = false
-    @State private var showLeaveConfirm = false
-    @State private var showEraseConfirm = false
-    @State var errorMessage: String?
+    @State private var errorMessage: String?
 
     var body: some View {
         ZStack {
@@ -29,204 +41,149 @@ struct HouseholdView: View {
 
             if isLoading {
                 ProgressView()
+            } else if snapshot.hasHousehold {
+                household
             } else {
-                List {
-                    householdSection
-                    if household != nil {
-                        shareSection
-                        shareCategoriesSection
-                        inviteSection
-                        eventsSection
-                        leaveSection
-                    } else {
-                        joinSection
-                    }
-
-                    if let errorMessage {
-                        FormErrorText(message: errorMessage)
-                    }
-                }
-                .scrollContentBackground(.hidden)
-                .refreshable { await load() }
+                HouseholdBlankState(
+                    onCreate: { setupRole = .owner },
+                    onJoin: { setupRole = .guest }
+                )
             }
         }
         .navigationTitle("Household")
         .navigationBarTitleDisplayMode(.inline)
-        // Keyed on the refresh token like every list in the app, so a
-        // pull triggered from anywhere else lands here too.
-        .task(id: session.refresh.token) { await load() }
-        .sheet(isPresented: $isInviting) {
-            InviteFlowView(session: session) { Task { await load() } }
+        .toolbar {
+            if snapshot.hasHousehold {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { isShowingInfo = true } label: {
+                        KeepoIcon(name: "icon-info", size: AppTheme.Size.glyph)
+                    }
+                    .accessibilityLabel("About households")
+                    .popover(isPresented: $isShowingInfo) {
+                        HouseholdInfoPopover()
+                            .presentationCompactAdaptation(.popover)
+                    }
+                }
+            }
         }
-        .sheet(isPresented: $isJoiningFlow) {
-            JoinFlowView(session: session) {
+        .task(id: session.refresh.token) { await load() }
+        // `item:` rather than two booleans: Create and Join are the same
+        // sheet with a different role, and two flags would make "both true"
+        // representable.
+        .fullScreenCover(item: $setupRole) { role in
+            HouseholdSetupFlow(session: session, avatars: avatars, role: role) {
                 session.refresh.bump()
                 Task { await load() }
             }
         }
-        .confirmationDialog(
-            "Leave this household?", isPresented: $showLeaveConfirm, titleVisibility: .visible
-        ) {
-            Button("Leave", role: .destructive) { Task { await leave() } }
-        } message: {
-            Text("Every shared account forks into your own private copy — nothing is lost, but sharing ends.")
-        }
-        .confirmationDialog(
-            "Erase your data?", isPresented: $showEraseConfirm, titleVisibility: .visible
-        ) {
-            Button("Erase", role: .destructive) { Task { await erase() } }
-        } message: {
-            Text("Forks your accounts like leaving does, then scrubs merchant names and filenames from your own copy.")
-        }
-    }
-
-    @ViewBuilder
-    private var householdSection: some View {
-        Section("Household") {
-            if household == nil {
-                Button {
-                    Task { await createHousehold() }
-                } label: {
-                    if isCreatingHousehold { ProgressView() } else { Text("Create Household") }
-                }
-                .disabled(isCreatingHousehold)
-            } else {
-                ForEach(members, id: \.userId) { member in
-                    Text(memberLabel(member)).foregroundStyle(AppTheme.Palette.textPrimary)
-                }
+        .sheet(isPresented: $isShowingMember) {
+            if let peer = snapshot.peer {
+                HouseholdMemberSheet(
+                    member: peer,
+                    image: peerAvatar,
+                    onRemove: {
+                        isShowingMember = false
+                        isRemoving = true
+                        isShowingLeaveConfirm = true
+                    }
+                )
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
             }
         }
-    }
-
-    @ViewBuilder
-    private var shareSection: some View {
-        Section {
-            ForEach(myAccounts, id: \.id) { account in
-                Toggle(account.name, isOn: sharedBinding(for: account.id))
-                    .tint(AppTheme.Palette.statusPositive)
+        .confirmationDialog(
+            isRemoving ? "Remove \(peerName) from your household?" : "Leave this household?",
+            isPresented: $isShowingLeaveConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(isRemoving ? "Remove" : "Leave", role: .destructive) {
+                Task { await leave() }
             }
-        } header: {
-            Text("Share accounts")
-        } footer: {
-            Text("A shared account becomes visible and editable by every household member.")
-        }
-    }
-
-    /// A door into the flow rather than a button that produces a code on the
-    /// spot. Choosing what to share and handing over the code are one act,
-    /// and the old screen split them: it made a code immediately and left
-    /// sharing to a row of toggles further down the same screen.
-    @ViewBuilder
-    private var inviteSection: some View {
-        Section {
-            Button("Invite a Partner") { isInviting = true }
-                .disabled(members.count >= 2)
-        } header: {
-            Text("Invite")
-        } footer: {
+            Button("Cancel", role: .cancel) { isRemoving = false }
+        } message: {
             Text(
-                members.count >= 2
-                    ? "Your household is full — two members is the limit."
-                    : "You'll choose what they can see before the code is created."
+                "Every shared account splits into two private copies — one each. Nothing is lost, "
+                    + "and neither of you keeps access to the other's."
             )
         }
     }
 
-    @ViewBuilder
-    private var joinSection: some View {
-        Section {
-            Button("Join a Household") { isJoiningFlow = true }
-        } header: {
-            Text("Join a Household")
-        } footer: {
-            Text("You'll see exactly what you're being given before you join.")
+    private var peerName: String {
+        snapshot.peer?.displayName ?? snapshot.peer?.email ?? "your partner"
+    }
+
+    // MARK: - The household
+
+    private var household: some View {
+        ScrollView {
+            VStack(spacing: AppTheme.Spacing.l) {
+                HouseholdContainer(
+                    owner: memberView(isMe: amOwner),
+                    guest: memberView(isMe: !amOwner),
+                    since: since,
+                    onTapOther: { isShowingMember = true }
+                )
+                .padding(.vertical, AppTheme.Spacing.m)
+
+                HouseholdSummaryCard(session: session, snapshot: snapshot) {
+                    Task { await load() }
+                }
+
+                DestructiveActionButton(title: "Leave Household", isEnabled: !isLeaving) {
+                    isRemoving = false
+                    isShowingLeaveConfirm = true
+                }
+                .padding(.top, AppTheme.Spacing.s)
+
+                if let errorMessage { FormErrorText(message: errorMessage) }
+            }
+            .padding(.horizontal, AppTheme.Spacing.l)
+            .padding(.bottom, AppTheme.Spacing.xl)
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .refreshable { await load() }
     }
 
-    private var eventsSection: some View {
-        HouseholdEventsSection(events: events)
+    /// The owner sits on the left of the container, always — it is the same
+    /// picture on both phones, which is what makes it a picture of the
+    /// household rather than of the viewer.
+    private var amOwner: Bool {
+        snapshot.peer.map { !$0.isOwner } ?? true
     }
 
-    @ViewBuilder
-    private var leaveSection: some View {
-        Section {
-            Button("Leave Household", role: .destructive) {
-                showLeaveConfirm = true
-            }
-            .disabled(isLeaving || isErasing)
-
-            Button("Erase My Data", role: .destructive) {
-                showEraseConfirm = true
-            }
-            .disabled(isLeaving || isErasing)
-        }
+    private func memberView(isMe: Bool) -> HouseholdMemberView {
+        isMe
+            ? HouseholdMemberView(
+                name: session.profile?.displayName ?? session.userEmail ?? "You",
+                image: avatars.image,
+                isMe: true
+            )
+            : HouseholdMemberView(name: peerName, image: peerAvatar, isMe: false)
     }
 
-    private func memberLabel(_ member: PublicSchema.HouseholdMembersSelect) -> String {
-        member.userId == session.profile?.id ? "You" : "Household member"
+    /// "Since Sep 26" — month and two-digit year, per the spec. Money rule
+    /// 5's reasoning applied to a date: an unparseable timestamp has no month,
+    /// and inventing one would put a confident wrong answer on the badge.
+    private var since: String? {
+        guard let createdAt = snapshot.household?.createdAt,
+              let date = PostgresDate.date(fromTimestamp: createdAt) else { return nil }
+        return "Since " + date.formatted(.dateTime.month(.abbreviated).year(.twoDigits))
     }
 
-    private func sharedBinding(for accountId: UUID) -> Binding<Bool> {
-        Binding(
-            get: { sharedAccountIds.contains(accountId) },
-            set: { newValue in
-                Task { await setShared(accountId, shared: newValue) }
-            }
+    // MARK: - Data
+
+    private func load() async {
+        errorMessage = nil
+        snapshot = await HouseholdDataLoader.load(session: session)
+        await avatars.load(path: session.profile?.avatarPath, client: session)
+        // The other member's face, now that a household exists and
+        // `avatars_select` admits it. Its own store, because `AvatarStore`
+        // holds exactly one image — the signed-in user's — and pointing it at
+        // somebody else would swap the face on every screen in the app.
+        peerAvatar = await HouseholdPeerAvatar.load(
+            path: snapshot.peer?.avatarPath, session: session
         )
-    }
-
-    func load() async {
-        errorMessage = nil
-        do {
-            let state = try await HouseholdViewLoader.load(session: session)
-            household = state.household
-            members = state.members
-            myAccounts = state.myAccounts
-            sharedAccountIds = state.sharedAccountIds
-            events = state.events
-            if let ownerId = session.profile?.id.uuidString {
-                myCategories = (try? await session.dbQueue.read { database in
-                    try LocalTableQueries.categories(database, ownerId: ownerId)
-                }) ?? []
-            }
-        } catch {
-            // Offline is ambient state, surfaced by the persistent status
-            // indicator elsewhere on screen — not a per-fetch red error.
-            errorMessage = UserFacingError.isOffline(error) ? nil : UserFacingError.describe(error)
-        }
         isLoading = false
-    }
-
-    private func createHousehold() async {
-        isCreatingHousehold = true
-        errorMessage = nil
-        do {
-            try await HouseholdRepository.create(client: session.client)
-            // The household exists on the server; this screen reads the local
-            // mirror, so without the pull it keeps rendering "Create
-            // Household" and the tap looks like it did nothing. Every other
-            // write on this screen already does this — creation was the one
-            // that only bumped.
-            await session.syncNow()
-            await load()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
-        isCreatingHousehold = false
-    }
-
-    private func setShared(_ accountId: UUID, shared: Bool) async {
-        errorMessage = nil
-        do {
-            if shared {
-                try await HouseholdRepository.share(client: session.client, accountId: accountId)
-            } else {
-                try await HouseholdRepository.unshare(client: session.client, accountId: accountId)
-            }
-            session.refresh.bump()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
     }
 
     private func leave() async {
@@ -235,53 +192,17 @@ struct HouseholdView: View {
         do {
             try await session.stepUp(reason: "Confirm it's you to leave this household")
             try await HouseholdRepository.leave(client: session.client)
+            await session.syncNow()
             session.refresh.bump()
             await load()
         } catch {
             errorMessage = UserFacingError.describe(error)
         }
         isLeaving = false
-    }
-
-    private func erase() async {
-        isErasing = true
-        errorMessage = nil
-        do {
-            try await session.stepUp(reason: "Confirm it's you to erase your data")
-            try await HouseholdRepository.eraseOwnAccount(client: session.client)
-            session.refresh.bump()
-            await load()
-        } catch {
-            errorMessage = UserFacingError.describe(error)
-        }
-        isErasing = false
+        isRemoving = false
     }
 }
 
-/// The household's activity log, as its own view rather than a section of
-/// `HouseholdView`'s body — the screen already carries create, share, invite,
-/// join, leave and erase, and the log is the one part of it that reads on its
-/// own.
-private struct HouseholdEventsSection: View {
-    let events: [PublicSchema.HouseholdEventsSelect]
-
-    var body: some View {
-        if !events.isEmpty {
-            Section("Recent Activity") {
-                ForEach(events, id: \.id) { event in
-                    Text(label(event))
-                }
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
-        }
-    }
-
-    private func label(_ event: PublicSchema.HouseholdEventsSelect) -> String {
-        switch event.kind {
-        case .memberJoined: return "A member joined"
-        case .memberLeft: return "A member left"
-        case .memberErased: return "A member erased their data"
-        }
-    }
+extension HouseholdPairingIdentity.Role: Identifiable {
+    public var id: String { rawValue }
 }

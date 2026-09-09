@@ -24,6 +24,11 @@ import KeepoCore
 /// tiebreak on name.
 struct LocalAccountRow: Identifiable {
     let id: UUID
+    /// Who the account belongs to. Every other screen can ignore this — an
+    /// account is an account whether or not you own it — but the household
+    /// screens split the shared list into "Shared by you" and "Shared with
+    /// you", and this is the only thing that tells them apart.
+    let ownerId: UUID
     let name: String
     let currency: String
     let currencyInfo: CurrencyInfo
@@ -43,7 +48,7 @@ struct LocalAccountRow: Identifiable {
         let accounts = try Row.fetchAll(
             database,
             sql: """
-            SELECT id, name, currency, kind, icon, color, sort_order, archived_at, version FROM accounts
+            SELECT id, owner_id, name, currency, kind, icon, color, sort_order, archived_at, version FROM accounts
             WHERE deleted_at IS NULL AND (
                 owner_id = ? OR id IN (
                     SELECT ha.account_id FROM household_accounts ha
@@ -72,8 +77,11 @@ struct LocalAccountRow: Identifiable {
             let kindRaw: String = row["kind"]
             let balance = balances[accountId]
             let balanceBase = try balance.flatMap { try convert(database, $0, from: currency) }
+            let owner: String = row["owner_id"]
             return LocalAccountRow(
-                id: UUID(uuidString: accountId) ?? UUID(), name: row["name"], currency: currency,
+                id: UUID(uuidString: accountId) ?? UUID(),
+                ownerId: UUID(uuidString: owner) ?? UUID(),
+                name: row["name"], currency: currency,
                 currencyInfo: CurrencyInfo(code: currency, minorUnit: currencies[currency] ?? 2),
                 kind: PublicSchema.AccountKind(rawValue: kindRaw) ?? .regular,
                 icon: row["icon"], color: row["color"], archivedAt: row["archived_at"],

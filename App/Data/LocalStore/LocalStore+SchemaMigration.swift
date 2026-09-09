@@ -104,5 +104,12 @@ extension LocalStore {
         // schema), leaving a shared category indistinguishable from a private
         // one on that device alone.
         migrator.registerMigration("v12_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260913100000 adds
+        // categories.merge_origin server-side. Additive, so nothing
+        // hard-fails; a stale device would silently drop it from every pulled
+        // category (`SyncApply` intersects its whitelist with the local
+        // schema), and the Household report would file every merged category
+        // under Extra — the one distinction that column exists to carry.
+        migrator.registerMigration("v13_rebuild_syncable_tables", migrate: rebuildSyncableTables)
     }
 }

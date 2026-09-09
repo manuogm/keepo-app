@@ -21,6 +21,10 @@ public enum PublicSchema {
     case expense = "expense"
     case income = "income"
   }
+  public enum CategoryMergeOrigin: String, Codable, Hashable, Sendable {
+    case automatic = "automatic"
+    case manual = "manual"
+  }
   public enum FxSource: String, Codable, Hashable, Sendable {
     case ecb = "ecb"
   }
@@ -250,6 +254,7 @@ public enum PublicSchema {
     public let id: UUID
     public let isDefault: Bool
     public let kind: CategoryKind
+    public let mergeOrigin: CategoryMergeOrigin?
     public let name: String
     public let ownerId: UUID
     public let sharedGroupId: UUID?
@@ -264,6 +269,7 @@ public enum PublicSchema {
       case id = "id"
       case isDefault = "is_default"
       case kind = "kind"
+      case mergeOrigin = "merge_origin"
       case name = "name"
       case ownerId = "owner_id"
       case sharedGroupId = "shared_group_id"
@@ -280,6 +286,7 @@ public enum PublicSchema {
     public let id: UUID?
     public let isDefault: Bool?
     public let kind: CategoryKind
+    public let mergeOrigin: CategoryMergeOrigin?
     public let name: String
     public let ownerId: UUID
     public let sharedGroupId: UUID?
@@ -294,6 +301,7 @@ public enum PublicSchema {
       case id = "id"
       case isDefault = "is_default"
       case kind = "kind"
+      case mergeOrigin = "merge_origin"
       case name = "name"
       case ownerId = "owner_id"
       case sharedGroupId = "shared_group_id"
@@ -309,7 +317,8 @@ public enum PublicSchema {
     public let icon: String?
     public let id: UUID?
     public let isDefault: Bool?
-    public let kind: CategoryKind?
+    public let kind: CategoryKind
+    public let mergeOrigin: CategoryMergeOrigin?
     public let name: String?
     public let ownerId: UUID?
     public let sharedGroupId: UUID?
@@ -324,6 +333,7 @@ public enum PublicSchema {
       case id = "id"
       case isDefault = "is_default"
       case kind = "kind"
+      case mergeOrigin = "merge_origin"
       case name = "name"
       case ownerId = "owner_id"
       case sharedGroupId = "shared_group_id"

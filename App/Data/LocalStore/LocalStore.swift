@@ -126,6 +126,7 @@ public enum LocalSchemaV1 {
             table.column("icon", .text).notNull()
             table.column("color", .text).notNull()
             table.column("shared_group_id", .text)
+            table.column("merge_origin", .text)
             table.column("version", .integer).notNull()
             table.column("deleted_at", .text)
             table.column("created_at", .text).notNull()

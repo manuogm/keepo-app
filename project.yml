@@ -56,14 +56,29 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_CFBundleDisplayName: Keepo
-        # The camera is the only system resource the app asks for by name.
         # There is deliberately no NSPhotoLibraryUsageDescription: the
         # library goes through `PhotosPicker`, which runs out of process —
         # the user picking a photo IS the grant, so the app never gets, or
         # needs, library access.
         INFOPLIST_KEY_NSCameraUsageDescription: >-
-          Keepo uses the camera only to take your profile photo. The picture
-          stays in your own private storage.
+          Keepo uses the camera to take your profile photo, and to scan a
+          household QR code when two phones cannot find each other over
+          Bluetooth. Nothing is recorded or uploaded.
+        # MultipeerConnectivity — the household pairing ceremony
+        # (`HouseholdPairingSession`). iOS 14 onward gates peer discovery
+        # behind the local-network prompt, and the failure mode without these
+        # two keys is NOT an error: the browser starts, finds nothing, and the
+        # discovery screen searches forever. NSBonjourServices must list both
+        # transports and must match `HouseholdPairingSession.serviceType`
+        # exactly — a mismatched string fails exactly as silently.
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: >-
+          Keepo looks for the other phone on your local network so the two of
+          you can build a household while standing next to each other. It
+          finds Keepo devices only, and only while that screen is open.
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: >-
+          Keepo uses Bluetooth to find the other phone when you build a
+          household together, so the two devices have to be close to each
+          other.
         # StepUpAuthenticator's LAContext.evaluatePolicy — the biometric
         # re-check before export, account deletion and leaving/erasing a
         # household — is a hard crash without this key on a real device.

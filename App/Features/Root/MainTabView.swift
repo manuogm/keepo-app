@@ -129,7 +129,7 @@ struct MainTabView: View {
     @ViewBuilder
     private func profileDestination(_ destination: AppNavigation.ProfileDestination) -> some View {
         switch destination {
-        case .household: HouseholdView(session: session)
+        case .household: HouseholdView(session: session, avatars: avatars)
         case .automations: AutomationsView(session: session)
         case .notifications: NotificationSettingsView()
         case .export: ExportView(session: session)

@@ -13,6 +13,20 @@
 			</array>
 		</dict>
 	</array>
+	<!-- MultipeerConnectivity's Bonjour registrations. An ARRAY, which
+	     INFOPLIST_KEY_* cannot express — only well-known scalar keys go
+	     through build settings, so this one lives here beside the Supabase
+	     pair for the same reason.
+
+	     Both transports must be listed, and the service name must match
+	     `HouseholdPairingSession.serviceType` exactly. Get either wrong and
+	     nothing errors: the browser simply never reports a peer, and the
+	     household discovery screen searches until it times out. -->
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_keepo-house._tcp</string>
+		<string>_keepo-house._udp</string>
+	</array>
 	<key>SupabaseAnonKey</key>
 	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>SupabaseURL</key>

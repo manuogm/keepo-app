@@ -31,16 +31,36 @@ extension PublicSchema.ProfilesSelect: @retroactive FetchableRecord {}
 extension PublicSchema.CardMappingsSelect: @retroactive FetchableRecord {}
 
 enum LocalTableQueries {
-    /// `ownerId`-scoped — `categories_select`'s own RLS is `owner_id =
-    /// auth.uid()` with no household clause (categories are never shared),
-    /// so this matches the server's own visibility exactly rather than
-    /// relying only on the local mirror never holding a stale prior
-    /// identity's rows.
+    /// **Your own** categories — the ones you can file a transaction under.
+    ///
+    /// Owner-scoped even though `categories_select` is no longer owner-only:
+    /// since 20260912100000 a household member can *read* the other member's
+    /// shared categories, but `transactions (category_id, owner_id) →
+    /// categories (id, owner_id)` still forbids filing anything under one.
+    /// Every picker in the app wants this list, and offering a row the
+    /// foreign key would reject is worse than not offering it.
+    ///
+    /// The household screens want the other reading, and take
+    /// `householdCategories` below.
     static func categories(_ database: Database, ownerId: String) throws -> [PublicSchema.CategoriesSelect] {
         try PublicSchema.CategoriesSelect.fetchAll(
             database,
             sql: "SELECT * FROM categories WHERE owner_id = ? AND deleted_at IS NULL ORDER BY kind, name",
             arguments: [ownerId]
+        )
+    }
+
+    /// Every category this device can see, both members' included.
+    ///
+    /// Deliberately unfiltered, on the same reasoning as `tags` below: the
+    /// pull already applies `can_read_category`, so the local table holds
+    /// exactly what the server would return, and filtering by owner here
+    /// would hide the other member's half of every shared pair — which is
+    /// the half the household screens exist to show.
+    static func householdCategories(_ database: Database) throws -> [PublicSchema.CategoriesSelect] {
+        try PublicSchema.CategoriesSelect.fetchAll(
+            database,
+            sql: "SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY kind, name COLLATE NOCASE"
         )
     }
 
