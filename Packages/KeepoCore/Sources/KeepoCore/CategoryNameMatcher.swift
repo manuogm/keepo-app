@@ -27,13 +27,19 @@ import Foundation
 public enum CategoryNameMatcher {
     /// Above this, two names are proposed as the same category.
     ///
-    /// 0.72 is the value that admits "Dine Out"/"Dining Out" (0.75) — the
-    /// weakest pair worth merging — while rejecting "Home"/"House" (0.60)
-    /// and "Travel"/"Transport" (0.33). "Food"/"Fuel", "Health"/"Wealth"
-    /// and "Salary"/"Solar" never reach the threshold at all: they are
-    /// stopped earlier, by `gatedEditRatio`. Every one of those pairs is
-    /// pinned in `CategoryNameMatcherTests`, so moving this number tells you
-    /// exactly which two categories you just changed your mind about.
+    /// 0.72 is the value that admits "Dine Out"/"Dining Out" — the weakest
+    /// pair worth merging on spelling alone — while rejecting
+    /// "Travel"/"Transport" (0.33). "Food"/"Fuel", "Health"/"Wealth" and
+    /// "Salary"/"Solar" never reach the threshold at all: they are stopped
+    /// earlier, by `gatedEditRatio`. Every one of those pairs is pinned in
+    /// `CategoryNameMatcherTests`, so moving this number tells you exactly
+    /// which two categories you just changed your mind about.
+    ///
+    /// It is deliberately not the only thing standing between two names and
+    /// a merge. Pairs that mean the same thing and share no spelling —
+    /// "Eating Out"/"Dining Out", "Home"/"House" — are settled by
+    /// `conceptLexicon` before any arithmetic happens, and arrive here as
+    /// exact matches. No threshold could have found them.
     public static let threshold: Double = 0.72
 
     /// A proposed pairing, strongest first.
@@ -117,8 +123,8 @@ public enum CategoryNameMatcher {
     /// of them inflected ("Dine Out" / "Dining Out"), where the shared token
     /// carries most of the meaning and whole-string distance under-reads it.
     public static func similarity(_ lhs: String, _ rhs: String) -> Double {
-        let mine = normalize(lhs)
-        let theirs = normalize(rhs)
+        let mine = concepts(lhs)
+        let theirs = concepts(rhs)
 
         guard !mine.isEmpty, !theirs.isEmpty else { return 0 }
         if mine == theirs { return 1 }
@@ -149,12 +155,12 @@ public enum CategoryNameMatcher {
     /// letter as any given one.
     ///
     /// The cost of the gate is that a genuine synonym pair sharing no
-    /// opening — "Eating Out" and "Dining Out" — no longer matches
-    /// automatically. That is the correct outcome rather than a regression:
-    /// nothing about those two strings says they are the same category, and
-    /// the pass they used to get came from the same arithmetic that passed
-    /// Health/Wealth. Semantic pairs are what the report's manual Merge
-    /// button is for.
+    /// opening — "Eating Out" and "Dining Out" — cannot be found by
+    /// arithmetic at all. That is still the correct outcome here: nothing
+    /// about those two *strings* says they are the same category, and the
+    /// pass they would otherwise get comes from the same arithmetic that
+    /// passes Health/Wealth. Meaning is not spelling, so it is answered
+    /// before this runs, by `conceptLexicon`.
     private static func gatedEditRatio(_ lhs: String, _ rhs: String) -> Double {
         guard commonPrefixLength(lhs, rhs) >= 2 else { return 0 }
         return editRatio(lhs, rhs)
@@ -226,6 +232,101 @@ public enum CategoryNameMatcher {
     /// Noise words that carry no identity of their own. "Food & Drink" and
     /// "Food and Drink" are one category; so are "The Car" and "Car".
     private static let ignoredTokens: Set<String> = ["and", "the", "a", "of", "my", "our"]
+
+    /// A name reduced to the **concepts** it names, which is what matching
+    /// actually compares.
+    ///
+    /// `normalize` settles spelling; this settles meaning, and they are
+    /// separate steps because they fail differently. Everything below the
+    /// gate in this file is arithmetic over characters, and arithmetic can
+    /// never learn that "Eating Out" and "Dining Out" are one category —
+    /// they share no opening, so `gatedEditRatio` scores them 0, and the only
+    /// threshold low enough to admit them also admits Health/Wealth. That is
+    /// not a tuning problem, it is a missing input.
+    ///
+    /// So the missing input is supplied directly. Nothing here is inferred:
+    /// each entry is a word two people plausibly used for the same line in
+    /// their own books, and a pair that collapses onto one concept scores an
+    /// exact 1.0 rather than squeaking past a threshold.
+    static func concepts(_ name: String) -> [String] {
+        normalize(name).map { conceptLexicon[$0] ?? $0 }
+    }
+
+    /// Words that name the same thing, mapped onto one of them.
+    ///
+    /// Keys are **singularized** forms, because this runs after
+    /// `singularize` — "Groceries" arrives as "grocery", "Holidays" as
+    /// "holiday". Values are canonical only in the sense that they are equal
+    /// to each other; which word won is arbitrary and never shown to anybody,
+    /// since the merge's resultant name comes from the row the owner pointed
+    /// at, not from here.
+    ///
+    /// ## What is deliberately absent
+    ///
+    /// **Ambiguous words.** "Food" means groceries to one person and eating
+    /// out to another, and "Gas" is a car in one country and a boiler in the
+    /// next. Mapping either one picks a side and produces a confidently
+    /// wrong merge, which is a worse failure than the near-miss this file
+    /// exists to fix — the merged pair is what the household then files
+    /// against. When a word genuinely has two meanings it is left alone and
+    /// the fuzzy scorer treats it as its own concept.
+    ///
+    /// **Anything needing a dictionary.** No stemming, no embeddings, no
+    /// network. This is a few dozen finance words, it works offline and
+    /// identically on both phones, and its whole behaviour is readable in one
+    /// screen — which matters, because two phones disagreeing about what
+    /// merged would be a household narrating itself differently to each
+    /// member.
+    private static let conceptLexicon: [String: String] = [
+        "dine": "dining", "dining": "dining", "restaurant": "dining",
+        "eatery": "dining", "eating": "dining", "eat": "dining",
+        "takeaway": "dining", "takeout": "dining",
+
+        "grocery": "grocery", "supermarket": "grocery",
+
+        "transport": "transport", "transportation": "transport",
+        "transit": "transport", "commute": "transport", "commuting": "transport",
+        "fare": "transport",
+
+        "fuel": "fuel", "petrol": "fuel", "gasoline": "fuel", "diesel": "fuel",
+
+        "car": "car", "auto": "car", "automobile": "car", "vehicle": "car",
+
+        "utility": "utility", "bill": "utility",
+
+        "home": "home", "house": "home", "household": "home", "housing": "home",
+
+        "health": "health", "healthcare": "health", "medical": "health", "doctor": "health",
+
+        "fitness": "fitness", "gym": "fitness", "workout": "fitness",
+
+        "entertainment": "entertainment", "leisure": "entertainment", "hobby": "entertainment",
+
+        "subscription": "subscription", "streaming": "subscription", "membership": "subscription",
+
+        "shopping": "shopping", "shop": "shopping", "retail": "shopping",
+
+        "travel": "travel", "trip": "travel", "holiday": "travel", "vacation": "travel",
+
+        "salary": "salary", "wage": "salary", "paycheck": "salary",
+        "payroll": "salary", "payslip": "salary",
+
+        "investment": "investment", "investing": "investment",
+
+        "gift": "gift", "present": "gift",
+
+        "child": "child", "children": "child", "kid": "child", "childcare": "child",
+
+        "education": "education", "school": "education", "tuition": "education", "study": "education",
+
+        "coffee": "coffee", "cafe": "coffee",
+
+        "drink": "drink", "bar": "drink", "pub": "drink", "alcohol": "drink",
+
+        "phone": "phone", "mobile": "phone", "telephone": "phone",
+
+        "internet": "internet", "broadband": "internet", "wifi": "internet"
+    ]
 
     /// A name reduced to its comparable words: lowercased, stripped of
     /// punctuation and diacritics, split, de-noised and singularized.

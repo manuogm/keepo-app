@@ -46,18 +46,11 @@ struct CategoryNameMatcherTests {
         arguments: [
             ("Food", "Fuel"),
             ("Health", "Wealth"),
-            ("Home", "House"),
             ("Travel", "Transport"),
             ("Gifts", "Gas"),
             ("Rent", "Refund"),
             ("Savings", "Shopping"),
             ("Salary", "Solar"),
-            // A real synonym pair, and deliberately NOT matched. Nothing in
-            // the two strings says they are the same category; the pass they
-            // would otherwise get comes from the same arithmetic that reads
-            // Health and Wealth as 83% alike. The report's manual Merge
-            // button is where a semantic pair gets joined.
-            ("Eating Out", "Dining Out"),
         ]
     )
     func nonMatches(pair: (String, String)) {
@@ -66,6 +59,65 @@ struct CategoryNameMatcherTests {
             score < CategoryNameMatcher.threshold,
             "\(pair.0) / \(pair.1) scored \(score), at or above \(CategoryNameMatcher.threshold)"
         )
+    }
+
+    // MARK: - Meaning, where spelling runs out
+
+    /// Pairs no amount of threshold tuning could ever have found.
+    ///
+    /// Every one of these shares too little spelling to clear
+    /// `gatedEditRatio` — several share none at all — and the only threshold
+    /// low enough to admit them would also admit Health/Wealth. They match
+    /// because `conceptLexicon` says the two words name the same thing, and
+    /// they arrive at the scorer already identical.
+    @Test(
+        "synonyms that share no spelling",
+        arguments: [
+            ("Eating Out", "Dining Out"),
+            ("Restaurants", "Dining Out"),
+            ("Takeaway", "Eating Out"),
+            ("Home", "House"),
+            ("Gym", "Fitness"),
+            ("Petrol", "Fuel"),
+            ("Bills", "Utilities"),
+            ("Kids", "Children"),
+            ("Wages", "Salary"),
+            ("Shopping", "Retail"),
+            ("Holidays", "Travel"),
+            ("Public Transport", "Commuting"),
+            ("Mobile", "Phone"),
+            ("Broadband", "Internet"),
+        ]
+    )
+    func synonyms(pair: (String, String)) {
+        let score = CategoryNameMatcher.similarity(pair.0, pair.1)
+        #expect(
+            score >= CategoryNameMatcher.threshold,
+            "\(pair.0) / \(pair.1) scored \(score), below \(CategoryNameMatcher.threshold)"
+        )
+    }
+
+    /// The lexicon is a list of decisions, so the words left off it are
+    /// decisions too. "Food" means groceries to one person and eating out to
+    /// another; "Gas" is a car in one country and a boiler in the next.
+    /// Mapping either would pick a side and produce a confidently wrong
+    /// merge — worse than the near-miss the lexicon exists to fix, because
+    /// the merged pair is what the household then files against.
+    @Test("ambiguous words stay their own concept")
+    func ambiguousWordsAreNotMapped() {
+        #expect(CategoryNameMatcher.concepts("Food") == ["food"])
+        #expect(CategoryNameMatcher.concepts("Gas") == ["gas"])
+        #expect(CategoryNameMatcher.similarity("Food", "Groceries") < CategoryNameMatcher.threshold)
+        #expect(CategoryNameMatcher.similarity("Gas", "Fuel") < CategoryNameMatcher.threshold)
+    }
+
+    /// Spelling first, then meaning — `concepts` reads the singularized
+    /// token, so a lexicon keyed on plurals would silently never fire.
+    @Test("the lexicon reads singularized words")
+    func lexiconRunsAfterSingularization() {
+        #expect(CategoryNameMatcher.normalize("Restaurants") == ["restaurant"])
+        #expect(CategoryNameMatcher.concepts("Restaurants") == ["dining"])
+        #expect(CategoryNameMatcher.concepts("Dine Out") == ["dining", "out"])
     }
 
     // MARK: - Normalization
@@ -118,7 +170,10 @@ struct CategoryNameMatcherTests {
     func oneToOne() {
         let mine = [
             CategoryNameMatcher.Candidate(id: 1, name: "Dining Out"),
-            CategoryNameMatcher.Candidate(id: 2, name: "Dine Out"),
+            // Not "Dine Out": the lexicon now makes that an exact match too,
+            // and a tie proves nothing about ranking. "Diner Out" clears the
+            // threshold on spelling alone and stays the weaker claim.
+            CategoryNameMatcher.Candidate(id: 2, name: "Diner Out"),
         ]
         let theirs = [CategoryNameMatcher.Candidate(id: 10, name: "Dining Out")]
 

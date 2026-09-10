@@ -27,34 +27,40 @@ import SwiftUI
 /// only pairing that means anything.
 @MainActor
 enum HouseholdAutoMerge {
+    /// One side's candidates, and their kinds — everything `pair` needs.
+    private struct Candidates {
+        var mine: [CategoryNameMatcher.Candidate<UUID>] = []
+        var theirs: [CategoryNameMatcher.Candidate<UUID>] = []
+        var kinds: [UUID: PublicSchema.CategoryKind] = [:]
+
+        /// True when not one shared group held both members' rows, which is
+        /// what an incomplete mirror looks like — never what a real
+        /// two-member household looks like, since sharing anything at all
+        /// mints the other member's row in the same transaction.
+        var sawNoPairs: Bool { mine.isEmpty && theirs.isEmpty }
+    }
+
     /// Runs the pass and returns the shared groups it created, if any.
     @discardableResult
     static func run(session: SessionStore, selectedCategoryIds: [UUID]) async throws -> Set<UUID> {
         guard let viewer = session.profile?.id else { return [] }
         let selected = Set(selectedCategoryIds)
 
-        let categories = (try? await session.dbQueue.read { database in
-            try LocalTableQueries.householdCategories(database)
-        }) ?? []
-
-        let shared = categories.filter { $0.sharedGroupId != nil && !$0.isDefault }
-        let byGroup = Dictionary(grouping: shared, by: { $0.sharedGroupId ?? UUID() })
-
-        var mine: [CategoryNameMatcher.Candidate<UUID>] = []
-        var theirs: [CategoryNameMatcher.Candidate<UUID>] = []
-        var kinds: [UUID: PublicSchema.CategoryKind] = [:]
-
-        for (_, rows) in byGroup {
-            guard let myRow = rows.first(where: { $0.ownerId == viewer }),
-                  let theirRow = rows.first(where: { $0.ownerId != viewer }) else { continue }
-            kinds[myRow.id] = myRow.kind
-            kinds[theirRow.id] = theirRow.kind
-            if selected.contains(myRow.id) {
-                mine.append(.init(id: myRow.id, name: myRow.name))
-            } else {
-                theirs.append(.init(id: theirRow.id, name: theirRow.name))
-            }
+        var candidates = await read(session: session, viewer: viewer, selected: selected)
+        // The pass reads the local mirror, and it runs seconds after the
+        // other phone's `accept_invite` — so the one way it can find nothing
+        // is that the pull carrying their rows has not landed. Looking once
+        // and quietly concluding "nothing to merge" is how a household ends
+        // up built with every near-miss unmatched and no sign anything went
+        // wrong. Ask again before believing it.
+        if candidates.sawNoPairs {
+            await session.syncNow()
+            candidates = await read(session: session, viewer: viewer, selected: selected)
         }
+
+        let mine = candidates.mine
+        let theirs = candidates.theirs
+        let kinds = candidates.kinds
 
         // Kind is part of what a category *is*, so the two lists are paired
         // once per kind rather than filtered afterwards — an expense
@@ -76,6 +82,33 @@ enum HouseholdAutoMerge {
         )
         await session.syncNow()
         return await groupIds(session: session, for: merges.map(\.mine))
+    }
+
+    /// Both members' shared categories, sorted into the two sides of a
+    /// pairing.
+    private static func read(
+        session: SessionStore, viewer: UUID, selected: Set<UUID>
+    ) async -> Candidates {
+        let categories = (try? await session.dbQueue.read { database in
+            try LocalTableQueries.householdCategories(database)
+        }) ?? []
+
+        let shared = categories.filter { $0.sharedGroupId != nil && !$0.isDefault }
+        let byGroup = Dictionary(grouping: shared, by: { $0.sharedGroupId ?? UUID() })
+
+        var candidates = Candidates()
+        for (_, rows) in byGroup {
+            guard let myRow = rows.first(where: { $0.ownerId == viewer }),
+                  let theirRow = rows.first(where: { $0.ownerId != viewer }) else { continue }
+            candidates.kinds[myRow.id] = myRow.kind
+            candidates.kinds[theirRow.id] = theirRow.kind
+            if selected.contains(myRow.id) {
+                candidates.mine.append(.init(id: myRow.id, name: myRow.name))
+            } else {
+                candidates.theirs.append(.init(id: theirRow.id, name: theirRow.name))
+            }
+        }
+        return candidates
     }
 
     /// Which shared groups the pass produced. Read back rather than assumed:

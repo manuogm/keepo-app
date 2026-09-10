@@ -157,6 +157,11 @@ enum HouseholdCeremonyPhase: Int, Codable, CaseIterable, Hashable, Sendable {
     /// the household is not real until the owner presses Finish, and a full
     /// house followed by several minutes of waiting would be the animation
     /// telling a lie the user has to sit through.
+    ///
+    /// Read only by `HouseholdSetupCoordinator`, and always off the phase the
+    /// **owner announced** — never off `mirrored`, which swaps two adjacent
+    /// steps and would have the guest's percentage step backwards. See
+    /// `HouseholdSetupCoordinator.fill`.
     var fill: Double {
         Double(rawValue + 1) / Double(Self.allCases.count) * 0.9
     }
@@ -164,6 +169,10 @@ enum HouseholdCeremonyPhase: Int, Codable, CaseIterable, Hashable, Sendable {
     /// The mirror image of this step on the other phone. What the owner
     /// shares, the guest is receiving, and both should be looking at a step
     /// that describes their own side of the same second.
+    ///
+    /// **Wording only.** Two of the swaps cross an ordinal boundary, so a
+    /// mirrored phase is not a position in the sequence and nothing may
+    /// derive progress from one.
     var mirrored: HouseholdCeremonyPhase {
         switch self {
         case .sharingAccounts: return .receivingAccounts

@@ -229,7 +229,7 @@ struct HouseholdCeremonyView: View {
     private var isComplete: Bool { coordinator.outcome == .finished }
 
     private var fill: Double {
-        isComplete ? 1 : coordinator.phase.fill
+        isComplete ? 1 : coordinator.fill
     }
 
     /// A slight, alternating swell rather than a value derived from progress:

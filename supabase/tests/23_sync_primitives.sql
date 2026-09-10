@@ -342,7 +342,13 @@ select throws_like(
 -- syncable table) — is now rate-limited too. Clears whatever budget
 -- fixture A's earlier pull_changes calls above already spent (this section
 -- tests the limiter itself, not how much of it those calls used), then
--- tops up to the 30/60s threshold and confirms the next call is refused.
+-- tops up to the threshold and confirms the next call is refused.
+--
+-- 120/60s since 20260916100000, raised from 30 because a pull is no longer a
+-- screen-level event: it is the last step of every local-first mutation, and
+-- the household report spends one per merge, per unmerge, per tag pruned.
+-- The old limit was tripped by ordinary use and the failure was invisible
+-- behind a full-screen cover — see that migration for the whole account.
 reset role;
 delete from ops_rate_limits where function_name = 'pull_changes';
 set local role authenticated;
@@ -351,7 +357,7 @@ do $$
 declare
   i int;
 begin
-  for i in 1..30 loop
+  for i in 1..120 loop
     perform pull_changes(0, 0);
   end loop;
 end;

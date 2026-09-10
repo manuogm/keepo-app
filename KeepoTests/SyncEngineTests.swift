@@ -116,8 +116,15 @@ struct SyncEngineTests {
         #expect(SyncCursorStore.cursor(for: userId) == 2)
     }
 
-    @Test("two overlapping pull() calls do not race — the second is a no-op while the first is in flight")
-    func overlappingPullsDoNotRace() async throws {
+    /// Overlapping calls are serialized, and **neither is dropped**.
+    ///
+    /// The second used to be a silent no-op while the first was in flight,
+    /// which broke every caller that writes to the server and then awaits a
+    /// pull to read its own write back — the household report's category
+    /// merge among them. Two pulls that never overlap keep the cursor-race
+    /// guarantee the old guard existed for; returning early does not.
+    @Test("overlapping pull() calls run one after the other, and both run")
+    func overlappingPullsSerializeWithoutDropping() async throws {
         let dbQueue = try makeDatabase()
         let userId = UUID().uuidString
         let puller = SlowStubSyncPuller(
@@ -129,7 +136,8 @@ struct SyncEngineTests {
         async let second: Void = engine.pull()
         _ = await (first, second)
 
-        #expect(puller.callCount == 1)
+        #expect(puller.callCount == 2, "the second caller must get a pull of its own, not an early return")
+        #expect(puller.maxConcurrent == 1, "and it must not overlap the first")
     }
 
     private func pullResult(accounts: [AnyJSON], nextCursor: Int64, epoch: Int64) -> PullChangesResult {
@@ -175,10 +183,12 @@ private final class StubSyncPuller: SyncPulling, @unchecked Sendable {
 /// A slow stub for the overlapping-call test — real work (the DB write)
 /// finishes fast enough that only an artificial delay in the RPC call
 /// itself reliably keeps the first `pull()` "in flight" while the second
-/// one is issued.
+/// one is issued. `maxConcurrent` is what proves the two never overlapped.
 private final class SlowStubSyncPuller: SyncPulling, @unchecked Sendable {
     private let result: PullChangesResult
     private(set) var callCount = 0
+    private(set) var maxConcurrent = 0
+    private var active = 0
 
     init(result: PullChangesResult) {
         self.result = result
@@ -186,6 +196,9 @@ private final class SlowStubSyncPuller: SyncPulling, @unchecked Sendable {
 
     func pullChanges(cursor: Int64, globalCursor: Int64) async throws -> PullChangesResult {
         callCount += 1
+        active += 1
+        maxConcurrent = max(maxConcurrent, active)
+        defer { active -= 1 }
         try await Task.sleep(nanoseconds: 50_000_000)
         return result
     }

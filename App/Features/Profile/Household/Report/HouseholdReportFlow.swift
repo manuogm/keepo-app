@@ -137,6 +137,16 @@ struct HouseholdReportFlow: View {
 
     private func load() async {
         snapshot = await HouseholdDataLoader.load(session: session)
+        // Every action on these screens is "call the RPC, pull, re-read the
+        // mirror". When the pull is the step that failed, the write did
+        // land and this screen redraws what it already had — which is
+        // indistinguishable, from the owner's side, from the action doing
+        // nothing at all. `OfflineStatusBar` carries this sentence
+        // everywhere else in the app, and it lives in `MainTabView`,
+        // underneath this full-screen cover.
+        errorMessage = session.syncEngine?.lastErrorMessage.map {
+            "Saved, but this phone hasn't caught up. \($0)"
+        }
         isLoading = false
     }
 }

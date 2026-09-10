@@ -33,20 +33,48 @@ public final class SyncEngine {
         self.userId = userId
     }
 
-    /// A no-op while a pull is already in flight — the four trigger sites
-    /// can fire close together (e.g. sign-in immediately followed by the
-    /// scene becoming active), and two overlapping pulls racing to write
-    /// the same cursor would be a real hazard, not just wasted work.
+    /// The pull currently running, or the last one queued behind it. Two
+    /// overlapping pulls racing to write the same cursor is a real hazard,
+    /// so they are **serialized** — but never dropped.
+    private var chain: Task<Void, Never>?
+
+    /// Pulls, and does not return until a pull that started **after this
+    /// call** has finished.
+    ///
+    /// This used to be `guard !isSyncing else { return }`, which is wrong in
+    /// a way that only shows up under the exact conditions it was written
+    /// for. Every caller that writes to the server and then awaits this to
+    /// read its own write back — `apply_category_merges` in the household
+    /// report, `share_account` in the summary, the setup ceremony's merge
+    /// step — was silently handed the mirror from *before* its write
+    /// whenever any other trigger site (scene-active, connectivity
+    /// regained, a capture notification) happened to have a pull in flight.
+    /// No error, no retry: the screen simply redrew what it already had, and
+    /// the user saw their action do nothing.
+    ///
+    /// Chaining keeps the guarantee the guard was protecting — pulls never
+    /// overlap — while making the await mean what every call site reads it
+    /// as meaning.
     public func pull() async {
-        guard !isSyncing else { return }
-        isSyncing = true
-        defer { isSyncing = false }
-        do {
-            try await pullOnce()
-            lastErrorMessage = nil
-        } catch {
-            lastErrorMessage = UserFacingError.describe(error)
+        let previous = chain
+        let task = Task { @MainActor [weak self] in
+            await previous?.value
+            guard let self else { return }
+            self.isSyncing = true
+            defer { self.isSyncing = false }
+            do {
+                try await self.pullOnce()
+                self.lastErrorMessage = nil
+            } catch {
+                self.lastErrorMessage = UserFacingError.describe(error)
+            }
         }
+        chain = task
+        await task.value
+        // Only the last link clears it, so a caller arriving while a chain
+        // is still draining joins the end of it rather than starting a
+        // second one.
+        if chain == task { chain = nil }
     }
 
     private func pullOnce() async throws {

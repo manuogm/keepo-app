@@ -57,6 +57,17 @@ final class HouseholdSetupCoordinator {
     }
 
     private(set) var phase: HouseholdCeremonyPhase = .sharingProfiles
+    /// How far through the ceremony both phones are, 0...0.9.
+    ///
+    /// Held here rather than read off `phase`, because the guest's `phase` is
+    /// the **mirror** of what the owner announced and the mirror swaps two
+    /// adjacent steps: `.sharingAccounts` (step 2) renders as
+    /// `.receivingAccounts` (step 3) and vice versa. Taking the fraction from
+    /// the mirrored phase made the guest's percentage read 9, 27, 18, 45, 36,
+    /// 54, 72, 63, 81, 90 — advancing, jumping back, advancing — beside an
+    /// owner counting smoothly up. The wording is what mirrors; the position
+    /// in the sequence is not.
+    private(set) var fill: Double = 0
     /// False until the first phase actually begins. The guest sits on this
     /// while it waits for the owner to press Create Household, and the
     /// discovery screen uses it to know when to hand over to the ceremony —
@@ -204,7 +215,7 @@ final class HouseholdSetupCoordinator {
         while let message = await pairing.nextMessage() {
             switch message {
             case .phase(let announced):
-                try await renderPhase(announced.mirrored)
+                try await renderPhase(announced)
                 if announced == .buildingHousehold {
                     await session.syncNow()
                     outcome = .waitingForOwner
@@ -232,7 +243,7 @@ final class HouseholdSetupCoordinator {
     /// whose call takes a second does not then sit for another half — the
     /// pacing is a minimum, not an addition.
     private func step(_ next: HouseholdCeremonyPhase, work: @escaping () async throws -> Void) async throws {
-        setPhase(next)
+        setPhase(next, fill: next.fill)
         if role == .owner { pairing.send(.phase(next)) }
 
         let startedAt = ContinuousClock.now
@@ -241,14 +252,20 @@ final class HouseholdSetupCoordinator {
         if remaining > .zero { try await Task.sleep(for: remaining) }
     }
 
-    private func setPhase(_ next: HouseholdCeremonyPhase) {
+    private func setPhase(_ next: HouseholdCeremonyPhase, fill: Double) {
         hasStarted = true
+        // Taken from the announced step even when the drawn step is its
+        // mirror, and never allowed to fall — the house fills, it does not
+        // breathe.
+        self.fill = max(self.fill, fill)
         guard next != phase || phaseTick == 0 else { return }
         phase = next
         phaseTick += 1
     }
 
-    /// The guest's side of the pacing.
+    /// The guest's side of the pacing, and the only place the mirror is
+    /// applied: the **wording** flips (`Sharing` here is `Receiving` there),
+    /// the position in the sequence does not.
     ///
     /// The owner's early announcements arrive while `accept_invite` is still
     /// in flight and nobody is reading the inbox, so they are buffered and
@@ -256,9 +273,9 @@ final class HouseholdSetupCoordinator {
     /// past in a single frame. The same floor the owner paces itself with is
     /// applied here on the way out of the buffer, so both phones spend the
     /// same time on the same step.
-    private func renderPhase(_ next: HouseholdCeremonyPhase) async throws {
+    private func renderPhase(_ announced: HouseholdCeremonyPhase) async throws {
         let startedAt = ContinuousClock.now
-        setPhase(next)
+        setPhase(announced.mirrored, fill: announced.fill)
         let remaining = Self.phaseFloor - startedAt.duration(to: ContinuousClock.now)
         if remaining > .zero { try await Task.sleep(for: remaining) }
     }
@@ -275,7 +292,7 @@ final class HouseholdSetupCoordinator {
             // `default: continue` does — leaves the guest on the discovery
             // screen until the token lands, and the two phones visibly start
             // the ceremony at different moments.
-            case .phase(let announced): try await renderPhase(announced.mirrored)
+            case .phase(let announced): try await renderPhase(announced)
             case .identity, .joined, .finished: continue
             }
         }

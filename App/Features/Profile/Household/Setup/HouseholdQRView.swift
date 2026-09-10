@@ -254,7 +254,11 @@ struct HouseholdQRView: View {
             // Somebody is in. From here the household is real and must never
             // be discarded on the way out.
             memberArrived = true
-            try? await HouseholdAutoMerge.run(session: session, selectedCategoryIds: categoryIds)
+            // Swallowed on purpose, and only here: the household is already
+            // real by this line, and a failed automatic pass leaves the
+            // report's manual Merge exactly where it was. Refusing to open
+            // the report over it would strand a household nobody can review.
+            _ = try? await HouseholdAutoMerge.run(session: session, selectedCategoryIds: categoryIds)
             await session.syncNow()
             session.refresh.bump()
             isShowingReport = true

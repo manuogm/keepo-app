@@ -238,6 +238,7 @@
 		EADC88BE53BA8201A5A0D55D /* AccountsListView+Reorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0EA44B535AF5D58FEEC1D0 /* AccountsListView+Reorder.swift */; };
 		EAE9BB0551B52CA258B1C65A /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD124F353024A73375A9AF82 /* ProfileView.swift */; };
 		EB554CA339750A417EB0F1B9 /* HouseholdSetupCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21DDD5B9F4CCB6DEB4FD9822 /* HouseholdSetupCoordinator.swift */; };
+		EB815779CF513F76B2473F8E /* HouseholdPairingPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66868ACBE8602B4C6A23AA49 /* HouseholdPairingPermission.swift */; };
 		EF971C3B042A4DEBE7CDF42D /* ScopeFilteringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C53BB03D4172A9EB478749C /* ScopeFilteringTests.swift */; };
 		EFBBF3712CE22D122A3C094D /* AppTheme+Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30916B8D3671A5BD1B620655 /* AppTheme+Typography.swift */; };
 		F0AAA6E73FF0AA1BEAC9C8E4 /* OutboxLocalWrite+Cards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DE810306ADAEBB96D57A745 /* OutboxLocalWrite+Cards.swift */; };
@@ -398,6 +399,7 @@
 		6527A3683E8F25003E736747 /* AccountFormView+Dialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountFormView+Dialogs.swift"; sourceTree = "<group>"; };
 		65CA9A35388756C92A2C2D1F /* DashboardGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardGridView.swift; sourceTree = "<group>"; };
 		666660B494D18FFDCFA6D9E9 /* DashboardCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCanvasView.swift; sourceTree = "<group>"; };
+		66868ACBE8602B4C6A23AA49 /* HouseholdPairingPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdPairingPermission.swift; sourceTree = "<group>"; };
 		672ABF9C6E754098C7465188 /* WidgetFillBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetFillBar.swift; sourceTree = "<group>"; };
 		6777B149C1267AD0636DC635 /* HouseholdDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdDiscoveryView.swift; sourceTree = "<group>"; };
 		67F70AFEF9431B8FA8A98F6E /* UUID+Identifiable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UUID+Identifiable.swift"; sourceTree = "<group>"; };
@@ -788,6 +790,7 @@
 			children = (
 				10BB6EE40E8A7380B61EB98B /* HouseholdLinkError.swift */,
 				989AE5C321395659FC0EEAF8 /* HouseholdPairingMessage.swift */,
+				66868ACBE8602B4C6A23AA49 /* HouseholdPairingPermission.swift */,
 				3BD32E93474AC4DE074C67F9 /* HouseholdPairingSession.swift */,
 				21DDD5B9F4CCB6DEB4FD9822 /* HouseholdSetupCoordinator.swift */,
 				79B22BD4DEC754DAEC181A07 /* UncheckedSendable.swift */,
@@ -1408,6 +1411,7 @@
 				2FA5C7471F5140A0CC03B744 /* HouseholdKit.swift in Sources */,
 				7C8FE756B3ACD3C96332648D /* HouseholdLinkError.swift in Sources */,
 				08BC136894905CD48CDB7EF5 /* HouseholdPairingMessage.swift in Sources */,
+				EB815779CF513F76B2473F8E /* HouseholdPairingPermission.swift in Sources */,
 				F1F9A451860CFE9C75DDB39C /* HouseholdPairingSession.swift in Sources */,
 				41DF945183EDD59058A03D38 /* HouseholdQRView.swift in Sources */,
 				5C62E6738B4BAB66464949BC /* HouseholdReportAccounts.swift in Sources */,

@@ -355,3 +355,84 @@ than asserting "you have none" before the read lands.
   (the composite FK still forbids filing a transaction under the other
   member's row). The household screens take the new
   `householdCategories(_:)`, which is unfiltered.
+
+---
+
+## Second pass, 2026-09-10 — what two physical devices found
+
+Five things, four of them one root cause wearing four faces.
+
+### The merge pipeline (feedback items 1.1 and 1.2)
+
+Reported as "fuzzy matching skips easy wins like Dine Out / Dining Out" and
+"manually merging does nothing". Neither was a matching bug: `Dine Out` /
+`Dining Out` scores 0.75 against a 0.72 threshold and has been pinned in
+`CategoryNameMatcherTests` since the day the matcher was written. Replaying
+the whole ceremony in one rolled-back transaction proved the SQL correct too
+— `apply_category_merges` links the rows, renames both, and retires the twins
+exactly as designed.
+
+Three client-side defects between the server and the screen:
+
+1. **`SyncEngine.pull()` dropped overlapping callers** (`guard !isSyncing else
+   { return }`). Every merge is *RPC, pull, re-read* — so a merge that
+   overlapped any other pull re-read the mirror from before its own write.
+   Now chained: concurrent callers are serialized, never dropped.
+   `SyncEngineTests` asserts both halves (`callCount == 2`,
+   `maxConcurrent == 1`).
+2. **Merge tombstones were unreadable to the member who needed them.**
+   `apply_category_merges` retired each redundant twin with
+   `deleted_at = now(), shared_group_id = null`, and `can_read_category`
+   admits another member's row only while the group link is there. The delete
+   was invisible to the other phone, so its mirror kept a phantom category
+   inside the merged group. The tombstone now keeps `shared_group_id`
+   (migration `20260916100000`); nothing reads a deleted category on either
+   side, and the propagate trigger already skipped them.
+3. **`pull_changes` was rate-limited at 30/60s** — reachable by the report
+   itself — and a tripped limit surfaces only in `OfflineStatusBar`, which
+   sits *under* the report's full-screen cover. Raised to 120/60s, and the
+   report now renders `lastErrorMessage` itself.
+
+Two hardening changes alongside: the automatic pass re-syncs and looks again
+before concluding there is nothing to merge, and `unshare_category` /
+`unmerge_category_group` bump both members' `sync_epoch`, because taking a
+live row out of a shared group is a revocation and no incremental pull can
+express one.
+
+### Better matching, since it was asked for (item 1.1)
+
+`CategoryNameMatcher.concepts` — a curated finance synonym lexicon applied
+after singularization, so `Eating Out`/`Dining Out`, `Home`/`House`,
+`Gym`/`Fitness`, `Bills`/`Utilities`, `Petrol`/`Fuel`, `Kids`/`Children`
+arrive at the scorer already identical. Spelling and meaning stay separate
+steps: `normalize` settles spelling, `concepts` settles meaning. Ambiguous
+words ("Food", "Gas") are deliberately absent and pinned as absent.
+
+`("Eating Out", "Dining Out")` and `("Home", "House")` moved from the
+non-match list to a new "synonyms that share no spelling" suite. The gate and
+the threshold are unchanged — they were never the problem.
+
+### Ceremony progress on the guest (item 2)
+
+The guest draws `phase.mirrored`, and `mirrored` swaps two pairs that sit on
+either side of an ordinal boundary. Taking `fill` from the mirrored phase made
+the guest read 9, 27, 18, 45, 36, 54, 72, 63, 81, 90. Progress now lives on
+`HouseholdSetupCoordinator.fill`, taken from the **announced** phase and
+clamped monotonic; `mirrored` is documented as wording-only.
+
+### Permission timing (item 3)
+
+`HouseholdPairingSession.primeLocalNetworkPermission()` (own file, for the
+length lint) starts the real advertiser and browser on the real `serviceType`
+for two seconds, from the intro screen's `.task`. There is no API that
+requests this permission — using Bonjour is the request — so the only way to
+move the prompt is to move the usage. Nothing is reported back: a denial still
+looks exactly like an empty room, and the QR fallback is still the answer.
+
+### Verification
+
+SwiftLint 0/296 · `xcodebuild test` TEST SUCCEEDED · pgTAP **419 tests, 29
+files, PASS** (new file `33_merge_tombstones_reach_the_other_phone.sql`).
+The four UI-visible changes are **not** visually verified — they need the two
+devices.
+

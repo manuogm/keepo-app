@@ -60,6 +60,12 @@ struct HouseholdSetupFlow: View {
         }
         .navigationTitle(role == .owner ? "New Household" : "Join Household")
         .navigationBarTitleDisplayMode(.inline)
+        // The local-network permission is asked for here, while the user is
+        // reading what the flow does, rather than on the discovery screen
+        // three steps later — see `primeLocalNetworkPermission`. Detached
+        // from the two picker steps on purpose: it takes two seconds of
+        // radio and must not hold up `Next`.
+        .task { await HouseholdPairingSession.primeLocalNetworkPermission() }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button { dismiss() } label: { Image(systemName: "xmark") }
