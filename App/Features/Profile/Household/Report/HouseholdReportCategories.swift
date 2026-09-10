@@ -38,8 +38,7 @@ struct HouseholdReportCategories: View {
     private var countsCard: some View {
         HouseholdCard(
             title: "Household categories",
-            subtitle: "Merged categories are one category on both phones. Extra ones are only "
-                + "one of yours — merge any that mean the same thing."
+            subtitle: "Merged ones are shared by both. Merge any Extra that mean the same thing."
         ) {
             HStack(alignment: .top, spacing: AppTheme.Spacing.l) {
                 HouseholdMetric(

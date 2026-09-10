@@ -105,17 +105,15 @@ struct HouseholdDiscoveryView: View {
 
             VStack(spacing: AppTheme.Spacing.s) {
                 Text("Looking for nearby devices")
-                    .font(AppTheme.Typography.sectionTitle)
+                    .font(AppTheme.Typography.screenTitle)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
                     .multilineTextAlignment(.center)
                 Text(
                     role == .owner
-                        ? "Hold your phone next to the person joining your household. "
-                            + "They need Keepo open on the Join screen."
-                        : "Hold your phone next to the person who owns the household. "
-                            + "They need Keepo open on the New Household screen."
+                        ? "Hold your phones together. Theirs needs Keepo open on Join Household."
+                        : "Hold your phones together. Theirs needs Keepo open on New Household."
                 )
-                .font(AppTheme.Typography.caption)
+                .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -146,12 +144,8 @@ struct HouseholdDiscoveryView: View {
             Text("Taking a while?")
                 .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
-            Text(
-                role == .owner
-                    ? "Show a QR code instead, and have them scan it with their camera."
-                    : "Scan the QR code shown on the other phone instead."
-            )
-            .font(AppTheme.Typography.caption)
+            Text(role == .owner ? "Show a code for them to scan instead." : "Scan the code on their phone instead.")
+                .font(AppTheme.Typography.caption)
             .foregroundStyle(AppTheme.Palette.textSecondary)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
@@ -224,14 +218,10 @@ struct HouseholdDiscoveryView: View {
             }
 
             Text(peer.resolvedName)
-                .font(AppTheme.Typography.sectionTitle)
+                .font(AppTheme.Typography.screenTitle)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
-            Text(
-                role == .owner
-                    ? "is nearby and ready to join your household."
-                    : "owns the household you're about to join."
-            )
-            .font(AppTheme.Typography.caption)
+            Text(role == .owner ? "is ready to join." : "owns this household.")
+                .font(AppTheme.Typography.body)
             .foregroundStyle(AppTheme.Palette.textSecondary)
             .multilineTextAlignment(.center)
         }

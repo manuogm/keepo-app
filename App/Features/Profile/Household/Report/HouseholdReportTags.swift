@@ -54,8 +54,7 @@ struct HouseholdReportTags: View {
     private var countCard: some View {
         HouseholdCard(
             title: "Household tags",
-            subtitle: "Every tag on a shared account, from both of you. Delete a duplicate and "
-                + "you'll choose which tag its transactions move to."
+            subtitle: "From both of you. Deleting one asks where its transactions go."
         ) {
             HouseholdMetric(
                 value: snapshot.tags.count,
@@ -122,6 +121,12 @@ private struct TagRetagSheet: View {
                         header
                         picker
                         if let errorMessage { FormErrorText(message: errorMessage) }
+
+                        DestructiveActionButton(
+                            title: "Delete and Re-tag", isEnabled: destination != nil && !isSaving
+                        ) {
+                            Task { await prune() }
+                        }
                     }
                     .padding(AppTheme.Spacing.l)
                 }
@@ -135,15 +140,7 @@ private struct TagRetagSheet: View {
                         .accessibilityLabel("Cancel")
                 }
             }
-            .safeAreaInset(edge: .bottom) {
-                DestructiveActionButton(
-                    title: "Delete and Re-tag", isEnabled: destination != nil && !isSaving
-                ) {
-                    Task { await prune() }
-                }
-                .padding(.horizontal, AppTheme.Spacing.l)
-                .padding(.bottom, AppTheme.Spacing.m)
-            }
+
         }
     }
 
@@ -161,10 +158,7 @@ private struct TagRetagSheet: View {
                 }
             }
 
-            Text(
-                "Every transaction wearing \"\(tag.name)\" will wear the tag you choose instead. "
-                    + "Nothing else about those transactions changes."
-            )
+            Text("Every transaction wearing \"\(tag.name)\" moves to the tag you choose.")
             .font(AppTheme.Typography.caption)
             .foregroundStyle(AppTheme.Palette.textSecondary)
             .fixedSize(horizontal: false, vertical: true)

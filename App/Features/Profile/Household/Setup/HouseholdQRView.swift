@@ -40,6 +40,11 @@ struct HouseholdQRView: View {
     @State private var errorMessage: String?
     @State private var hasJoined = false
     @State private var isShowingReport = false
+    /// Whether **this screen** brought the household into existence, and
+    /// whether anybody ever arrived in it. Both are needed to undo the
+    /// creation safely on the way out — see `discardIfUnused()`.
+    @State private var didCreateHousehold = false
+    @State private var memberArrived = false
 
     var body: some View {
         NavigationStack {
@@ -56,6 +61,10 @@ struct HouseholdQRView: View {
                 }
             }
             .task { await prepare() }
+            // Backing out must not leave the user stranded in a household
+            // nobody joined. `onDisappear` rather than the close button
+            // alone, because a sheet is also dismissed by swiping it down.
+            .onDisappear { Task { await discardIfUnused() } }
             .fullScreenCover(isPresented: $isShowingReport) {
                 // No avatars: the peer link is what carries a face before the
                 // household is final, and this is the road taken because there
@@ -103,13 +112,10 @@ struct HouseholdQRView: View {
 
             VStack(spacing: AppTheme.Spacing.s) {
                 Text("Have them scan this")
-                    .font(AppTheme.Typography.sectionTitle)
+                    .font(AppTheme.Typography.screenTitle)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
-                Text(
-                    "It works once and expires in seven days. Nothing is shared until they scan it — "
-                        + "you'll review everything before the household is final."
-                )
-                .font(AppTheme.Typography.caption)
+                Text("Nothing is shared until they do. You'll review it all afterwards.")
+                    .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -154,10 +160,10 @@ struct HouseholdQRView: View {
 
             VStack(spacing: AppTheme.Spacing.s) {
                 Text("Point at their code")
-                    .font(AppTheme.Typography.sectionTitle)
+                    .font(AppTheme.Typography.screenTitle)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
-                Text("They'll find it under \"Show QR Code\" on their own Household Setup screen.")
-                    .font(AppTheme.Typography.caption)
+                Text("They'll find it under Show QR Code.")
+                    .font(AppTheme.Typography.body)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -194,9 +200,37 @@ struct HouseholdQRView: View {
         let existing = try? await session.dbQueue.read { database in
             try LocalTableQueries.myHousehold(database, userId: userId)
         }
+        // A household the user already had is not ours to undo later.
         guard existing == nil else { return }
         try await HouseholdRepository.create(client: session.client)
+        didCreateHousehold = true
         await session.syncNow()
+    }
+
+    /// Undoes the household this screen created, if nobody used it.
+    ///
+    /// **The leak this closes.** Showing a QR code requires a token, and
+    /// `create_invite` requires a household — so opening this screen has to
+    /// create one. Closing it again used to leave the user a member of a
+    /// single-member household they never asked for: the Household screen
+    /// stopped offering Create/Join, and the only way back to the blank state
+    /// was to notice the "Leave Household" button and use it.
+    ///
+    /// `leave_household()` on a single-member household forks nothing (there
+    /// is no second member) and shares nothing back — it retires the
+    /// membership row, which is exactly the undo. Nothing the user owns is
+    /// touched.
+    ///
+    /// The invite itself is left to expire on its own. It is single-use, it
+    /// dies after seven days, and the only copy of its code was on the screen
+    /// that just went away — so the cost of orphaning it is bounded, where
+    /// cancelling it would need an RPC that does not exist yet.
+    private func discardIfUnused() async {
+        guard didCreateHousehold, !memberArrived, !isShowingReport else { return }
+        didCreateHousehold = false
+        try? await HouseholdRepository.leave(client: session.client)
+        await session.syncNow()
+        session.refresh.bump()
     }
 
     /// Polling, because there is no peer link here to be told over and this
@@ -217,6 +251,9 @@ struct HouseholdQRView: View {
             guard (try? await HouseholdRepository.memberProfile(client: session.client)) != nil else {
                 continue
             }
+            // Somebody is in. From here the household is real and must never
+            // be discarded on the way out.
+            memberArrived = true
             try? await HouseholdAutoMerge.run(session: session, selectedCategoryIds: categoryIds)
             await session.syncNow()
             session.refresh.bump()
@@ -233,6 +270,7 @@ struct HouseholdQRView: View {
                 client: session.client, token: token,
                 accountIds: accountIds, categoryIds: categoryIds
             )
+            memberArrived = true
             await session.syncNow()
             session.refresh.bump()
             onJoined()
@@ -283,101 +321,5 @@ private struct QRCodeImage: View {
         let context = CIContext()
         guard let cgImage = context.createCGImage(output, from: output.extent) else { return nil }
         return UIImage(cgImage: cgImage)
-    }
-}
-
-// MARK: - Scanning
-
-/// The camera, looking for one QR code.
-///
-/// `AVCaptureMetadataOutput` rather than the Vision framework: the job is
-/// "tell me when a QR code is in frame", which this does in a dozen lines with
-/// hardware detection and no per-frame image processing.
-private struct QRScannerView: UIViewControllerRepresentable {
-    let onFound: (String) -> Void
-
-    func makeUIViewController(context: Context) -> ScannerController {
-        let controller = ScannerController()
-        controller.onFound = onFound
-        return controller
-    }
-
-    func updateUIViewController(_ controller: ScannerController, context: Context) {
-        controller.onFound = onFound
-    }
-
-    final class ScannerController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
-        var onFound: ((String) -> Void)?
-
-        private let captureSession = AVCaptureSession()
-        private var previewLayer: AVCaptureVideoPreviewLayer?
-
-        override func viewDidLoad() {
-            super.viewDidLoad()
-            view.backgroundColor = .black
-            configure()
-        }
-
-        private func configure() {
-            guard let device = AVCaptureDevice.default(for: .video),
-                  let input = try? AVCaptureDeviceInput(device: device),
-                  captureSession.canAddInput(input) else { return }
-            captureSession.addInput(input)
-
-            let output = AVCaptureMetadataOutput()
-            guard captureSession.canAddOutput(output) else { return }
-            captureSession.addOutput(output)
-            output.setMetadataObjectsDelegate(self, queue: .main)
-            // Set *after* the output is attached to the session — the
-            // available types are empty until then, and assigning `.qr`
-            // beforehand throws.
-            output.metadataObjectTypes = [.qr]
-
-            let preview = AVCaptureVideoPreviewLayer(session: captureSession)
-            preview.videoGravity = .resizeAspectFill
-            view.layer.addSublayer(preview)
-            previewLayer = preview
-        }
-
-        override func viewDidLayoutSubviews() {
-            super.viewDidLayoutSubviews()
-            previewLayer?.frame = view.bounds
-        }
-
-        override func viewWillAppear(_ animated: Bool) {
-            super.viewWillAppear(animated)
-            guard !captureSession.isRunning else { return }
-            // Off the main thread: `startRunning` blocks until the camera is
-            // configured, and on the main queue that is a visible hitch as
-            // the sheet presents.
-            let session = UncheckedSendable(captureSession)
-            Task.detached { session.value.startRunning() }
-        }
-
-        override func viewWillDisappear(_ animated: Bool) {
-            super.viewWillDisappear(animated)
-            guard captureSession.isRunning else { return }
-            let session = UncheckedSendable(captureSession)
-            Task.detached { session.value.stopRunning() }
-        }
-
-        /// `nonisolated` with an explicit hop, rather than letting the
-        /// conformance be inferred as main-actor: `AVCaptureMetadataOutput`
-        /// declares this delegate without actor isolation, and a
-        /// main-actor-isolated implementation of it is a data race the
-        /// compiler refuses outright. The callback queue is already `.main`
-        /// (set in `configure`), so the hop is free.
-        nonisolated func metadataOutput(
-            _ output: AVCaptureMetadataOutput,
-            didOutput metadataObjects: [AVMetadataObject],
-            from connection: AVCaptureConnection
-        ) {
-            guard let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
-                  let payload = object.stringValue else { return }
-            Task { @MainActor [weak self] in
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                self?.onFound?(payload)
-            }
-        }
     }
 }

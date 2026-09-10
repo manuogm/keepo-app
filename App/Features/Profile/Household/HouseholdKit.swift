@@ -26,7 +26,11 @@ struct HouseholdContainer: View {
     var onTapOther: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: AppTheme.Spacing.s) {
+        // Top-aligned and hugging its own content rather than spread across
+        // the screen: the three things are one object — two people and the
+        // house they share — and a row that distributes them edge to edge
+        // reads as three separate columns that happen to be on the same line.
+        HStack(alignment: .top, spacing: AppTheme.Spacing.xs) {
             member(owner)
             connector
             house
@@ -43,12 +47,14 @@ struct HouseholdContainer: View {
                 name: member.name, email: nil, image: member.image, size: AppTheme.Size.avatar
             )
             Text(member.name)
-                .font(AppTheme.Typography.micro)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .font(AppTheme.Typography.captionEmphasis)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                // Capped rather than flexible, so a long name cannot push the
+                // house away from the people it belongs to.
+                .frame(maxWidth: AppTheme.Size.illustration)
         }
-        .frame(maxWidth: .infinity)
 
         if !member.isMe, let onTapOther {
             Button(action: onTapOther) { content }
@@ -62,22 +68,29 @@ struct HouseholdContainer: View {
 
     private var house: some View {
         VStack(spacing: AppTheme.Spacing.s) {
-            KeepoIcon(name: "icon-home-filled", size: AppTheme.Size.icon)
+            // The same diameter as the two faces beside it. The house is the
+            // third member of this row, not an ornament between two members.
+            KeepoIcon(name: "icon-home-filled", size: AppTheme.Size.avatar)
                 .foregroundStyle(PublicSchema.AccountScope.household.tint)
-                .frame(width: AppTheme.Size.avatar, height: AppTheme.Size.avatar)
 
             if let since {
                 Text(since)
                     .font(AppTheme.Typography.nano)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
+                    .lineLimit(1)
+                    // Never truncated: "Since S…" is not a date. The badge
+                    // takes whatever width its own text needs and the row
+                    // makes room, rather than the badge being squeezed to fit
+                    // a column it was never measured against.
+                    .fixedSize()
                     .padding(.horizontal, AppTheme.Spacing.s)
                     .padding(.vertical, AppTheme.Spacing.xxs)
-                    .background(Capsule().fill(AppTheme.Palette.fillSubtle))
-                    .lineLimit(1)
+                    .background(
+                        Capsule().fill(PublicSchema.AccountScope.household.tint)
+                    )
             } else {
-                // The badge's own height, held empty. Without it the house
-                // rides higher than the two names beside it and the row reads
-                // as three things at three heights rather than one object.
+                // The badge's own height, held empty, so the house sits at
+                // the same level whether or not there is a date to state.
                 Color.clear.frame(height: AppTheme.Spacing.l)
             }
         }
@@ -86,17 +99,20 @@ struct HouseholdContainer: View {
     /// Drawn rather than a `Divider`: a dotted line is the one shape that
     /// says "linked, but still two things", and it is the same stroke style
     /// the merge sheet uses between two categories for the same reason.
+    ///
+    /// A fixed short length, not a flexible one. Stretched to fill, it read
+    /// as two long leads with a house marooned in the middle; at this length
+    /// the three parts group.
     private var connector: some View {
         Line()
             .stroke(
-                AppTheme.Palette.fillStrong,
+                PublicSchema.AccountScope.household.tint.opacity(AppTheme.Opacity.fillStrong),
                 style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [2, 4])
             )
-            .frame(height: 1)
-            .frame(maxWidth: .infinity)
-            // Level with the middle of the avatars, not with the whole
-            // stack — the names underneath must not push it down.
-            .padding(.bottom, AppTheme.Size.avatar / 2)
+            .frame(width: AppTheme.Spacing.xl, height: 1)
+            // Level with the middle of the avatars, which the top alignment
+            // makes a fixed offset rather than something the labels can move.
+            .padding(.top, AppTheme.Size.avatar / 2)
     }
 }
 
@@ -302,14 +318,19 @@ struct HouseholdDisclosure<Content: View>: View {
 
 // MARK: - Navigation
 
-/// The bottom bar every screen in the setup flow and the report carries:
-/// Back on the left where there is somewhere to go back to, the one primary
-/// action on the right.
+/// The step's controls: Back on the left where there is somewhere to go back
+/// to, the one primary action on the right.
 ///
 /// Right-aligned rather than full-width, which is the spec's own call and the
 /// right one here: these screens are a sequence being stepped through, not a
 /// form being submitted, and a full-width button at the bottom of each one
 /// would read as nine separate commitments.
+///
+/// **It scrolls with the page.** Pinned to the bottom it covered the last row
+/// of every list it sat over — and on the report, a floating bar over a card
+/// read as chrome belonging to the app rather than to the step. Living at the
+/// end of the content also means reaching it *is* reaching the end, which is
+/// the right gate for a screen whose whole job is to be read.
 struct HouseholdFlowBar: View {
     var backTitle: String?
     var onBack: (() -> Void)?
@@ -357,8 +378,6 @@ struct HouseholdFlowBar: View {
             .disabled(!isEnabled || isBusy)
             .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: isBusy)
         }
-        .padding(.horizontal, AppTheme.Spacing.l)
-        .padding(.vertical, AppTheme.Spacing.m)
-        .background(.bar)
+        .padding(.top, AppTheme.Spacing.s)
     }
 }

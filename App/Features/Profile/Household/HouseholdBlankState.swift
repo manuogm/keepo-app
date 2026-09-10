@@ -30,17 +30,14 @@ struct HouseholdBlankState: View {
                     .background(tint.opacity(AppTheme.Opacity.fill), in: Circle())
 
                 Text("No household yet")
-                    .font(AppTheme.Typography.sectionTitle)
+                    .font(AppTheme.Typography.screenTitle)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
 
-                Text(
-                    "A household is two Keepo users seeing the same money. Share the accounts you "
-                        + "choose, keep the rest private, and build it together in one go."
-                )
-                .font(AppTheme.Typography.label)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+                Text("Two people, one view of the money you choose to share.")
+                    .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()
@@ -71,7 +68,7 @@ struct HouseholdBlankState: View {
                 }
                 .buttonStyle(.pressableCard)
 
-                Text("Both of you need to be together, with Keepo open.")
+                Text("You'll need to be together, with Keepo open on both phones.")
                     .font(AppTheme.Typography.micro)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
             }
@@ -92,34 +89,14 @@ struct HouseholdInfoPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
             Text("About your household")
-                .font(AppTheme.Typography.rowTitle)
+                .font(AppTheme.Typography.cardTitle)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
 
-            point(
-                "person.2.fill",
-                "Both of you own all of it. A shared account is 100% yours and 100% theirs — "
-                    + "Keepo never splits a balance between you."
-            )
-            point(
-                "coloncurrencysign.circle.fill",
-                "Every figure here is in **your** base currency. Theirs may differ, and the same "
-                    + "household will read differently on their phone."
-            )
-            point(
-                "arrow.triangle.2.circlepath",
-                "A shared account is visible and editable by both of you. You can share more at "
-                    + "any time; stop sharing one and it goes back to being yours alone, with its "
-                    + "whole history."
-            )
-            point(
-                "tag.fill",
-                "Tags follow their account. Share it and they come with it, unshare it and they go."
-            )
-            point(
-                "exclamationmark.triangle.fill",
-                "Leaving splits every shared account into two private copies — one each — and "
-                    + "breaks the link for good. It asks for Face ID first."
-            )
+            point("person.2.fill", "A shared account is 100% yours **and** 100% theirs. Never split.")
+            point("coloncurrencysign.circle.fill", "Figures are in **your** base currency. Theirs may differ.")
+            point("arrow.triangle.2.circlepath", "Stop sharing an account and it returns to you, history intact.")
+            point("tag.fill", "Tags follow their account, both ways.")
+            point("exclamationmark.triangle.fill", "Leaving splits every shared account in two. Face ID required.")
         }
         .padding(AppTheme.Spacing.l)
         .frame(maxWidth: AppTheme.Size.proseWidth)
@@ -163,14 +140,11 @@ struct HouseholdMemberSheet: View {
                         facts
                         DestructiveActionButton(title: "Remove from Household", action: onRemove)
                             .padding(.top, AppTheme.Spacing.s)
-                        Text(
-                            "This ends the household for both of you and splits every shared "
-                                + "account into two private copies."
-                        )
-                        .font(AppTheme.Typography.micro)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text("Ends the household for both of you. Each keeps a private copy.")
+                            .font(AppTheme.Typography.micro)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(AppTheme.Spacing.l)
                 }

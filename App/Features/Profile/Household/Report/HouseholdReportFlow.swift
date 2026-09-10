@@ -56,7 +56,6 @@ struct HouseholdReportFlow: View {
             }
             .ignoresSafeArea(edges: .top)
         }
-        .safeAreaInset(edge: .bottom) { flowBar }
         .task { await load() }
     }
 
@@ -87,9 +86,11 @@ struct HouseholdReportFlow: View {
                 if let errorMessage {
                     FormErrorText(message: errorMessage)
                 }
+
+                flowBar
             }
             .padding(.horizontal, AppTheme.Spacing.l)
-            .padding(.bottom, AppTheme.Spacing.xl)
+            .padding(.bottom, AppTheme.Spacing.l)
         }
         .scrollBounceBehavior(.basedOnSize)
         // A cross-fade keyed on the step, rather than a push: the banner and

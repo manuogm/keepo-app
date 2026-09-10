@@ -55,18 +55,17 @@ struct HouseholdSetupFlow: View {
     // MARK: - A. What is about to happen
 
     private var intro: some View {
-        HouseholdSetupIntro(role: role)
-            .navigationTitle(role == .owner ? "New Household" : "Join Household")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
-                        .accessibilityLabel("Close")
-                }
+        HouseholdSetupIntro(role: role) {
+            HouseholdFlowBar(nextTitle: "Next") { path.append(.accounts) }
+        }
+        .navigationTitle(role == .owner ? "New Household" : "Join Household")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button { dismiss() } label: { Image(systemName: "xmark") }
+                    .accessibilityLabel("Close")
             }
-            .safeAreaInset(edge: .bottom) {
-                HouseholdFlowBar(nextTitle: "Next") { path.append(.accounts) }
-            }
+        }
     }
 
     // MARK: - B. Which accounts
@@ -76,11 +75,10 @@ struct HouseholdSetupFlow: View {
             accounts: model.accounts,
             isLoaded: model.isLoaded,
             selection: Bindable(model).selectedAccountIds
-        )
-            .householdSetupChrome()
-            .safeAreaInset(edge: .bottom) {
-                HouseholdFlowBar(nextTitle: "Next") { path.append(.categories) }
-            }
+        ) {
+            HouseholdFlowBar(nextTitle: "Next") { path.append(.categories) }
+        }
+        .householdSetupChrome()
     }
 
     // MARK: - C. Which categories
@@ -90,11 +88,10 @@ struct HouseholdSetupFlow: View {
             categories: model.categories,
             isLoaded: model.isLoaded,
             selection: Bindable(model).selectedCategoryIds
-        )
-            .householdSetupChrome()
-            .safeAreaInset(edge: .bottom) {
-                HouseholdFlowBar(nextTitle: "Next") { path.append(.discovery) }
-            }
+        ) {
+            HouseholdFlowBar(nextTitle: "Next") { path.append(.discovery) }
+        }
+        .householdSetupChrome()
     }
 
     // MARK: - D/E. Finding the other phone, then building

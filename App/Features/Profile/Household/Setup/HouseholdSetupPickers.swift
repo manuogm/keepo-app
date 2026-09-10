@@ -9,41 +9,43 @@ import SwiftUI
 /// list. A group with nothing in it is not drawn at all — an empty
 /// "Investment" header on a screen full of switches reads as a group that
 /// failed to load.
-struct HouseholdAccountPicker: View {
+struct HouseholdAccountPicker<Footer: View>: View {
     let accounts: [LocalAccountRow]
     /// False until the read lands. "You have no accounts to share yet" is a
     /// claim about the user's data, and making it before looking is worse
     /// than showing nothing — the same rule `ScopeContext.isLoaded` exists for.
     let isLoaded: Bool
     @Binding var selection: Set<UUID>
+    @ViewBuilder var footer: Footer
 
     var body: some View {
         HouseholdPickerScaffold(
             title: "Which accounts?",
-            subtitle: "A shared account is visible and editable by both of you. Anything you leave "
-                + "out stays yours alone, and you can share more at any time.",
+            subtitle: "Both of you can see and edit a shared account. You can share more later.",
             isLoaded: isLoaded,
             isEmpty: accounts.isEmpty,
-            emptyMessage: "You have no accounts to share yet."
-        ) {
-            ForEach(HouseholdAccountGroup.allCases, id: \.self) { group in
-                let rows = accounts.filter { $0.kind == group.kind }
-                if !rows.isEmpty {
-                    HouseholdPickerSection(title: group.title) {
-                        ForEach(rows) { account in
-                            HouseholdAccountRow(
-                                name: account.name,
-                                icon: account.icon,
-                                color: Color(hex: account.color),
-                                isInvestment: account.kind == .investment
-                            ) {
-                                HouseholdPickerToggle(isOn: binding(for: account.id))
+            emptyMessage: "You have no accounts to share yet.",
+            footer: { footer },
+            content: {
+                    ForEach(HouseholdAccountGroup.allCases, id: \.self) { group in
+                    let rows = accounts.filter { $0.kind == group.kind }
+                    if !rows.isEmpty {
+                        HouseholdPickerSection(title: group.title) {
+                            ForEach(rows) { account in
+                                HouseholdAccountRow(
+                                    name: account.name,
+                                    icon: account.icon,
+                                    color: Color(hex: account.color),
+                                    isInvestment: account.kind == .investment
+                                ) {
+                                    HouseholdPickerToggle(isOn: binding(for: account.id))
+                                }
                             }
                         }
                     }
                 }
             }
-        }
+        )
     }
 
     private func binding(for id: UUID) -> Binding<Bool> {
@@ -65,37 +67,39 @@ enum HouseholdAccountGroup: CaseIterable {
 }
 
 /// Which of your categories join the household, split by kind.
-struct HouseholdCategoryPicker: View {
+struct HouseholdCategoryPicker<Footer: View>: View {
     let categories: [PublicSchema.CategoriesSelect]
     let isLoaded: Bool
     @Binding var selection: Set<UUID>
+    @ViewBuilder var footer: Footer
 
     var body: some View {
         HouseholdPickerScaffold(
             title: "Which categories?",
-            subtitle: "A shared category is one category on both phones — rename it and it renames "
-                + "for them too. Where you both already have the same thing, Keepo merges them.",
+            subtitle: "One category on both phones. Keepo merges the ones you both already have.",
             isLoaded: isLoaded,
             isEmpty: categories.isEmpty,
-            emptyMessage: "You have no categories to share yet."
-        ) {
-            ForEach([PublicSchema.CategoryKind.expense, .income], id: \.self) { kind in
-                let rows = categories.filter { $0.kind == kind }
-                if !rows.isEmpty {
-                    HouseholdPickerSection(title: kind == .expense ? "Expenses" : "Income") {
-                        ForEach(rows, id: \.id) { category in
-                            HouseholdCategoryRow(
-                                name: category.name,
-                                icon: category.icon,
-                                color: Color(hex: category.color)
-                            ) {
-                                HouseholdPickerToggle(isOn: binding(for: category.id))
+            emptyMessage: "You have no categories to share yet.",
+            footer: { footer },
+            content: {
+                    ForEach([PublicSchema.CategoryKind.expense, .income], id: \.self) { kind in
+                    let rows = categories.filter { $0.kind == kind }
+                    if !rows.isEmpty {
+                        HouseholdPickerSection(title: kind == .expense ? "Expenses" : "Income") {
+                            ForEach(rows, id: \.id) { category in
+                                HouseholdCategoryRow(
+                                    name: category.name,
+                                    icon: category.icon,
+                                    color: Color(hex: category.color)
+                                ) {
+                                    HouseholdPickerToggle(isOn: binding(for: category.id))
+                                }
                             }
                         }
                     }
                 }
             }
-        }
+        )
     }
 
     private func binding(for id: UUID) -> Binding<Bool> {
@@ -112,23 +116,28 @@ struct HouseholdCategoryPicker: View {
 
 /// The page both pickers are: a question, a sentence explaining the
 /// consequence, and grouped cards of switches.
-private struct HouseholdPickerScaffold<Content: View>: View {
+private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
     let title: String
     let subtitle: String
     let isLoaded: Bool
     let isEmpty: Bool
     let emptyMessage: String
+    /// The step's action, rendered as the last thing in the scroll rather
+    /// than pinned over it — a list of switches with a button floating on top
+    /// hides whichever row is underneath it, and the row it hides is always
+    /// the last one.
+    @ViewBuilder var footer: Footer
     @ViewBuilder var content: Content
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                     Text(title)
-                        .font(AppTheme.Typography.sectionTitle)
+                        .font(AppTheme.Typography.screenTitle)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                     Text(subtitle)
-                        .font(AppTheme.Typography.caption)
+                        .font(AppTheme.Typography.body)
                         .foregroundStyle(AppTheme.Palette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -146,10 +155,12 @@ private struct HouseholdPickerScaffold<Content: View>: View {
                 } else {
                     content
                 }
+
+                footer
             }
             .padding(.horizontal, AppTheme.Spacing.l)
             .padding(.top, AppTheme.Spacing.s)
-            .padding(.bottom, AppTheme.Spacing.xl)
+            .padding(.bottom, AppTheme.Spacing.l)
         }
         .background(AppTheme.Palette.bgCanvas)
         .scrollBounceBehavior(.basedOnSize)

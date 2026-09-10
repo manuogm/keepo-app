@@ -19,7 +19,7 @@ struct HouseholdReportOverview: View {
     private var netWorthCard: some View {
         HouseholdCard(
             title: "Household net worth",
-            subtitle: "Everything the two of you share, in your base currency."
+            subtitle: "In your base currency."
         ) {
             // `BalanceHeaderView` rather than a formatted string: it is where
             // the currency-symbol-first layout, the smaller fraction digits
@@ -37,8 +37,7 @@ struct HouseholdReportOverview: View {
     @ViewBuilder
     private var currencyCard: some View {
         HouseholdCard(
-            title: "Currencies",
-            subtitle: "What the household's money is actually held in."
+            title: "Currencies"
         ) {
             if let slices = snapshot.currencySlices, !slices.isEmpty {
                 VStack(spacing: AppTheme.Spacing.m) {

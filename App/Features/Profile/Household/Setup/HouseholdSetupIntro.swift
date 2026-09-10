@@ -1,18 +1,21 @@
 import KeepoCore
 import SwiftUI
 
-/// The first screen of the flow: what a household is, and what is about to
-/// happen, before anything happens.
+/// The first screen of the flow: what is about to happen, before it happens.
 ///
 /// Four illustrated lines rather than a paragraph. The information is not
-/// optional — "the person you share with can edit your transactions" is
-/// something a user must know before they agree to it, not after — but a
-/// wall of text at the start of a flow is read by nobody, which makes it
-/// worse than useless: it discharges the obligation to explain without
-/// actually explaining. A glyph, four words of heading and one sentence
-/// each is the most that gets read.
-struct HouseholdSetupIntro: View {
+/// optional — "the other person can edit your transactions" is something a
+/// user must know *before* agreeing to it — but a wall of text at the start
+/// of a flow is read by nobody, which makes it worse than useless: it
+/// discharges the obligation to explain without explaining. A glyph, two or
+/// three words of heading and **one line** each is the most that gets read.
+///
+/// The action lives at the end of the scroll, not pinned over it: this page
+/// is something to read to the bottom, and a button floating above unread
+/// text invites skipping the one screen that exists to be understood.
+struct HouseholdSetupIntro<Footer: View>: View {
     let role: HouseholdPairingIdentity.Role
+    @ViewBuilder var footer: Footer
 
     private var tint: Color { PublicSchema.AccountScope.household.tint }
 
@@ -26,10 +29,11 @@ struct HouseholdSetupIntro: View {
                     }
                 }
                 footnote
+                footer
             }
             .padding(.horizontal, AppTheme.Spacing.l)
             .padding(.top, AppTheme.Spacing.s)
-            .padding(.bottom, AppTheme.Spacing.xxl)
+            .padding(.bottom, AppTheme.Spacing.l)
         }
         .background(AppTheme.Palette.bgCanvas)
         .scrollBounceBehavior(.basedOnSize)
@@ -42,36 +46,29 @@ struct HouseholdSetupIntro: View {
                 .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
                 .background(tint.opacity(AppTheme.Opacity.fill), in: Circle())
 
-            Text(role == .owner ? "You're about to create a household" : "You're about to join a household")
-                .font(AppTheme.Typography.sectionTitle)
+            Text(role == .owner ? "Create a household" : "Join a household")
+                .font(AppTheme.Typography.screenTitle)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text(
-                role == .owner
-                    ? "A household is two Keepo users seeing the same money. You choose exactly what goes in."
-                    : "A household is two Keepo users seeing the same money. You choose exactly what you bring to it."
-            )
-            .font(AppTheme.Typography.body)
-            .foregroundStyle(AppTheme.Palette.textSecondary)
-            .fixedSize(horizontal: false, vertical: true)
+            Text("Two people, one view of the money you choose to share.")
+                .font(AppTheme.Typography.body)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, AppTheme.Spacing.m)
     }
 
-    /// The one thing that is genuinely a caveat rather than a step, kept
-    /// apart from the four so it is not read as one of them.
+    /// The one caveat, kept apart from the four steps so it is not read as
+    /// another thing to do.
     private var footnote: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.s) {
             KeepoIcon(name: "icon-info", size: AppTheme.Size.glyphSmall)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
-            Text(
-                "Nothing is permanent. Either of you can leave, and leaving splits every shared account "
-                    + "back into private copies — you each keep everything."
-            )
-            .font(AppTheme.Typography.caption)
-            .foregroundStyle(AppTheme.Palette.textSecondary)
-            .fixedSize(horizontal: false, vertical: true)
+            Text("Either of you can leave. Shared accounts split back into private copies — you each keep everything.")
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(AppTheme.Spacing.m)
         .background(AppTheme.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
@@ -81,33 +78,23 @@ struct HouseholdSetupIntro: View {
         [
             .init(
                 icon: "icon-account",
-                title: "Choose your accounts",
-                detail: role == .owner
-                    ? "Pick which of your accounts join the household. A shared account is visible "
-                        + "and editable by both of you — balances, transactions, everything on it."
-                    : "Pick which of your accounts you bring. A shared account is visible and "
-                        + "editable by both of you — balances, transactions, everything on it."
+                title: "Your accounts",
+                detail: "Pick which ones join. Both of you can see and edit a shared account."
             ),
             .init(
                 icon: "icon-tag",
-                title: "Choose your categories",
-                detail: "A shared category is one category on both phones: rename it and it renames "
-                    + "for them too. It shares the label, never your spending."
+                title: "Your categories",
+                detail: "One category on both phones. It shares the label, never your spending."
             ),
             .init(
                 icon: "icon-tag-filled",
-                title: "Tags come along",
-                detail: "Every tag on a shared account is shared automatically, and stops being "
-                    + "shared the moment that account does."
+                title: "Tags follow accounts",
+                detail: "Every tag on a shared account comes along, and leaves when it does."
             ),
             .init(
                 icon: "icon-tap",
-                title: "Stand next to them",
-                detail: role == .owner
-                    ? "The person joining needs to be beside you with Keepo open. The two phones "
-                        + "find each other directly."
-                    : "The person who owns the household needs to be beside you with Keepo open. "
-                        + "The two phones find each other directly."
+                title: "Stay close",
+                detail: "The other phone has to be beside you, with Keepo open."
             )
         ]
     }
