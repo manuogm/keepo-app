@@ -159,7 +159,14 @@ select is(
   'the recurring rule was duplicated onto B''s new copy'
 );
 
--- 12. B is no longer a household member; A still is (single-member household).
+-- 12. Leaving DISSOLVES the household — neither member is left in one.
+--
+-- This assertion used to read "A remains a household member (single-member
+-- household)", which was the behaviour until 20260915100000. Two real phones
+-- showed why it was wrong: the member who stayed was told nothing and their
+-- Household screen went on showing a partner who had gone. A household is two
+-- people, so one leaving ends it — and the fork above has already given each
+-- side an independent private copy, so nothing is lost either way.
 select is(
   (select count(*) from household_members where user_id = auth.uid()),
   0::bigint,
@@ -172,9 +179,9 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
 select is(
-  (select count(*) from household_members where user_id = auth.uid()),
-  1::bigint,
-  'A remains a household member (single-member household) after B leaves'
+  (select count(*) from household_members where user_id = auth.uid() and deleted_at is null),
+  0::bigint,
+  'A''s membership is retired too — leaving dissolves the household for both'
 );
 
 -- 13/14. A also has her own untouched original transaction/recurring rule
@@ -206,17 +213,29 @@ select is(
   'the original account is fully unshared after the fork'
 );
 
--- 16. household_events carries the member_left event, visible to A.
+-- 16. The member_left event is still recorded — but the remaining member can
+-- no longer read it, because dissolving retired their membership too and
+-- `household_events`' policy is scoped to membership.
+--
+-- That is why the client does **not** learn about a dissolution from this
+-- table: `HouseholdView` notices that a household it was holding has gone
+-- from its own local mirror, which needs no read access at all.
 select is(
   (select count(*) from household_events where kind = 'member_left'),
-  1::bigint,
-  'a member_left event was recorded and is visible to the remaining member'
+  0::bigint,
+  'the event exists but is invisible once membership is retired — the client cannot rely on it'
 );
 
 -- ----------------------------------------------------------------------------
 -- erase_own_account: a fresh household + share + erase, scrubbing the
 -- caller's own resulting copy without touching the other member's.
+--
+-- A genuinely fresh household now, not the leftovers of the last one: since
+-- 20260915100000 B's departure dissolved it for both, so A has to create one
+-- again before there is anything to share into.
 -- ----------------------------------------------------------------------------
+
+select create_household();
 
 insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
 values ('a4000000-0000-0000-0000-00000000a002', auth.uid(), auth.uid(), 'regular', 'Erase Shared', 'EUR', 1000000);

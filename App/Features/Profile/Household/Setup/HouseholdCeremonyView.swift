@@ -120,6 +120,17 @@ struct HouseholdCeremonyView: View {
                     .font(AppTheme.Typography.sectionTitle)
                     .foregroundStyle(AppTheme.Palette.textOnAccent)
 
+                // How far along, as a number. The filling house says
+                // "something is happening"; this says how much is left, which
+                // is the question anybody watching a progress animation is
+                // actually asking. It holds at 90% while the owner reviews the
+                // report — the same truth the house's own fill tells.
+                Text(fill.formatted(.percent.precision(.fractionLength(0))))
+                    .font(AppTheme.Typography.Number.inline)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
+                    .contentTransition(.numericText())
+                    .animation(AppTheme.Motion.colorSafe, value: fill)
+
                 Text(caption)
                     .font(AppTheme.Typography.label)
                     .foregroundStyle(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.muted))

@@ -28,6 +28,17 @@ enum AppSettingsKeys {
     /// widget renders from the synced local mirror. Promoting it to a synced
     /// table later means changing `DashboardStore` and nothing above it.
     static let dashboardArrangement = "dashboardArrangement"
+    /// The household this device last saw itself in.
+    ///
+    /// Device-local on purpose, and it is how the **remaining** member learns
+    /// the household was dissolved. Since 20260915100000 one member leaving
+    /// ends the household for both — and the one who stayed cannot be told by
+    /// `household_events`, because dissolving retires their membership and
+    /// that table's policy is scoped to membership (pinned by
+    /// `18_household_lifecycle.sql`'s own assertion). So the signal is the
+    /// absence itself: a household this device was holding is gone from the
+    /// mirror after a pull. Nothing to read, nothing to grant.
+    static let lastKnownHouseholdId = "lastKnownHouseholdId"
 }
 
 enum AppearanceMode: String, CaseIterable, Hashable {

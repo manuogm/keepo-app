@@ -241,3 +241,71 @@ enum HouseholdPeerAvatar {
         return UIImage(data: data)
     }
 }
+
+/// What the member who *stayed* sees when the other one leaves.
+///
+/// Since 20260915100000 a departure dissolves the household for both — a
+/// household is two people, and one walking out ends it rather than leaving
+/// the other in a household of one. On two real phones the old behaviour read
+/// as a bug: the person who stayed was told nothing at all, and their
+/// Household screen went on showing a partner who had gone.
+///
+/// It leads with what happened and follows with what it cost them, in that
+/// order, because the second is the part they are actually worried about and
+/// the answer is "nothing". `interactiveDismissDisabled` at the call site:
+/// this is the one place in the feature the app has news the user did not ask
+/// for, and swiping it away by accident means never seeing it.
+struct HouseholdDissolvedSheet: View {
+    /// Their name if this device still had it, otherwise a neutral stand-in —
+    /// by the time this shows, the member row is gone.
+    let partner: String
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var tint: Color { PublicSchema.AccountScope.household.tint }
+
+    var body: some View {
+        VStack(spacing: AppTheme.Spacing.xl) {
+            Spacer()
+
+            VStack(spacing: AppTheme.Spacing.m) {
+                KeepoIcon(name: "icon-home", size: AppTheme.Size.icon)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
+                    .background(AppTheme.Palette.fillSubtle, in: Circle())
+
+                Text("\(partner.isEmpty ? "Your partner" : partner) left")
+                    .font(AppTheme.Typography.sectionTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text(
+                    "Your household has been dissolved. Every shared account is now a private copy "
+                        + "of your own — nothing was lost."
+                )
+                    .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            Button {
+                dismiss()
+            } label: {
+                Text("Got it")
+                    .font(AppTheme.Typography.bodyEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppTheme.Spacing.m)
+                    .background(tint, in: Capsule())
+            }
+            .buttonStyle(.pressableCard)
+        }
+        .padding(.horizontal, AppTheme.Spacing.xxl)
+        .padding(.vertical, AppTheme.Spacing.xxl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.Palette.bgCanvas)
+    }
+}

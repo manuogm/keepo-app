@@ -33,6 +33,8 @@ struct HouseholdView: View {
     /// does not make.
     @State private var isRemoving = false
     @State private var isLeaving = false
+    @State private var isShowingDissolved = false
+    @AppStorage(AppSettingsKeys.lastKnownHouseholdId) private var lastKnownHouseholdId = ""
     @State private var errorMessage: String?
 
     var body: some View {
@@ -85,6 +87,11 @@ struct HouseholdView: View {
             HouseholdInfoSheet()
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingDissolved) {
+            HouseholdDissolvedSheet(partner: dissolvedPartnerName)
+                .presentationDetents([.medium])
+                .interactiveDismissDisabled()
         }
         .task(id: session.refresh.token) { await load() }
         // `item:` rather than two booleans: Create and Join are the same
@@ -192,9 +199,14 @@ struct HouseholdView: View {
 
     // MARK: - Data
 
+    /// Kept across the dissolution so the notice can name who left — by the
+    /// time it shows, the household and its member row are both gone.
+    @State private var dissolvedPartnerName = ""
+
     private func load() async {
         errorMessage = nil
         snapshot = await HouseholdDataLoader.load(session: session)
+        noticeDissolutionIfNeeded()
         await avatars.load(path: session.profile?.avatarPath, client: session)
         // The other member's face, now that a household exists and
         // `avatars_select` admits it. Its own store, because `AvatarStore`
@@ -206,9 +218,29 @@ struct HouseholdView: View {
         isLoading = false
     }
 
+    /// The household is gone from the mirror but this device was holding one:
+    /// the other member left, and leaving now ends it for both.
+    ///
+    /// Not shown to whoever pressed Leave — `leave()` clears the marker before
+    /// reloading, so `previous` is already empty by the time this runs. They
+    /// know; they did it.
+    private func noticeDissolutionIfNeeded() {
+        let previous = lastKnownHouseholdId
+        if let current = snapshot.household?.id.uuidString {
+            lastKnownHouseholdId = current
+            dissolvedPartnerName = peerName
+        } else if !previous.isEmpty {
+            lastKnownHouseholdId = ""
+            isShowingDissolved = true
+        }
+    }
+
     private func leave() async {
         isLeaving = true
         errorMessage = nil
+        // Cleared up front: this device is about to lose its household on
+        // purpose, and the notice is for the member who did not choose it.
+        lastKnownHouseholdId = ""
         do {
             try await session.stepUp(reason: "Confirm it's you to leave this household")
             try await HouseholdRepository.leave(client: session.client)

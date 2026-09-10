@@ -54,7 +54,6 @@ struct HouseholdReportFlow: View {
                     body(for: step)
                 }
             }
-            .ignoresSafeArea(edges: .top)
         }
         .task { await load() }
     }
@@ -155,8 +154,6 @@ struct HouseholdReportBanner: View {
     let step: Int
     let total: Int
 
-    @Environment(\.topSafeAreaInset) private var topSafeAreaInset
-
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
             HStack(spacing: AppTheme.Spacing.s) {
@@ -186,19 +183,27 @@ struct HouseholdReportBanner: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppTheme.Spacing.l)
+        .padding(.top, AppTheme.Spacing.m)
         .padding(.bottom, AppTheme.Spacing.l)
-        // The card paints up behind the status bar so the header has no hard
-        // colour edge at the top of the screen, exactly as the scope banner
-        // does — see `ScopeBannerView`'s own note on why the inset has to
-        // come from the environment rather than from local geometry.
-        .padding(.top, topSafeAreaInset + AppTheme.Spacing.m)
-        .background(PublicSchema.AccountScope.household.tint)
-        .clipShape(
+        // **Content inside the safe area, colour outside it.** The first cut
+        // padded the content down by `\.topSafeAreaInset` and let the whole
+        // card ignore the safe area — but that environment value is published
+        // by the app shell, and the report is a `fullScreenCover` presented
+        // from the ceremony, which never inherits it. It read as 0, so the
+        // title rode up level with the Dynamic Island.
+        //
+        // Letting the *background* ignore the safe area is the version that
+        // needs no ambient value: the header sits at the same height as every
+        // other screen's, and the colour still runs up behind the status bar
+        // so there is no hard edge at the top.
+        .background {
             UnevenRoundedRectangle(
                 bottomLeadingRadius: AppTheme.Radius.surface,
                 bottomTrailingRadius: AppTheme.Radius.surface
             )
-        )
+            .fill(PublicSchema.AccountScope.household.tint)
+            .ignoresSafeArea(edges: .top)
+        }
         .elevation(.resting)
     }
 }

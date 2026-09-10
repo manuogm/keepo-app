@@ -11,13 +11,11 @@ import SwiftUI
 /// Profile → Preferences. A category stopped being a thing you configure
 /// once at signup the moment tags started hanging off it.
 ///
-/// It wears the same `ScopeBannerView` as the three money screens even
-/// though a category is not scoped money — `categories_select` is
-/// `owner_id = auth.uid()` with no household clause, so the swipe changes
-/// the app-wide scope the other tabs honour rather than filtering this
-/// grid. Kept for the avatar (the only route into Profile) and for one
-/// header language across every tab; it stops being inert here the moment
-/// household category sharing lands.
+/// It wears the same `ScopeBannerView` as the three money screens, and since
+/// household category sharing landed the swipe **filters this grid too**:
+/// Household shows the categories you share, Private the ones you do not.
+/// The banner was inert here until then, which is what the previous version
+/// of this comment described.
 struct CategoriesView: View {
     let session: SessionStore
 
@@ -49,7 +47,23 @@ struct CategoriesView: View {
     }
 
     private var visibleCategories: [PublicSchema.CategoriesSelect] {
-        selectedTab == .expense ? expenseCategories : incomeCategories
+        (selectedTab == .expense ? expenseCategories : incomeCategories).filter(isInScope)
+    }
+
+    /// The same question the money screens ask, now that a category can
+    /// genuinely be shared: a shared category is one with a `shared_group_id`,
+    /// exactly as a shared account is one with a `household_accounts` row.
+    ///
+    /// This screen's header comment used to say the swipe was inert here and
+    /// would stop being so "the moment household category sharing lands". It
+    /// landed; switching scope with the grid unchanged read as the filter
+    /// being broken.
+    private func isInScope(_ category: PublicSchema.CategoriesSelect) -> Bool {
+        switch session.scope {
+        case .total: return true
+        case .me: return category.sharedGroupId == nil
+        case .household: return category.sharedGroupId != nil
+        }
     }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.m), count: 3)

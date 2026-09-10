@@ -23,7 +23,7 @@
 
 begin;
 
-select plan(25);
+select plan(26);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -259,21 +259,47 @@ select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111
 
 select leave_household();
 
--- 15. Leaving bumps the LEAVER's own epoch (not the other member's).
+-- 15. Leaving bumps BOTH members' epochs.
+--
+-- It used to bump only the leaver's, which was right while the other member
+-- stayed behind in a single-member household. Since 20260915100000 leaving
+-- **dissolves** the household, so the domain changes under both of them — and
+-- the member who stayed needs the bump most: without it their device never
+-- re-pulls, and their Household screen goes on rendering a household that no
+-- longer exists.
 select is(
   (select sync_epoch from profiles where id = '11111111-1111-1111-1111-111111111111'),
   2::bigint,
   'leave_household bumps the leaving member''s own sync_epoch (domain change)'
 );
 
--- 16. A former member can rejoin the SAME household without the 2-member
--- cap or the household_members PK blocking it — enforce_household_member_
--- cap must ignore a tombstoned row, and accept_invite must reactivate one
--- rather than colliding on it.
+-- As superuser: `profiles_select` is `id = auth.uid()`, so A cannot read B's
+-- row and the assertion would compare against NULL rather than fail honestly.
+reset role;
+
+select is(
+  (select sync_epoch > 1 from profiles where id = '22222222-2222-2222-2222-222222222222'),
+  true,
+  'and the remaining member''s, so their device discovers the household is gone'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+-- 16. A former member can rejoin a household without the 2-member cap or the
+-- household_members PK blocking it — enforce_household_member_cap must ignore
+-- a tombstoned row, and accept_invite must reactivate one rather than
+-- colliding on it.
+--
+-- B creates the household afresh here: since 20260915100000 A's departure
+-- dissolved the one they shared, so there is no longer a household sitting
+-- there for B to invite into.
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+
+select create_household();
 
 create temp table rejoin_token as select create_invite() as token;
 

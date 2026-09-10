@@ -33,11 +33,16 @@ import SwiftUI
 @Observable
 @MainActor
 final class HouseholdSetupCoordinator {
-    /// The shortest a step may be on screen. Ten of these is the ~6 seconds
-    /// the ceremony takes when the network is instant, which is the pace the
-    /// choreography was designed at. A slow network stretches steps; nothing
-    /// shortens them.
-    private static let phaseFloor: Duration = .milliseconds(560)
+    /// The shortest a step may be on screen.
+    ///
+    /// Was 560ms, which two people watching on real phones found too quick to
+    /// read — the step names went by faster than they could be taken in, and
+    /// the ceremony's whole point is that both of you can follow what is
+    /// happening. At 1.1s the ten steps take about eleven seconds, which is
+    /// long enough to read each line and still short enough to feel like an
+    /// event rather than a wait. A slow network stretches a step; nothing
+    /// shortens one.
+    private static let phaseFloor: Duration = .milliseconds(1100)
 
     enum Outcome: Equatable {
         case running
