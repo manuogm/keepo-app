@@ -47,10 +47,20 @@ struct ProfileMetricCard<Content: View>: View {
                 }
             }
 
+            // Centred in whatever height is left under the title, not
+            // pinned to the top of it. The two cards are the same height and
+            // their titles are the same height, so the leftover rectangle is
+            // identical in both — which makes "centred in it" the one rule
+            // that puts a one-line currency badge and a two-line date on the
+            // same axis, without either card knowing what the other holds.
             content
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // Both axes, so a pair of these side by side is one pair of
+        // identical rectangles whatever they contain: the width was always
+        // shared, and the height now is too — the card takes all it is
+        // offered and its caller decides how much that is.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(AppTheme.Spacing.m)
         .background(
             AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card)
@@ -58,44 +68,60 @@ struct ProfileMetricCard<Content: View>: View {
     }
 }
 
-/// The base-currency picker, as a sheet rather than the inline `Picker` row
-/// it replaces.
+/// The base-currency picker: one spinning wheel, dead centre of a half
+/// sheet, and nothing else on it.
 ///
-/// A `Picker` in a `List` renders its options as a pushed screen of plain
-/// three-letter codes — no flags, no names — which is a worse list than the
-/// app already draws for currencies everywhere else. This is the same
-/// `CurrencyBadge` row the account form's own picker uses.
+/// It was a scrolling `List` of tappable rows, which is the wrong shape for
+/// this. Picking a base currency is choosing one value out of a fixed set —
+/// the same job iOS gives a wheel everywhere it appears — and a list of
+/// thirty near-identical rows makes the reader hunt through them, while a
+/// wheel puts the current one under the finger and spins the rest past it.
+/// The rows are still `CurrencyBadge`, so this is the same flag-and-code the
+/// account form and Currency Exposure draw — with the code set in `body`
+/// rather than the badge's usual disc-derived size, which at wheel scale is
+/// too small to read across the room. It has to be asked for separately: a
+/// `UIPickerView` row is a fixed ~30pt whatever it is handed, so growing the
+/// disc to carry bigger letters only made neighbouring flags overlap.
+///
+/// The wheel writes to a **draft**, not straight through to the profile. A
+/// wheel emits a selection for every currency it passes on the way to the
+/// one you wanted, and each of those would have been a `PATCH`, a profile
+/// refresh, and a full app-wide re-read. "Done" is what commits.
 struct BaseCurrencySheet: View {
     let currencies: [PublicSchema.CurrenciesSelect]
     @Binding var selection: String
 
     @Environment(\.dismiss) private var dismiss
+    @State private var draft = ""
+
+    /// The wheel's own fixed 216pt, plus the inline title bar above it and a
+    /// little air either side. Written out rather than taken from
+    /// `AppTheme`: its scales size glyphs, gaps and corners, and a sheet
+    /// detent is none of those — inventing a token for one screen's height
+    /// would put a number on the scale that nothing else could ever reach
+    /// for.
+    private static let sheetHeight: CGFloat = 320
 
     var body: some View {
         NavigationStack {
             ZStack {
                 AppTheme.Palette.bgCanvas.ignoresSafeArea()
-                List {
-                    ForEach(currencies, id: \.code) { currency in
-                        Button {
-                            selection = currency.code
-                            dismiss()
-                        } label: {
-                            HStack(spacing: AppTheme.Spacing.m) {
-                                CurrencyBadge(code: currency.code, diameter: AppTheme.Size.glyph)
-                                Spacer()
-                                if currency.code == selection {
-                                    Image(systemName: "checkmark")
-                                        .font(AppTheme.Typography.labelEmphasis)
-                                        .foregroundStyle(AppTheme.Palette.brandPrimary)
-                                }
-                            }
-                            .contentShape(Rectangle())
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    Picker("Base Currency", selection: $draft) {
+                        ForEach(currencies, id: \.code) { currency in
+                            CurrencyBadge(
+                                code: currency.code,
+                                diameter: AppTheme.Size.glyph,
+                                codeFont: AppTheme.Typography.bodyEmphasis
+                            )
+                            .tag(currency.code)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .pickerStyle(.wheel)
+                    .labelsHidden()
+                    Spacer(minLength: 0)
                 }
-                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Base Currency")
             .navigationBarTitleDisplayMode(.inline)
@@ -104,7 +130,34 @@ struct BaseCurrencySheet: View {
                     Button { dismiss() } label: { Image(systemName: "xmark") }
                         .accessibilityLabel("Close")
                 }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        selection = draft
+                        dismiss()
+                    } label: {
+                        Image(systemName: "checkmark")
+                    }
+                    .accessibilityLabel("Set base currency")
+                    .disabled(draft.isEmpty)
+                }
+            }
+            // A profile with no base currency yet has nothing for the wheel
+            // to land on, and an unmatched selection leaves it parked on the
+            // first row while the binding still says "". Seeding from that
+            // first row makes what the wheel shows and what "Done" would
+            // write the same thing.
+            .onAppear {
+                draft = selection.isEmpty ? (currencies.first?.code ?? "") : selection
             }
         }
+        // Sized to its contents rather than to `.medium`, which the rest of
+        // the app's pick-one-value sheets use. Those hold a list that grows
+        // into whatever height it is given; this holds a wheel, and a wheel
+        // is a fixed 216pt however much room it has — at half a screen it
+        // floated in an empty field, and the rows cannot be made taller to
+        // fill one (`UIPickerView` sets its own row height, and SwiftUI
+        // exposes no way in).
+        .presentationDetents([.height(Self.sheetHeight)])
+        .presentationDragIndicator(.visible)
     }
 }

@@ -185,12 +185,20 @@ extension AccountFormView {
     /// Permanent. The DB refuses (raises, never a silent conflict) while the
     /// account still has transactions, which is exactly why the confirmation
     /// offers archiving alongside it.
+    ///
+    /// Never cascades, deliberately. This is the form for an account that is
+    /// still in use, and the dialog it comes from already offers the right
+    /// answer for one with history — archive it. Taking a live account's
+    /// whole ledger with it is offered in exactly one place, on Archived,
+    /// where the user has already parked the account and come back for it.
     func deletePermanently() async {
         guard let id = editingId, let expectedVersion = editingVersion else { return }
         isSaving = true
         errorMessage = nil
         do {
-            _ = try await AccountRepository.delete(client: session.client, id: id, expectedVersion: expectedVersion)
+            _ = try await AccountRepository.delete(
+                client: session.client, id: id, expectedVersion: expectedVersion, cascade: false
+            )
             onSaved()
             dismissSelf()
         } catch {

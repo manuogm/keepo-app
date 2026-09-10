@@ -29,13 +29,22 @@ struct CurrencyBadge: View {
     /// `nil` everywhere else — a row in Currency Exposure has no snapshot to
     /// disagree with and should hug its own code.
     var codeWidth: CGFloat?
+    /// Overrides the code's size, which is otherwise derived from `diameter`.
+    ///
+    /// Only `BaseCurrencySheet`'s wheel passes one. Everywhere else the badge
+    /// grows as one thing and tying the letters to the disc is exactly right;
+    /// a `UIPickerView` row, though, is a fixed height SwiftUI does not
+    /// expose, so a disc large enough to carry big letters collides with the
+    /// flags above and below it. There the two have to be asked for
+    /// separately.
+    var codeFont: Font?
 
     var body: some View {
         HStack(spacing: AppTheme.Spacing.xs) {
             disc
             if showsCode {
                 Text(label ?? code ?? "—")
-                    .font(.system(size: diameter * 0.55, weight: .semibold))
+                    .font(codeFont ?? .system(size: diameter * 0.55, weight: .semibold))
                     .foregroundStyle(AppTheme.Palette.textPrimary)
                     .lineLimit(1)
                     // A currency code is three letters and must never be

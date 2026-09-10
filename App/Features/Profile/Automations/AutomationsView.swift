@@ -8,25 +8,26 @@ struct AutomationsView: View {
         ZStack {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
             List {
+                // One section, not two. They were split only so each could
+                // carry its own explanatory footer; with the footers gone
+                // the split was two rows pretending to be two topics.
                 Section {
-                    NavigationLink("Recurring Transactions") {
+                    NavigationLink {
                         RecurringRulesView(session: session)
+                    } label: {
+                        ProfileRowLabel(icon: "icon-recurrent", title: "Recurring Transactions")
                     }
-                } footer: {
-                    Text("Rent, subscriptions, salary — anything on a schedule logs itself automatically.")
-                }
 
-                Section {
-                    NavigationLink("Set Up Apple Pay Capture") {
+                    NavigationLink {
                         WalletAutomationGuideView()
+                    } label: {
+                        ProfileRowLabel(icon: "icon-tap", title: "Set Up Apple Pay Capture")
                     }
-                } footer: {
-                    Text("Log Apple Pay purchases automatically via a Shortcuts automation on the Wallet trigger.")
                 }
             }
             .scrollContentBackground(.hidden)
         }
-        .navigationTitle("Automations")
+        .navigationTitle("My Automations")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

@@ -216,6 +216,7 @@
 		D3C3397C6D4C7D777497E060 /* ProfileAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 756BC1493636418DB21F41D6 /* ProfileAvatarView.swift */; };
 		D4AA2BDD4ED0AE7893ED8527 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1506F139C92C88A14BDEE6BE /* MainTabView.swift */; };
 		D530555F72E1DD35B8DDD5CF /* CurrencyBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3B46B7F5593307A881BC90 /* CurrencyBadge.swift */; };
+		D64124F33CB34BB851120789 /* ProfileRowLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF6E55983303FD58CA0B30 /* ProfileRowLabel.swift */; };
 		D65A1019026AF89426A721E3 /* TransactionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59AA89C7BCC52496BCAC8B27 /* TransactionsListView.swift */; };
 		D6B7A4A8322A6A3BA1524FA4 /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A90C1F178F118C5A076397 /* RefreshCoordinator.swift */; };
 		D73E9DD2D1217DBB27F8C072 /* DashboardExpansionScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ABD39DFAF1B6C4FA58FC42B /* DashboardExpansionScroll.swift */; };
@@ -377,6 +378,7 @@
 		4DD4484E755728FA2992E894 /* LocalTransactionRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTransactionRowTests.swift; sourceTree = "<group>"; };
 		4DE810306ADAEBB96D57A745 /* OutboxLocalWrite+Cards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OutboxLocalWrite+Cards.swift"; sourceTree = "<group>"; };
 		4EE2A359806A42C23450BD63 /* FxRateWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FxRateWidget.swift; sourceTree = "<group>"; };
+		50EF6E55983303FD58CA0B30 /* ProfileRowLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRowLabel.swift; sourceTree = "<group>"; };
 		5128E2B3C07029D4C8598446 /* CaptureNotify.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotify.swift; sourceTree = "<group>"; };
 		5217828C1806CB6DD7973DB8 /* RemoveBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoveBadge.swift; sourceTree = "<group>"; };
 		545F067E19458ED8951075E0 /* OutboxPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxPayloads.swift; sourceTree = "<group>"; };
@@ -764,6 +766,7 @@
 			children = (
 				2B81EA0691D95EE39E4461BC /* AvatarPicker.swift */,
 				9E22F93DB44C5DFEC4CF6725 /* ProfileMetricCard.swift */,
+				50EF6E55983303FD58CA0B30 /* ProfileRowLabel.swift */,
 				FD124F353024A73375A9AF82 /* ProfileView.swift */,
 				14C5A444304241F495436350 /* ProfileView+Sections.swift */,
 				765EAD6AC925F7E5AC653A3A /* Automations */,
@@ -1485,6 +1488,7 @@
 				C942E94D282D0F15C4C02322 /* PrivateText.swift in Sources */,
 				D3C3397C6D4C7D777497E060 /* ProfileAvatarView.swift in Sources */,
 				7027DFCC65547FCC92C2644F /* ProfileMetricCard.swift in Sources */,
+				D64124F33CB34BB851120789 /* ProfileRowLabel.swift in Sources */,
 				610B068DBE2C22A3C45B085E /* ProfileView+Sections.swift in Sources */,
 				EAE9BB0551B52CA258B1C65A /* ProfileView.swift in Sources */,
 				C83D5628BC4774EBD0CC495E /* QRScannerView.swift in Sources */,

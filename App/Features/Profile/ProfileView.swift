@@ -63,13 +63,12 @@ struct ProfileView: View {
             List {
                 identity
                 Section {
-                    NavigationLink("My Household", value: AppNavigation.ProfileDestination.household)
-                    NavigationLink("Automations", value: AppNavigation.ProfileDestination.automations)
-                } footer: {
-                    Text(
-                        "Build a household with someone nearby and share the accounts you choose. "
-                            + "Every balance and chart converts into your base currency above."
-                    )
+                    NavigationLink(value: AppNavigation.ProfileDestination.household) {
+                        ProfileRowLabel(icon: "icon-home", title: "My Household")
+                    }
+                    NavigationLink(value: AppNavigation.ProfileDestination.automations) {
+                        ProfileRowLabel(icon: "icon-robot", title: "My Automations")
+                    }
                 }
                 general
                 dataAndPrivacy
@@ -78,7 +77,11 @@ struct ProfileView: View {
                 exits
                 #if DEBUG
                 Section("Developer") {
-                    NavigationLink("Simulate Capture") { SimulateCaptureView(session: session) }
+                    NavigationLink {
+                        SimulateCaptureView(session: session)
+                    } label: {
+                        ProfileRowLabel(icon: "hammer", title: "Simulate Capture")
+                    }
                 }
                 #endif
             }
@@ -142,25 +145,31 @@ struct ProfileView: View {
                 .disabled(avatars.isBusy)
                 .accessibilityLabel("Change profile photo")
 
-                TextField("Add your name", text: $draftName)
-                    .font(AppTheme.Typography.cardTitle)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                    .multilineTextAlignment(.center)
-                    .textContentType(.givenName)
-                    .textInputAutocapitalization(.words)
-                    .submitLabel(.done)
-                    .focused($isNamingSelf)
-                    .onSubmit { Task { await commitName() } }
-                    // Blur commits too: tapping away from a name just typed
-                    // means the edit is finished, and losing it there would
-                    // be the surprise.
-                    .onChange(of: isNamingSelf) { wasEditing, _ in
-                        if wasEditing { Task { await commitName() } }
-                    }
+                // Their own stack, tighter than the one around it. Name and
+                // email are one thing — who you are — and at the outer `s`
+                // they read as two unrelated lines that happen to be
+                // stacked.
+                VStack(spacing: AppTheme.Spacing.xxs) {
+                    TextField("Add your name", text: $draftName)
+                        .font(AppTheme.Typography.cardTitle)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .textContentType(.givenName)
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.done)
+                        .focused($isNamingSelf)
+                        .onSubmit { Task { await commitName() } }
+                        // Blur commits too: tapping away from a name just
+                        // typed means the edit is finished, and losing it
+                        // there would be the surprise.
+                        .onChange(of: isNamingSelf) { wasEditing, _ in
+                            if wasEditing { Task { await commitName() } }
+                        }
 
-                Text(session.userEmail ?? "—")
-                    .font(AppTheme.Typography.caption)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    Text(session.userEmail ?? "—")
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
+                }
 
                 metrics
 
@@ -169,9 +178,23 @@ struct ProfileView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, AppTheme.Spacing.m)
+            .padding(.top, AppTheme.Spacing.m)
             .listRowBackground(Color.clear)
+            // Zeroed on purpose. A grouped list insets a row's *content*
+            // inside the rounded tile it draws, which is right for a label
+            // and wrong for the two cards below: they are tiles themselves,
+            // and inset a second time they sat visibly narrower than every
+            // row under them. With no inset the row spans the section's own
+            // rectangle, so a card's edge and a row tile's edge are the same
+            // line.
+            .listRowInsets(EdgeInsets())
         }
+        // The cards are tiles, and the rows below them are tiles; a grouped
+        // list's default section gap is sized for a *header* to sit in, and
+        // there is none here. `m` is the gap between the two cards
+        // themselves, so the whole block reads as one grid rather than as a
+        // header floating above a list.
+        .listSectionSpacing(AppTheme.Spacing.m)
     }
 
     /// Money rule 5: a value that cannot be computed renders as `—`, never as
@@ -192,7 +215,7 @@ struct ProfileView: View {
     /// one that changes the meaning of every number on every other screen.
     private var metrics: some View {
         HStack(spacing: AppTheme.Spacing.m) {
-            ProfileMetricCard(title: "Keepo member since:") {
+            ProfileMetricCard(title: "Keepo member since") {
                 Text(memberSince)
                     .font(AppTheme.Typography.cardTitle)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
@@ -203,7 +226,12 @@ struct ProfileView: View {
                 action: { isPickingCurrency = true },
                 content: {
                     if let code = session.profile?.baseCurrency, !code.isEmpty {
-                        CurrencyBadge(code: code, diameter: AppTheme.Size.glyph)
+                        // `icon`, not `glyph`: this is the card's headline,
+                        // the peer of the join date's `cardTitle` beside it,
+                        // and at badge size it read as a caption under one.
+                        // The badge scales its own code from the disc, so
+                        // the letters come up with it.
+                        CurrencyBadge(code: code, diameter: AppTheme.Size.icon)
                     } else {
                         Text("—")
                             .font(AppTheme.Typography.cardTitle)
@@ -212,6 +240,13 @@ struct ProfileView: View {
                 }
             )
         }
+        // Two cards, one shape. Each card already asks for all the height it
+        // is offered (`maxHeight: .infinity` inside `ProfileMetricCard`);
+        // this pins how much that is to the taller card's *ideal* height
+        // rather than letting the pair stretch to whatever the list row
+        // gives them. A date is one line and a currency badge is a 24pt
+        // disc, so without it the two cards were visibly different heights.
+        .fixedSize(horizontal: false, vertical: true)
         .padding(.top, AppTheme.Spacing.s)
     }
 
@@ -284,17 +319,19 @@ struct ProfileView: View {
 
     private var general: some View {
         Section {
-            NavigationLink("Notifications", value: AppNavigation.ProfileDestination.notifications)
+            NavigationLink(value: AppNavigation.ProfileDestination.notifications) {
+                ProfileRowLabel(icon: "icon-bell", title: "Notifications")
+            }
             // A toggle, not the three-way System/Light/Dark picker this
             // replaces. Until it is touched the app still follows iOS, and
             // the toggle reflects whichever way that resolved — so its first
             // position is never a surprise. Touching it pins the choice.
-            Toggle("Dark Mode", isOn: isDarkMode)
-                .tint(AppTheme.Palette.statusPositive)
+            Toggle(isOn: isDarkMode) {
+                ProfileRowLabel(icon: "moon", title: "Dark Mode")
+            }
+            .tint(AppTheme.Palette.statusPositive)
         } header: {
             Text("General")
-        } footer: {
-            Text("Dark Mode applies to Keepo only, independent of your iOS system setting.")
         }
     }
 

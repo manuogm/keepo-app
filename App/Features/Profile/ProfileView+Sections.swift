@@ -15,8 +15,12 @@ extension ProfileView {
     /// switches is a folder wearing a title bar.
     var dataAndPrivacy: some View {
         Section {
-            NavigationLink("Export", value: AppNavigation.ProfileDestination.export)
-            NavigationLink("Archived", value: AppNavigation.ProfileDestination.archive)
+            NavigationLink(value: AppNavigation.ProfileDestination.export) {
+                ProfileRowLabel(icon: "square.and.arrow.up", title: "Export")
+            }
+            NavigationLink(value: AppNavigation.ProfileDestination.archive) {
+                ProfileRowLabel(icon: "archivebox", title: "Archived")
+            }
 
             Button {
                 Task { await syncFXRates() }
@@ -25,7 +29,7 @@ extension ProfileView {
                     if isSyncingFX {
                         ProgressView().id("fx-sync-spinner")
                     } else {
-                        Text("Sync Exchange Rates")
+                        ProfileRowLabel(icon: "icon-planet", title: "Sync Exchange Rates")
                     }
                     Spacer()
                     if let lastFXSyncedAt {
@@ -45,35 +49,33 @@ extension ProfileView {
             // Face ID" on an account type with no biometric step-up is a
             // promise the app cannot keep.
             if session.authCapabilities.requiresBiometricStepUp {
-                Toggle("Enable Face ID", isOn: $isFaceIDEnabled)
-                    .tint(AppTheme.Palette.statusPositive)
+                Toggle(isOn: $isFaceIDEnabled) {
+                    ProfileRowLabel(icon: "faceid", title: "Enable Face ID")
+                }
+                .tint(AppTheme.Palette.statusPositive)
             }
 
-            Toggle("Enable Hiding Balance", isOn: $isHideBalanceEnabled)
-                .tint(AppTheme.Palette.statusPositive)
-                .onChange(of: isHideBalanceEnabled) { _, enabled in
-                    // The button that would normally let the user reveal it
-                    // again is the very thing being turned off here — force it
-                    // back on so nothing stays stuck hidden with no
-                    // affordance to undo it.
-                    if !enabled { session.isPrivacyMode = false }
-                }
+            Toggle(isOn: $isHideBalanceEnabled) {
+                ProfileRowLabel(icon: "icon-hidden", title: "Enable Hiding Balance")
+            }
+            .tint(AppTheme.Palette.statusPositive)
+            .onChange(of: isHideBalanceEnabled) { _, enabled in
+                // The button that would normally let the user reveal it
+                // again is the very thing being turned off here — force it
+                // back on so nothing stays stuck hidden with no
+                // affordance to undo it.
+                if !enabled { session.isPrivacyMode = false }
+            }
         } header: {
             Text("Data and Privacy")
-        } footer: {
-            Text(
-                "Face ID guards export, account deletion and household actions. "
-                    + "Hiding balances adds a button to Home, Accounts and Transactions "
-                    + "for using the app in public."
-            )
         }
     }
 
     var helpAndSupport: some View {
         Section {
-            ComingSoonRow(title: "FAQ")
-            ComingSoonRow(title: "Contact the Keepo Team")
-            ComingSoonRow(title: "Give Us Feedback")
+            ComingSoonRow(icon: "questionmark.circle", title: "FAQ")
+            ComingSoonRow(icon: "envelope", title: "Contact the Keepo Team")
+            ComingSoonRow(icon: "text.bubble", title: "Give Us Feedback")
         } header: {
             Text("Help and Support")
         }
@@ -81,8 +83,8 @@ extension ProfileView {
 
     var legal: some View {
         Section {
-            ComingSoonRow(title: "Terms and Conditions")
-            ComingSoonRow(title: "Privacy Policy")
+            ComingSoonRow(icon: "doc.text", title: "Terms and Conditions")
+            ComingSoonRow(icon: "hand.raised", title: "Privacy Policy")
         } header: {
             Text("Legal")
         }
@@ -110,7 +112,11 @@ extension ProfileView {
                 Task { await signOut() }
             } label: {
                 HStack {
-                    Text("Sign Out")
+                    ProfileRowLabel(
+                        icon: "rectangle.portrait.and.arrow.right",
+                        title: "Sign Out",
+                        tint: AppTheme.Palette.statusNegative
+                    )
                     Spacer()
                     if isSigningOut { ProgressView() }
                 }
@@ -121,14 +127,16 @@ extension ProfileView {
                 isShowingDeleteConfirmation = true
             } label: {
                 HStack {
-                    Text("Delete Account")
+                    ProfileRowLabel(
+                        icon: "trash",
+                        title: "Delete Account",
+                        tint: AppTheme.Palette.statusNegative
+                    )
                     Spacer()
                     if isDeletingAccount { ProgressView() }
                 }
             }
             .disabled(isDeletingAccount)
-        } footer: {
-            Text("Deleting your account permanently removes your financial data. This cannot be undone.")
         }
         .confirmationDialog(
             "Delete your account?",
@@ -182,11 +190,15 @@ extension ProfileView {
 /// tappable — a row that opens an alert saying "coming soon" makes the user
 /// do work to learn what the label beside it already told them.
 struct ComingSoonRow: View {
+    let icon: String
     let title: String
 
     var body: some View {
         HStack {
-            Text(title)
+            // Grey, not brand-coloured: the glyph belongs to a row that is
+            // deliberately inert, and a live-looking icon beside a dead
+            // label is the mixed signal the "Soon" chip exists to avoid.
+            ProfileRowLabel(icon: icon, title: title, tint: AppTheme.Palette.textSecondary)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
             Spacer()
             Text("Soon")

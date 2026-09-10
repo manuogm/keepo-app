@@ -12,8 +12,25 @@ struct ArchiveAccountsView: View {
     @State private var accounts: [LocalAccountRow] = []
     @State private var isLoading = true
     @State private var actionErrorMessage: String?
-    @State private var deleteCandidate: LocalAccountRow?
+    @State private var deleteCandidate: DeleteCandidate?
     @State private var isDeleting = false
+
+    /// An account the user has asked to delete, paired with how much history
+    /// goes with it.
+    ///
+    /// The count is read *before* the alert is raised, not discovered from a
+    /// failed delete. `delete_account` refuses an account that still has
+    /// transactions, and that refusal used to be the whole interaction: the
+    /// user got a sentence with a raw UUID in it telling them to archive an
+    /// account they had already archived, and no way forward. Knowing the
+    /// number up front is what lets the alert ask the real question instead.
+    private struct DeleteCandidate: Identifiable {
+        let account: LocalAccountRow
+        let transactionCount: Int
+
+        var id: UUID { account.id }
+        var cascades: Bool { transactionCount > 0 }
+    }
 
     private var archived: [LocalAccountRow] {
         accounts.filter { $0.archivedAt != nil }
@@ -51,21 +68,46 @@ struct ArchiveAccountsView: View {
         .navigationTitle("Archived")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: session.refresh.token) { await load() }
-        .alert(
-            "Delete \"\(deleteCandidate?.name ?? "")\"?",
-            isPresented: deleteConfirmationBinding
-        ) {
-            Button("Delete", role: .destructive) {
-                if let deleteCandidate { Task { await performDelete(deleteCandidate) } }
+        // `item:` rather than `isPresented:` — the alert's own text depends on
+        // the candidate, and a boolean plus a separate optional is how a
+        // dialog ends up rendering one account's name over another
+        // account's count for a frame.
+        .alert(item: $deleteCandidate) { candidate in
+            if candidate.cascades {
+                Alert(
+                    title: Text("Delete \"\(candidate.account.name)\" and its \(countPhrase(candidate))?"),
+                    message: Text(
+                        "The account and every transaction on it will be permanently deleted, "
+                            + "and any recurring transactions set up on it will stop. This cannot be undone."
+                    ),
+                    primaryButton: .destructive(Text("Delete Everything")) {
+                        Task { await performDelete(candidate) }
+                    },
+                    // Named for what it leaves behind, not for the button
+                    // it is. "Cancel" beside "Delete Everything" reads as
+                    // "did nothing"; the account does stay, and it stays
+                    // archived — which is the choice, not the absence of
+                    // one.
+                    secondaryButton: .cancel(Text("Keep Archived"))
+                )
+            } else {
+                Alert(
+                    title: Text("Delete \"\(candidate.account.name)\"?"),
+                    message: Text("This permanently deletes the account. This cannot be undone."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        Task { await performDelete(candidate) }
+                    },
+                    secondaryButton: .cancel()
+                )
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This permanently deletes the account. This cannot be undone.")
         }
     }
 
-    private var deleteConfirmationBinding: Binding<Bool> {
-        Binding(get: { deleteCandidate != nil }, set: { if !$0 { deleteCandidate = nil } })
+    /// "3 transactions" / "1 transaction" — the count and its noun, so the
+    /// title never reads "its 1 transactions".
+    private func countPhrase(_ candidate: DeleteCandidate) -> String {
+        let count = candidate.transactionCount
+        return "\(count) transaction\(count == 1 ? "" : "s")"
     }
 
     private func archiveRow(_ row: LocalAccountRow) -> some View {
@@ -80,7 +122,7 @@ struct ArchiveAccountsView: View {
             }
             .buttonStyle(.borderless)
             Button {
-                deleteCandidate = row
+                Task { await confirmDelete(row) }
             } label: {
                 Image(systemName: "trash")
                     .foregroundStyle(AppTheme.Palette.statusNegative)
@@ -115,19 +157,39 @@ struct ArchiveAccountsView: View {
         session.refresh.bump()
     }
 
+    /// Counts the account's history, then raises the alert that matches it.
+    ///
+    /// The read is local, off the mirror the rest of this screen is drawn
+    /// from, so it costs nothing and works offline. It can be stale — a
+    /// household partner could have filed something against a shared
+    /// account since the last pull — which is why the server still refuses
+    /// a non-cascading delete rather than trusting this number.
+    private func confirmDelete(_ row: LocalAccountRow) async {
+        actionErrorMessage = nil
+        let count = (try? await session.dbQueue.read { database in
+            try LocalTableQueries.transactionCount(database, accountId: row.id.uuidString)
+        }) ?? 0
+        deleteCandidate = DeleteCandidate(account: row, transactionCount: count)
+    }
+
     /// Online-only, like `CategoryFormView.performDelete` — `delete_account`
-    /// refuses (raises) while the account still has non-deleted
-    /// transactions, a live check that can't be answered honestly offline.
-    private func performDelete(_ row: LocalAccountRow) async {
+    /// resolves a version race and, without `cascade`, refuses an account
+    /// that still has transactions. Neither is a question that can be
+    /// answered honestly from a local mirror.
+    private func performDelete(_ candidate: DeleteCandidate) async {
+        let row = candidate.account
         isDeleting = true
         actionErrorMessage = nil
         do {
             let succeeded = try await AccountRepository.delete(
-                client: session.client, id: row.id, expectedVersion: row.version
+                client: session.client, id: row.id, expectedVersion: row.version,
+                cascade: candidate.cascades
             )
             if succeeded {
                 try? await session.dbQueue.write { database in
-                    try AccountLocalWrite.delete(accountId: row.id, in: database)
+                    try AccountLocalWrite.delete(
+                        accountId: row.id, cascade: candidate.cascades, in: database
+                    )
                 }
                 session.refresh.bump()
             } else {

@@ -236,6 +236,21 @@ enum LocalTableQueries {
         return Set(rows.map { $0["account_id"] as String })
     }
 
+    /// How many live transactions one account still holds.
+    ///
+    /// Read before offering to delete an archived account, so the
+    /// confirmation can name the number rather than let the server refuse
+    /// and make the user decode the refusal. A count, not the rows: the
+    /// screen needs the figure and nothing else, and an account's whole
+    /// history can be thousands of rows.
+    static func transactionCount(_ database: Database, accountId: String) throws -> Int {
+        try Int.fetchOne(
+            database,
+            sql: "SELECT COUNT(*) FROM transactions WHERE account_id = ? AND deleted_at IS NULL",
+            arguments: [accountId]
+        ) ?? 0
+    }
+
     /// The single `household_accounts` row for one account, `shared_at`
     /// included — unlike `sharedAccountIds`, which only answers "is this
     /// shared" for a whole household's worth of accounts at once.

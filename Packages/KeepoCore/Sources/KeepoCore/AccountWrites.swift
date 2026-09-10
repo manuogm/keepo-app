@@ -78,9 +78,11 @@ struct ArchiveAccountParams: Encodable {
 struct DeleteAccountParams: Encodable {
     let id: UUID
     let expectedVersion: Int
+    let cascade: Bool
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case expectedVersion = "p_expected_version"
+        case cascade = "p_cascade"
     }
 }
 
@@ -195,10 +197,19 @@ public extension AccountRepository {
         return rows.first.map(AccountWriteResult.init) ?? .conflict
     }
 
-    /// Refused by the DB (raises, not a conflict) while the account still
-    /// has non-deleted transactions — archive it instead.
-    static func delete(client: SupabaseClient, id: UUID, expectedVersion: Int) async throws -> Bool {
-        let params = DeleteAccountParams(id: id, expectedVersion: expectedVersion)
+    /// `cascade: false` is refused by the DB (raises, not a conflict) while
+    /// the account still has non-deleted transactions; `true` soft-deletes
+    /// them along with it, and retires the account's recurring rules so
+    /// nothing mints new ones onto a deleted account afterwards.
+    ///
+    /// The caller decides which, and has to *ask* first — the count is on
+    /// screen before the alert appears (`ArchiveAccountsView.confirmDelete`),
+    /// so the refusal is a backstop for a stale local mirror rather than the
+    /// way the choice is normally put.
+    static func delete(
+        client: SupabaseClient, id: UUID, expectedVersion: Int, cascade: Bool
+    ) async throws -> Bool {
+        let params = DeleteAccountParams(id: id, expectedVersion: expectedVersion, cascade: cascade)
         let rows: [AccountDeleteConflictFlag] = try await client.rpc("delete_account", params: params).execute().value
         return !(rows.first?.conflict ?? true)
     }
