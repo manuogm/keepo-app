@@ -81,25 +81,44 @@ struct HouseholdBlankState: View {
 
 /// The five things a member should be able to check without asking anybody.
 ///
-/// A popover rather than a screen: each of these is one sentence, they are
-/// read once, and pushing a whole view for them would make finding them again
-/// a journey. The last one is the only warning, and it is last because it is
-/// about undoing something the user has not done yet.
-struct HouseholdInfoPopover: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
-            Text("About your household")
-                .font(AppTheme.Typography.cardTitle)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
+/// A sheet rather than a popover: on a phone a popover is a cramped bubble
+/// with an arrow pointing at a 16pt glyph, and these five lines are the
+/// answer to "what did I actually agree to". A half-height modal gives them
+/// room and gives the reader an obvious way out. The last one is the only
+/// warning, and it is last because it is about undoing something the user
+/// has not done yet.
+struct HouseholdInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
 
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AppTheme.Palette.bgCanvas.ignoresSafeArea()
+                ScrollView {
+                    points.padding(AppTheme.Spacing.l)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            .navigationTitle("About your household")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("Close")
+                }
+            }
+        }
+    }
+
+    private var points: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
             point("person.2.fill", "A shared account is 100% yours **and** 100% theirs. Never split.")
             point("coloncurrencysign.circle.fill", "Figures are in **your** base currency. Theirs may differ.")
             point("arrow.triangle.2.circlepath", "Stop sharing an account and it returns to you, history intact.")
             point("tag.fill", "Tags follow their account, both ways.")
             point("exclamationmark.triangle.fill", "Leaving splits every shared account in two. Face ID required.")
         }
-        .padding(AppTheme.Spacing.l)
-        .frame(maxWidth: AppTheme.Size.proseWidth)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func point(_ symbol: String, _ text: String) -> some View {
@@ -109,7 +128,7 @@ struct HouseholdInfoPopover: View {
                 .foregroundStyle(PublicSchema.AccountScope.household.tint)
                 .frame(width: AppTheme.Size.glyphSmall)
             Text(.init(text))
-                .font(AppTheme.Typography.caption)
+                .font(AppTheme.Typography.label)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }

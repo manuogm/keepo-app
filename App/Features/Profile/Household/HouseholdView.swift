@@ -52,19 +52,39 @@ struct HouseholdView: View {
         }
         .navigationTitle("Household")
         .navigationBarTitleDisplayMode(.inline)
+        // The info affordance belongs **to the title**, not to the corner.
+        // As a top-right bar button it read as a second action competing with
+        // the back chevron; beside the word it reads as what it is — a
+        // footnote on the thing named next to it. `.principal` is the only
+        // placement that can put anything alongside the title.
         .toolbar {
-            if snapshot.hasHousehold {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { isShowingInfo = true } label: {
-                        KeepoIcon(name: "icon-info", size: AppTheme.Size.glyph)
-                    }
-                    .accessibilityLabel("About households")
-                    .popover(isPresented: $isShowingInfo) {
-                        HouseholdInfoPopover()
-                            .presentationCompactAdaptation(.popover)
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    Text("Household")
+                        .font(AppTheme.Typography.rowTitle)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
+                    if snapshot.hasHousehold {
+                        Button { isShowingInfo = true } label: {
+                            // Padding **inside** the label, not `.hitTarget()`
+                            // outside the button: that modifier works by
+                            // overlaying a hit-testable `Color.clear`, which
+                            // on a `Button` lands *on top of* it and swallows
+                            // every tap. The glyph rendered and did nothing.
+                            KeepoIcon(name: "icon-info", size: AppTheme.Size.glyphSmall)
+                                .foregroundStyle(AppTheme.Palette.textSecondary)
+                                .padding(AppTheme.Spacing.s)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("About households")
                     }
                 }
             }
+        }
+        .sheet(isPresented: $isShowingInfo) {
+            HouseholdInfoSheet()
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
         .task(id: session.refresh.token) { await load() }
         // `item:` rather than two booleans: Create and Join are the same
