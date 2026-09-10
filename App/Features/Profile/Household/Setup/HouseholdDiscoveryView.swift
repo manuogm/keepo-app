@@ -108,11 +108,7 @@ struct HouseholdDiscoveryView: View {
                     .font(AppTheme.Typography.screenTitle)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
                     .multilineTextAlignment(.center)
-                Text(
-                    role == .owner
-                        ? "Hold your phones together. Theirs needs Keepo open on Join Household."
-                        : "Hold your phones together. Theirs needs Keepo open on New Household."
-                )
+                Text("Hold your phones together. Make sure both have Keepo open")
                 .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
@@ -140,15 +136,10 @@ struct HouseholdDiscoveryView: View {
     }
 
     private var fallback: some View {
-        VStack(spacing: AppTheme.Spacing.m) {
-            Text("Taking a while?")
+        VStack(spacing: AppTheme.Spacing.s) {
+            Text("Taking a while? Instead")
                 .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
-            Text(role == .owner ? "Show a code for them to scan instead." : "Scan the code on their phone instead.")
-                .font(AppTheme.Typography.caption)
-            .foregroundStyle(AppTheme.Palette.textSecondary)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
 
             Button {
                 isShowingQR = true

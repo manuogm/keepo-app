@@ -3,12 +3,17 @@ import SwiftUI
 
 /// The first screen of the flow: what is about to happen, before it happens.
 ///
-/// Four illustrated lines rather than a paragraph. The information is not
+/// Six illustrated lines rather than a paragraph. The information is not
 /// optional — "the other person can edit your transactions" is something a
 /// user must know *before* agreeing to it — but a wall of text at the start
 /// of a flow is read by nobody, which makes it worse than useless: it
-/// discharges the obligation to explain without explaining. A glyph, two or
-/// three words of heading and **one line** each is the most that gets read.
+/// discharges the obligation to explain without explaining. A glyph, a short
+/// heading and **one line** each is the most that gets read.
+///
+/// The last line is the reassurance rather than another instruction, and it
+/// sits in the same list as the rest deliberately: it is the answer to the
+/// question the other five raise ("what have I just signed up to?"), not a
+/// warning to be quarantined in a box.
 ///
 /// The action lives at the end of the scroll, not pinned over it: this page
 /// is something to read to the bottom, and a button floating above unread
@@ -28,7 +33,6 @@ struct HouseholdSetupIntro<Footer: View>: View {
                         HouseholdIntroPoint(point: point, tint: tint)
                     }
                 }
-                footnote
                 footer
             }
             .padding(.horizontal, AppTheme.Spacing.l)
@@ -50,51 +54,49 @@ struct HouseholdSetupIntro<Footer: View>: View {
                 .font(AppTheme.Typography.screenTitle)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
-
-            Text("Two people, one view of the money you choose to share.")
-                .font(AppTheme.Typography.body)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, AppTheme.Spacing.m)
     }
 
-    /// The one caveat, kept apart from the four steps so it is not read as
-    /// another thing to do.
-    private var footnote: some View {
-        HStack(alignment: .top, spacing: AppTheme.Spacing.s) {
-            KeepoIcon(name: "icon-info", size: AppTheme.Size.glyphSmall)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-            Text("Either of you can leave. Shared accounts split back into private copies — you each keep everything.")
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(AppTheme.Spacing.m)
-        .background(AppTheme.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
-    }
-
+    /// Points 1 and 2 are the only lines that differ between creating and
+    /// joining — one invites, the other accepts. The rest of the deal is
+    /// identical from both sides, so it is written once.
     private var points: [HouseholdIntroPoint.Point] {
         [
             .init(
-                icon: "icon-account",
-                title: "Your accounts",
-                detail: "Pick which ones join. Both of you can see and edit a shared account."
-            ),
-            .init(
-                icon: "icon-tag",
-                title: "Your categories",
-                detail: "One category on both phones. It shares the label, never your spending."
-            ),
-            .init(
-                icon: "icon-tag-filled",
-                title: "Tags follow accounts",
-                detail: "Every tag on a shared account comes along, and leaves when it does."
+                icon: "icon-shared",
+                title: "Share your finances",
+                detail: role == .owner
+                    ? "Invite your partner, roommate or family member"
+                    : "Join your partner, roommate or family member"
             ),
             .init(
                 icon: "icon-tap",
-                title: "Stay close",
-                detail: "The other phone has to be beside you, with Keepo open."
+                title: "Build your household together",
+                detail: role == .owner
+                    ? "Ask your guest to join, make decisions and stay close until completion"
+                    : "Find a household owner, make decisions and stay close until completion"
+            ),
+            .init(
+                icon: "icon-account",
+                title: "Choose accounts to share",
+                detail: "Both members can edit and log transactions to them"
+            ),
+            .init(
+                icon: "icon-tag",
+                title: "Choose categories to share",
+                detail: "Decide to merge common ones or to keep them separated"
+            ),
+            .init(
+                icon: "icon-tag-filled",
+                title: "Tags are automatically shared",
+                detail: "Only when applied to transactions from shared accounts"
+            ),
+            .init(
+                icon: "icon-info",
+                title: "Don't worry, Nothing is permanent",
+                detail: "Either member can leave the household anytime and get a private copy "
+                    + "of everything. Nothing is lost."
             )
         ]
     }

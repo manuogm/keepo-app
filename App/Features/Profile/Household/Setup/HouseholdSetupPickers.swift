@@ -20,8 +20,8 @@ struct HouseholdAccountPicker<Footer: View>: View {
 
     var body: some View {
         HouseholdPickerScaffold(
-            title: "Which accounts?",
-            subtitle: "Both of you can see and edit a shared account. You can share more later.",
+            title: "Shared accounts",
+            subtitle: nil,
             isLoaded: isLoaded,
             isEmpty: accounts.isEmpty,
             emptyMessage: "You have no accounts to share yet.",
@@ -75,8 +75,8 @@ struct HouseholdCategoryPicker<Footer: View>: View {
 
     var body: some View {
         HouseholdPickerScaffold(
-            title: "Which categories?",
-            subtitle: "One category on both phones. Keepo merges the ones you both already have.",
+            title: "Shared categories",
+            subtitle: nil,
             isLoaded: isLoaded,
             isEmpty: categories.isEmpty,
             emptyMessage: "You have no categories to share yet.",
@@ -114,11 +114,13 @@ struct HouseholdCategoryPicker<Footer: View>: View {
 
 // MARK: - Shared shell
 
-/// The page both pickers are: a question, a sentence explaining the
-/// consequence, and grouped cards of switches.
+/// The page both pickers are: a title, an optional sentence explaining the
+/// consequence, and grouped cards of switches. The intro screen now carries
+/// the explanation, so both pickers pass `subtitle: nil` and the row of
+/// switches sits directly under the heading.
 private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
     let title: String
-    let subtitle: String
+    let subtitle: String?
     let isLoaded: Bool
     let isEmpty: Bool
     let emptyMessage: String
@@ -136,10 +138,12 @@ private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
                     Text(title)
                         .font(AppTheme.Typography.screenTitle)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
-                    Text(subtitle)
-                        .font(AppTheme.Typography.body)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(AppTheme.Typography.body)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 

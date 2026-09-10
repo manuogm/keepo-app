@@ -30,14 +30,8 @@ struct HouseholdBlankState: View {
                     .background(tint.opacity(AppTheme.Opacity.fill), in: Circle())
 
                 Text("No household yet")
-                    .font(AppTheme.Typography.screenTitle)
+                    .font(AppTheme.Typography.sectionTitle)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
-
-                Text("Two people, one view of the money you choose to share.")
-                    .font(AppTheme.Typography.body)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()
@@ -67,10 +61,6 @@ struct HouseholdBlankState: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.pressableCard)
-
-                Text("You'll need to be together, with Keepo open on both phones.")
-                    .font(AppTheme.Typography.micro)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
         }
         .padding(.horizontal, AppTheme.Spacing.xxl)
