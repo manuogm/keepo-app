@@ -55,21 +55,26 @@ struct HouseholdSummaryCard: View {
 
     // MARK: - Accounts
 
+    /// Both your shared accounts and the ones you could still share: the
+    /// switch is the difference, which is what makes "share one more" a flip
+    /// rather than a journey back through the setup flow.
+    private var accountRows: [LocalAccountRow] {
+        (snapshot.sharedAccounts + snapshot.privateAccounts)
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     private var accountsSection: some View {
+        // Counted on what is actually listed, not on what is shared. Passing
+        // the shared count made an untouched household render "Nothing here."
+        // over a list of the very accounts the user came to switch on.
         HouseholdDisclosure(
             title: "Shared accounts",
-            count: snapshot.sharedAccounts.count,
+            count: accountRows.count,
             isExpanded: $isAccountsExpanded
         ) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
                 ForEach(HouseholdAccountGroup.allCases, id: \.self) { group in
-                    // Both your shared accounts and the ones you could still
-                    // share, in one list: the switch is the difference, which
-                    // is what makes "share one more" a flip rather than a
-                    // journey back through the setup flow.
-                    let rows = (snapshot.sharedAccounts + snapshot.privateAccounts)
-                        .filter { $0.kind == group.kind }
-                        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                    let rows = accountRows.filter { $0.kind == group.kind }
                     if !rows.isEmpty {
                         subheading(group.title)
                         ForEach(rows) { account in
@@ -102,7 +107,7 @@ struct HouseholdSummaryCard: View {
     private var categoriesSection: some View {
         HouseholdDisclosure(
             title: "Shared categories",
-            count: snapshot.mergedCategories.count + snapshot.extraCategories.count,
+            count: categoryRows(.expense).count + categoryRows(.income).count,
             isExpanded: $isCategoriesExpanded
         ) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {

@@ -11,6 +11,10 @@ import SwiftUI
 /// failed to load.
 struct HouseholdAccountPicker: View {
     let accounts: [LocalAccountRow]
+    /// False until the read lands. "You have no accounts to share yet" is a
+    /// claim about the user's data, and making it before looking is worse
+    /// than showing nothing — the same rule `ScopeContext.isLoaded` exists for.
+    let isLoaded: Bool
     @Binding var selection: Set<UUID>
 
     var body: some View {
@@ -18,6 +22,7 @@ struct HouseholdAccountPicker: View {
             title: "Which accounts?",
             subtitle: "A shared account is visible and editable by both of you. Anything you leave "
                 + "out stays yours alone, and you can share more at any time.",
+            isLoaded: isLoaded,
             isEmpty: accounts.isEmpty,
             emptyMessage: "You have no accounts to share yet."
         ) {
@@ -62,6 +67,7 @@ enum HouseholdAccountGroup: CaseIterable {
 /// Which of your categories join the household, split by kind.
 struct HouseholdCategoryPicker: View {
     let categories: [PublicSchema.CategoriesSelect]
+    let isLoaded: Bool
     @Binding var selection: Set<UUID>
 
     var body: some View {
@@ -69,6 +75,7 @@ struct HouseholdCategoryPicker: View {
             title: "Which categories?",
             subtitle: "A shared category is one category on both phones — rename it and it renames "
                 + "for them too. Where you both already have the same thing, Keepo merges them.",
+            isLoaded: isLoaded,
             isEmpty: categories.isEmpty,
             emptyMessage: "You have no categories to share yet."
         ) {
@@ -108,6 +115,7 @@ struct HouseholdCategoryPicker: View {
 private struct HouseholdPickerScaffold<Content: View>: View {
     let title: String
     let subtitle: String
+    let isLoaded: Bool
     let isEmpty: Bool
     let emptyMessage: String
     @ViewBuilder var content: Content
@@ -126,7 +134,11 @@ private struct HouseholdPickerScaffold<Content: View>: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                if isEmpty {
+                if !isLoaded {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, AppTheme.Spacing.xl)
+                } else if isEmpty {
                     Text(emptyMessage)
                         .font(AppTheme.Typography.caption)
                         .foregroundStyle(AppTheme.Palette.textSecondary)

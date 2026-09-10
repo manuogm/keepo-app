@@ -32,10 +32,11 @@ struct HouseholdSetupFlow: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var path: [Step] = []
-    @State private var accounts: [LocalAccountRow] = []
-    @State private var categories: [PublicSchema.CategoriesSelect] = []
-    @State private var selectedAccountIds: Set<UUID> = []
-    @State private var selectedCategoryIds: Set<UUID> = []
+    /// A reference type, deliberately — see `HouseholdSetupModel`'s own note.
+    /// Reading this flow's data from `@State` inside the
+    /// `navigationDestination` closure below silently rendered a stale, empty
+    /// copy on every pushed step.
+    @State private var model = HouseholdSetupModel()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -48,7 +49,7 @@ struct HouseholdSetupFlow: View {
                     }
                 }
         }
-        .task { await load() }
+        .task { await model.load(session: session) }
     }
 
     // MARK: - A. What is about to happen
@@ -71,7 +72,11 @@ struct HouseholdSetupFlow: View {
     // MARK: - B. Which accounts
 
     private var accountsStep: some View {
-        HouseholdAccountPicker(accounts: accounts, selection: $selectedAccountIds)
+        HouseholdAccountPicker(
+            accounts: model.accounts,
+            isLoaded: model.isLoaded,
+            selection: Bindable(model).selectedAccountIds
+        )
             .householdSetupChrome()
             .safeAreaInset(edge: .bottom) {
                 HouseholdFlowBar(nextTitle: "Next") { path.append(.categories) }
@@ -81,7 +86,11 @@ struct HouseholdSetupFlow: View {
     // MARK: - C. Which categories
 
     private var categoriesStep: some View {
-        HouseholdCategoryPicker(categories: shareableCategories, selection: $selectedCategoryIds)
+        HouseholdCategoryPicker(
+            categories: model.categories,
+            isLoaded: model.isLoaded,
+            selection: Bindable(model).selectedCategoryIds
+        )
             .householdSetupChrome()
             .safeAreaInset(edge: .bottom) {
                 HouseholdFlowBar(nextTitle: "Next") { path.append(.discovery) }
@@ -95,8 +104,8 @@ struct HouseholdSetupFlow: View {
             session: session,
             avatars: avatars,
             role: role,
-            accountIds: Array(selectedAccountIds),
-            categoryIds: Array(selectedCategoryIds),
+            accountIds: Array(model.selectedAccountIds),
+            categoryIds: Array(model.selectedCategoryIds),
             onBuilt: {
                 onBuilt()
                 dismiss()
@@ -105,31 +114,6 @@ struct HouseholdSetupFlow: View {
         .householdSetupChrome()
     }
 
-    // MARK: - Data
-
-    /// The two "Other" rows are each member's own fallback and `share_category`
-    /// refuses one, so they are never offered — a control that always fails is
-    /// worse than no control.
-    private var shareableCategories: [PublicSchema.CategoriesSelect] {
-        categories.filter { !$0.isDefault }
-    }
-
-    private func load() async {
-        guard let ownerId = session.profile?.id.uuidString else { return }
-        let baseCurrency = session.profile?.baseCurrency ?? "EUR"
-        let loaded = try? await session.dbQueue.read { database in
-            (
-                try LocalAccountRow.fetchAll(database, ownerId: ownerId, baseCurrency: baseCurrency),
-                try LocalTableQueries.categories(database, ownerId: ownerId)
-            )
-        }
-        guard let loaded else { return }
-        // Only your own, and only the live ones. An archived account holds no
-        // money the household would see, and the other member's accounts are
-        // not yours to offer.
-        accounts = loaded.0.filter { $0.ownerId == session.profile?.id && $0.archivedAt == nil }
-        categories = loaded.1
-    }
 }
 
 private extension View {
