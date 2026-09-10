@@ -281,10 +281,29 @@ All green as of 2026-09-09, after Docker came back.
 | `xcodebuild ... test` | ✅ TEST SUCCEEDED |
 | `swift test` (KeepoCore, 199) | ✅ green |
 | `swiftlint` | ✅ 0 violations, 293 files |
-| Simulator walkthrough | ⚠️ not done — the interesting half needs two devices |
+| Simulator walkthrough | ✅ done — and it found two real bugs, below |
 | Two-device pairing | ❌ **still the outstanding item** (= human review stop #4) |
 
-### Two things the verification caught
+### What the simulator walkthrough caught
+
+Worth doing: the flow **looked** finished and was not.
+
+1. **The setup pickers rendered empty over loaded data.** The step was a
+   computed property reading the flow's `@State` from inside
+   `navigationDestination(for:)`; that closure holds a `self` struct copy
+   from an earlier body evaluation, so it read a pre-load snapshot while the
+   state itself was correct. Fixed by moving the flow's data into
+   `HouseholdSetupModel` (`@Observable`). **Do not move it back onto the
+   view.**
+2. **The Household summary's disclosures counted the wrong collection** —
+   `count:` came from what is *shared* while the body listed shared +
+   shareable, so an untouched household drew "Nothing here." over the
+   accounts you went there to switch on.
+
+Also hardened: the pickers now take `isLoaded` and show a spinner rather
+than asserting "you have none" before the read lands.
+
+### Two things the migration verification caught
 
 1. **The pgTAP fixture invented `transactions.kind`.** There is no such
    column: direction is the sign of `amount_e4` (money rule 1),
