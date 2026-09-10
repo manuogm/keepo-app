@@ -189,6 +189,7 @@
 		BBE92DC63297AE6FDD9EAE9F /* CardMappingLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */; };
 		BDBD09EE3CF8613353AFF224 /* DashboardHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61E117F7A777571884BB0AA1 /* DashboardHaptics.swift */; };
 		BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */; };
+		BE7C61B7E8E452D13B424BF1 /* HouseholdSetupModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2764C668FBE41514EAF7AE12 /* HouseholdSetupModel.swift */; };
 		BF17C34B30995D6EAFF9C4CA /* CaptureNotificationCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB4D58C60A91E97162570E8 /* CaptureNotificationCopy.swift */; };
 		BF7B49CC2C0BFEC3722BD092 /* CaptureQuickActionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F517CE621FEFAB857D2BE34F /* CaptureQuickActionHandler.swift */; };
 		BF8A3723CCF5DC8095621601 /* DashboardCanvasCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B51809A9E015EC3C4BA079 /* DashboardCanvasCatalog.swift */; };
@@ -325,6 +326,7 @@
 		23B92B44899D6DDB44851A8E /* TransferLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferLocalWriteTests.swift; sourceTree = "<group>"; };
 		242AFF22D448A2969EE96D9C /* StubTransactionSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StubTransactionSender.swift; sourceTree = "<group>"; };
 		2466CDC8B59EB28490597507 /* PickerRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickerRows.swift; sourceTree = "<group>"; };
+		2764C668FBE41514EAF7AE12 /* HouseholdSetupModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdSetupModel.swift; sourceTree = "<group>"; };
 		29E27B8CE90F8B5B8DD7F514 /* TransactionsListView+Period.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionsListView+Period.swift"; sourceTree = "<group>"; };
 		2A1CF50053339F613C77014E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		2ABD39DFAF1B6C4FA58FC42B /* DashboardExpansionScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExpansionScroll.swift; sourceTree = "<group>"; };
@@ -1122,6 +1124,7 @@
 				145A30F06CC4CD6561EC2248 /* HouseholdQRView.swift */,
 				791B69045C75E082FC09B489 /* HouseholdSetupFlow.swift */,
 				942E9C4DEEBB16CF77CC7243 /* HouseholdSetupIntro.swift */,
+				2764C668FBE41514EAF7AE12 /* HouseholdSetupModel.swift */,
 				AFFD45E92FCC1806522C43F9 /* HouseholdSetupPickers.swift */,
 			);
 			path = Setup;
@@ -1412,6 +1415,7 @@
 				EB554CA339750A417EB0F1B9 /* HouseholdSetupCoordinator.swift in Sources */,
 				CC59625186FAFA1CCCD6480C /* HouseholdSetupFlow.swift in Sources */,
 				8E9818CFD169C4C33B7D2E5F /* HouseholdSetupIntro.swift in Sources */,
+				BE7C61B7E8E452D13B424BF1 /* HouseholdSetupModel.swift in Sources */,
 				921517E7A2464B306F8609FC /* HouseholdSetupPickers.swift in Sources */,
 				8770EE13B7B06187DD378960 /* HouseholdSummaryCard.swift in Sources */,
 				44359E27B4DD139EB052A64B /* HouseholdView.swift in Sources */,
