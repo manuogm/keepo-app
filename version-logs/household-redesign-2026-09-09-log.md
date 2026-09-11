@@ -554,3 +554,105 @@ files, PASS** (new file `34_tag_deletes_reach_the_other_phone.sql`) ·
 **all three features exercised by hand on two simulators**, owner and guest,
 through the real pairing ceremony — twice, and once more with the pull
 deliberately broken to prove the new failure path.
+
+---
+
+## Fourth pass, 2026-09-10 — the cause underneath all of it
+
+The third pass shipped a real fix for tags and a safety net for the report,
+and item 1 and 2 came back from the phones unchanged. The safety net is what
+identified the cause: the manual merge failed with **"Saved, but this phone
+hasn't caught up yet. Check your connection and try again."** That sentence
+is the `reason == nil` branch — the pull had **succeeded and carried
+nothing**. Not rate-limited, not offline, not dropped. Empty, and correct to
+be empty.
+
+### One cursor, two sequences
+
+`stamp_sync_seq_owner` stamps every row `next_ticket(sync_domain_id(owner_id))`,
+and `sync_domain_id` is "your household if you are in one, otherwise
+yourself". So joining a household moves every subsequent write onto the
+household's sequence — and `next_ticket` starts a brand-new domain at **1**.
+
+`pull_changes` is `sync_seq > p_cursor` across every table, and the cursor it
+returns is `max(sync_seq)` over everything the device can see. One scalar,
+spanning two sequences, with nothing keeping them monotonic with respect to
+each other.
+
+For a user with real history:
+
+* their private domain has issued, say, 5,000 tickets;
+* `accept_invite` bumps both epochs, the device wipes and re-pulls from 0,
+  and its cursor lands on ~5,000 — their own pre-existing rows, still
+  stamped in the private domain, are the high-water mark;
+* the household domain starts at 1, so every category twin, every merge,
+  every tag prune is stamped 2, 3, 4 …;
+* `pull_changes(5000)` matches none of them and returns an empty payload
+  with no error at all.
+
+Proven in a rolled-back transaction: `apply_category_merges` returns 1, both
+rows are renamed on the server at `sync_seq` 13 and 14, and
+`pull_changes(5000, 0)` reports `categories_delivered = 0`. After the fix the
+same script delivers 4.
+
+**This is invisible on a seeded account.** Twenty rows of history means the
+household's sequence overtakes the cursor inside the ceremony itself, which
+is exactly why two full two-device runs passed here and the same build failed
+immediately on two real phones. Every fix in the three passes before this one
+— the tombstone keeping its group, chaining overlapping pulls, raising the
+pull rate limit, bumping epochs on revocation, confirming writes against the
+mirror — was downstream of a cursor that could never advance to meet the new
+domain. All of them were real bugs. None of them was this one.
+
+### The rule
+
+**A domain a user is moved into must start ahead of any cursor that user's
+devices could already hold.** The move is always a `household_members` write
+— `create_household` and `accept_invite` insert or revive a row,
+`leave_household` and `erase_own_account` retire one — so `20260919100000`
+puts the guarantee on that table as a trigger rather than into four function
+bodies. Nothing existing is restated, and a fifth call site cannot forget it.
+
+`sync_high_water()` is deliberately the **global** maximum rather than the
+user's own rows: a member's cursor is the high-water mark of everything they
+can *see*, which includes the other member's shared accounts, transactions
+and categories, so a per-owner max would under-read in exactly the case this
+exists for. Over-allocating tickets costs nothing — `sync_seq` is bigint and
+cursors are compared, never counted.
+
+Leaving strands a cursor in the other direction: the departing member goes
+back to their own sequence, which stopped the day they joined while their
+rows climbed into the household's. Both directions are raised.
+
+### Repairing the households already stranded
+
+A household built before this migration started at 1 and is very likely still
+below its members' cursors — which was the live bug on real phones. Raising
+the domain fixes every write from here on, but the writes made *during* the
+stalled window carry tickets no cursor will ever reach again, so the members
+also re-pull in full. `sync_epoch` is bumped for the domains that actually
+moved, and only those: a household already ahead of its members costs nobody
+a wipe.
+
+### Verification
+
+pgTAP **435 tests, 31 files, PASS** (new file
+`35_sync_domains_stay_ahead_of_cursors.sql`, whose central assertion is the
+one that returned 0 before) · SwiftLint 0/298 · `supabase gen types` diff
+clean.
+
+End to end in the app **with the failing precondition reproduced**: both dev
+identities given private domains that had already issued 5,000 and 3,000
+tickets, with every row re-stamped accordingly. The new household domain
+opened at **5017** rather than 1; the automatic pass merged Dine Out/Dining
+Out, Utilities/Utilities & Bills, Transport/Transportation,
+Salary/Salaries and Groceries, all visible in the report (5 Merged / 2
+Extra); the manual merge of Nightlife/Going Out completed and dismissed (6 /
+0); the tag prune completed and the list fell to one. Driven through the QR
+road on a single simulator, which advertises nothing over Bonjour.
+
+### A note for whoever tests next
+
+`supabase gen types swift` (as CLAUDE.md writes it) now errors on CLI 2.110
+with "use --lang flag to specify the typegen language". The working form is
+`supabase gen types --local --lang swift --swift-access-control public`.
