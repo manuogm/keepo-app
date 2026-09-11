@@ -656,3 +656,96 @@ road on a single simulator, which advertises nothing over Bonjour.
 `supabase gen types swift` (as CLAUDE.md writes it) now errors on CLI 2.110
 with "use --lang flag to specify the typegen language". The working form is
 `supabase gen types --local --lang swift --swift-access-control public`.
+
+---
+
+## Fifth pass, 2026-09-11 — what the report shows, and how the ceremony reads
+
+The three broken features came back working from two real devices. Six
+pieces of polish, one of which reverses a decision from the second pass.
+
+### A merge remembers what it joined (feedback 1)
+
+The report's merge sheet drew the same tile twice for a merged pair, because
+`apply_category_merges` writes the resultant identity onto **both** rows —
+by the time the owner opens it, `Dining Out` no longer exists anywhere to be
+compared against `Dine Out`. 20260913100000 chose that deliberately ("the
+alternative is restoring a name from before the merge that this schema
+deliberately does not keep a copy of"); `20260920100000` keeps the copy.
+
+`pre_merge_name/icon/color`, captured at the one moment the identity is
+overwritten and `coalesce`d so a second merge over the same row keeps the
+*first* capture. Both merge sites capture: `apply_category_merges`, and
+`ensure_category_twin`'s exact-name branch, where the names match by
+definition but the icons and colours usually do not. The sheet's two tiles
+now read the originals and the headline reads the result — *what were these
+two* and *what will they become*, on one screen.
+
+**Unmerge is an undo now, not a release.** It restores both identities and
+puts each original back into a shared group of its own with the partner's
+twin re-minted, which is the shape the report draws under Extra. Order is
+the correctness argument: remember the ids, release the group *before*
+touching any name (`propagate_shared_category_edit` would otherwise copy the
+first restored name over the second row's, destroying the value being
+restored), restore, re-share. Two rows that were always called the same
+thing are the exception — they were never twinned, so re-sharing them would
+hand each member a duplicate or walk straight back into the exact-name
+branch and re-merge the pair. Those go private, which is where they came
+from.
+
+`unshare_category` and `unlink_shared_categories` clear the capture with the
+link. They do not restore from it: renaming somebody's category as a side
+effect of a share toggle is a worse surprise than losing an undo for a merge
+that is being dissolved anyway.
+
+Verified on device: the Utilities sheet drew `Utilities` and
+`Utilities & Bills` with their own icons and colours, and unmerging took
+Merged 5 → 4 and Extra 2 → 4 with both originals back under their own
+headings.
+
+### Select All (feedback 2)
+
+In `HouseholdPickerScaffold`, so the accounts and categories steps cannot
+drift, and one control covers both of the category picker's sections. It
+flips to Deselect All once everything is on, read off the list rather than
+remembered, so it is always the one that would change something. It sits on
+its own line under the title: beside it, the capsule and "Shared categories"
+overflow the width and wrap the heading, and a screen title that shrinks to
+make room for a shortcut has the priority backwards.
+
+### The ceremony (feedback 3 and the two additions)
+
+* The percentage is now the headline — `Number.balance` through
+  `numberFont`, above "Building Household" rather than under it. The step
+  name explains the figure instead of the other way round.
+* "Waiting for Alice" → "Waiting for Alice to finish the setup". The guest
+  holds at 90% for as long as the owner reads a report, and a sentence that
+  does not say what is being waited for reads as a hang.
+* **The steps are no longer ten equal ninths.** Each phase carries a 1-to-4
+  `weight`, and both the fill ramp and the per-phase floor come off it — so
+  the six steps that name something an earlier gate already made true go by
+  quickly, and the three with a server call behind them (`accept_invite`
+  returning, the fuzzy pass with its RPC and two pulls, the final sync) are
+  given room. The ladder is now 5, 10, 25, 30, 35, 55, 60, 70, 75, 90.
+* **The guest catches up instead of trailing.** The owner's early
+  announcements arrive while `accept_invite` is in flight and nobody is
+  reading the inbox, so the guest started several steps in debt and paid a
+  full floor for each one — staying that far behind for the whole ceremony.
+  `HouseholdPairingSession.hasBacklog` exposes the queue, and a step the
+  owner has already moved past now gets 220ms instead of its own floor.
+  Sampled on two simulators: both phones read **70%** in the same second,
+  with the guest showing the mirrored wording.
+
+### Verification
+
+pgTAP **445 tests, 32 files, PASS** (new
+`36_a_merge_remembers_what_it_joined.sql`) · SwiftLint 0/300 ·
+`xcodebuild test` TEST SUCCEEDED including a new `Ceremony progress` suite
+pinning the ladder's shape rather than its numbers · `supabase gen types`
+regenerated for the three new columns, with `v14_rebuild_syncable_tables`
+added so an upgraded device does not silently drop them.
+
+`CategoryMergeSheet` crossed the 250-line type-body lint; `Subject` moved to
+`CategoryMergeSubject.swift`, which is a seam rather than an arbitrary cut —
+it is the answer to "what is being merged", and the sheet is what the owner
+does about it.

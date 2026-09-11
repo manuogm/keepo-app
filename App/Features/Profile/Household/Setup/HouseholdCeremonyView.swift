@@ -116,20 +116,25 @@ struct HouseholdCeremonyView: View {
             }
 
             VStack(spacing: AppTheme.Spacing.s) {
-                Text(isComplete ? "Household built" : "Building Household")
-                    .font(AppTheme.Typography.sectionTitle)
-                    .foregroundStyle(AppTheme.Palette.textOnAccent)
-
-                // How far along, as a number. The filling house says
-                // "something is happening"; this says how much is left, which
-                // is the question anybody watching a progress animation is
-                // actually asking. It holds at 90% while the owner reviews the
-                // report — the same truth the house's own fill tells.
+                // How far along, as a number, and the headline of the screen.
+                // The filling house says "something is happening"; this says
+                // how much is left, which is the question anybody watching a
+                // progress animation is actually asking — so it leads, and
+                // the step name explains it rather than the other way round.
+                // It holds at 90% while the owner reviews the report — the
+                // same truth the house's own fill tells.
                 Text(fill.formatted(.percent.precision(.fractionLength(0))))
-                    .font(AppTheme.Typography.Number.inline)
+                    // `numberFont` rather than a raw `.font`: it carries the
+                    // `@ScaledMetric` that makes every display figure in the
+                    // app grow together under Dynamic Type.
+                    .numberFont(AppTheme.Typography.Number.balance, weight: .semibold)
                     .foregroundStyle(AppTheme.Palette.textOnAccent)
                     .contentTransition(.numericText())
                     .animation(AppTheme.Motion.colorSafe, value: fill)
+
+                Text(isComplete ? "Household built" : "Building Household")
+                    .font(AppTheme.Typography.sectionTitle)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
 
                 Text(caption)
                     .font(AppTheme.Typography.label)
@@ -244,7 +249,7 @@ struct HouseholdCeremonyView: View {
         case .finished:
             return "You belong to the same household now."
         case .waitingForOwner:
-            return "Waiting for \(coordinator.peer?.resolvedName ?? "the household owner")"
+            return "Waiting for \(coordinator.peer?.resolvedName ?? "the household owner") to finish the setup"
         case .readyForReport, .running, .failed:
             return coordinator.phase.title
         }

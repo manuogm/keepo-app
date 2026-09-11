@@ -75,6 +75,20 @@ struct HouseholdSnapshot {
     }
 }
 
+/// What a row was called before a merge took its name away.
+///
+/// A merged pair is two rows that agree about everything — that is what the
+/// merge *did* — so the report's own sheet had nothing to show the owner but
+/// the same tile twice. `pre_merge_*` is the only copy of the two categories
+/// the merge was made of, and these three are how every screen reads it:
+/// the row's own identity when it is not the product of a merge, and the
+/// identity it brought to one when it is.
+extension PublicSchema.CategoriesSelect {
+    var originalName: String { preMergeName ?? name }
+    var originalIcon: String { preMergeIcon ?? icon }
+    var originalColor: String { preMergeColor ?? color }
+}
+
 /// Two categories that are one category: one row per member, sharing a group.
 struct HouseholdMergedCategory: Identifiable, Equatable {
     let groupId: UUID

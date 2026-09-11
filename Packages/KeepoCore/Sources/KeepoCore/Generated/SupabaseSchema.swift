@@ -257,6 +257,9 @@ public enum PublicSchema {
     public let mergeOrigin: CategoryMergeOrigin?
     public let name: String
     public let ownerId: UUID
+    public let preMergeColor: String?
+    public let preMergeIcon: String?
+    public let preMergeName: String?
     public let sharedGroupId: UUID?
     public let syncSeq: Int64
     public let updatedAt: String
@@ -272,6 +275,9 @@ public enum PublicSchema {
       case mergeOrigin = "merge_origin"
       case name = "name"
       case ownerId = "owner_id"
+      case preMergeColor = "pre_merge_color"
+      case preMergeIcon = "pre_merge_icon"
+      case preMergeName = "pre_merge_name"
       case sharedGroupId = "shared_group_id"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
@@ -289,6 +295,9 @@ public enum PublicSchema {
     public let mergeOrigin: CategoryMergeOrigin?
     public let name: String
     public let ownerId: UUID
+    public let preMergeColor: String?
+    public let preMergeIcon: String?
+    public let preMergeName: String?
     public let sharedGroupId: UUID?
     public let syncSeq: Int64?
     public let updatedAt: String?
@@ -304,6 +313,9 @@ public enum PublicSchema {
       case mergeOrigin = "merge_origin"
       case name = "name"
       case ownerId = "owner_id"
+      case preMergeColor = "pre_merge_color"
+      case preMergeIcon = "pre_merge_icon"
+      case preMergeName = "pre_merge_name"
       case sharedGroupId = "shared_group_id"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"
@@ -321,6 +333,9 @@ public enum PublicSchema {
     public let mergeOrigin: CategoryMergeOrigin?
     public let name: String?
     public let ownerId: UUID?
+    public let preMergeColor: String?
+    public let preMergeIcon: String?
+    public let preMergeName: String?
     public let sharedGroupId: UUID?
     public let syncSeq: Int64?
     public let updatedAt: String?
@@ -336,6 +351,9 @@ public enum PublicSchema {
       case mergeOrigin = "merge_origin"
       case name = "name"
       case ownerId = "owner_id"
+      case preMergeColor = "pre_merge_color"
+      case preMergeIcon = "pre_merge_icon"
+      case preMergeName = "pre_merge_name"
       case sharedGroupId = "shared_group_id"
       case syncSeq = "sync_seq"
       case updatedAt = "updated_at"

@@ -150,6 +150,42 @@ enum HouseholdCeremonyPhase: Int, Codable, CaseIterable, Hashable, Sendable {
         }
     }
 
+    /// Roughly how much of the household this step is.
+    ///
+    /// The ten steps are not ten equal tenths of the work and the progress
+    /// should not pretend they are. Three of them sit in front of everything
+    /// that actually takes time — `accept_invite` returning, the fuzzy pass
+    /// plus its merge RPC and two pulls, the final sync — and six are the
+    /// narration of something an earlier gate already made true. A constant
+    /// 9% a step made the quick ones feel slow and the slow ones feel stuck,
+    /// which is the one thing a progress indicator exists not to do.
+    ///
+    /// Deliberately coarse. These are 1-to-4 ratings of "how much is
+    /// happening here", not measurements: the real durations depend on a
+    /// network and a category count, and a percentage fitted to a stopwatch
+    /// on one household would be wrong on the next.
+    var weight: Int {
+        switch self {
+        // The two phones already have each other's identity by the time this
+        // is drawn, and the invite is one small round trip.
+        case .sharingProfiles: return 1
+        // Already true: the token the guest is holding carries these.
+        case .sharingAccounts, .sharingCategories, .receivingCategories, .sharingTags: return 1
+        // Nothing merges tags automatically — the step names a decision the
+        // report will ask for.
+        case .mergingTags: return 1
+        // One pull, to bring the other member's tags onto this phone.
+        case .receivingTags: return 2
+        // The gate. `accept_invite` is one transaction carrying both members'
+        // accounts and both members' categories.
+        case .receivingAccounts: return 3
+        // A sync, then the fuzzy pass, then `apply_category_merges`, then
+        // another sync. The densest step in the ceremony by some distance.
+        case .mergingCategories: return 4
+        case .buildingHousehold: return 3
+        }
+    }
+
     /// How full the house is once this step is done.
     ///
     /// The last step stops at 0.9, not 1.0. The house is deliberately left
@@ -163,7 +199,23 @@ enum HouseholdCeremonyPhase: Int, Codable, CaseIterable, Hashable, Sendable {
     /// steps and would have the guest's percentage step backwards. See
     /// `HouseholdSetupCoordinator.fill`.
     var fill: Double {
-        Double(rawValue + 1) / Double(Self.allCases.count) * 0.9
+        let done = Self.allCases.prefix(rawValue + 1).reduce(0) { $0 + $1.weight }
+        let total = Self.allCases.reduce(0) { $0 + $1.weight }
+        return Double(done) / Double(total) * 0.9
+    }
+
+    /// The shortest this step may be on screen.
+    ///
+    /// Scaled by the same weight, so the pacing and the percentage tell one
+    /// story: a step worth 5% goes by in under a second, and the one worth
+    /// 20% is given room. It remains a **floor** — real work can stretch a
+    /// step, nothing shortens one.
+    ///
+    /// The lower bound is 0.8s rather than something brisker because two
+    /// people are reading these words off two phones at once, and a step name
+    /// that cannot be read is a step that may as well not be narrated.
+    var minimumDuration: Duration {
+        .milliseconds(550 + 250 * weight)
     }
 
     /// The mirror image of this step on the other phone. What the owner

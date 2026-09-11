@@ -25,6 +25,8 @@ struct HouseholdAccountPicker<Footer: View>: View {
             isLoaded: isLoaded,
             isEmpty: accounts.isEmpty,
             emptyMessage: "You have no accounts to share yet.",
+            everyID: accounts.map(\.id),
+            selection: $selection,
             footer: { footer },
             content: {
                     ForEach(HouseholdAccountGroup.allCases, id: \.self) { group in
@@ -80,6 +82,8 @@ struct HouseholdCategoryPicker<Footer: View>: View {
             isLoaded: isLoaded,
             isEmpty: categories.isEmpty,
             emptyMessage: "You have no categories to share yet.",
+            everyID: categories.map(\.id),
+            selection: $selection,
             footer: { footer },
             content: {
                     ForEach([PublicSchema.CategoryKind.expense, .income], id: \.self) { kind in
@@ -124,6 +128,14 @@ private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
     let isLoaded: Bool
     let isEmpty: Bool
     let emptyMessage: String
+    /// Every id the list offers, and the selection to write. Held here rather
+    /// than in the two pickers so the control cannot drift between them —
+    /// and so it sits beside the title, above *both* of the category
+    /// picker's sections. One button for the screen, not one per group: a
+    /// pair of them under "Expenses" and "Income" is more chrome than it
+    /// saves on a list of six.
+    let everyID: [UUID]
+    @Binding var selection: Set<UUID>
     /// The step's action, rendered as the last thing in the scroll rather
     /// than pinned over it — a list of switches with a button floating on top
     /// hides whichever row is underneath it, and the row it hides is always
@@ -147,6 +159,16 @@ private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+                // Its own line, trailing, rather than beside the title.
+                // Alongside it the capsule and "Shared categories" together
+                // overflow the width and wrap the heading onto two lines —
+                // and a screen title that wraps or shrinks to make room for a
+                // shortcut has the priority backwards.
+                if isLoaded && !isEmpty {
+                    selectAll
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+
                 if !isLoaded {
                     ProgressView()
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -168,6 +190,38 @@ private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
         }
         .background(AppTheme.Palette.bgCanvas)
         .scrollBounceBehavior(.basedOnSize)
+    }
+
+    /// One control with two jobs, because they are the same job: the fastest
+    /// route to "most of them" is all-on-then-untick a few, and the fastest
+    /// route back is all-off. Which one it offers is read off the list rather
+    /// than remembered, so it is always the one that would change something.
+    private var isEverythingSelected: Bool {
+        !everyID.isEmpty && everyID.allSatisfy(selection.contains)
+    }
+
+    private var selectAll: some View {
+        Button {
+            withAnimation(AppTheme.Motion.standard) {
+                if isEverythingSelected {
+                    selection.subtract(everyID)
+                } else {
+                    selection.formUnion(everyID)
+                }
+            }
+        } label: {
+            Text(isEverythingSelected ? "Deselect All" : "Select All")
+                .font(AppTheme.Typography.microEmphasis)
+                .foregroundStyle(PublicSchema.AccountScope.household.tint)
+                .padding(.horizontal, AppTheme.Spacing.s)
+                .padding(.vertical, AppTheme.Spacing.xs)
+                .background(
+                    PublicSchema.AccountScope.household.tint.opacity(AppTheme.Opacity.fill),
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.pressableCard)
+        .sensoryFeedback(AppTheme.Feedback.toggle, trigger: isEverythingSelected)
     }
 }
 

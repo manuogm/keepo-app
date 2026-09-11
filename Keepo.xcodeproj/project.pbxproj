@@ -43,6 +43,7 @@
 		29A9DAF6B04FAC0AE4F55FE5 /* FxRateWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE2A359806A42C23450BD63 /* FxRateWidget.swift */; };
 		2CFD36E60702C8927613C671 /* TransferDivergenceAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9CCA2BF8D2E735851609DA9 /* TransferDivergenceAlert.swift */; };
 		2DD3AAF91598A045DF790FD2 /* DashboardGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65CA9A35388756C92A2C2D1F /* DashboardGridView.swift */; };
+		2E3B3DDB0252C2C09D0842D5 /* CategoryMergeSubject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54321BA404673645FC7ACC9A /* CategoryMergeSubject.swift */; };
 		2EE829D9540BCA03093D5566 /* CategoryIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA3361FC13DBC4D8C0BF9A01 /* CategoryIconView.swift */; };
 		2F0B4AC72E20917F31A0D9F7 /* AccountFormView+Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = E82D12D8E224E6F3833EFD78 /* AccountFormView+Data.swift */; };
 		2F93B60FFC35E87E8539459C /* CurrencyFlagAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7440D8EAA40F17639CC1041 /* CurrencyFlagAssetTests.swift */; };
@@ -241,6 +242,7 @@
 		EAE9BB0551B52CA258B1C65A /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD124F353024A73375A9AF82 /* ProfileView.swift */; };
 		EB554CA339750A417EB0F1B9 /* HouseholdSetupCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21DDD5B9F4CCB6DEB4FD9822 /* HouseholdSetupCoordinator.swift */; };
 		EB815779CF513F76B2473F8E /* HouseholdPairingPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66868ACBE8602B4C6A23AA49 /* HouseholdPairingPermission.swift */; };
+		EE831F5FCEEE2B4DA8882CBF /* HouseholdCeremonyPhaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDE221678D9A5BF41714A1B /* HouseholdCeremonyPhaseTests.swift */; };
 		EF971C3B042A4DEBE7CDF42D /* ScopeFilteringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C53BB03D4172A9EB478749C /* ScopeFilteringTests.swift */; };
 		EFBBF3712CE22D122A3C094D /* AppTheme+Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30916B8D3671A5BD1B620655 /* AppTheme+Typography.swift */; };
 		F0AAA6E73FF0AA1BEAC9C8E4 /* OutboxLocalWrite+Cards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DE810306ADAEBB96D57A745 /* OutboxLocalWrite+Cards.swift */; };
@@ -382,6 +384,7 @@
 		50EF6E55983303FD58CA0B30 /* ProfileRowLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRowLabel.swift; sourceTree = "<group>"; };
 		5128E2B3C07029D4C8598446 /* CaptureNotify.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotify.swift; sourceTree = "<group>"; };
 		5217828C1806CB6DD7973DB8 /* RemoveBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoveBadge.swift; sourceTree = "<group>"; };
+		54321BA404673645FC7ACC9A /* CategoryMergeSubject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryMergeSubject.swift; sourceTree = "<group>"; };
 		545F067E19458ED8951075E0 /* OutboxPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxPayloads.swift; sourceTree = "<group>"; };
 		54A90C1F178F118C5A076397 /* RefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinator.swift; sourceTree = "<group>"; };
 		5597232F1DF84A5AC9F1058F /* NotificationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationRouter.swift; sourceTree = "<group>"; };
@@ -460,6 +463,7 @@
 		AC6172260F18B9BD85969A88 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		AD95DB3B792AD9E1A3FD2755 /* HouseholdReportAccounts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdReportAccounts.swift; sourceTree = "<group>"; };
 		ADB4D58C60A91E97162570E8 /* CaptureNotificationCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationCopy.swift; sourceTree = "<group>"; };
+		ADDE221678D9A5BF41714A1B /* HouseholdCeremonyPhaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdCeremonyPhaseTests.swift; sourceTree = "<group>"; };
 		AEF251868300EF158A6F57D1 /* FormPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormPrimitives.swift; sourceTree = "<group>"; };
 		AF2E1C41DCDF32CA26D9E904 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		AF3A3B1E628DB2EC5C721FAA /* HouseholdCeremonyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdCeremonyView.swift; sourceTree = "<group>"; };
@@ -891,6 +895,7 @@
 			isa = PBXGroup;
 			children = (
 				341E14CE6FFBD77B40BAD3E6 /* CategoryMergeSheet.swift */,
+				54321BA404673645FC7ACC9A /* CategoryMergeSubject.swift */,
 				5CB53E034FD3042637C97381 /* CategoryMergeTiles.swift */,
 				AD95DB3B792AD9E1A3FD2755 /* HouseholdReportAccounts.swift */,
 				65131372E8A961D7B423253D /* HouseholdReportCategories.swift */,
@@ -1016,6 +1021,7 @@
 				C80AB872EF3B66A5C757E62D /* DashboardGeometryTests.swift */,
 				C3FEA59391FE97D8365A918F /* DashboardScopeFixture.swift */,
 				B613C356A942D38A598800EC /* DashboardWidgetMetricsTests.swift */,
+				ADDE221678D9A5BF41714A1B /* HouseholdCeremonyPhaseTests.swift */,
 				8BD07F8E4322452DD34E6A1C /* KeepoTests.swift */,
 				38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */,
 				A5D45833432D943398CC902D /* LocalMoneyConversionArchivedAccountTests.swift */,
@@ -1290,6 +1296,7 @@
 				197652F2F5196F4A4487FB4F /* DashboardGeometryTests.swift in Sources */,
 				CD8D3443804EBD1B5E4A6BE4 /* DashboardScopeFixture.swift in Sources */,
 				05E2ED4777332A5751BFCD16 /* DashboardWidgetMetricsTests.swift in Sources */,
+				EE831F5FCEEE2B4DA8882CBF /* HouseholdCeremonyPhaseTests.swift in Sources */,
 				4C27DB33415AF4D03D91EEE8 /* KeepoTests.swift in Sources */,
 				BE4065A6413D625D4C960DC1 /* LocalAccountRowTests.swift in Sources */,
 				CBA1F8EB27B25B3AE8413965 /* LocalMoneyConversionArchivedAccountTests.swift in Sources */,
@@ -1371,6 +1378,7 @@
 				2EE829D9540BCA03093D5566 /* CategoryIconView.swift in Sources */,
 				6816EB621F86C2FCE0861C70 /* CategoryLocalWrite.swift in Sources */,
 				37E8FE8EFD376BDDE344AB6F /* CategoryMergeSheet.swift in Sources */,
+				2E3B3DDB0252C2C09D0842D5 /* CategoryMergeSubject.swift in Sources */,
 				A91D573436DB3670A85B7632 /* CategoryMergeTiles.swift in Sources */,
 				625F861035030FD85FA5D8A4 /* ChartAxisLabels.swift in Sources */,
 				0CFAB8B74442EB878B25B5D6 /* ColorHex.swift in Sources */,

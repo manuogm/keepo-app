@@ -21,40 +21,6 @@ import SwiftUI
 /// categories (id, owner_id)` means each member keeps filing under their own
 /// row, and the merge is what makes the two rows read as one category.
 struct CategoryMergeSheet: View {
-    /// What is being merged — an existing pair being edited, or a new merge
-    /// starting from one of your unpartnered categories.
-    enum Subject: Identifiable {
-        case existing(HouseholdMergedCategory)
-        case new(HouseholdExtraCategory)
-
-        var id: UUID {
-            switch self {
-            case .existing(let merged): return merged.groupId
-            case .new(let extra): return extra.category.id
-            }
-        }
-
-        var kind: PublicSchema.CategoryKind {
-            switch self {
-            case .existing(let merged): return merged.kind
-            case .new(let extra): return extra.category.kind
-            }
-        }
-
-        /// Your own row, which is always the left-hand tile.
-        var mine: PublicSchema.CategoriesSelect {
-            switch self {
-            case .existing(let merged): return merged.mine
-            case .new(let extra): return extra.category
-            }
-        }
-
-        var isExisting: Bool {
-            if case .existing = self { return true }
-            return false
-        }
-    }
-
     let session: SessionStore
     let snapshot: HouseholdSnapshot
     let subject: Subject
@@ -132,9 +98,14 @@ struct CategoryMergeSheet: View {
                 .textInputAutocapitalization(.words)
                 .submitLabel(.done)
 
-            Text("Both of you will see this name, icon and colour.")
-                .font(AppTheme.Typography.micro)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
+            Text(
+                subject.isExisting
+                    ? "What the two below became. Both of you see this name, icon and colour."
+                    : "Both of you will see this name, icon and colour."
+            )
+            .font(AppTheme.Typography.micro)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
+            .multilineTextAlignment(.center)
         }
     }
 
@@ -144,9 +115,9 @@ struct CategoryMergeSheet: View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.s) {
             column("Shared by You") {
                 MergeCategoryTile(
-                    name: subject.mine.name,
-                    icon: subject.mine.icon,
-                    color: Color(hex: subject.mine.color)
+                    name: subject.mine.originalName,
+                    icon: subject.mine.originalIcon,
+                    color: Color(hex: subject.mine.originalColor)
                 )
             }
 
@@ -165,15 +136,15 @@ struct CategoryMergeSheet: View {
                             Button {
                                 partner = option
                             } label: {
-                                Label(option.name, systemImage: option.icon)
+                                Label(option.originalName, systemImage: option.originalIcon)
                             }
                         }
                     } label: {
                         if let partner {
                             MergeCategoryTile(
-                                name: partner.name,
-                                icon: partner.icon,
-                                color: Color(hex: partner.color),
+                                name: partner.originalName,
+                                icon: partner.originalIcon,
+                                color: Color(hex: partner.originalColor),
                                 isActionable: true
                             )
                         } else {
@@ -233,7 +204,7 @@ struct CategoryMergeSheet: View {
                 Task { await performUnmerge() }
             }
 
-            Text("Both categories go back to being separate. Neither loses a transaction.")
+            Text("Each goes back to its own name, icon and colour. Neither loses a transaction.")
                 .font(AppTheme.Typography.micro)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)

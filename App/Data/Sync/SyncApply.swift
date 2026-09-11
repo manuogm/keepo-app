@@ -34,7 +34,8 @@ enum SyncApply {
         ],
         "categories": [
             "id", "owner_id", "kind", "name", "is_default", "icon", "color", "shared_group_id",
-            "merge_origin", "version", "deleted_at", "created_at", "updated_at", "sync_seq"
+            "merge_origin", "pre_merge_name", "pre_merge_icon", "pre_merge_color",
+            "version", "deleted_at", "created_at", "updated_at", "sync_seq"
         ],
         "recurring_rules": [
             "id", "owner_id", "created_by", "account_id", "category_id", "amount_e4", "currency", "frequency",

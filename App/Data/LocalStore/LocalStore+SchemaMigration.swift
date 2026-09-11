@@ -111,5 +111,13 @@ extension LocalStore {
         // schema), and the Household report would file every merged category
         // under Extra — the one distinction that column exists to carry.
         migrator.registerMigration("v13_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260920100000 adds
+        // categories.pre_merge_name/icon/color server-side. Additive, so
+        // nothing hard-fails; a stale device would silently drop all three
+        // from every pulled category (`SyncApply` intersects its whitelist
+        // with the local schema), and the merge sheet would go on showing two
+        // identical tiles for a merged pair — the exact thing those columns
+        // were added to fix.
+        migrator.registerMigration("v14_rebuild_syncable_tables", migrate: rebuildSyncableTables)
     }
 }

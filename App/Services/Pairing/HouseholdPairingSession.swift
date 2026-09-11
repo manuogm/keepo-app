@@ -73,6 +73,17 @@ final class HouseholdPairingSession: NSObject {
     private var waiter: CheckedContinuation<HouseholdPairingMessage?, Never>?
     private var isStopped = false
 
+    /// Whether another message is already waiting behind the one just read.
+    ///
+    /// The guest paces itself off a floor per step, and the owner's early
+    /// announcements arrive while `accept_invite` is still in flight and
+    /// nobody is reading the inbox — so they all land at once and the guest
+    /// starts the ceremony several steps in debt, paying a full floor for
+    /// each one it works through and never catching up. Reading the backlog
+    /// is what lets it shorten the floor until it is level with the owner
+    /// again. See `HouseholdSetupCoordinator.renderPhase`.
+    var hasBacklog: Bool { !pending.isEmpty }
+
     /// The next message, or `nil` once the link is closed for good.
     func nextMessage() async -> HouseholdPairingMessage? {
         if !pending.isEmpty { return pending.removeFirst() }

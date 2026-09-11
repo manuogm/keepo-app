@@ -33,16 +33,16 @@ import SwiftUI
 @Observable
 @MainActor
 final class HouseholdSetupCoordinator {
-    /// The shortest a step may be on screen.
+    /// How long the guest spends on a step it is already behind on.
     ///
-    /// Was 560ms, which two people watching on real phones found too quick to
-    /// read — the step names went by faster than they could be taken in, and
-    /// the ceremony's whole point is that both of you can follow what is
-    /// happening. At 1.1s the ten steps take about eleven seconds, which is
-    /// long enough to read each line and still short enough to feel like an
-    /// event rather than a wait. A slow network stretches a step; nothing
-    /// shortens one.
-    private static let phaseFloor: Duration = .milliseconds(1100)
+    /// The owner's first announcements arrive while `accept_invite` is in
+    /// flight and nobody is reading the inbox, so the guest begins several
+    /// steps in debt. Paying the full floor for each of those keeps the two
+    /// phones that far apart for the whole ceremony — which two people
+    /// watching side by side read as one of them being stuck. While there is
+    /// a backlog the guest spends just enough on a step to see it change,
+    /// and converges on the owner within a step or two.
+    private static let catchUpFloor: Duration = .milliseconds(220)
 
     enum Outcome: Equatable {
         case running
@@ -236,19 +236,22 @@ final class HouseholdSetupCoordinator {
 
     // MARK: - Steps
 
-    /// Runs `work`, holds the phase on screen for at least the floor, then
-    /// tells the other phone where we are.
+    /// Runs `work`, holds the phase on screen for at least its own floor,
+    /// then tells the other phone where we are.
     ///
     /// The floor is measured around the work rather than after it, so a step
     /// whose call takes a second does not then sit for another half — the
-    /// pacing is a minimum, not an addition.
+    /// pacing is a minimum, not an addition. Each phase carries its own (see
+    /// `HouseholdCeremonyPhase.minimumDuration`), so the steps that are only
+    /// naming something already true go by quickly and the ones with a server
+    /// call behind them are given room.
     private func step(_ next: HouseholdCeremonyPhase, work: @escaping () async throws -> Void) async throws {
         setPhase(next, fill: next.fill)
         if role == .owner { pairing.send(.phase(next)) }
 
         let startedAt = ContinuousClock.now
         try await work()
-        let remaining = Self.phaseFloor - startedAt.duration(to: ContinuousClock.now)
+        let remaining = next.minimumDuration - startedAt.duration(to: ContinuousClock.now)
         if remaining > .zero { try await Task.sleep(for: remaining) }
     }
 
@@ -276,7 +279,11 @@ final class HouseholdSetupCoordinator {
     private func renderPhase(_ announced: HouseholdCeremonyPhase) async throws {
         let startedAt = ContinuousClock.now
         setPhase(announced.mirrored, fill: announced.fill)
-        let remaining = Self.phaseFloor - startedAt.duration(to: ContinuousClock.now)
+        // A step the owner has already moved past is one this side is behind
+        // on, not one to dwell over. `announced.minimumDuration` is the pace
+        // the owner is keeping; the backlog is the debt.
+        let floor = pairing.hasBacklog ? Self.catchUpFloor : announced.minimumDuration
+        let remaining = floor - startedAt.duration(to: ContinuousClock.now)
         if remaining > .zero { try await Task.sleep(for: remaining) }
     }
 
