@@ -84,12 +84,29 @@ final class HouseholdSetupCoordinator {
     let role: HouseholdPairingIdentity.Role
     var peer: HouseholdPairingIdentity? { pairing.peer }
 
-    private let session: SessionStore
+    /// Internal rather than private for the teardown in
+    /// `HouseholdSetupCoordinator+Teardown.swift` — `pairing` and `role`
+    /// beside it already are.
+    let session: SessionStore
     private let selectedAccountIds: [UUID]
     private let selectedCategoryIds: [UUID]
     /// Kept so the report can tell an original category from a twin that
     /// `accept_invite` auto-created — see `autoMergeCategories()`.
     private(set) var mergedGroupIds: Set<UUID> = []
+    /// Whether **this run** brought the household into existence, and whether
+    /// anybody ever arrived in it. Together they are what makes an abort safe
+    /// to undo: a household the user already had is not this screen's to
+    /// dissolve, and one nobody joined is this screen's to discard. The same
+    /// two facts, for the same reason, as `HouseholdQRView.discardIfUnused`.
+    ///
+    /// Internal rather than private only because the teardown that reads them
+    /// lives in `HouseholdSetupCoordinator+Teardown.swift`, split off for the
+    /// project's file-length lint.
+    var didCreateHousehold = false
+    var hasJoined = false
+    /// Set by `abort()`, so the failure it deliberately causes is not then
+    /// reported back to the person who chose it.
+    var didAbort = false
 
     init(
         session: SessionStore,
@@ -121,12 +138,20 @@ final class HouseholdSetupCoordinator {
             // `UserFacingError.describe` deliberately suppresses errors it
             // does not recognise into "Something went wrong", which is the
             // right default for a Postgres failure and the wrong one here.
-            outcome = .failed(error.message)
-            pairing.send(.cancelled(reason: error.message))
+            await report(error.message)
         } catch {
-            outcome = .failed(UserFacingError.describe(error))
-            pairing.send(.cancelled(reason: nil))
+            await report(UserFacingError.describe(error))
         }
+    }
+
+    /// The single place `outcome` is written from outside the run.
+    ///
+    /// `outcome` stays `private(set)`: the run is what decides how the
+    /// ceremony went, and a settable outcome is a screen any caller could
+    /// lie to. The teardown next door needs exactly this one word and gets
+    /// exactly this one word.
+    func conclude(_ message: String) {
+        outcome = .failed(message)
     }
 
     /// Called by the report when the owner presses Finish. Both houses fill
@@ -159,6 +184,7 @@ final class HouseholdSetupCoordinator {
         // household actually has two members and both sets of shares.
         try await step(.receivingAccounts) {
             try await self.waitForJoin()
+            self.hasJoined = true
         }
 
         // Already true — the same transaction applied both members' category
@@ -189,6 +215,18 @@ final class HouseholdSetupCoordinator {
         }
 
         outcome = .readyForReport
+
+        // The report has no clock on it — the owner can sit with it for
+        // minutes. Nobody is reading the inbox during that, so a guest who
+        // backs out would leave the owner reviewing a household the server
+        // has already dissolved, and finding out one failed RPC at a time.
+        // The loop ends on its own when the link is torn down, which resumes
+        // the waiter with nil.
+        while let message = await pairing.nextMessage() {
+            if case .cancelled(let reason) = message {
+                throw HouseholdLinkError.stopped(reason)
+            }
+        }
     }
 
     // MARK: - The guest's run
@@ -206,6 +244,7 @@ final class HouseholdSetupCoordinator {
             accountIds: selectedAccountIds,
             categoryIds: selectedCategoryIds
         )
+        hasJoined = true
         await session.syncNow()
         session.refresh.bump()
         pairing.send(.joined)
@@ -226,7 +265,9 @@ final class HouseholdSetupCoordinator {
                 outcome = .finished
                 return
             case .cancelled(let reason):
-                outcome = .failed(reason ?? "The other phone stopped before the household was built.")
+                await report(
+                    reason ?? "\(peer?.resolvedName ?? "The other phone") stopped before the household was built."
+                )
                 return
             case .identity, .invite, .joined:
                 continue
@@ -246,6 +287,13 @@ final class HouseholdSetupCoordinator {
     /// naming something already true go by quickly and the ones with a server
     /// call behind them are given room.
     private func step(_ next: HouseholdCeremonyPhase, work: @escaping () async throws -> Void) async throws {
+        // Checked here rather than by awaiting the inbox, because between
+        // `waitForJoin` and the end of the ceremony nobody is awaiting it —
+        // the owner is inside these closures doing server work. A guest who
+        // backs out mid-ceremony would otherwise sit unread in `pending`
+        // while this side went on building a household that no longer has
+        // two members in it.
+        if pairing.didPeerStop { throw HouseholdLinkError.stopped(pairing.peerStopReason) }
         setPhase(next, fill: next.fill)
         if role == .owner { pairing.send(.phase(next)) }
 
@@ -329,6 +377,7 @@ final class HouseholdSetupCoordinator {
         }
         guard existing == nil else { return }
         try await HouseholdRepository.create(client: session.client)
+        didCreateHousehold = true
         await session.syncNow()
     }
 

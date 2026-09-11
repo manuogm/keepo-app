@@ -36,6 +36,12 @@ struct HouseholdCeremonyView: View {
 
     @State private var isShowingReport = false
     @State private var hasCelebrated = false
+    @State private var isConfirmingStop = false
+    @State private var isStopping = false
+    /// Cleared whenever a ceremony ends badly — see the `.failed` branch
+    /// below. `HouseholdView` watches this to decide whether to open its
+    /// "they left, your household has been dissolved" notice.
+    @AppStorage(AppSettingsKeys.lastKnownHouseholdId) private var lastKnownHouseholdId = ""
 
     /// A very dark shade of the household colour, per the spec — the same hue
     /// the scope banner uses, taken almost to black so the filling house and
@@ -52,7 +58,35 @@ struct HouseholdCeremonyView: View {
             glow
             content
         }
+        // An **overlay**, not a fourth layer in the ZStack. Giving the stack
+        // `.topLeading` to place this button re-aligned every layer in it:
+        // the house, the glow and the whole caption block size to their
+        // content, so they stopped being centred and went to the corner with
+        // the button.
+        .overlay(alignment: .topLeading) {
+            if canStop { stopButton }
+        }
         .preferredColorScheme(.dark)
+        // An alert rather than a `confirmationDialog`: presented from inside
+        // this full-screen cover, the dialog rendered as a compact card with
+        // the **cancel button missing entirely** — one destructive button and
+        // no drawn way back. A confirmation whose only visible answer is yes
+        // is worse than no confirmation.
+        .alert("Stop building this household?", isPresented: $isConfirmingStop) {
+            Button("Stop", role: .destructive) {
+                isStopping = true
+                Task {
+                    await coordinator.abort()
+                    onBuilt()
+                }
+            }
+            Button("Keep Going", role: .cancel) {}
+        } message: {
+            Text(
+                "The household won't be created and the other phone will be told. "
+                    + "Neither of you loses an account, a category or a tag."
+            )
+        }
         // Every step lands as a tap. The vocabulary is deliberate: `.toggle`
         // for the eight ordinary steps and `.success` for the finish, so the
         // end of the ceremony is felt as different rather than just as the
@@ -72,7 +106,22 @@ struct HouseholdCeremonyView: View {
                     try? await Task.sleep(for: .seconds(2.6))
                     onBuilt()
                 }
-            case .running, .waitingForOwner, .failed:
+            case .failed:
+                // The other phone backed out while this one was reading the
+                // report. Take the report down — it is describing a household
+                // that no longer exists — and let the failure underneath say
+                // so.
+                isShowingReport = false
+                // ...and that failure *is* the notice. Without this, both
+                // phones then land on the Household screen and get
+                // `HouseholdDissolvedSheet` on top of it — which says
+                // somebody left a household that, per the screen behind it,
+                // was never built. On the phone that pressed Stop it named
+                // the wrong person entirely. Same clearing, and the same
+                // reasoning, as `HouseholdView.leave()`: they know, they were
+                // just told.
+                lastKnownHouseholdId = ""
+            case .running, .waitingForOwner:
                 break
             }
         }
@@ -92,6 +141,43 @@ struct HouseholdCeremonyView: View {
                 }
             )
         }
+    }
+
+    /// Only while it is still being built.
+    ///
+    /// `.finished` takes itself off screen a couple of seconds later, and
+    /// `.failed` already draws its own Close — a second way out beside it
+    /// would be two buttons for one act. `.readyForReport` is the owner with
+    /// the report covering this screen; what happens there is the report's
+    /// own business.
+    private var canStop: Bool {
+        switch coordinator.outcome {
+        case .running, .waitingForOwner: return true
+        case .readyForReport, .finished, .failed: return false
+        }
+    }
+
+    /// Top-left, over the ceremony rather than in a bar, because there is no
+    /// bar: both phones are full-screen covers with no chrome. Until this
+    /// existed the ritual was a one-way door — the only ways out were to
+    /// finish it or for the link to drop.
+    private var stopButton: some View {
+        Button { isConfirmingStop = true } label: {
+            Image(systemName: "xmark")
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .padding(AppTheme.Spacing.s)
+                .background(
+                    AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fill), in: Circle()
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isStopping)
+        .opacity(isStopping ? AppTheme.Opacity.dim : 1)
+        .padding(.leading, AppTheme.Spacing.l)
+        .padding(.top, AppTheme.Spacing.m)
+        .accessibilityLabel("Stop building this household")
     }
 
     // MARK: - Layers
@@ -263,63 +349,5 @@ struct HouseholdCeremonyView: View {
         case .waitingForOwner, .finished, .readyForReport: return .local
         case .running, .failed: return coordinator.phase.direction
         }
-    }
-}
-
-// MARK: - Particles
-
-/// Light travelling between the two phones.
-///
-/// Driven by `TimelineView(.animation)` and pure arithmetic on the clock
-/// rather than by animated state: there are two dozen of these, each on its
-/// own offset, and giving every one its own `@State` plus a repeating
-/// animation is two dozen animation drivers SwiftUI has to keep in step. One
-/// clock, twenty-four positions computed from it, no state at all.
-private struct CeremonyParticles: View {
-    let direction: HouseholdCeremonyPhase.Direction
-    let tint: Color
-
-    private static let count = 24
-    private static let period: Double = 2.2
-
-    var body: some View {
-        TimelineView(.animation) { context in
-            Canvas { drawing, size in
-                guard direction != .local else { return }
-                let now = context.date.timeIntervalSinceReferenceDate
-
-                for index in 0..<Self.count {
-                    // A stable pseudo-random lane and phase per particle, so
-                    // the stream looks scattered but never re-scatters
-                    // between frames.
-                    let seed = Double(index)
-                    let lane = (sin(seed * 12.9898) * 43758.5453).truncatingRemainder(dividingBy: 1).magnitude
-                    let offset = (sin(seed * 78.233) * 12345.678).truncatingRemainder(dividingBy: 1).magnitude
-
-                    var progress = ((now / Self.period) + offset).truncatingRemainder(dividingBy: 1)
-                    if direction == .inbound { progress = 1 - progress }
-
-                    let originX = size.width * (0.12 + lane * 0.76)
-                    let originY = size.height * progress
-                    // Fade in and out at both ends so nothing pops into
-                    // existence at the edge of the canvas.
-                    let fade = sin(progress * .pi)
-                    let radius = 1.5 + lane * 2
-
-                    drawing.fill(
-                        Path(
-                            ellipseIn: CGRect(
-                                x: originX - radius, y: originY - radius,
-                                width: radius * 2, height: radius * 2
-                            )
-                        ),
-                        with: .color(tint.opacity(0.15 + fade * 0.75))
-                    )
-                }
-            }
-        }
-        .blur(radius: 0.6)
-        .animation(AppTheme.Motion.colorSafe, value: direction)
-        .accessibilityHidden(true)
     }
 }

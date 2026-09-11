@@ -150,72 +150,69 @@ enum HouseholdCeremonyPhase: Int, Codable, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// Roughly how much of the household this step is.
+    /// How full the house is once this step is done, as a percentage.
     ///
-    /// The ten steps are not ten equal tenths of the work and the progress
-    /// should not pretend they are. Three of them sit in front of everything
-    /// that actually takes time — `accept_invite` returning, the fuzzy pass
-    /// plus its merge RPC and two pulls, the final sync — and six are the
-    /// narration of something an earlier gate already made true. A constant
-    /// 9% a step made the quick ones feel slow and the slow ones feel stuck,
-    /// which is the one thing a progress indicator exists not to do.
+    /// Written out rather than computed, and deliberately not a pattern. Ten
+    /// equal ninths made the six steps that narrate something an earlier gate
+    /// already made true feel as slow as the three with a server round trip
+    /// behind them. But a *tidy* weighting is its own tell — a ladder of
+    /// 5, 10, 25, 30, 35 is visibly arithmetic, and progress that can be
+    /// predicted a step ahead stops being read as progress and starts being
+    /// read as an animation.
     ///
-    /// Deliberately coarse. These are 1-to-4 ratings of "how much is
-    /// happening here", not measurements: the real durations depend on a
-    /// network and a category count, and a percentage fitted to a stopwatch
-    /// on one household would be wrong on the next.
-    var weight: Int {
+    /// So these are hand-set: uneven, unrounded, no repeating interval, and
+    /// **no two consecutive steps the same size**, which is the property that
+    /// makes a ladder look counted rather than authored. The three long jumps
+    /// are the three real gates — `accept_invite` returning, the fuzzy pass
+    /// with its merge RPC and two pulls, and the final sync.
+    ///
+    /// It stops at 90, not 100. The house is deliberately left unfinished
+    /// while the owner reviews the report and the guest waits — the household
+    /// is not real until Finish, and a full house followed by several minutes
+    /// of waiting would be the animation telling a lie the user has to sit
+    /// through.
+    var filledPercent: Int {
         switch self {
-        // The two phones already have each other's identity by the time this
-        // is drawn, and the invite is one small round trip.
-        case .sharingProfiles: return 1
-        // Already true: the token the guest is holding carries these.
-        case .sharingAccounts, .sharingCategories, .receivingCategories, .sharingTags: return 1
-        // Nothing merges tags automatically — the step names a decision the
-        // report will ask for.
-        case .mergingTags: return 1
-        // One pull, to bring the other member's tags onto this phone.
-        case .receivingTags: return 2
-        // The gate. `accept_invite` is one transaction carrying both members'
-        // accounts and both members' categories.
-        case .receivingAccounts: return 3
-        // A sync, then the fuzzy pass, then `apply_category_merges`, then
-        // another sync. The densest step in the ceremony by some distance.
-        case .mergingCategories: return 4
-        case .buildingHousehold: return 3
+        case .sharingProfiles: return 5
+        case .sharingAccounts: return 9
+        case .receivingAccounts: return 26
+        case .sharingCategories: return 31
+        case .receivingCategories: return 37
+        case .mergingCategories: return 58
+        case .sharingTags: return 62
+        case .receivingTags: return 73
+        case .mergingTags: return 78
+        case .buildingHousehold: return 90
         }
     }
 
-    /// How full the house is once this step is done.
-    ///
-    /// The last step stops at 0.9, not 1.0. The house is deliberately left
-    /// unfinished while the owner reviews the report and the guest waits —
-    /// the household is not real until the owner presses Finish, and a full
-    /// house followed by several minutes of waiting would be the animation
-    /// telling a lie the user has to sit through.
+    /// How far along, in 0...1.
     ///
     /// Read only by `HouseholdSetupCoordinator`, and always off the phase the
     /// **owner announced** — never off `mirrored`, which swaps two adjacent
     /// steps and would have the guest's percentage step backwards. See
     /// `HouseholdSetupCoordinator.fill`.
-    var fill: Double {
-        let done = Self.allCases.prefix(rawValue + 1).reduce(0) { $0 + $1.weight }
-        let total = Self.allCases.reduce(0) { $0 + $1.weight }
-        return Double(done) / Double(total) * 0.9
+    var fill: Double { Double(filledPercent) / 100 }
+
+    /// How much of the house this step alone adds.
+    var step: Int {
+        guard let previous = Self(rawValue: rawValue - 1) else { return filledPercent }
+        return filledPercent - previous.filledPercent
     }
 
     /// The shortest this step may be on screen.
     ///
-    /// Scaled by the same weight, so the pacing and the percentage tell one
-    /// story: a step worth 5% goes by in under a second, and the one worth
-    /// 20% is given room. It remains a **floor** — real work can stretch a
-    /// step, nothing shortens one.
+    /// Taken from the same number as the percentage, so pacing and progress
+    /// cannot disagree: a step worth 4% goes by in under a second, and the
+    /// one worth 21% is given room. It remains a **floor** — real work can
+    /// stretch a step, nothing shortens one.
     ///
-    /// The lower bound is 0.8s rather than something brisker because two
-    /// people are reading these words off two phones at once, and a step name
-    /// that cannot be read is a step that may as well not be narrated.
+    /// The lower bound is deliberately above what the arithmetic alone would
+    /// give. Two people are reading these words off two phones at once, and a
+    /// step name that cannot be read is a step that may as well not be
+    /// narrated.
     var minimumDuration: Duration {
-        .milliseconds(550 + 250 * weight)
+        .milliseconds(700 + 30 * step)
     }
 
     /// The mirror image of this step on the other phone. What the owner

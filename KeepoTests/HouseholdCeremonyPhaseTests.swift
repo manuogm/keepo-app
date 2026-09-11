@@ -26,29 +26,34 @@ struct HouseholdCeremonyPhaseTests {
         #expect((phases.last?.fill ?? 0).isApproximately(0.9))
     }
 
-    /// The regression: a constant step is the thing being removed.
-    @Test("no two steps are worth the same amount of progress")
-    func stepsAreNotUniform() {
-        let steps = zip(phases, phases.dropFirst()).map { $1.fill - $0.fill }
-        #expect(Set(steps.map { ($0 * 1000).rounded() }).count > 1)
+    /// The regression: a constant step was the first thing removed, and a
+    /// *tidy* one is the second. Progress that can be predicted a step ahead
+    /// stops reading as progress.
+    @Test("the ladder has no pattern to spot")
+    func stepsLookOrganic() {
+        let steps = phases.map(\.step)
+        #expect(Set(steps).count >= 5, "only \(Set(steps).count) distinct step sizes: \(steps)")
+        for (earlier, later) in zip(steps, steps.dropFirst()) {
+            #expect(earlier != later, "two steps of \(earlier) in a row reads as a pattern")
+        }
     }
 
     @Test("the steps with a server call behind them are the big ones")
     func theWorkCarriesTheWeight() {
         let gated: [HouseholdCeremonyPhase] = [.receivingAccounts, .mergingCategories, .buildingHousehold]
         let narrated: [HouseholdCeremonyPhase] = [.sharingProfiles, .sharingAccounts, .mergingTags]
-        let lightest = gated.map(\.weight).min() ?? 0
-        let heaviest = narrated.map(\.weight).max() ?? 0
+        let lightest = gated.map(\.step).min() ?? 0
+        let heaviest = narrated.map(\.step).max() ?? 0
         #expect(lightest > heaviest)
     }
 
     /// Pacing and percentage have to tell one story: a step worth 5% that sat
     /// on screen as long as the one worth 20% is the same lie in a different
     /// place.
-    @Test("time on screen follows the same weighting")
-    func durationFollowsWeight() {
+    @Test("time on screen follows the same number as the percentage")
+    func durationFollowsTheStep() {
         for phase in phases {
-            for other in phases where phase.weight < other.weight {
+            for other in phases where phase.step < other.step {
                 #expect(phase.minimumDuration < other.minimumDuration)
             }
         }

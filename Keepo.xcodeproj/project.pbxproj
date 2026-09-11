@@ -62,7 +62,9 @@
 		39E9A032A4C47DDFD25A6A1C /* LocalDashboardQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3AF792C04D22B7EF9030339 /* LocalDashboardQueries.swift */; };
 		3A61F61EAADD3574DD5A9E4A /* MetricHeadline.swift in Sources */ = {isa = PBXBuildFile; fileRef = F149A624F5F2249B3FA98BA9 /* MetricHeadline.swift */; };
 		3A9AACA2AC8D02F3ED6645C3 /* OutboxLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A3C001E043B35FE6CF03CC /* OutboxLocalWriteTests.swift */; };
+		3D48EF697266F82826CE4A5F /* CeremonyParticles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1865CC6E75576ED201B2E3E0 /* CeremonyParticles.swift */; };
 		3E5A3C213A9C4C24DA0CDAD2 /* CaptureEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC330CD2BD135E7B857838F3 /* CaptureEnvironment.swift */; };
+		400C16FB82D8BDEFD68FDD71 /* HouseholdSetupCoordinator+Teardown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD9C054FF016E3872C4A1D9 /* HouseholdSetupCoordinator+Teardown.swift */; };
 		417D9CA1DF24EBD69F0A89F4 /* TransactionFormView+Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5623F587B3B8D61238E69B8D /* TransactionFormView+Data.swift */; };
 		41DF945183EDD59058A03D38 /* HouseholdQRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 145A30F06CC4CD6561EC2248 /* HouseholdQRView.swift */; };
 		41FDD9F61FE0C27BB4C5439B /* PressableRowButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7215DD41F6B092BD6986AD /* PressableRowButtonStyle.swift */; };
@@ -315,11 +317,13 @@
 		165D0C1A1BF53D4803DE5FBC /* LocalMoneyTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyTypes.swift; sourceTree = "<group>"; };
 		1690836BEC31AA131CD45E46 /* FadingEdges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FadingEdges.swift; sourceTree = "<group>"; };
 		16BB8494AC69695DE300BFFD /* CalculatorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorSheet.swift; sourceTree = "<group>"; };
+		1865CC6E75576ED201B2E3E0 /* CeremonyParticles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CeremonyParticles.swift; sourceTree = "<group>"; };
 		18D7EDAF6788363C5C9CB5C9 /* ChartAxisLabels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartAxisLabels.swift; sourceTree = "<group>"; };
 		1907CF10603055CC52ED389C /* NetWorthWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthWidget.swift; sourceTree = "<group>"; };
 		1978AC02A9A187AF7E931051 /* CaptureQuickActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionsTests.swift; sourceTree = "<group>"; };
 		1AB633A420FD5674DE9E465B /* CaptureQuickActionSuggestionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionSuggestionsTests.swift; sourceTree = "<group>"; };
 		1B2FE72E4813873273D8E511 /* DashboardCanvasLoading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCanvasLoading.swift; sourceTree = "<group>"; };
+		1BD9C054FF016E3872C4A1D9 /* HouseholdSetupCoordinator+Teardown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HouseholdSetupCoordinator+Teardown.swift"; sourceTree = "<group>"; };
 		1EAD50C8C4F508D8508ADA8D /* AppTheme+Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTheme+Motion.swift"; sourceTree = "<group>"; };
 		1FC1BC7AE3C35B901FDBC490 /* TransactionsRequestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionsRequestTests.swift; sourceTree = "<group>"; };
 		2022ED7EAFC392568FE06C52 /* LocalMoneyRefereeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyRefereeTests.swift; sourceTree = "<group>"; };
@@ -802,6 +806,7 @@
 				66868ACBE8602B4C6A23AA49 /* HouseholdPairingPermission.swift */,
 				3BD32E93474AC4DE074C67F9 /* HouseholdPairingSession.swift */,
 				21DDD5B9F4CCB6DEB4FD9822 /* HouseholdSetupCoordinator.swift */,
+				1BD9C054FF016E3872C4A1D9 /* HouseholdSetupCoordinator+Teardown.swift */,
 				79B22BD4DEC754DAEC181A07 /* UncheckedSendable.swift */,
 			);
 			path = Pairing;
@@ -1136,6 +1141,7 @@
 		FBE350DD3D5DD8D891B20D19 /* Setup */ = {
 			isa = PBXGroup;
 			children = (
+				1865CC6E75576ED201B2E3E0 /* CeremonyParticles.swift */,
 				AF3A3B1E628DB2EC5C721FAA /* HouseholdCeremonyView.swift */,
 				6777B149C1267AD0636DC635 /* HouseholdDiscoveryView.swift */,
 				145A30F06CC4CD6561EC2248 /* HouseholdQRView.swift */,
@@ -1380,6 +1386,7 @@
 				37E8FE8EFD376BDDE344AB6F /* CategoryMergeSheet.swift in Sources */,
 				2E3B3DDB0252C2C09D0842D5 /* CategoryMergeSubject.swift in Sources */,
 				A91D573436DB3670A85B7632 /* CategoryMergeTiles.swift in Sources */,
+				3D48EF697266F82826CE4A5F /* CeremonyParticles.swift in Sources */,
 				625F861035030FD85FA5D8A4 /* ChartAxisLabels.swift in Sources */,
 				0CFAB8B74442EB878B25B5D6 /* ColorHex.swift in Sources */,
 				DA3DD0A6F03B63D0B703EB28 /* ConflictDetailSheet+Loading.swift in Sources */,
@@ -1433,6 +1440,7 @@
 				1A627C469E88842C26A53B4E /* HouseholdReportFlow.swift in Sources */,
 				30C5671CBE0B6D3E11AEBAA7 /* HouseholdReportOverview.swift in Sources */,
 				96ED7844DAA0D081336C92DA /* HouseholdReportTags.swift in Sources */,
+				400C16FB82D8BDEFD68FDD71 /* HouseholdSetupCoordinator+Teardown.swift in Sources */,
 				EB554CA339750A417EB0F1B9 /* HouseholdSetupCoordinator.swift in Sources */,
 				CC59625186FAFA1CCCD6480C /* HouseholdSetupFlow.swift in Sources */,
 				8E9818CFD169C4C33B7D2E5F /* HouseholdSetupIntro.swift in Sources */,

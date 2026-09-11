@@ -73,6 +73,18 @@ final class HouseholdPairingSession: NSObject {
     private var waiter: CheckedContinuation<HouseholdPairingMessage?, Never>?
     private var isStopped = false
 
+    /// Set the instant a `.cancelled` lands, whether or not anybody is
+    /// reading.
+    ///
+    /// The owner spends most of the ceremony inside `step`, doing server
+    /// work — it is not awaiting a message between `waitForJoin` and the end,
+    /// so a guest who backs out mid-ceremony would sit in `pending`,
+    /// unnoticed, while the owner carried on building a household that no
+    /// longer has two members. A flag the running side can read without
+    /// awaiting is what makes the abort travel in both directions.
+    private(set) var didPeerStop = false
+    private(set) var peerStopReason: String?
+
     /// Whether another message is already waiting behind the one just read.
     ///
     /// The guest paces itself off a floor per step, and the owner's early
@@ -94,6 +106,10 @@ final class HouseholdPairingSession: NSObject {
     }
 
     private func deliver(_ message: HouseholdPairingMessage) {
+        if case .cancelled(let reason) = message {
+            didPeerStop = true
+            peerStopReason = reason
+        }
         if let waiter {
             self.waiter = nil
             waiter.resume(returning: message)

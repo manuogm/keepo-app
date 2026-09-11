@@ -25,14 +25,16 @@ struct HouseholdAccountPicker<Footer: View>: View {
             isLoaded: isLoaded,
             isEmpty: accounts.isEmpty,
             emptyMessage: "You have no accounts to share yet.",
-            everyID: accounts.map(\.id),
-            selection: $selection,
             footer: { footer },
             content: {
                     ForEach(HouseholdAccountGroup.allCases, id: \.self) { group in
                     let rows = accounts.filter { $0.kind == group.kind }
                     if !rows.isEmpty {
-                        HouseholdPickerSection(title: group.title) {
+                        HouseholdPickerSection(
+                            title: group.title,
+                            ids: rows.map(\.id),
+                            selection: $selection
+                        ) {
                             ForEach(rows) { account in
                                 HouseholdAccountRow(
                                     name: account.name,
@@ -82,14 +84,16 @@ struct HouseholdCategoryPicker<Footer: View>: View {
             isLoaded: isLoaded,
             isEmpty: categories.isEmpty,
             emptyMessage: "You have no categories to share yet.",
-            everyID: categories.map(\.id),
-            selection: $selection,
             footer: { footer },
             content: {
                     ForEach([PublicSchema.CategoryKind.expense, .income], id: \.self) { kind in
                     let rows = categories.filter { $0.kind == kind }
                     if !rows.isEmpty {
-                        HouseholdPickerSection(title: kind == .expense ? "Expenses" : "Income") {
+                        HouseholdPickerSection(
+                            title: kind == .expense ? "Expenses" : "Income",
+                            ids: rows.map(\.id),
+                            selection: $selection
+                        ) {
                             ForEach(rows, id: \.id) { category in
                                 HouseholdCategoryRow(
                                     name: category.name,
@@ -128,14 +132,6 @@ private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
     let isLoaded: Bool
     let isEmpty: Bool
     let emptyMessage: String
-    /// Every id the list offers, and the selection to write. Held here rather
-    /// than in the two pickers so the control cannot drift between them —
-    /// and so it sits beside the title, above *both* of the category
-    /// picker's sections. One button for the screen, not one per group: a
-    /// pair of them under "Expenses" and "Income" is more chrome than it
-    /// saves on a list of six.
-    let everyID: [UUID]
-    @Binding var selection: Set<UUID>
     /// The step's action, rendered as the last thing in the scroll rather
     /// than pinned over it — a list of switches with a button floating on top
     /// hides whichever row is underneath it, and the row it hides is always
@@ -159,16 +155,6 @@ private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                // Its own line, trailing, rather than beside the title.
-                // Alongside it the capsule and "Shared categories" together
-                // overflow the width and wrap the heading onto two lines —
-                // and a screen title that wraps or shrinks to make room for a
-                // shortcut has the priority backwards.
-                if isLoaded && !isEmpty {
-                    selectAll
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
-
                 if !isLoaded {
                     ProgressView()
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -191,57 +177,75 @@ private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
         .background(AppTheme.Palette.bgCanvas)
         .scrollBounceBehavior(.basedOnSize)
     }
-
-    /// One control with two jobs, because they are the same job: the fastest
-    /// route to "most of them" is all-on-then-untick a few, and the fastest
-    /// route back is all-off. Which one it offers is read off the list rather
-    /// than remembered, so it is always the one that would change something.
-    private var isEverythingSelected: Bool {
-        !everyID.isEmpty && everyID.allSatisfy(selection.contains)
-    }
-
-    private var selectAll: some View {
-        Button {
-            withAnimation(AppTheme.Motion.standard) {
-                if isEverythingSelected {
-                    selection.subtract(everyID)
-                } else {
-                    selection.formUnion(everyID)
-                }
-            }
-        } label: {
-            Text(isEverythingSelected ? "Deselect All" : "Select All")
-                .font(AppTheme.Typography.microEmphasis)
-                .foregroundStyle(PublicSchema.AccountScope.household.tint)
-                .padding(.horizontal, AppTheme.Spacing.s)
-                .padding(.vertical, AppTheme.Spacing.xs)
-                .background(
-                    PublicSchema.AccountScope.household.tint.opacity(AppTheme.Opacity.fill),
-                    in: Capsule()
-                )
-        }
-        .buttonStyle(.pressableCard)
-        .sensoryFeedback(AppTheme.Feedback.toggle, trigger: isEverythingSelected)
-    }
 }
 
-/// One titled group of rows on its own card.
+/// One titled group of rows on its own card, with its own Select All.
+///
+/// **Per group, on the group's own line.** Flipping a long list one toggle at
+/// a time is the tedious part of this screen, and the fastest route to "most
+/// of them" is all-on then untick a few. One control for the whole screen was
+/// tried first and is worse in both directions: it has to sit somewhere that
+/// is not beside anything it acts on, and on the categories step it silently
+/// covers Income as well as Expenses. Beside the heading it names exactly
+/// what it will do.
 struct HouseholdPickerSection<Content: View>: View {
     let title: String
+    /// Every id this group lists — the scope of its own button, and nothing
+    /// else's.
+    let ids: [UUID]
+    @Binding var selection: Set<UUID>
     @ViewBuilder var content: Content
+
+    private var isEverythingSelected: Bool {
+        !ids.isEmpty && ids.allSatisfy(selection.contains)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            Text(title.uppercased())
-                .font(AppTheme.Typography.nanoEmphasis)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .kerning(0.6)
+            HStack(alignment: .firstTextBaseline) {
+                Text(title.uppercased())
+                    .font(AppTheme.Typography.nanoEmphasis)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .kerning(0.6)
+                Spacer(minLength: AppTheme.Spacing.s)
+                selectAll
+            }
             FormCard(padding: AppTheme.Spacing.m) {
                 VStack(spacing: AppTheme.Spacing.xs) {
                     content
                 }
             }
         }
+    }
+
+    /// One control with two jobs, because they are the same job. Which one it
+    /// offers is read off the list rather than remembered, so it is always the
+    /// one that would change something.
+    ///
+    /// Plain text rather than a capsule: it sits on a line of small grey
+    /// uppercase metadata, and a filled pill there would outweigh the heading
+    /// it belongs to. The padding is inside the label — `hitTarget()` overlays
+    /// a hit-testable `Color.clear`, which on a `Button` lands on top of it
+    /// and swallows every tap (found on the Household screen's info glyph).
+    private var selectAll: some View {
+        Button {
+            withAnimation(AppTheme.Motion.standard) {
+                if isEverythingSelected {
+                    selection.subtract(ids)
+                } else {
+                    selection.formUnion(ids)
+                }
+            }
+        } label: {
+            Text(isEverythingSelected ? "Deselect All" : "Select All")
+                .font(AppTheme.Typography.microEmphasis)
+                .foregroundStyle(PublicSchema.AccountScope.household.tint)
+                .padding(.vertical, AppTheme.Spacing.xs)
+                .padding(.leading, AppTheme.Spacing.s)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sensoryFeedback(AppTheme.Feedback.toggle, trigger: isEverythingSelected)
     }
 }
 

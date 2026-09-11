@@ -721,12 +721,16 @@ make room for a shortcut has the priority backwards.
 * "Waiting for Alice" → "Waiting for Alice to finish the setup". The guest
   holds at 90% for as long as the owner reads a report, and a sentence that
   does not say what is being waited for reads as a hang.
-* **The steps are no longer ten equal ninths.** Each phase carries a 1-to-4
-  `weight`, and both the fill ramp and the per-phase floor come off it — so
-  the six steps that name something an earlier gate already made true go by
-  quickly, and the three with a server call behind them (`accept_invite`
-  returning, the fuzzy pass with its RPC and two pulls, the final sync) are
-  given room. The ladder is now 5, 10, 25, 30, 35, 55, 60, 70, 75, 90.
+* **The steps are no longer ten equal ninths** — and no longer tidy either.
+  A 1-to-4 weighting produced 5, 10, 25, 30, 35 …, which is visibly
+  arithmetic, and progress that can be predicted a step ahead stops reading
+  as progress. The ladder is hand-set: **5, 9, 26, 31, 37, 58, 62, 73, 78,
+  90**, with no repeating interval and no two consecutive steps the same
+  size, which is the property that makes a ladder look counted rather than
+  authored. The per-phase floor comes off the same number, so pacing and
+  percentage cannot disagree; the three long jumps are the three real gates
+  (`accept_invite` returning, the fuzzy pass with its RPC and two pulls, the
+  final sync).
 * **The guest catches up instead of trailing.** The owner's early
   announcements arrive while `accept_invite` is in flight and nobody is
   reading the inbox, so the guest started several steps in debt and paid a
@@ -736,10 +740,59 @@ make room for a shortcut has the priority backwards.
   Sampled on two simulators: both phones read **70%** in the same second,
   with the guest showing the mirrored wording.
 
+### Backing out
+
+The ritual was a one-way door: both phones are full-screen covers with no
+chrome, and the only exits were to finish or to have the link drop. There is
+now a close button top-left on both roles, an alert, and
+`HouseholdSetupCoordinator.abort()`.
+
+The undo is the same wherever it is called from — **if this device is in a
+household this run put it in, leave it**. On one nobody joined that retires
+the membership and nothing else; on one the guest has joined,
+`leave_household` ends it for both, which is what an abort after the join has
+to mean. A household the user already had and nobody joined is left alone: it
+was never this screen's. A genuine *failure* rather than a choice discards
+only the never-joined case — `HouseholdQRView.discardIfUnused`'s rule, since
+a transient error in the last step is not grounds for dissolving a household
+that exists.
+
+Three things the two-device run found that reading would not have:
+
+* **The owner never noticed.** Between `waitForJoin` and the end nobody is
+  awaiting the inbox — the owner is inside `step` doing server work, and
+  during the report it can be minutes. `HouseholdPairingSession.didPeerStop`
+  is set the instant a `.cancelled` lands whether or not anybody is reading;
+  `step` checks it, and `runAsOwner` keeps listening after `.readyForReport`
+  so the report comes down rather than describing a household the server has
+  already dissolved.
+* **`confirmationDialog` rendered with no cancel button** — presented from
+  inside the full-screen cover it became a compact card with one destructive
+  action and no drawn way back. `.alert` draws both.
+* **The phone that pressed Stop was told "Alice left".**
+  `HouseholdDissolvedSheet` fires off `lastKnownHouseholdId`, so both members
+  got a dissolution notice on top of a screen saying the household was never
+  built — and on the aborting side it named the wrong person. The `.failed`
+  branch clears the marker: that screen *is* the notice.
+
+Fixed in passing: giving the ceremony's `ZStack` a `.topLeading` alignment to
+place the close button re-aligned **every layer in it**, so the house, the
+glow and the caption block stopped being centred and drifted to the corner
+with the button. It is an `.overlay(alignment:)` now.
+
+`HouseholdSetupCoordinator` and `HouseholdCeremonyView` both crossed the
+file-length lint; the teardown and `CeremonyParticles` moved to their own
+files.
+
+Both abort directions were exercised on two simulators, including the guest
+backing out while the owner was inside the report: the owner's report closed
+onto "The household wasn't built", the guest landed on a clean blank state
+with no wrong notice, and the server showed `live_members=0`.
+
 ### Verification
 
 pgTAP **445 tests, 32 files, PASS** (new
-`36_a_merge_remembers_what_it_joined.sql`) · SwiftLint 0/300 ·
+`36_a_merge_remembers_what_it_joined.sql`) · SwiftLint 0/302 ·
 `xcodebuild test` TEST SUCCEEDED including a new `Ceremony progress` suite
 pinning the ladder's shape rather than its numbers · `supabase gen types`
 regenerated for the three new columns, with `v14_rebuild_syncable_tables`
