@@ -73,6 +73,16 @@ public enum HouseholdRepository {
         try await client.rpc("discard_household").execute()
     }
 
+    /// The owner accepted the report: from here the household is real.
+    ///
+    /// Drops the undo log that made everything before this point reversible
+    /// — chiefly the record of which transactions a pruned tag's labels moved
+    /// to. Left lying about, a *later* household's abort could reach back and
+    /// revert a prune that has been part of this one's history for months.
+    public static func finalizeHousehold(client: SupabaseClient) async throws {
+        try await client.rpc("finalize_household").execute()
+    }
+
     /// Same fork, plus scrubbing the caller's own resulting copy's free-text
     /// fields (merchant names, filenames, ...) — never the other member's.
     public static func eraseOwnAccount(client: SupabaseClient) async throws {

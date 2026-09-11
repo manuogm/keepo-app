@@ -849,21 +849,49 @@ member has agreed to, and all of it is now undoable, so the report carries the
 same close button and the same alert as the ceremony. It sits on the banner,
 the one part of that screen that holds still.
 
-### Known gap
+### The pruned tag, too (20260922100000)
 
-A **tag pruned in the report** before aborting stays pruned.
-`delete_tag_retagging` moves `transaction_tags` rows onto the destination tag
-and records nothing about which ones moved, so the discard cannot put them
-back. Everything else on the report — every merge and unmerge — is reversed.
-Making this reversible means either recording the move (a column on
-`transaction_tags`) or deferring tag prunes to Finish; both are a design
-decision rather than a fix, and neither is in this pass.
+Left as a gap in the first cut of this pass and closed straight after.
+`delete_tag_retagging` moved every `transaction_tags` row off the doomed tag
+and recorded nothing, so afterwards the destination simply had more
+transactions and nothing could say which had arrived that way.
+
+The obvious place for the record is two columns on `transaction_tags` — the
+tag it wore and the `deleted_at` it had. It is the wrong place: that table is
+in `pull_changes` and in `SyncApply`'s whitelist, so every column on it is
+carried to every device on every sync, needs a local-schema rebuild to land,
+and is paid for forever — to support an undo reachable for the few minutes
+between joining and accepting. **A side table nobody syncs costs the client
+nothing**: no codegen consumer, no local column, no payload.
+
+`household_pruned_tags` ("this household retired this tag") and
+`household_retagged_links` ("and these links moved, each with the state to
+put it back to"). Two tables rather than one, because folding them together
+means a nullable `transaction_id` that means "actually this row is about the
+tag". Each of the prune's three statements now captures its rows **before**
+changing them — `UPDATE … RETURNING` hands back the new row and the undo
+needs the old one — and the link log is keyed by the row's state *after* the
+move, which is what the undo looks it up by.
+
+`discard_household` replays it, and the order is load-bearing: **tags first**,
+because `set_transaction_tag_derived_columns` fires before every
+`transaction_tags` update and looks the tag up with `deleted_at is null`, so
+putting a link back before its tag exists again raises "tag not found" from a
+trigger; then **links newest-first**, because a link pruned twice in one
+session (X → Y, then Y → Z) only reaches X again if Z → Y is undone first.
+
+`finalize_household()` drops the log, and the owner accepting the report is
+what calls it. Left lying about, a *later* household's abort could reach back
+and revert a prune that has been part of this one's history for months — so
+Finish is now a real event on the server, not only on screen.
 
 ### Verification
 
-pgTAP **456 tests, 33 files, PASS** (new `37_aborting_leaves_no_trace.sql`,
-which includes the trap: a category its owner made and never used must
-survive a discard) · SwiftLint 0/302 · `xcodebuild test` SUCCEEDED ·
+pgTAP **465 tests, 34 files, PASS** (new `37_aborting_leaves_no_trace.sql`,
+which includes the trap — a category its owner made and never used must
+survive a discard — and `38_a_pruned_tag_comes_back_too.sql`, which pins the
+revived-collision branch as well as the plain move) · SwiftLint 0/302 ·
+`xcodebuild test` SUCCEEDED ·
 `supabase gen types` regenerated, with `v15_rebuild_syncable_tables` — this
 column is `NOT NULL`, so unlike the additive ones a stale device would
 hard-fail every pulled category rather than silently drop it.
@@ -873,3 +901,8 @@ members went from one account each to one account each, eight live categories
 each to eight, zero shared, zero twins, no live memberships — and every
 category back to its own name, icon and colour, including the ones four
 automatic merges had overwritten.
+
+Run again with a tag pruned in the report first: `Holidays` deleted and both
+transactions moved onto `Holiday`, one prune and one link logged. After the
+abort, `Holidays` live again with one link and `Holiday` back to one — the
+baseline recorded before the run, exactly.

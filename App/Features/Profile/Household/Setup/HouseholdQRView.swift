@@ -73,6 +73,7 @@ struct HouseholdQRView: View {
                 HouseholdReportFlow(
                     session: session,
                     onFinish: {
+                        try? await HouseholdRepository.finalizeHousehold(client: session.client)
                         await session.syncNow()
                         session.refresh.bump()
                         isShowingReport = false

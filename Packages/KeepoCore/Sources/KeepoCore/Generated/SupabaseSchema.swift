@@ -732,6 +732,90 @@ public enum PublicSchema {
       case userId = "user_id"
     }
   }
+  public struct HouseholdPrunedTagsSelect: Codable, Hashable, Sendable {
+    public let householdId: UUID
+    public let id: Int64
+    public let prunedAt: String
+    public let tagId: UUID
+    public enum CodingKeys: String, CodingKey {
+      case householdId = "household_id"
+      case id = "id"
+      case prunedAt = "pruned_at"
+      case tagId = "tag_id"
+    }
+  }
+  public struct HouseholdPrunedTagsInsert: Codable, Hashable, Sendable {
+    public let householdId: UUID
+    public let id: Int64?
+    public let prunedAt: String?
+    public let tagId: UUID
+    public enum CodingKeys: String, CodingKey {
+      case householdId = "household_id"
+      case id = "id"
+      case prunedAt = "pruned_at"
+      case tagId = "tag_id"
+    }
+  }
+  public struct HouseholdPrunedTagsUpdate: Codable, Hashable, Sendable {
+    public let householdId: UUID?
+    public let id: Int64?
+    public let prunedAt: String?
+    public let tagId: UUID?
+    public enum CodingKeys: String, CodingKey {
+      case householdId = "household_id"
+      case id = "id"
+      case prunedAt = "pruned_at"
+      case tagId = "tag_id"
+    }
+  }
+  public struct HouseholdRetaggedLinksSelect: Codable, Hashable, Sendable {
+    public let id: Int64
+    public let prevDeletedAt: String?
+    public let prevTagId: UUID
+    public let pruneId: Int64
+    public let tagId: UUID
+    public let transactionId: UUID
+    public enum CodingKeys: String, CodingKey {
+      case id = "id"
+      case prevDeletedAt = "prev_deleted_at"
+      case prevTagId = "prev_tag_id"
+      case pruneId = "prune_id"
+      case tagId = "tag_id"
+      case transactionId = "transaction_id"
+    }
+  }
+  public struct HouseholdRetaggedLinksInsert: Codable, Hashable, Sendable {
+    public let id: Int64?
+    public let prevDeletedAt: String?
+    public let prevTagId: UUID
+    public let pruneId: Int64
+    public let tagId: UUID
+    public let transactionId: UUID
+    public enum CodingKeys: String, CodingKey {
+      case id = "id"
+      case prevDeletedAt = "prev_deleted_at"
+      case prevTagId = "prev_tag_id"
+      case pruneId = "prune_id"
+      case tagId = "tag_id"
+      case transactionId = "transaction_id"
+    }
+  }
+  public struct HouseholdRetaggedLinksUpdate: Codable, Hashable, Sendable {
+    public let id: Int64?
+    public let prevDeletedAt: String?
+    public let prevTagId: UUID?
+    public let pruneId: Int64?
+    public let tagId: UUID?
+    public let transactionId: UUID?
+    public enum CodingKeys: String, CodingKey {
+      case id = "id"
+      case prevDeletedAt = "prev_deleted_at"
+      case prevTagId = "prev_tag_id"
+      case pruneId = "prune_id"
+      case tagId = "tag_id"
+      case transactionId = "transaction_id"
+    }
+  }
   public struct HouseholdsSelect: Codable, Hashable, Sendable {
     public let createdAt: String
     public let deletedAt: String?

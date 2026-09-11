@@ -157,6 +157,10 @@ final class HouseholdSetupCoordinator {
     /// Called by the report when the owner presses Finish. Both houses fill
     /// the rest of the way together.
     func finish() async {
+        // The one irreversible moment in the whole flow. Everything up to here
+        // — the shares, the merges, a pruned tag's labels — was undoable, and
+        // this is what gives that up.
+        try? await HouseholdRepository.finalizeHousehold(client: session.client)
         await session.syncNow()
         session.refresh.bump()
         pairing.send(.finished)
