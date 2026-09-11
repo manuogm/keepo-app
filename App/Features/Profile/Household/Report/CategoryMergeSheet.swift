@@ -278,34 +278,41 @@ struct CategoryMergeSheet: View {
         }
     }
 
+    /// The sheet closes when the merge is **visible here**, not when the RPC
+    /// returns — see `HouseholdWrite`. A write the server took and this
+    /// device cannot see leaves the sheet open with the reason on it, rather
+    /// than dismissing onto a list that has not changed.
     private func save() async {
         guard let partner else { return }
         isSaving = true
         errorMessage = nil
         do {
-            try await HouseholdRepository.applyCategoryMerges(
-                client: session.client,
-                merges: [
-                    CategoryMerge(
-                        mine: subject.mine.id,
-                        theirs: partner.id,
-                        name: name.trimmingCharacters(in: .whitespaces),
-                        icon: icon,
-                        // `hexString` can fail for a colour with no RGB
-                        // representation, which the catalogue cannot produce
-                        // — falling back to what the row already had keeps
-                        // the merge from writing an empty column.
-                        color: color.hexString ?? subject.mine.color
-                    )
-                ],
-                automatic: false
-            )
-            await session.syncNow()
-            session.refresh.bump()
+            try await HouseholdWrite.apply(session: session) {
+                try await HouseholdRepository.applyCategoryMerges(
+                    client: session.client,
+                    merges: [
+                        CategoryMerge(
+                            mine: subject.mine.id,
+                            theirs: partner.id,
+                            name: name.trimmingCharacters(in: .whitespaces),
+                            icon: icon,
+                            // `hexString` can fail for a colour with no RGB
+                            // representation, which the catalogue cannot
+                            // produce — falling back to what the row already
+                            // had keeps the merge from writing an empty
+                            // column.
+                            color: color.hexString ?? subject.mine.color
+                        )
+                    ],
+                    automatic: false
+                )
+            } landed: { mirror in
+                mirror.isMerged(mine: subject.mine.id, theirs: partner.id)
+            }
             onChange()
             dismiss()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            errorMessage = HouseholdWrite.describe(error)
         }
         isSaving = false
     }
@@ -315,15 +322,17 @@ struct CategoryMergeSheet: View {
         isSaving = true
         errorMessage = nil
         do {
-            try await HouseholdRepository.unmergeCategoryGroup(
-                client: session.client, groupId: merged.groupId
-            )
-            await session.syncNow()
-            session.refresh.bump()
+            try await HouseholdWrite.apply(session: session) {
+                try await HouseholdRepository.unmergeCategoryGroup(
+                    client: session.client, groupId: merged.groupId
+                )
+            } landed: { mirror in
+                mirror.isUnmerged(group: merged.groupId)
+            }
             onChange()
             dismiss()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            errorMessage = HouseholdWrite.describe(error)
         }
         isSaving = false
     }

@@ -100,10 +100,14 @@ values (
   'a0000000-0000-0000-0000-000000000010', 'c0000000-0000-0000-0000-000000000010', -100000, 'EUR', now()
 );
 
+-- The refusal itself is unchanged; its wording was rewritten for a person in
+-- 20260917100000, which left this assertion pinning a sentence the function
+-- no longer says. `p_cascade` is the second answer that migration added, so
+-- the refusal is specifically the *no-cascade* one.
 select throws_like(
-  $$ select * from delete_account('a0000000-0000-0000-0000-000000000010', 4) $$,
-  '%archive it instead%',
-  'delete_account refuses while the account still has non-deleted transactions'
+  $$ select * from delete_account('a0000000-0000-0000-0000-000000000010', 4, false) $$,
+  '%still has transactions%',
+  'delete_account refuses, without a cascade, while non-deleted transactions remain'
 );
 
 -- 6. delete_account succeeds on an account with no transactions.

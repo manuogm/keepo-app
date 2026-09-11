@@ -436,3 +436,121 @@ files, PASS** (new file `33_merge_tombstones_reach_the_other_phone.sql`).
 The four UI-visible changes are **not** visually verified — they need the two
 devices.
 
+
+---
+
+## Third pass, 2026-09-10 — re-testing all three reported failures on two devices
+
+Three features were reported as still broken after the second pass: manual
+category merge, automatic category merge, and deleting a tag with re-tagging.
+All three were reproduced or refuted against a real two-device run (two
+simulators, MultipeerConnectivity, the full ceremony) rather than by
+reasoning. **One was a real, previously unfound bug; the other two are
+already fixed on this branch and behave correctly.**
+
+### Tag delete with re-tagging (item 3) — a genuine bug, now fixed
+
+Reproduced exactly as reported: the server ends up correct (`Holidays`
+tombstoned, both transactions moved onto `Holiday`) and the report goes on
+listing two tags, on both the QR road and the paired ceremony.
+
+The cause is the second pass's own rule, applied to the table it was not
+applied to. `can_read_tag` admits another member's tag on exactly one ground —
+it currently sits on a **live** `transaction_tags` row of a shared account —
+and `delete_tag_retagging`'s first job is to empty that set. So the statement
+that tombstones the tag is the statement that hides the tombstone from the
+member who pressed the button. `pull_changes` is incremental and RLS-scoped;
+a row you cannot see is a row you are never told about.
+
+Unlike `categories`, the tombstone cannot simply keep what makes it readable:
+a tag's visibility is a *join* the delete necessarily destroys, not a column
+it can hold on to. That is the case `sync_epoch` exists for. Migration
+`20260918100000`:
+
+* `household_sharing_tag(uuid)` — the second branch of `can_read_tag` asked
+  the other way round ("whose household is about to stop seeing this"),
+  granted to nobody and called only from the two definer bodies below.
+* `delete_tag_retagging` captures it **before** moving any links and bumps
+  both members' epochs at the end. Restated from `pg_get_functiondef`; the
+  body is otherwise byte-identical.
+* `cascade_tag_soft_delete` does the same for the other road to the same
+  revocation — a plain `update tags set deleted_at = now()`, which is what
+  the Tags screen writes through the outbox. Without it, deleting your own
+  shared tag left the *other* member holding it forever.
+
+A tag no other member could see bumps nobody, so the common case still costs
+no re-pull.
+
+### Manual and automatic merging (items 1 and 2) — correct on this branch
+
+Both work, verified in the UI on two devices with the exact pairs reported:
+`Dine Out`/`Dining Out`, `Utilities`/`Utilities & Bills`, plus
+`Transport`/`Transportation`, `Salary`/`Salaries` and the exact-name
+`Groceries`. Automatic merged five; the manual sheet moved `Nightlife` /
+`Going Out` from Extra to Merged, and the counts updated in place (5 merged /
+2 extra → 6 / 0). Server state matched the screen at every step.
+
+`supabase migration list` confirms the hosted project is current through
+`20260917100000`, so the server is not the difference. **`35530f5` — the
+commit carrying the second pass's *client* half — is on `dev` only; `main`
+is 37 commits behind it.** Migrations are pushed from the working tree
+regardless of branch, so a device build made from `main` runs the new
+server against the old `SyncEngine.pull()`, the one that opened with
+`guard !isSyncing else { return }` and dropped any pull that overlapped
+another. Every local-first mutation is *call the RPC, pull, re-read the
+mirror*; a dropped pull re-reads the mirror from before its own write and
+redraws unchanged. That is symptom 1 and 3 exactly, and the automatic pass
+reading a stale mirror is symptom 2. **Check which commit the device build
+came from before re-testing.**
+
+### The report no longer reports success it cannot see
+
+Whatever the environment turns out to be, the reason three different causes
+all arrived as one useless bug report is that every action on the report
+treated *the RPC returning* as the end of the operation. It is not: the
+report's content comes from the local mirror, so the act is finished when
+the mirror reflects it. Between those two moments sat all three failures —
+a tombstone RLS hid, a pull that failed, a pull that was dropped — and in
+every case the sheet dismissed, the list redrew identically, and nothing
+said a word.
+
+`HouseholdWrite` (new) is now the one write path for merge, unmerge and tag
+prune: run the RPC, sync, then **confirm against the mirror**. If the write
+is not visible it re-syncs once (the epoch bumps behind these writes make
+the pull a wipe-and-re-pull, which can still be landing) and then reports
+`NotVisible` — the sheet stays open, carrying whatever the sync layer
+itself complained about, and the user gets a retry instead of a shrug.
+
+Verified by forcing the failure: with `pull_changes` rate-limited, the merge
+lands on the server and the sheet holds with *"Saved, but this phone hasn't
+caught up yet. Rate limit exceeded"*; clearing the limit and pressing the
+check again completes it (Extra 2 → 0). That is the reported symptom,
+reproduced deliberately, now carrying its own diagnosis.
+
+### One hardening change alongside
+
+`HouseholdAutoMerge` skipped any shared group whose partner row had not
+landed in the local mirror, and re-synced only when it had found *nothing at
+all*. A half-landed pull therefore merged an arbitrary subset of the
+near-misses — and a skipped group does not appear under Extra either (the
+report's `split` drops it for the same reason), so there was no manual
+fallback. It now counts half-groups and treats any of them as a mirror worth
+re-reading, which is the precise shape of "some pairs merged and some didn't".
+
+Also removed a never-assigned `errorMessage` from `HouseholdReportTags`.
+
+### Unrelated repair
+
+`06_account_lifecycle.sql` test 9 had been red since `20260917100000` renamed
+`delete_account`'s refusal for a human reader; the assertion still pinned the
+old sentence. Updated to the new wording and to the explicit `p_cascade =>
+false` the refusal now belongs to. The behaviour under test is unchanged.
+
+### Verification
+
+SwiftLint 0/298 · `xcodebuild test` TEST SUCCEEDED · pgTAP **428 tests, 30
+files, PASS** (new file `34_tag_deletes_reach_the_other_phone.sql`) ·
+`supabase gen types swift` diff clean (the migration adds functions only) ·
+**all three features exercised by hand on two simulators**, owner and guest,
+through the real pairing ceremony — twice, and once more with the pull
+deliberately broken to prove the new failure path.

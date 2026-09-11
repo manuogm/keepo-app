@@ -32,12 +32,25 @@ enum HouseholdAutoMerge {
         var mine: [CategoryNameMatcher.Candidate<UUID>] = []
         var theirs: [CategoryNameMatcher.Candidate<UUID>] = []
         var kinds: [UUID: PublicSchema.CategoryKind] = [:]
+        /// Shared groups the mirror held only half of.
+        var halfGroups = 0
 
-        /// True when not one shared group held both members' rows, which is
-        /// what an incomplete mirror looks like — never what a real
-        /// two-member household looks like, since sharing anything at all
-        /// mints the other member's row in the same transaction.
-        var sawNoPairs: Bool { mine.isEmpty && theirs.isEmpty }
+        /// Whether the mirror can be believed.
+        ///
+        /// **One row per member per shared group is the invariant**, written
+        /// in the same transaction that creates the group — so a group with
+        /// one row locally is never a real state of the household, it is a
+        /// pull that has not finished landing. Every such group is skipped,
+        /// silently, and a skipped group is a near-miss nobody will ever be
+        /// offered again: the report's own `split` drops it too, so it does
+        /// not even appear under Extra for the owner to merge by hand.
+        ///
+        /// This used to ask only whether the pass had found *nothing*, which
+        /// catches a mirror that is entirely empty and misses the far more
+        /// likely one that is merely behind — half the groups landed, half
+        /// did not, and the household is built with an arbitrary subset of
+        /// its duplicates merged.
+        var isTrustworthy: Bool { halfGroups == 0 && !(mine.isEmpty && theirs.isEmpty) }
     }
 
     /// Runs the pass and returns the shared groups it created, if any.
@@ -48,12 +61,12 @@ enum HouseholdAutoMerge {
 
         var candidates = await read(session: session, viewer: viewer, selected: selected)
         // The pass reads the local mirror, and it runs seconds after the
-        // other phone's `accept_invite` — so the one way it can find nothing
-        // is that the pull carrying their rows has not landed. Looking once
-        // and quietly concluding "nothing to merge" is how a household ends
-        // up built with every near-miss unmatched and no sign anything went
-        // wrong. Ask again before believing it.
-        if candidates.sawNoPairs {
+        // other phone's `accept_invite` — so anything missing from it is a
+        // pull still in flight, not a fact about the household. Believing it
+        // first time is how a household gets built with an arbitrary subset
+        // of its near-misses merged and no sign anything went wrong. Ask
+        // again before believing it.
+        if !candidates.isTrustworthy {
             await session.syncNow()
             candidates = await read(session: session, viewer: viewer, selected: selected)
         }
@@ -99,7 +112,10 @@ enum HouseholdAutoMerge {
         var candidates = Candidates()
         for (_, rows) in byGroup {
             guard let myRow = rows.first(where: { $0.ownerId == viewer }),
-                  let theirRow = rows.first(where: { $0.ownerId != viewer }) else { continue }
+                  let theirRow = rows.first(where: { $0.ownerId != viewer }) else {
+                candidates.halfGroups += 1
+                continue
+            }
             candidates.kinds[myRow.id] = myRow.kind
             candidates.kinds[theirRow.id] = theirRow.kind
             if selected.contains(myRow.id) {

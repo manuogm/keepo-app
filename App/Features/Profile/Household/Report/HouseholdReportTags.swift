@@ -28,13 +28,11 @@ struct HouseholdReportTags: View {
     /// orbit.
     @State private var pruning: PruningTag?
     @State private var isExpanded = true
-    @State private var errorMessage: String?
 
     var body: some View {
         VStack(spacing: AppTheme.Spacing.l) {
             countCard
             listCard
-            if let errorMessage { FormErrorText(message: errorMessage) }
         }
         .sheet(item: $pruning) { selected in
             TagRetagSheet(
@@ -187,20 +185,27 @@ private struct TagRetagSheet: View {
         }
     }
 
+    /// Closes when the tag is **gone from this device's list**, not when the
+    /// RPC returns — see `HouseholdWrite`. This is the operation that taught
+    /// the report the difference: the delete landed on the server every time
+    /// and arrived here never, because re-tagging removes the very link
+    /// `can_read_tag` admits the other member's tag by.
     private func prune() async {
         guard let destination else { return }
         isSaving = true
         errorMessage = nil
         do {
-            try await HouseholdRepository.deleteTag(
-                client: session.client, tagId: tag.id, retaggingInto: destination.id
-            )
-            await session.syncNow()
-            session.refresh.bump()
+            try await HouseholdWrite.apply(session: session) {
+                try await HouseholdRepository.deleteTag(
+                    client: session.client, tagId: tag.id, retaggingInto: destination.id
+                )
+            } landed: { mirror in
+                mirror.isGone(tag: tag.id)
+            }
             onDone()
             dismiss()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            errorMessage = HouseholdWrite.describe(error)
         }
         isSaving = false
     }
