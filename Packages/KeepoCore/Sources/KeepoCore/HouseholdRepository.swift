@@ -58,6 +58,21 @@ public enum HouseholdRepository {
         try await client.rpc("leave_household").execute()
     }
 
+    /// Undoes a household nobody has agreed to yet, which is **not** what
+    /// `leave` does.
+    ///
+    /// Leaving dissolves a household that has existed, and forks every shared
+    /// account into a private copy per member so neither loses the ledger
+    /// they kept together. Using it to back out of a setup gave both people a
+    /// duplicate of the other's accounts every time — right verb, wrong
+    /// moment. This one removes the listing, unpicks the category sharing,
+    /// deletes the rows the sharing minted, and leaves both members with
+    /// exactly what they had. Either member may call it; the household is not
+    /// real until the owner accepts the report.
+    public static func discardHousehold(client: SupabaseClient) async throws {
+        try await client.rpc("discard_household").execute()
+    }
+
     /// Same fork, plus scrubbing the caller's own resulting copy's free-text
     /// fields (merchant names, filenames, ...) — never the other member's.
     public static func eraseOwnAccount(client: SupabaseClient) async throws {

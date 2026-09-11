@@ -248,6 +248,7 @@ public enum PublicSchema {
   }
   public struct CategoriesSelect: Codable, Hashable, Sendable {
     public let color: String
+    public let createdAsTwin: Bool
     public let createdAt: String
     public let deletedAt: String?
     public let icon: String
@@ -266,6 +267,7 @@ public enum PublicSchema {
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
       case color = "color"
+      case createdAsTwin = "created_as_twin"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
       case icon = "icon"
@@ -286,6 +288,7 @@ public enum PublicSchema {
   }
   public struct CategoriesInsert: Codable, Hashable, Sendable {
     public let color: String?
+    public let createdAsTwin: Bool?
     public let createdAt: String?
     public let deletedAt: String?
     public let icon: String?
@@ -304,6 +307,7 @@ public enum PublicSchema {
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case color = "color"
+      case createdAsTwin = "created_as_twin"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
       case icon = "icon"
@@ -324,6 +328,7 @@ public enum PublicSchema {
   }
   public struct CategoriesUpdate: Codable, Hashable, Sendable {
     public let color: String?
+    public let createdAsTwin: Bool?
     public let createdAt: String?
     public let deletedAt: String?
     public let icon: String?
@@ -342,6 +347,7 @@ public enum PublicSchema {
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
       case color = "color"
+      case createdAsTwin = "created_as_twin"
       case createdAt = "created_at"
       case deletedAt = "deleted_at"
       case icon = "icon"

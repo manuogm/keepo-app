@@ -119,5 +119,11 @@ extension LocalStore {
         // identical tiles for a merged pair — the exact thing those columns
         // were added to fix.
         migrator.registerMigration("v14_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260921100000 adds
+        // categories.created_as_twin server-side, `NOT NULL` with a default.
+        // Unlike the additive cases above this one would hard-fail: a stale
+        // device drops the column from its whitelist intersection, and every
+        // pulled category then hits a NOT NULL violation on insert.
+        migrator.registerMigration("v15_rebuild_syncable_tables", migrate: rebuildSyncableTables)
     }
 }

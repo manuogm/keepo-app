@@ -70,12 +70,26 @@ struct HouseholdQRView: View {
                 // household is final, and this is the road taken because there
                 // is no peer link. The container falls back to initials, the
                 // same as for a member with no photo.
-                HouseholdReportFlow(session: session) {
-                    await session.syncNow()
-                    session.refresh.bump()
-                    isShowingReport = false
-                    onJoined()
-                }
+                HouseholdReportFlow(
+                    session: session,
+                    onFinish: {
+                        await session.syncNow()
+                        session.refresh.bump()
+                        isShowingReport = false
+                        onJoined()
+                    },
+                    onAbort: {
+                        // No peer link on this road, so nobody to tell — the
+                        // other member's device finds the household gone on
+                        // its next pull, which the discard's epoch bump makes
+                        // immediate.
+                        try? await HouseholdRepository.discardHousehold(client: session.client)
+                        await session.syncNow()
+                        session.refresh.bump()
+                        isShowingReport = false
+                        onJoined()
+                    }
+                )
             }
         }
     }
@@ -228,7 +242,7 @@ struct HouseholdQRView: View {
     private func discardIfUnused() async {
         guard didCreateHousehold, !memberArrived, !isShowingReport else { return }
         didCreateHousehold = false
-        try? await HouseholdRepository.leave(client: session.client)
+        try? await HouseholdRepository.discardHousehold(client: session.client)
         await session.syncNow()
         session.refresh.bump()
     }

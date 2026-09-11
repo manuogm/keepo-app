@@ -802,3 +802,74 @@ added so an upgraded device does not silently drop them.
 `CategoryMergeSubject.swift`, which is a seam rather than an arbitrary cut —
 it is the answer to "what is being merged", and the sheet is what the owner
 does about it.
+
+---
+
+## Sixth pass, 2026-09-11 — an abort is an undo, not a dissolution
+
+Reported: backing out left both members holding a copy of the other's
+accounts. Confirmed — a few build-and-abort cycles during testing took both
+phones from two accounts to four.
+
+`abort()` undid the setup by calling `leave_household()`, which is the wrong
+verb. Leaving **dissolves** a household that has existed, and
+`fork_household_accounts` gives each member a private copy of everything
+shared so neither loses the ledger they kept together. That is right for two
+people separating and wrong for two who pressed Stop thirty seconds in.
+
+`20260921100000` adds `discard_household()`: the opposite of creating one,
+not the end of one.
+
+| what setup made | how it comes back |
+| --- | --- |
+| `households` + two memberships | memberships retired, as leaving retires them — a `DELETE` fires neither the sync tombstone nor `household_members_raise_sync_domain` |
+| `household_accounts` | retired. The household listed an account, it never owned one. **No fork, no copies.** |
+| categories it *linked* | `shared_group_id`, `merge_origin` and the identity a merge wrote over, all restored — 20260920100000 keeps the copy |
+| categories it *minted* | deleted outright |
+
+That last row is why this adds a column. `apply_category_merges` tells a
+minted twin from a real category by proxy — no transactions, no recurring
+rule, no merchant mapping — which is sound for a twin minted seconds earlier
+and **not** sound here: a category its owner made and never used answers
+exactly the same way, and deleting one on that basis loses something the user
+created. `categories.created_as_twin` records it at the moment it is known,
+for the same reason `merge_origin` does. `unlink_shared_categories` clears it,
+because once a household ends for real the twin is that member's own category.
+
+The deletes are hard rather than soft. A tombstone is a message to the other
+device and there is no message to send — the epoch bump makes both of them
+wipe and re-pull, after which a row that was never really theirs simply is not
+there.
+
+### The report is abortable too
+
+**Finish is what makes a household real.** Everything before it — the shares,
+the automatic merges, the ones the owner made by hand — is setup neither
+member has agreed to, and all of it is now undoable, so the report carries the
+same close button and the same alert as the ceremony. It sits on the banner,
+the one part of that screen that holds still.
+
+### Known gap
+
+A **tag pruned in the report** before aborting stays pruned.
+`delete_tag_retagging` moves `transaction_tags` rows onto the destination tag
+and records nothing about which ones moved, so the discard cannot put them
+back. Everything else on the report — every merge and unmerge — is reversed.
+Making this reversible means either recording the move (a column on
+`transaction_tags`) or deferring tag prunes to Finish; both are a design
+decision rather than a fix, and neither is in this pass.
+
+### Verification
+
+pgTAP **456 tests, 33 files, PASS** (new `37_aborting_leaves_no_trace.sql`,
+which includes the trap: a category its owner made and never used must
+survive a discard) · SwiftLint 0/302 · `xcodebuild test` SUCCEEDED ·
+`supabase gen types` regenerated, with `v15_rebuild_syncable_tables` — this
+column is `NOT NULL`, so unlike the additive ones a stale device would
+hard-fail every pulled category rather than silently drop it.
+
+On two simulators, aborting from the **report** (the deepest point): both
+members went from one account each to one account each, eight live categories
+each to eight, zero shared, zero twins, no live memberships — and every
+category back to its own name, icon and colour, including the ones four
+automatic merges had overwritten.

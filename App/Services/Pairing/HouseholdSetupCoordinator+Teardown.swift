@@ -30,7 +30,7 @@ extension HouseholdSetupCoordinator {
         // household that genuinely exists; the Household screen will show it,
         // and leaving is a decision for the person, not for an error handler.
         if didCreateHousehold && !hasJoined {
-            try? await HouseholdRepository.leave(client: session.client)
+            try? await HouseholdRepository.discardHousehold(client: session.client)
             await session.syncNow()
             session.refresh.bump()
         }
@@ -43,21 +43,23 @@ extension HouseholdSetupCoordinator {
     /// or to have the link drop.
     ///
     /// The undo is the same wherever it is called from — **if this device is
-    /// in a household this run put it in, leave it**. On a household nobody
-    /// joined that retires the membership and nothing else; on one the guest
-    /// has already joined, `leave_household` ends it for both, which is what
-    /// an abort after the join has to mean. A household the user already had
-    /// and nobody joined is left alone: it was never this screen's.
+    /// in a household this run put it in, discard it**. `discard_household`
+    /// rather than `leave_household`: leaving *dissolves* a household, forking
+    /// every shared account into a copy per member, which is right for two
+    /// people separating and was giving both of them a duplicate of the
+    /// other's accounts every time somebody pressed Stop. A household the
+    /// user already had and nobody joined is left alone: it was never this
+    /// screen's.
     ///
-    /// Swallowed, because the other phone may have got there first and
-    /// dissolved it already — and "you are not a member" is the outcome being
-    /// asked for, not a failure to report.
+    /// Swallowed, because the other phone may have got there first — and
+    /// finding no household is the outcome being asked for, not a failure to
+    /// report.
     func abort() async {
         guard !didAbort else { return }
         didAbort = true
         pairing.send(.cancelled(reason: nil))
         if didCreateHousehold || hasJoined {
-            try? await HouseholdRepository.leave(client: session.client)
+            try? await HouseholdRepository.discardHousehold(client: session.client)
             await session.syncNow()
             session.refresh.bump()
         }

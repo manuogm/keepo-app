@@ -30,11 +30,22 @@ struct HouseholdReportFlow: View {
     /// `coordinator.finish()`, which fills both houses; the QR fallback,
     /// which has no other phone to tell, passes a plain sync.
     var onFinish: () async -> Void
+    /// Runs when the owner backs out instead.
+    ///
+    /// **Finish is what makes a household real.** Everything this screen has
+    /// done up to that point — the shares, the automatic merges, the ones the
+    /// owner made by hand — is setup the owner has not agreed to yet, and
+    /// `discard_household` takes all of it back without either member
+    /// gaining so much as a copy of the other's accounts. So the report is
+    /// abortable for exactly as long as it is undoable, which is until the
+    /// last button on it.
+    var onAbort: () async -> Void
 
     @State private var step = 0
     @State private var snapshot = HouseholdSnapshot()
     @State private var isLoading = true
     @State private var isFinishing = false
+    @State private var isConfirmingStop = false
     @State private var errorMessage: String?
 
     private static let stepCount = 5
@@ -44,7 +55,9 @@ struct HouseholdReportFlow: View {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                HouseholdReportBanner(step: step, total: Self.stepCount)
+                HouseholdReportBanner(step: step, total: Self.stepCount) {
+                    isConfirmingStop = true
+                }
 
                 if isLoading {
                     Spacer()
@@ -56,6 +69,21 @@ struct HouseholdReportFlow: View {
             }
         }
         .task { await load() }
+        // An alert rather than a `confirmationDialog`, for the reason the
+        // ceremony's carries: presented from inside a full-screen cover the
+        // dialog rendered with no cancel button at all.
+        .alert("Stop building this household?", isPresented: $isConfirmingStop) {
+            Button("Stop", role: .destructive) {
+                isFinishing = true
+                Task { await onAbort() }
+            }
+            Button("Keep Going", role: .cancel) {}
+        } message: {
+            Text(
+                "The household won't be created. Neither of you loses an account, "
+                    + "a category or a tag, and nothing you have merged here is kept."
+            )
+        }
     }
 
     @ViewBuilder
@@ -163,10 +191,23 @@ struct HouseholdReportFlow: View {
 struct HouseholdReportBanner: View {
     let step: Int
     let total: Int
+    /// Backing out. On the banner rather than floating over the cards,
+    /// because the banner is the one part of this screen that holds still —
+    /// the same reason the title is on it.
+    var onClose: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
             HStack(spacing: AppTheme.Spacing.s) {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(AppTheme.Typography.labelEmphasis)
+                        .padding(AppTheme.Spacing.xs)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Stop building this household")
+
                 KeepoIcon(name: "icon-home-filled", size: AppTheme.Size.glyphSmall)
                 Text("Household Report")
                     .font(AppTheme.Typography.cardTitle)

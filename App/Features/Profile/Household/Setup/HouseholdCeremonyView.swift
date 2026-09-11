@@ -138,6 +138,11 @@ struct HouseholdCeremonyView: View {
                 onFinish: {
                     isShowingReport = false
                     await coordinator.finish()
+                },
+                onAbort: {
+                    isShowingReport = false
+                    await coordinator.abort()
+                    onBuilt()
                 }
             )
         }

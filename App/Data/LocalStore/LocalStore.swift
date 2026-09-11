@@ -130,6 +130,7 @@ public enum LocalSchemaV1 {
             table.column("pre_merge_name", .text)
             table.column("pre_merge_icon", .text)
             table.column("pre_merge_color", .text)
+            table.column("created_as_twin", .boolean).notNull().defaults(to: false)
             table.column("version", .integer).notNull()
             table.column("deleted_at", .text)
             table.column("created_at", .text).notNull()
