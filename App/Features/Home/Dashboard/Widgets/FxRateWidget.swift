@@ -109,24 +109,34 @@ struct FxRateWidget: View {
         }
     }
 
+    /// Both FX pills draw their code at one width — see `CurrencyBadge`'s
+    /// `codeWidth`. Wide enough for the widest code in the supported set
+    /// (`MXN`), and scaled so three letters still fit at larger Dynamic Type
+    /// sizes. Two of them, because the pair is drawn at two scales — see
+    /// `PairScale`.
+    @ScaledMetric(relativeTo: .subheadline) private var codeWidth: CGFloat = 34
+    @ScaledMetric(relativeTo: .caption) private var compactCodeWidth: CGFloat = 30
+
+    /// The pair is a heading on an expanded tile and a label on a collapsed
+    /// one, and is sized accordingly — `PairScale` has the measurements.
+    private var scale: PairScale { isExpanded ? .full : .compact }
+
+    private var pairCodeWidth: CGFloat { isExpanded ? codeWidth : compactCodeWidth }
+
     /// Quote, slash, base — the order the number is read in. `EUR / USD` at
     /// 1.1654 means one euro buys 1.1654 dollars, so the pair has to be
     /// written the same way round as the figure under it.
     ///
-    /// The slash is `.title3` rather than `.caption`, with real air either
+    /// The slash is a size up from the codes beside it, with real air either
     /// side. It is the only thing on the row saying these two currencies are
-    /// a *ratio* and not a list, and at caption size between two 22pt discs
-    /// it read as a stray mark.
-    /// Both FX pills draw their code at one width — see `CurrencyBadge`'s
-    /// `codeWidth`. Scaled so three letters still fit at larger Dynamic Type
-    /// sizes.
-    @ScaledMetric(relativeTo: .subheadline) private var codeWidth: CGFloat = 34
-
+    /// a *ratio* and not a list, and level with them it read as a stray mark.
+    /// It steps down with the rest of the row rather than keeping a heading's
+    /// size over caption-sized pills.
     private var pair: some View {
-        HStack(spacing: AppTheme.Spacing.s) {
+        HStack(spacing: scale.spacing) {
             quotePicker
             Text("/")
-                .font(AppTheme.Typography.cardTitle)
+                .font(scale.slashFont)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
             basePill
         }
@@ -150,11 +160,14 @@ struct FxRateWidget: View {
                 }
             }
         } label: {
-            CurrencyBadge(code: series.config.quoteCurrency, diameter: AppTheme.Size.glyph, codeWidth: codeWidth)
-                .currencyPill(stroke: AppTheme.Palette.fillStrong)
-                .hitTarget()
-                // See `basePill` for why both pills take their ideal width.
-                .fixedSize(horizontal: true, vertical: false)
+            CurrencyBadge(
+                code: series.config.quoteCurrency, diameter: scale.diameter,
+                codeWidth: pairCodeWidth, codeFont: scale.codeFont
+            )
+            .currencyPill(stroke: AppTheme.Palette.fillStrong, trailing: scale.pillTrailing)
+            .hitTarget()
+            // See `basePill` for why both pills take their ideal width.
+            .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.plain)
         // **The pill must not animate.** Picking a currency changes the
@@ -186,15 +199,18 @@ struct FxRateWidget: View {
         Button {
             isShowingBaseNote = true
         } label: {
-            CurrencyBadge(code: currency?.code, diameter: AppTheme.Size.glyph, codeWidth: codeWidth)
-                .opacity(AppTheme.Opacity.muted)
-                .currencyPill(stroke: AppTheme.Palette.fillStrong)
-                .hitTarget()
-                // Both pills report their own ideal width rather than
-                // accepting a proposal, so the host measures them once. See
-                // `TransactionsListView.pillLabel` for the artifact this
-                // helps with and for what it cannot fix.
-                .fixedSize(horizontal: true, vertical: false)
+            CurrencyBadge(
+                code: currency?.code, diameter: scale.diameter,
+                codeWidth: pairCodeWidth, codeFont: scale.codeFont
+            )
+            .opacity(AppTheme.Opacity.muted)
+            .currencyPill(stroke: AppTheme.Palette.fillStrong, trailing: scale.pillTrailing)
+            .hitTarget()
+            // Both pills report their own ideal width rather than
+            // accepting a proposal, so the host measures them once. See
+            // `TransactionsListView.pillLabel` for the artifact this
+            // helps with and for what it cannot fix.
+            .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(currency?.code ?? "Base currency"), your base currency")
@@ -300,24 +316,79 @@ private struct FxQuoteSelection: Equatable {
     let picked: String?
 }
 
+/// How large the pair is drawn. **The collapsed tile cannot carry the full
+/// size and never could** — this is the difference, in one place, rather
+/// than five ternaries scattered down the pills.
+///
+/// A 2×1 tile has 133–147pt inside its padding, depending on the device.
+/// Two `Size.glyph` pills with a three-letter code apiece, a title3 slash
+/// and the air either side of it need about 170. The row was within a point
+/// of the card's edge when the discs were 22pt and each code hugged its own
+/// letters; rounding the disc up to the `Size.glyph` token and then pinning
+/// the codes to one width (both of which were right for their own reasons)
+/// pushed it 23pt over, so the base pill was drawn through the card's right
+/// edge and the slash — the one mark saying these two are a *ratio* — was
+/// squeezed away to nothing.
+///
+/// So the collapsed pair drops to caption scale, which is what it actually
+/// is on that tile: a label over the figure, not a control row. Expanded
+/// keeps the full size, where a 4×2 has ~340pt and the pair is a heading
+/// above a chart.
+///
+/// **Check a change to these numbers at 375pt**, the narrowest iPhone on
+/// iOS 18, and not at whatever device is attached — a row that fits a 402pt
+/// Pro says nothing about the one it has to fit. Compact measures ~129pt
+/// against the 133.5pt an SE's tile gives it, which is the whole of the
+/// margin there is.
+private struct PairScale {
+    let diameter: CGFloat
+    /// `nil` lets `CurrencyBadge` size the code off the disc, which is right
+    /// at full size and far too small at 16pt — hence a type token here.
+    let codeFont: Font?
+    let slashFont: Font
+    /// Between the pills and the slash, and inside each pill after its code.
+    /// The leading inset is the disc's own and never changes.
+    let spacing: CGFloat
+    let pillTrailing: CGFloat
+
+    static let full = PairScale(
+        diameter: AppTheme.Size.glyph,
+        codeFont: nil,
+        slashFont: AppTheme.Typography.cardTitle,
+        spacing: AppTheme.Spacing.s,
+        pillTrailing: AppTheme.Spacing.s
+    )
+
+    static let compact = PairScale(
+        diameter: AppTheme.Size.glyphSmall,
+        codeFont: AppTheme.Typography.microEmphasis,
+        slashFont: AppTheme.Typography.labelEmphasis,
+        spacing: AppTheme.Spacing.xs,
+        pillTrailing: AppTheme.Spacing.xs
+    )
+}
+
 /// The pill both currencies are drawn in. One modifier rather than two call
 /// sites, because the whole point of the base pill is that it is the same
 /// shape as the one beside it — laid out separately they drifted by a point
 /// of padding and read as two different controls.
 private struct CurrencyPill: ViewModifier {
     let stroke: Color
+    let trailing: CGFloat
 
     func body(content: Content) -> some View {
         content
             .padding(.leading, AppTheme.Spacing.xs)
-            .padding(.trailing, AppTheme.Spacing.s)
+            .padding(.trailing, trailing)
             .padding(.vertical, AppTheme.Spacing.xs)
             .overlay(Capsule().stroke(stroke, lineWidth: 1))
     }
 }
 
 private extension View {
-    func currencyPill(stroke: Color) -> some View { modifier(CurrencyPill(stroke: stroke)) }
+    func currencyPill(stroke: Color, trailing: CGFloat) -> some View {
+        modifier(CurrencyPill(stroke: stroke, trailing: trailing))
+    }
 }
 
 private struct FxCollapsedKey: Equatable {
