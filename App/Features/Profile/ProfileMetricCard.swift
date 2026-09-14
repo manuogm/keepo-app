@@ -41,9 +41,14 @@ struct ProfileMetricCard<Content: View>: View {
                     .minimumScaleFactor(0.85)
                 if action != nil {
                     Spacer(minLength: 0)
+                    // `textTertiary`, not `textSecondary`: this card sits on
+                    // My Profile directly above the row tiles below it (My
+                    // Household, My Automations), whose chevron is `List`'s
+                    // own system-drawn disclosure indicator — a lighter grey
+                    // than every other manual chevron in the app uses.
                     Image(systemName: "chevron.right")
                         .font(AppTheme.Typography.nanoEmphasis)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
+                        .foregroundStyle(AppTheme.Palette.textTertiary)
                 }
             }
 

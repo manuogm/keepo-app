@@ -200,8 +200,12 @@ struct CategoriesView: View {
                 Text("All Tags")
                     .font(AppTheme.Typography.label)
                 Spacer()
+                // Overridden against the row's own `textPrimary`: every
+                // disclosure chevron in the app is `textSecondary`, matching
+                // the system indicator `List` draws for a `NavigationLink`.
                 Image(systemName: "chevron.right")
                     .font(AppTheme.Typography.micro)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
             .foregroundStyle(AppTheme.Palette.textPrimary)
             .padding(AppTheme.Spacing.l)

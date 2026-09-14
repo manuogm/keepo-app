@@ -52,6 +52,13 @@ extension AppTheme {
         static let textPrimary = Color("TextPrimary")
         /// Metadata, timestamps, captions. Replaces `Color.secondary`.
         static let textSecondary = Color("TextSecondary")
+        /// A step lighter still than `textSecondary` — the disclosure
+        /// chevron on My Profile's Base Currency card, matched to the system
+        /// grey `List` itself draws for a `NavigationLink`'s chevron (which
+        /// is `UIColor.tertiaryLabel`, not a token this app otherwise
+        /// names). Baked as a flat colour rather than that system colour's
+        /// own alpha, matching how every other token here is authored.
+        static let textTertiary = Color("TextTertiary")
         /// Text and glyphs drawn on a saturated fill — a scope banner, a
         /// tinted circle. Replaces `Color.white` at every such call site.
         static let textOnAccent = Color("TextOnAccent")

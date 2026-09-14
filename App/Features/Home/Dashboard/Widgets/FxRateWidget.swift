@@ -254,6 +254,7 @@ struct FxRateWidget: View {
                     Text("Go to settings")
                     Image(systemName: "chevron.right")
                         .font(AppTheme.Typography.nanoEmphasis)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
                 .font(AppTheme.Typography.labelEmphasis)
             }
