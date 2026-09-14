@@ -23,8 +23,9 @@ struct MainTabView: View {
     @State private var navigation = AppNavigation()
     /// Loaded here, once, for the same reason: the three money screens all
     /// render the identical "this scope is empty" answer, and the read
-    /// behind it is the same read whichever screen asks. Categories is not
-    /// among them — a category is not scoped money.
+    /// behind it is the same read whichever screen asks. Categories reads
+    /// only `hasHousehold` off this same instance — a category is not scoped
+    /// money, so the account-shaped emptiness cases don't apply to it.
     @State private var scopeContext = ScopeContext()
     /// Also owned here, and for the third time the same reason: two views
     /// draw the avatar — this tab's scope banner and the Profile sheet — and

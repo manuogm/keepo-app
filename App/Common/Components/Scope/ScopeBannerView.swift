@@ -51,6 +51,10 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     /// card by its own corner radius — so a screen's filters read as part of
     /// its header rather than as a toolbar underneath one.
     var isFiltersExpanded = false
+    /// Categories has nothing money-shaped to mask, so it's the one screen
+    /// that opts out — every other caller keeps the toggle by leaving this
+    /// at its default.
+    var showsPrivacyToggle = true
     let onOpenProfile: () -> Void
     /// Rendered immediately before the privacy toggle. Home puts "Done"
     /// here while the dashboard is being rearranged; Transactions puts the
@@ -155,8 +159,10 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
             Spacer(minLength: AppTheme.Spacing.xs)
 
             accessory
-            PrivacyToggleButton(session: session, tint: .white)
-                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+            if showsPrivacyToggle {
+                PrivacyToggleButton(session: session, tint: .white)
+                    .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+            }
         }
         .padding(.horizontal, AppTheme.Spacing.l)
         .padding(.top, topSafeAreaInset + topOvershoot + 12)
@@ -298,10 +304,13 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
 }
 
 extension ScopeBannerView where Accessory == EmptyView, Filters == EmptyView {
-    init(title: String, session: SessionStore, onOpenProfile: @escaping () -> Void) {
+    init(
+        title: String, session: SessionStore, showsPrivacyToggle: Bool = true,
+        onOpenProfile: @escaping () -> Void
+    ) {
         self.init(
-            title: title, session: session, onOpenProfile: onOpenProfile,
-            accessory: { EmptyView() }, filters: { EmptyView() }
+            title: title, session: session, showsPrivacyToggle: showsPrivacyToggle,
+            onOpenProfile: onOpenProfile, accessory: { EmptyView() }, filters: { EmptyView() }
         )
     }
 }

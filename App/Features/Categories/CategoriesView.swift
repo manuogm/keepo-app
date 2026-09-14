@@ -37,6 +37,12 @@ struct CategoriesView: View {
     @State private var selectedTab: KindTab = .expense
 
     @Environment(AppNavigation.self) private var navigation: AppNavigation?
+    /// Shared with the three money screens (see `MainTabView`) purely for the
+    /// one fact this screen also needs: whether a household exists at all.
+    /// Its account-shaped emptiness cases (`noAccounts`, `noSharedAccounts`,
+    /// ...) don't apply here — a category isn't scoped money — so this reads
+    /// `hasHousehold` directly rather than going through `emptiness(for:)`.
+    @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
 
     private var expenseCategories: [PublicSchema.CategoriesSelect] {
         categories.filter { $0.kind == .expense }
@@ -66,6 +72,15 @@ struct CategoriesView: View {
         }
     }
 
+    /// Household scope with nobody to share a category with — the same
+    /// "nothing behind this scope" state the money screens show, minus the
+    /// account-specific cases that don't mean anything here. Gated on
+    /// `isLoaded` so a household that simply hasn't loaded yet doesn't flash
+    /// as "no household" for a frame.
+    private var showsHouseholdBlankState: Bool {
+        session.scope == .household && scopeContext?.isLoaded == true && scopeContext?.hasHousehold == false
+    }
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.m), count: 3)
 
     var body: some View {
@@ -74,22 +89,30 @@ struct CategoriesView: View {
 
             VStack(spacing: 0) {
                 ScopeBannerView(
-                    title: "Categories", session: session, onOpenProfile: { navigation?.openProfileRoot() }
+                    title: "Categories", session: session, showsPrivacyToggle: false,
+                    onOpenProfile: { navigation?.openProfileRoot() }
                 )
                 .padding(.bottom, AppTheme.Spacing.xs)
                 .zIndex(1)
 
-                Picker("Kind", selection: $selectedTab) {
-                    ForEach(KindTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                // Hidden in the household blank state: there is nothing behind
+                // either tab to switch to, so the control would offer a choice
+                // between two views of the same emptiness.
+                if !showsHouseholdBlankState {
+                    Picker("Kind", selection: $selectedTab) {
+                        ForEach(KindTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding()
+                    .sensoryFeedback(AppTheme.Feedback.selection, trigger: selectedTab)
                 }
-                .pickerStyle(.segmented)
-                .padding()
-                .sensoryFeedback(AppTheme.Feedback.selection, trigger: selectedTab)
 
                 if isLoading {
                     Spacer()
                     ProgressView()
                     Spacer()
+                } else if showsHouseholdBlankState {
+                    ScopeEmptyStateView(emptiness: .noHousehold, session: session)
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: AppTheme.Spacing.m) {
