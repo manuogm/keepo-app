@@ -76,9 +76,17 @@ enum NotificationLevel: String, CaseIterable, Hashable {
 
     var detail: String {
         switch self {
-        case .none: return "Never notified, including automatic payment capture."
-        case .functional: return "Automatic payment capture and items needing review."
-        case .full: return "Functional notifications, plus a monthly balance check-in reminder."
+        case .none: return "You will be missing out the good stuff"
+        case .functional: return "Automatically captured payments and other items needing your review"
+        case .full: return "Functional + Monthly reminders to help you stick to good habits"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "icon-notification-none"
+        case .functional: return "icon-notification-money"
+        case .full: return "icon-bell"
         }
     }
 }

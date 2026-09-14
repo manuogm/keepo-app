@@ -27,6 +27,16 @@ struct NotificationSettingsView: View {
     @AppStorage(AppSettingsKeys.notificationLevel) private var level = NotificationLevel.full
     @State private var showPermissionDeniedAlert = false
     @State private var isSystemPermissionDenied = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// The selected card's fill is `textPrimary` itself — dark ink in light
+    /// mode, a darker shade of white in dark mode — so its own text can't
+    /// reuse that same adaptive token without disappearing into it. Light
+    /// mode's ink fill needs fixed white text (`textOnAccent`); dark mode's
+    /// near-white fill needs fixed dark ink (`textOnLight`) instead.
+    private var selectedTextColor: Color {
+        colorScheme == .dark ? AppTheme.Palette.textOnLight : AppTheme.Palette.textOnAccent
+    }
 
     var body: some View {
         Form {
@@ -38,28 +48,69 @@ struct NotificationSettingsView: View {
             }
             Section {
                 ForEach(NotificationLevel.allCases, id: \.self) { option in
+                    let isSelected = level == option
                     Button {
                         level = option
                         Task { await sync(option) }
                     } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
-                                Text(option.label)
-                                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                                Text(option.detail)
-                                    .font(AppTheme.Typography.caption)
-                                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                        HStack(spacing: AppTheme.Spacing.s) {
+                            KeepoIcon(name: option.icon, size: AppTheme.Size.icon)
+                                .foregroundStyle(isSelected ? selectedTextColor : AppTheme.Palette.textPrimary)
+                                .frame(width: AppTheme.Size.touchTarget, height: AppTheme.Size.touchTarget)
+                                .accessibilityHidden(true)
+                            // A hidden twin sized for the longest possible
+                            // detail (two lines) reserves one consistent
+                            // height for every card. The real title+detail
+                            // block — one line of detail for "No
+                            // Notifications", two for the others — centers
+                            // as a whole inside that reserved height, so
+                            // every card gets the same top/bottom margin
+                            // without disturbing the title-to-detail gap
+                            // that separates its own two lines.
+                            ZStack(alignment: .leading) {
+                                VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
+                                    Text(option.label)
+                                        .font(AppTheme.Typography.bodyEmphasis)
+                                        .lineLimit(1)
+                                    Text("Reserved\nReserved")
+                                        .font(AppTheme.Typography.caption)
+                                        .lineLimit(2)
+                                }
+                                .opacity(0)
+                                .accessibilityHidden(true)
+
+                                VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
+                                    Text(option.label)
+                                        .font(isSelected ? AppTheme.Typography.bodyEmphasis : AppTheme.Typography.body)
+                                        .foregroundStyle(isSelected ? selectedTextColor : AppTheme.Palette.textPrimary)
+                                        .lineLimit(1)
+                                    Text(option.detail)
+                                        .font(AppTheme.Typography.caption)
+                                        .foregroundStyle(
+                                            isSelected
+                                                ? selectedTextColor.opacity(0.85)
+                                                : AppTheme.Palette.textSecondary
+                                        )
+                                        .lineLimit(2)
+                                }
                             }
                             Spacer()
-                            if level == option {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                            }
                         }
+                        .padding(AppTheme.Spacing.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            isSelected ? AppTheme.Palette.textPrimary : AppTheme.Palette.bgSurface,
+                            in: RoundedRectangle(cornerRadius: AppTheme.Radius.card)
+                        )
                     }
+                    .buttonStyle(.pressableRow)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(
+                        top: AppTheme.Spacing.s, leading: AppTheme.Spacing.l,
+                        bottom: AppTheme.Spacing.s, trailing: AppTheme.Spacing.l
+                    ))
                 }
-            } footer: {
-                Text("Wallet-automation captures always land in Needs Review even when notifications are off.")
             }
         }
         .navigationTitle("Notifications")

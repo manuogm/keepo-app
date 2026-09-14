@@ -55,6 +55,13 @@ extension AppTheme {
         /// Text and glyphs drawn on a saturated fill — a scope banner, a
         /// tinted circle. Replaces `Color.white` at every such call site.
         static let textOnAccent = Color("TextOnAccent")
+        /// Text drawn on a fill that is itself `textPrimary` — a selected
+        /// row inverted to stand out, whose background is therefore dark ink
+        /// in light mode but a near-white in dark mode. `textOnAccent`
+        /// (fixed white) only works for the light-mode half of that; this is
+        /// the fixed dark ink the dark-mode half needs instead, since
+        /// `textPrimary` itself already flips to supply the background.
+        static let textOnLight = Color("TextOnLight")
 
         // MARK: Neutral fills
         /// A neutral wash behind a chip or an icon well. Replaces

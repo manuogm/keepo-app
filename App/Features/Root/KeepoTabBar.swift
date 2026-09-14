@@ -117,19 +117,19 @@ extension AppNavigation.Tab {
     /// the selected one. All are template-rendered and tinted by the caller.
     var icon: String {
         switch self {
-        case .home: return "icon-dashboard"
-        case .accounts: return "icon-account"
+        case .home: return "icon-chart"
+        case .accounts: return "icon-card"
         case .transactions: return "icon-transaction"
-        case .categories: return "icon-tag"
+        case .categories: return "icon-categories"
         }
     }
 
     var selectedIcon: String {
         switch self {
-        case .home: return "icon-dashboard-filled"
-        case .accounts: return "icon-account-filled"
+        case .home: return "icon-chart-filled"
+        case .accounts: return "icon-card-filled"
         case .transactions: return "icon-transaction-filled"
-        case .categories: return "icon-tag-filled"
+        case .categories: return "icon-categories-filled"
         }
     }
 

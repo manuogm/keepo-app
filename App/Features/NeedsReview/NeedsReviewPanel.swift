@@ -199,10 +199,8 @@ struct NeedsReviewPanel: View {
             withAnimation(AppTheme.Motion.standard) { isExpanded.toggle() }
         } label: {
             HStack(spacing: AppTheme.Spacing.m) {
-                Image(systemName: "tray.full.fill")
-                    .font(AppTheme.Typography.labelEmphasis)
+                KeepoIcon(name: "icon-inbox", size: AppTheme.Size.icon)
                     .foregroundStyle(accent)
-                    .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
                     .background(accent.opacity(AppTheme.Opacity.fill), in: Circle())
 
                 Text(headline)

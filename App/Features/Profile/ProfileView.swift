@@ -132,12 +132,12 @@ struct ProfileView: View {
                         if avatars.isBusy {
                             ProgressView()
                         } else {
-                            Image(systemName: "camera.fill")
-                                .font(AppTheme.Typography.nanoEmphasis)
-                                .foregroundStyle(AppTheme.Palette.textOnAccent)
-                                .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.glyph)
-                                .background(AppTheme.Palette.textPrimary, in: Circle())
+                            KeepoIcon(name: "icon-camera", size: AppTheme.Size.glyphSmall)
+                                .foregroundStyle(AppTheme.Palette.textPrimary)
+                                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                                .background(AppTheme.Palette.textOnAccent, in: Circle())
                                 .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
+                                .offset(x: 8, y: 8)
                         }
                     }
                 }
