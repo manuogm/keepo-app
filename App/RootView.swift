@@ -25,6 +25,23 @@ struct RootView: View {
     @State private var captureObserver: DarwinNotificationObserver?
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
+    /// Live system appearance, read here because this is the one place in
+    /// the app guaranteed not to be inside a modal presentation. A `.sheet`'s
+    /// content runs in its own `UIHostingController`, which does not reliably
+    /// re-observe a bare system Dark Mode flip while idle on screen — it
+    /// only catches up on its next state-driven re-render (a push, a pop,
+    /// being dismissed and re-presented), which is exactly the "close and
+    /// reopen Profile" symptom this was reported as. Resolving the concrete
+    /// scheme up here, where SwiftUI *does* re-render on the flip, and
+    /// threading it down to `MainTabView` lets the Profile sheet reassert
+    /// `.preferredColorScheme` with a value that actually changes, instead
+    /// of leaving it to inherit an environment its own hosting controller
+    /// isn't watching.
+    @Environment(\.colorScheme) private var systemColorScheme
+
+    private var resolvedColorScheme: ColorScheme {
+        appearanceMode.colorScheme ?? systemColorScheme
+    }
 
     /// iOS greys every tinted view in a window while a modal is presented
     /// (`tintAdjustmentMode` flips to `.dimmed`) and is supposed to undo it
@@ -65,7 +82,7 @@ struct RootView: View {
                     Task { try? await session.refreshProfile() }
                 }
             case .ready:
-                MainTabView(session: session, network: network)
+                MainTabView(session: session, network: network, colorScheme: resolvedColorScheme)
             case .failed(let message):
                 RootErrorView(message: message)
             }

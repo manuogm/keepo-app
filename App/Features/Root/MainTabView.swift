@@ -8,6 +8,12 @@ import SwiftUI
 struct MainTabView: View {
     let session: SessionStore
     let network: NetworkMonitor
+    /// Resolved by `RootView`, which — unlike this view's Profile `.sheet`
+    /// — reliably observes a live system Dark Mode flip. Reasserted
+    /// explicitly on the sheet's content below so its own hosting
+    /// controller picks up the change immediately instead of only on its
+    /// next push/pop/re-present.
+    let colorScheme: ColorScheme
 
     @State private var needsReviewCount = 0
     /// Owned here because this is the only view that can act on it — the tab
@@ -95,6 +101,7 @@ struct MainTabView: View {
                         profileDestination(destination)
                     }
             }
+            .preferredColorScheme(colorScheme)
         }
         .task(id: session.refresh.token) {
             await loadNeedsReviewCount()
