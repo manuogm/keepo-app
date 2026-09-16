@@ -18,6 +18,7 @@ Before starting work on a new version, **read every file in `version-logs/`** �
 
 ## Commands
 - Build/run: Xcode (`xcodebuild -scheme Keepo build`, or open `Keepo.xcodeproj` and Run). `Keepo.xcodeproj` is generated from `project.yml` via XcodeGen — edit `project.yml`, then run `xcodegen generate`, never hand-edit the `.xcodeproj`
+- **Two schemes, and the difference is which Supabase you hit.** `Keepo` (config `Debug`/`Release`) points at the **hosted** project — use it for device builds and anything shipping. `Keepo-Local` (config `Debug-Local`) points at the local `supabase start` stack — use it for Simulator work, and prefer it when running the app or the test suites, so a casual run never writes to production. Both are DEBUG builds with the same affordances; only the xcconfig differs. A `Keepo-Local` build **cannot** work on a real phone: `127.0.0.1` is the phone itself, and the app stops at "Couldn't connect". Copy `Config/Debug-Local.xcconfig.example` to `Config/Debug-Local.xcconfig` (gitignored) and paste the values from `supabase status`
 - Lint: SwiftLint — must pass before PR/release
 - `Swift Testing` (`@Suite`/`@Test`/`#expect`, not `XCTest`) — pure logic (money, dates, FX, validation) lives in the `KeepoCore` Swift package and is unit tested in `Packages/KeepoCore/Tests/KeepoCoreTests`, run via `swift test` or as part of the `Keepo` scheme. App-target-specific logic is tested in `KeepoTests`
 - `XCUITest` — UI flows in `KeepoUITests`

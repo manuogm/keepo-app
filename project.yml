@@ -8,6 +8,15 @@ options:
 
 configs:
   Debug: debug
+  # Identical to Debug in every compiler setting — `debug` is the *type*, and
+  # that is what gives it DEBUG, -Onone and the Developer section in Profile.
+  # The only thing that differs is which Config/*.xcconfig it reads, and so
+  # which Supabase it talks to: Debug points at the hosted project, this one
+  # at the local `supabase start` stack. Before this existed there was one
+  # Debug config and pointing it at hosted (to get a DEBUG build onto a real
+  # phone) silently took the local stack away from the Simulator too, so
+  # every casual run wrote to production.
+  Debug-Local: debug
   Release: release
 
 settings:
@@ -47,6 +56,7 @@ targets:
         type: folder
     configFiles:
       Debug: Config/Debug.xcconfig
+      Debug-Local: Config/Debug-Local.xcconfig
       Release: Config/Release.xcconfig
     dependencies:
       - package: KeepoCore
@@ -142,6 +152,8 @@ targets:
         TEST_TARGET_NAME: Keepo
 
 schemes:
+  # The everyday scheme. Debug and Release both point at the hosted project,
+  # so this is what goes on a real phone and what ships.
   Keepo:
     build:
       targets:
@@ -157,3 +169,24 @@ schemes:
         - KeepoUITests
     archive:
       config: Release
+
+  # The local-stack scheme: same code, same DEBUG affordances, pointed at
+  # `supabase start` instead of production. Pick it in Xcode's scheme menu,
+  # or `xcodebuild -scheme Keepo-Local`.
+  #
+  # Deliberately has no archive action. An archive of a build hard-wired to
+  # 127.0.0.1 is only ever a mistake, and leaving the action off means the
+  # menu item cannot quietly produce one.
+  Keepo-Local:
+    build:
+      targets:
+        Keepo: all
+        KeepoTests: [test]
+        KeepoUITests: [test]
+    run:
+      config: Debug-Local
+    test:
+      config: Debug-Local
+      targets:
+        - KeepoTests
+        - KeepoUITests
