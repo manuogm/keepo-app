@@ -35,7 +35,7 @@ struct HouseholdView: View {
     @State private var isLeaving = false
     @State private var isShowingDissolved = false
     @AppStorage(AppSettingsKeys.lastKnownHouseholdId) private var lastKnownHouseholdId = ""
-    @State private var errorMessage: String?
+    @State private var actionError: ActionError?
 
     var body: some View {
         ZStack {
@@ -161,14 +161,13 @@ struct HouseholdView: View {
                     isShowingLeaveConfirm = true
                 }
                 .padding(.top, AppTheme.Spacing.s)
-
-                if let errorMessage { FormErrorText(message: errorMessage) }
             }
             .padding(.horizontal, AppTheme.Spacing.l)
             .padding(.bottom, AppTheme.Spacing.xl)
         }
         .scrollBounceBehavior(.basedOnSize)
         .refreshable { await load() }
+        .errorAlert($actionError)
     }
 
     /// The owner sits on the left of the container, always — it is the same
@@ -204,7 +203,7 @@ struct HouseholdView: View {
     @State private var dissolvedPartnerName = ""
 
     private func load() async {
-        errorMessage = nil
+        actionError = nil
         snapshot = await HouseholdDataLoader.load(session: session)
         noticeDissolutionIfNeeded()
         await avatars.load(path: session.profile?.avatarPath, client: session)
@@ -237,7 +236,7 @@ struct HouseholdView: View {
 
     private func leave() async {
         isLeaving = true
-        errorMessage = nil
+        actionError = nil
         // Cleared up front: this device is about to lose its household on
         // purpose, and the notice is for the member who did not choose it.
         lastKnownHouseholdId = ""
@@ -248,7 +247,7 @@ struct HouseholdView: View {
             session.refresh.bump()
             await load()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Leave This Household", error)
         }
         isLeaving = false
         isRemoving = false

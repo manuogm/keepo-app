@@ -42,7 +42,7 @@ struct ProfileView: View {
     // Internal, not private: `ProfileView+Sections.swift` reads them, and
     // `private` is file-scoped. Same convention as `NeedsReviewPanel`'s own
     // split.
-    @State var errorMessage: String?
+    @State var actionError: ActionError?
     @State var isSyncingFX = false
     @State var lastFXSyncedAt: Date?
     @State var isSigningOut = false
@@ -115,6 +115,18 @@ struct ProfileView: View {
             onPicked: { image in Task { _ = await avatars.replace(with: image, session: session) } },
             onRemove: { Task { await avatars.removeAvatar(session: session) } }
         )
+        // The avatar store owns its own failures — it is shared with
+        // onboarding's first step, which has no Profile screen to report
+        // into — so they are lifted into the same alert here rather than
+        // given a second, quieter channel of their own. It clears
+        // `lastError` at the start of every attempt, so the same failure
+        // twice in a row still arrives twice.
+        .onChange(of: avatars.lastError) { _, message in
+            guard let message else { return }
+            actionError = ActionError(title: "Couldn't Update Your Photo", message: message)
+            avatars.clearLastError()
+        }
+        .errorAlert($actionError)
     }
 
     // MARK: - Who you are
@@ -177,10 +189,6 @@ struct ProfileView: View {
                 }
 
                 metrics
-
-                if let message = errorMessage ?? avatars.lastError {
-                    FormErrorText(message: message)
-                }
             }
             .frame(maxWidth: .infinity)
             .padding(.top, AppTheme.Spacing.m)
@@ -267,14 +275,14 @@ struct ProfileView: View {
             draftName = session.profile?.displayName ?? ""
             return
         }
-        errorMessage = nil
+        actionError = nil
         do {
             try await ProfileRepository.updateDisplayName(
                 client: session.client, userId: userId, displayName: trimmed
             )
             try await session.refreshProfile()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Save Your Name", error)
             draftName = session.profile?.displayName ?? ""
         }
     }
@@ -295,7 +303,7 @@ struct ProfileView: View {
     }
 
     private func saveBaseCurrency(_ code: String, userId: UUID) async {
-        errorMessage = nil
+        actionError = nil
         do {
             try await ProfileRepository.updateBaseCurrency(
                 client: session.client, userId: userId, baseCurrency: code
@@ -303,7 +311,7 @@ struct ProfileView: View {
             try await session.refreshProfile()
             session.refresh.bump()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Change Your Base Currency", error)
         }
     }
 

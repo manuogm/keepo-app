@@ -15,7 +15,7 @@ struct ExportView: View {
     @State private var from = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State private var through = Date()
     @State private var isExporting = false
-    @State private var errorMessage: String?
+    @State private var actionError: ActionError?
     @State private var exportedFileURL: URL?
     @State private var showShareSheet = false
 
@@ -64,9 +64,6 @@ struct ExportView: View {
                 .disabled(isExportDisabled)
             }
 
-            if let errorMessage {
-                FormErrorText(message: errorMessage)
-            }
         }
         .navigationTitle("Export")
         .navigationBarTitleDisplayMode(.inline)
@@ -81,6 +78,7 @@ struct ExportView: View {
                 ShareSheet(fileURL: exportedFileURL)
             }
         }
+        .errorAlert($actionError)
     }
 
     private func selectionBinding(for accountId: UUID) -> Binding<Bool> {
@@ -94,7 +92,7 @@ struct ExportView: View {
 
     private func export() async {
         isExporting = true
-        errorMessage = nil
+        actionError = nil
         do {
             try await session.stepUp(reason: "Confirm it's you to export your financial data")
             let accountIds = exportAllAccounts
@@ -110,7 +108,7 @@ struct ExportView: View {
             exportedFileURL = url
             showShareSheet = true
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Export", error)
         }
         isExporting = false
     }

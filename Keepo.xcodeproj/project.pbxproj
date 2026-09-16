@@ -134,6 +134,7 @@
 		6D136EF3E95EB5BD256F22C7 /* KeepoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA14030637CFFD08A547224 /* KeepoUITests.swift */; };
 		6ED447E86A5FFA53C5AC3C60 /* BalanceReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0FAAB5B77568D01ADFCCDA7 /* BalanceReminderScheduler.swift */; };
 		6F9953A72DAD11FF5AF4185B /* SetupCategoriesStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = D621FA324F7CDB455E50A5B6 /* SetupCategoriesStep.swift */; };
+		70127DD81CE7AC78BD52FAE3 /* ErrorAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5786A3C4FD7E1FFBB3C8FBF /* ErrorAlert.swift */; };
 		7027DFCC65547FCC92C2644F /* ProfileMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E22F93DB44C5DFEC4CF6725 /* ProfileMetricCard.swift */; };
 		720897F8D137E6761E836C80 /* AvatarStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC04F25F3E87CBB7240E1BC6 /* AvatarStore.swift */; };
 		740E6573623946DF9C219E5F /* CaptureQuickActionRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D622D3BC234133CBEBEA83 /* CaptureQuickActionRegistry.swift */; };
@@ -526,6 +527,7 @@
 		A23166A8674504049A46489F /* LocalAccountRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRow.swift; sourceTree = "<group>"; };
 		A2EFE59B1202392CFCB41D33 /* DropsBottomSafeArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropsBottomSafeArea.swift; sourceTree = "<group>"; };
 		A3AF792C04D22B7EF9030339 /* LocalDashboardQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDashboardQueries.swift; sourceTree = "<group>"; };
+		A5786A3C4FD7E1FFBB3C8FBF /* ErrorAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorAlert.swift; sourceTree = "<group>"; };
 		A5D45833432D943398CC902D /* LocalMoneyConversionArchivedAccountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyConversionArchivedAccountTests.swift; sourceTree = "<group>"; };
 		A6EC2DB7E832362CEA7CCF77 /* KeepoCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = KeepoCore; path = Packages/KeepoCore; sourceTree = SOURCE_ROOT; };
 		A7440D8EAA40F17639CC1041 /* CurrencyFlagAssetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyFlagAssetTests.swift; sourceTree = "<group>"; };
@@ -798,6 +800,7 @@
 				6FB1C58405432F114141B208 /* CategoryTile.swift */,
 				9F0C82F5CF87BF218D907A0D /* CurrencyConversionLabel.swift */,
 				EB4473C45DBF70F6796DE4B7 /* CurrencyWheel.swift */,
+				A5786A3C4FD7E1FFBB3C8FBF /* ErrorAlert.swift */,
 				AEF251868300EF158A6F57D1 /* FormPrimitives.swift */,
 				59D17800B8CAFD32B42ECB90 /* IconCatalogView.swift */,
 				D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */,
@@ -1587,6 +1590,7 @@
 				04DAB563D2880FF92D7AF874 /* DashboardWidgetView.swift in Sources */,
 				3869BFDA8B7529874F2CD254 /* DaySplitRing.swift in Sources */,
 				A7E7A7AA57AE3AA8A98E0B85 /* DropsBottomSafeArea.swift in Sources */,
+				70127DD81CE7AC78BD52FAE3 /* ErrorAlert.swift in Sources */,
 				DCEFB45D20BC131FA0C9519B /* ExportView.swift in Sources */,
 				5865DCBD730A1A6676CB888B /* FTUXCoordinator.swift in Sources */,
 				124124D5FCC9AB799601F076 /* FadingEdges.swift in Sources */,

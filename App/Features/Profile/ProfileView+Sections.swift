@@ -126,7 +126,7 @@ extension ProfileView {
             session.refresh.bump()
             await loadLastFXSyncedAt()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Sync Exchange Rates", error)
         }
         isSyncingFX = false
     }
@@ -180,23 +180,28 @@ extension ProfileView {
 
     func signOut() async {
         isSigningOut = true
-        errorMessage = nil
+        actionError = nil
         do {
             try await session.signOut()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Sign Out", error)
             isSigningOut = false
         }
     }
 
+    /// Both halves report into the same alert, and both have to: a step-up
+    /// that never got past `canEvaluatePolicy` and a server that refused are
+    /// equally invisible from the outside, and this is the one button in the
+    /// app where "nothing appeared to happen" is indistinguishable from
+    /// "your account is gone".
     func deleteAccount() async {
         isDeletingAccount = true
-        errorMessage = nil
+        actionError = nil
         do {
             try await session.stepUp(reason: "Confirm account deletion")
             try await session.deleteAccount()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Delete Your Account", error)
             isDeletingAccount = false
         }
     }
