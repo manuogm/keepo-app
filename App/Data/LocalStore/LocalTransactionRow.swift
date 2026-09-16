@@ -83,7 +83,8 @@ enum LocalTransactionRow {
         SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
                t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
-               t.recurring_rule_id,
+               t.recurring_rule_id, t.original_amount_e4, t.original_currency,
+               ocur.minor_unit AS original_minor_unit,
                CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                     WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
         FROM transactions t
@@ -91,6 +92,7 @@ enum LocalTransactionRow {
             AND a.deleted_at IS NULL AND a.archived_at IS NULL AND \(visibleAccountClause)
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN currencies cur ON cur.code = t.currency
+        LEFT JOIN currencies ocur ON ocur.code = t.original_currency
         WHERE t.deleted_at IS NULL
           AND (t.account_id IS NULL AND t.owner_id = ? OR a.id IS NOT NULL)
         """
@@ -154,13 +156,15 @@ enum LocalTransactionRow {
             SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
                    t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
-                   t.recurring_rule_id,
+                   t.recurring_rule_id, t.original_amount_e4, t.original_currency,
+                   ocur.minor_unit AS original_minor_unit,
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                         WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
             FROM transactions t
             JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
             JOIN currencies cur ON cur.code = t.currency
+            LEFT JOIN currencies ocur ON ocur.code = t.original_currency
             WHERE t.deleted_at IS NULL AND t.transfer_group_id = ?
             """,
             arguments: [ownerId, ownerId, transferGroupId]
@@ -189,13 +193,15 @@ enum LocalTransactionRow {
             SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
                    t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
-                   t.recurring_rule_id,
+                   t.recurring_rule_id, t.original_amount_e4, t.original_currency,
+                   ocur.minor_unit AS original_minor_unit,
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                         WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
             FROM transactions t
             LEFT JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
             LEFT JOIN currencies cur ON cur.code = t.currency
+            LEFT JOIN currencies ocur ON ocur.code = t.original_currency
             WHERE t.deleted_at IS NULL AND t.id = ?
               AND (t.account_id IS NULL AND t.owner_id = ? OR a.id IS NOT NULL)
             """,

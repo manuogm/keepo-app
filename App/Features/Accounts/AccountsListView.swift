@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import TipKit
 
 /// UI labels are "Everyday" and "Investments" — the groups still split by
 /// `kind`, and each investment row carries its own `InvestmentBadge`, per
@@ -150,6 +151,10 @@ struct AccountsListView: View {
             .onMove { offsets, destination in
                 Task { await handleMove(from: offsets, to: destination) }
             }
+            // On the rows themselves, because the lesson is about dragging
+            // one — a tip anchored to the screen would point at nothing in
+            // particular.
+            .popoverTip(KeepoTips.accounts)
 
             if !archived.isEmpty {
                 archivedRow

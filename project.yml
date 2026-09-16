@@ -34,7 +34,16 @@ targets:
       - path: App
         excludes:
           - "Resources/ThirdPartyLicenses/**"
+          - "Resources/Videos/**"
       - path: App/Resources/ThirdPartyLicenses
+        type: folder
+      # The Shortcuts walkthrough clips, same folder-reference treatment and
+      # for a plainer reason: dropping a newly recorded clip in should not
+      # also require setting its target membership. The folder is referenced
+      # while still empty on purpose — `ShortcutsWalkthrough` names clips
+      # that may not exist yet and the walkthrough falls back to its text,
+      # so the flow builds against nothing here.
+      - path: App/Resources/Videos
         type: folder
     configFiles:
       Debug: Config/Debug.xcconfig
@@ -54,7 +63,13 @@ targets:
         # only place a setting survives regeneration.
         DEVELOPMENT_TEAM: K46X3FA9HH
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # NOT `INFOPLIST_KEY_UILaunchScreen_Generation` any more, and none
+        # of its siblings: `UILaunchScreen` is a **dictionary**, which the
+        # INFOPLIST_KEY_* mechanism cannot express — setting
+        # `..._BackgroundColor` and `..._UIImageName` alongside it builds an
+        # *empty* `UILaunchScreen` dict and a blank white launch screen,
+        # verified in the built Info.plist. It lives in App/Info.plist
+        # instead, for the same reason `NSBonjourServices` (an array) does.
         INFOPLIST_KEY_CFBundleDisplayName: Keepo
         # There is deliberately no NSPhotoLibraryUsageDescription: the
         # library goes through `PhotosPicker`, which runs out of process —

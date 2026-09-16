@@ -7,14 +7,17 @@ import UserNotifications
 /// full experience (functional, plus a monthly balance check-in reminder
 /// scheduled/cancelled here via `BalanceReminderScheduler`).
 ///
-/// System notification permission is requested from two places: once,
-/// unconditionally, at the end of onboarding (`OnboardingView`, right where
-/// Wallet automation is explained — C-06, so a fresh install's default
-/// `.full` preference is backed by a real iOS answer instead of an assumed
-/// one), and again here, defensively, on the deliberate act of tapping
-/// "Functional Only" or "Full Experience" for a returning user who somehow
-/// never saw onboarding's ask. Never from `CaptureIntent` — an App Intent
-/// has no business interrupting a Wallet automation with a permission sheet.
+/// System notification permission is requested here, on the deliberate act
+/// of tapping "Functional Only" or "Full Experience". Never from
+/// `CaptureIntent` — an App Intent has no business interrupting a Wallet
+/// automation with a permission sheet.
+///
+/// Both this and setup step 4 go through `NotificationPermission`, which
+/// is the only place in the app that calls `requestAuthorization` — iOS
+/// asks exactly once ever, so a second call site is not a second chance,
+/// it is a call that looks like it did something and did not. Setup does
+/// the real ask, primed and behind an explicit button; this one is the
+/// defensive repeat for a returning user who never saw setup.
 ///
 /// No app can flip iOS's own notification toggle, in either direction —
 /// once the user has answered the system dialog once, `requestAuthorization`
@@ -125,21 +128,12 @@ struct NotificationSettingsView: View {
     }
 
     private func refreshSystemPermissionState() async {
-        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-        isSystemPermissionDenied = status == .denied && level != .none
+        isSystemPermissionDenied = await NotificationPermission.status() == .denied && level != .none
     }
 
     private func sync(_ level: NotificationLevel) async {
-        if level != .none {
-            let center = UNUserNotificationCenter.current()
-            switch await center.notificationSettings().authorizationStatus {
-            case .notDetermined:
-                _ = try? await center.requestAuthorization(options: [.alert, .sound])
-            case .denied:
-                showPermissionDeniedAlert = true
-            default:
-                break
-            }
+        if level != .none, await NotificationPermission.requestIfNeeded() == .denied {
+            showPermissionDeniedAlert = true
         }
         await refreshSystemPermissionState()
         if level == .full {

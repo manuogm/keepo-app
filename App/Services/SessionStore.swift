@@ -347,14 +347,6 @@ public final class SessionStore {
         phase = profile.onboardedAt == nil ? .needsOnboarding : .ready
     }
 
-    public func completeOnboarding(baseCurrency: String, displayName: String) async throws {
-        guard let userId else { return }
-        try await ProfileRepository.completeOnboarding(
-            client: client, userId: userId, baseCurrency: baseCurrency, displayName: displayName
-        )
-        try await refreshProfile()
-    }
-
     /// Info.plist keys are set via INFOPLIST_KEY_SupabaseURL/SupabaseAnonKey
     /// in project.yml, themselves populated from the gitignored
     /// Config/*.xcconfig at build time — no secret is ever committed.

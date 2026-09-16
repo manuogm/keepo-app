@@ -81,12 +81,8 @@ struct ProfileMetricCard<Content: View>: View {
 /// the same job iOS gives a wheel everywhere it appears — and a list of
 /// thirty near-identical rows makes the reader hunt through them, while a
 /// wheel puts the current one under the finger and spins the rest past it.
-/// The rows are still `CurrencyBadge`, so this is the same flag-and-code the
-/// account form and Currency Exposure draw — with the code set in `body`
-/// rather than the badge's usual disc-derived size, which at wheel scale is
-/// too small to read across the room. It has to be asked for separately: a
-/// `UIPickerView` row is a fixed ~30pt whatever it is handed, so growing the
-/// disc to carry bigger letters only made neighbouring flags overlap.
+/// The wheel itself is `CurrencyWheel`, shared with onboarding's currency
+/// step — including the row-font sizing, whose reasoning lives there now.
 ///
 /// The wheel writes to a **draft**, not straight through to the profile. A
 /// wheel emits a selection for every currency it passes on the way to the
@@ -113,18 +109,7 @@ struct BaseCurrencySheet: View {
                 AppTheme.Palette.bgCanvas.ignoresSafeArea()
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
-                    Picker("Base Currency", selection: $draft) {
-                        ForEach(currencies, id: \.code) { currency in
-                            CurrencyBadge(
-                                code: currency.code,
-                                diameter: AppTheme.Size.glyph,
-                                codeFont: AppTheme.Typography.bodyEmphasis
-                            )
-                            .tag(currency.code)
-                        }
-                    }
-                    .pickerStyle(.wheel)
-                    .labelsHidden()
+                    CurrencyWheel(currencies: currencies, selection: $draft, label: "Base Currency")
                     Spacer(minLength: 0)
                 }
             }

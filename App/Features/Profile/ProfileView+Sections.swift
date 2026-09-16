@@ -76,8 +76,33 @@ extension ProfileView {
             ComingSoonRow(icon: "questionmark.circle", title: "FAQ")
             ComingSoonRow(icon: "envelope", title: "Contact the Keepo Team")
             ComingSoonRow(icon: "text.bubble", title: "Give Us Feedback")
+            // Available and never mandatory — which is the whole shape of
+            // §3.11's answer. The tips fire once each, just-in-time; this is
+            // where somebody who dismissed one, or never triggered it, can
+            // read all of them.
+            NavigationLink(value: AppNavigation.ProfileDestination.showMeAround) {
+                ProfileRowLabel(icon: "sparkles", title: "Show Me Around")
+            }
+            rateKeepoRow
         } header: {
             Text("Help and Support")
+        }
+    }
+
+    /// The permanent way to rate Keepo, for the person who decided to —
+    /// never an interruption. It is the one path that always works: the
+    /// in-app prompt (`ReviewPromptModifier`) may silently show nothing,
+    /// capped at three displays a year by a system that reports neither.
+    ///
+    /// Hidden entirely until the app exists in App Store Connect. A row
+    /// that opens a 404 is worse than no row, because the user has already
+    /// left Keepo by the time they find out.
+    @ViewBuilder
+    var rateKeepoRow: some View {
+        if let url = AppStoreListing.writeReviewURL {
+            Link(destination: url) {
+                ProfileRowLabel(icon: "star", title: "Rate Keepo")
+            }
         }
     }
 

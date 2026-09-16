@@ -59,16 +59,25 @@ extension View {
     }
 }
 
-/// Currency choice, create-mode only — an account's currency is immutable
-/// once it exists (no RPC changes it), which is why the edit form renders the
-/// symbol in front of the figure instead of a disabled version of this.
+/// Pick one currency out of the supported set.
 ///
 /// A searchable list rather than a wheel `Picker`: the ECB/Frankfurter set
 /// is ~30 entries, which is exactly the size where scrolling a wheel is
-/// slower than typing three letters.
+/// slower than typing three letters. (`BaseCurrencySheet` on My Profile is
+/// a wheel and says the opposite — that one is picked once, from a currency
+/// you already hold; these two are picked while you are looking for a
+/// specific code you already know.)
+///
+/// **Two callers**, which is why `title` exists. The account form uses it
+/// create-mode only — an account's currency is immutable once it exists (no
+/// RPC changes it), which is why the edit form renders the symbol in front
+/// of the figure instead of a disabled version of this. The transaction
+/// form uses it for "what did you pay in?", where the answer genuinely
+/// changes per purchase.
 struct CurrencyPickerSheet: View {
     let currencies: [PublicSchema.CurrenciesSelect]
     @Binding var selection: String
+    var title = "Currency"
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
@@ -103,7 +112,7 @@ struct CurrencyPickerSheet: View {
                 .buttonStyle(.pressableRow)
             }
             .searchable(text: $query, prompt: "Currency code")
-            .navigationTitle("Currency")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

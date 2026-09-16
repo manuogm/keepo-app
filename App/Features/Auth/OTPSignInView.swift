@@ -1,135 +1,224 @@
 import KeepoCore
 import SwiftUI
+import UIKit
 
-/// Interim sign-in screen (before SIWA): collects an email address, triggers
+/// Interim sign-in (before SIWA): collects an email address, triggers
 /// Supabase's magic-link flow, then waits. When the user taps the link in
 /// their email app, iOS hands the `com.manuogm.keepo://auth-callback` URL to
 /// `RootView.onOpenURL`, which calls `SessionStore.handleMagicLink(url:)` and
 /// advances the phase automatically — this view does nothing to complete auth.
+///
+/// **This is the highest-attrition moment in the whole flow**, and it sits
+/// immediately after four screens that just built enthusiasm: the user has
+/// to leave Keepo, find an email, and come back. Nothing here can fix that
+/// — only Sign in with Apple can, and it is the single highest-value
+/// unblock for this redesign. What this screen can do is not waste the
+/// enthusiasm: the mark and tagline carry the intro's tone into it, the
+/// waiting state says exactly what is happening, and every dead end has an
+/// escape (resend, open Mail, wrong address).
+///
+/// The mark is `Typography.Number.hero` — the 48pt size whose own doc
+/// comment calls it "the sign-in screen's mark", and which the sign-in
+/// screen did not use until now.
 struct OTPSignInView: View {
     let session: SessionStore
 
     private enum Step { case email, waiting }
 
+    /// Long enough that a second tap is a real decision rather than
+    /// impatience with a mail server, short enough not to strand someone
+    /// whose first link genuinely never arrived.
+    private static let resendCooldown = 30
+
     @State private var email = ""
     @State private var step: Step = .email
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var secondsUntilResend = 0
+
+    @ScaledMetric(relativeTo: .largeTitle) private var typeScale: CGFloat = 1
+    @FocusState private var isEditingEmail: Bool
+
+    private var trimmedEmail: String { email.trimmingCharacters(in: .whitespaces) }
 
     var body: some View {
         ZStack {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
+
             VStack(spacing: AppTheme.Spacing.xxl) {
-                VStack(spacing: AppTheme.Spacing.xs) {
-                    Text("Keepo")
-                        .font(AppTheme.Typography.screenTitle).fontWeight(.bold)
-                        .foregroundStyle(AppTheme.Palette.textPrimary)
-                    Text("Personal finance, captured automatically.")
-                        .font(AppTheme.Typography.caption)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
-                }
+                Spacer(minLength: 0)
+                mark
 
                 switch step {
                 case .email: emailStep
                 case .waiting: waitingStep
                 }
 
-                // Errors from a stale/invalid link arriving via deep link
-                let linkError = session.linkError ?? errorMessage
-                if let linkError {
-                    Text(linkError)
+                // A stale or already-used link arrives back here through the
+                // deep link, so this covers both that and a send failure.
+                if let message = session.linkError ?? errorMessage {
+                    Text(message)
                         .font(AppTheme.Typography.caption)
                         .foregroundStyle(AppTheme.Palette.statusNegative)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal)
                 }
+
+                Spacer(minLength: 0)
             }
-            .padding(AppTheme.Spacing.xl)
+            .padding(.horizontal, AppTheme.Spacing.l)
+            .padding(.vertical, AppTheme.Spacing.xxl)
+            .animation(AppTheme.Motion.standard, value: step)
         }
     }
 
+    private var mark: some View {
+        VStack(spacing: AppTheme.Spacing.s) {
+            Text("Keepo")
+                .font(AppTheme.Typography.Number.display(
+                    AppTheme.Typography.Number.hero, weight: .bold, scale: typeScale
+                ))
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+            Text("Where all your money is kept under control.")
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    // MARK: - Ask
+
     private var emailStep: some View {
         VStack(spacing: AppTheme.Spacing.l) {
-            Text("Sign in to continue")
-                .font(AppTheme.Typography.cardTitle).fontWeight(.semibold)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-
             TextField("Email address", text: $email)
-                .textFieldStyle(.roundedBorder)
+                .font(AppTheme.Typography.body)
                 .textContentType(.emailAddress)
                 .keyboardType(.emailAddress)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
+                .submitLabel(.go)
+                .focused($isEditingEmail)
+                .onSubmit { Task { await sendLink() } }
+                .padding(AppTheme.Spacing.m)
+                .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
 
-            Button {
+            // The same button the intro and every setup step use — this is
+            // one step of one flow, and a sign-in button that looked like a
+            // different product's would say so.
+            OnboardingPrimaryButton(
+                title: "Continue", isEnabled: !trimmedEmail.isEmpty, isLoading: isLoading, fillsWidth: true
+            ) {
                 Task { await sendLink() }
-            } label: {
-                Group {
-                    if isLoading {
-                        ProgressView()
-                    } else {
-                        Text("Send Sign-In Link").fontWeight(.semibold)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, AppTheme.Spacing.m)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.Palette.textPrimary)
-            .disabled(email.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+
+            // No password to forget, and saying so up front is the reason
+            // the next screen is not a surprise.
+            Text("We'll email you a link to sign in. No password to remember.")
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
         }
     }
+
+    private var canSend: Bool { !trimmedEmail.isEmpty && !isLoading }
+
+    // MARK: - Wait
 
     private var waitingStep: some View {
         VStack(spacing: AppTheme.Spacing.l) {
             Image(systemName: "envelope.badge")
                 .font(AppTheme.Typography.screenTitle.weight(.regular))
                 .imageScale(.large)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
+                .foregroundStyle(AppTheme.Palette.brandPrimary)
 
             Text("Check your email")
-                .font(AppTheme.Typography.cardTitle).fontWeight(.semibold)
+                .font(AppTheme.Typography.cardTitle)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
 
-            Text(
-                "We sent a sign-in link to\n**\(email)**\n\n"
-                    + "Tap the link in your email to continue. It may take a minute to arrive."
-            )
+            // The address is shown because the commonest failure by far is
+            // having typed it wrong, and the user cannot spot that unless
+            // it is in front of them.
+            Text("We sent a sign-in link to **\(trimmedEmail)**. Tap it and you're in — it may take a minute.")
                 .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: AppTheme.Size.proseWidth)
 
-            Button {
-                Task { await sendLink() }
-            } label: {
-                if isLoading {
-                    ProgressView()
-                } else {
-                    Text("Resend Link")
+            openMailButton
+
+            VStack(spacing: AppTheme.Spacing.s) {
+                resendButton
+                Button("Wrong address?") {
+                    step = .email
+                    errorMessage = nil
+                    secondsUntilResend = 0
+                    isEditingEmail = true
                 }
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
             }
-            .font(AppTheme.Typography.caption)
-            .foregroundStyle(AppTheme.Palette.textPrimary)
-            .disabled(isLoading)
-
-            Button("Use a different email") {
-                step = .email
-                errorMessage = nil
-            }
-            .font(AppTheme.Typography.caption)
-            .foregroundStyle(AppTheme.Palette.textSecondary)
         }
     }
 
+    /// `message://` is Mail's own scheme. It is offered rather than assumed:
+    /// a user whose mail lives in Gmail or Outlook would be sent to an app
+    /// they do not use, so this is a convenience beside the instruction,
+    /// never a step in it.
+    @ViewBuilder
+    private var openMailButton: some View {
+        if let mail = URL(string: "message://"), UIApplication.shared.canOpenURL(mail) {
+            Button("Open Mail") { UIApplication.shared.open(mail) }
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+        }
+    }
+
+    /// The countdown is visible on purpose. A Resend button that silently
+    /// does nothing for thirty seconds reads as broken, and the user taps
+    /// it again — which is the behaviour the cooldown exists to prevent.
+    private var resendButton: some View {
+        Button {
+            Task { await sendLink() }
+        } label: {
+            if isLoading {
+                ProgressView()
+            } else if secondsUntilResend > 0 {
+                Text("Resend in \(secondsUntilResend)s")
+            } else {
+                Text("Resend link")
+            }
+        }
+        .font(AppTheme.Typography.caption)
+        .foregroundStyle(
+            secondsUntilResend > 0 ? AppTheme.Palette.textSecondary : AppTheme.Palette.textPrimary
+        )
+        .disabled(isLoading || secondsUntilResend > 0)
+    }
+
+    // MARK: - Sending
+
     private func sendLink() async {
+        guard canSend else { return }
         isLoading = true
         errorMessage = nil
         do {
-            try await session.sendOTP(email: email.trimmingCharacters(in: .whitespaces))
+            try await session.sendOTP(email: trimmedEmail)
             step = .waiting
+            isEditingEmail = false
+            await startCooldown()
         } catch {
             errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
+    }
+
+    /// Driven here rather than by a `Timer`, so it cancels with the view and
+    /// cannot outlive the screen that shows it.
+    private func startCooldown() async {
+        secondsUntilResend = Self.resendCooldown
+        while secondsUntilResend > 0 {
+            try? await Task.sleep(for: .seconds(1))
+            if Task.isCancelled { return }
+            secondsUntilResend -= 1
+        }
     }
 }

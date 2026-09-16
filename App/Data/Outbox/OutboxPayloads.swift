@@ -12,10 +12,15 @@ public struct CreateTransactionPayload: Codable, Sendable {
     public let currency: String
     public let occurredAt: Date
     public let notes: String?
+    /// Non-nil only for a purchase made in another currency. Optional in
+    /// the stored payload as well as in the type, so an item queued before
+    /// this existed still decodes — `decodeIfPresent` is what Swift
+    /// synthesizes for an `Optional` property.
+    public let original: ForeignOriginal?
 
     public init(
         id: UUID, ownerId: UUID, accountId: UUID, categoryId: UUID, amountE4: Int64, currency: String,
-        occurredAt: Date, notes: String? = nil
+        occurredAt: Date, notes: String? = nil, original: ForeignOriginal? = nil
     ) {
         self.id = id
         self.ownerId = ownerId
@@ -25,6 +30,7 @@ public struct CreateTransactionPayload: Codable, Sendable {
         self.currency = currency
         self.occurredAt = occurredAt
         self.notes = notes
+        self.original = original
     }
 }
 
@@ -67,10 +73,15 @@ public struct UpdateTransactionPayload: Codable, Sendable {
     public let occurredAt: Date
     public let merchantRaw: String?
     public let notes: String?
+    /// See `CreateTransactionPayload.original`. Passing `nil` on an edit
+    /// **clears** a stored original, which is how a row wrongly marked
+    /// foreign is corrected.
+    public let original: ForeignOriginal?
 
     public init(
         id: UUID, expectedVersion: Int, accountId: UUID, categoryId: UUID,
-        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?, notes: String? = nil
+        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?, notes: String? = nil,
+        original: ForeignOriginal? = nil
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
@@ -81,6 +92,7 @@ public struct UpdateTransactionPayload: Codable, Sendable {
         self.occurredAt = occurredAt
         self.merchantRaw = merchantRaw
         self.notes = notes
+        self.original = original
     }
 }
 
@@ -131,10 +143,17 @@ public struct CaptureTransactionPayload: Codable, Sendable {
     public let occurredAt: Date
     public let externalId: String
     public let notes: String?
+    /// What `CurrencyDetector` read out of Wallet's formatted amount, or
+    /// `nil` when it could not be certain. **Not a decision** — the server
+    /// and `CaptureLocalWrite` both compare it against the mapped account's
+    /// currency and both re-check it against the supported set, because
+    /// only they know the account.
+    public let detectedCurrency: String?
 
     public init(
         id: UUID, cardIdentifier: String, merchantRaw: String, merchantNormalized: String,
-        amountE4: Int64, occurredAt: Date, externalId: String, notes: String? = nil
+        amountE4: Int64, occurredAt: Date, externalId: String, notes: String? = nil,
+        detectedCurrency: String? = nil
     ) {
         self.id = id
         self.cardIdentifier = cardIdentifier
@@ -144,6 +163,7 @@ public struct CaptureTransactionPayload: Codable, Sendable {
         self.occurredAt = occurredAt
         self.externalId = externalId
         self.notes = notes
+        self.detectedCurrency = detectedCurrency
     }
 }
 

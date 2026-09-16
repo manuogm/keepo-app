@@ -1432,6 +1432,8 @@ public enum PublicSchema {
     public let merchantRaw: String?
     public let notes: String?
     public let occurredAt: String
+    public let originalAmountE4: Int64?
+    public let originalCurrency: String?
     public let ownerId: UUID
     public let recurringRuleId: UUID?
     public let source: TransactionSource
@@ -1456,6 +1458,8 @@ public enum PublicSchema {
       case merchantRaw = "merchant_raw"
       case notes = "notes"
       case occurredAt = "occurred_at"
+      case originalAmountE4 = "original_amount_e4"
+      case originalCurrency = "original_currency"
       case ownerId = "owner_id"
       case recurringRuleId = "recurring_rule_id"
       case source = "source"
@@ -1482,6 +1486,8 @@ public enum PublicSchema {
     public let merchantRaw: String?
     public let notes: String?
     public let occurredAt: String?
+    public let originalAmountE4: Int64?
+    public let originalCurrency: String?
     public let ownerId: UUID
     public let recurringRuleId: UUID?
     public let source: TransactionSource?
@@ -1506,6 +1512,8 @@ public enum PublicSchema {
       case merchantRaw = "merchant_raw"
       case notes = "notes"
       case occurredAt = "occurred_at"
+      case originalAmountE4 = "original_amount_e4"
+      case originalCurrency = "original_currency"
       case ownerId = "owner_id"
       case recurringRuleId = "recurring_rule_id"
       case source = "source"
@@ -1532,6 +1540,8 @@ public enum PublicSchema {
     public let merchantRaw: String?
     public let notes: String?
     public let occurredAt: String?
+    public let originalAmountE4: Int64?
+    public let originalCurrency: String?
     public let ownerId: UUID?
     public let recurringRuleId: UUID?
     public let source: TransactionSource?
@@ -1556,6 +1566,8 @@ public enum PublicSchema {
       case merchantRaw = "merchant_raw"
       case notes = "notes"
       case occurredAt = "occurred_at"
+      case originalAmountE4 = "original_amount_e4"
+      case originalCurrency = "original_currency"
       case ownerId = "owner_id"
       case recurringRuleId = "recurring_rule_id"
       case source = "source"
@@ -1671,6 +1683,9 @@ public enum PublicSchema {
     public let minorUnit: Int16?
     public let notes: String?
     public let occurredAt: String?
+    public let originalAmountE4: Int64?
+    public let originalCurrency: String?
+    public let originalMinorUnit: Int16?
     public let recurringRuleId: UUID?
     public let source: TransactionSource?
     public let status: TransactionStatus?
@@ -1696,6 +1711,9 @@ public enum PublicSchema {
       case minorUnit = "minor_unit"
       case notes = "notes"
       case occurredAt = "occurred_at"
+      case originalAmountE4 = "original_amount_e4"
+      case originalCurrency = "original_currency"
+      case originalMinorUnit = "original_minor_unit"
       case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"

@@ -130,6 +130,11 @@ struct UpdateTransactionParams: Encodable {
     let occurredAt: String
     let merchantRaw: String?
     let notes: String?
+    /// Omitted from the JSON when nil, which is exactly right here: both
+    /// carry `default null` in SQL, and omitting them is how an edit
+    /// **clears** an original that no longer applies.
+    let originalAmountE4: Int64?
+    let originalCurrency: String?
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case expectedVersion = "p_expected_version"
@@ -140,6 +145,8 @@ struct UpdateTransactionParams: Encodable {
         case occurredAt = "p_occurred_at"
         case merchantRaw = "p_merchant_raw"
         case notes = "p_notes"
+        case originalAmountE4 = "p_original_amount_e4"
+        case originalCurrency = "p_original_currency"
     }
 }
 

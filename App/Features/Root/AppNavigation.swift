@@ -44,6 +44,7 @@ final class AppNavigation {
         case notifications
         case export
         case archive
+        case showMeAround
     }
 
     var tab: Tab = .home

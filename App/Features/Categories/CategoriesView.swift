@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import TipKit
 
 /// Square icon+color tiles rather than plain rows — tap opens the edit
 /// sheet, which is also where deletion now lives (see CategoryFormView):
@@ -126,6 +127,7 @@ struct CategoriesView: View {
                             }
                         }
                         .padding(.horizontal)
+                        .popoverTip(KeepoTips.categories)
                     }
                     // Pinned below rather than the tab bar's own distance: the
                     // grid now hands off to the "All Tags" row sitting right
@@ -232,27 +234,5 @@ struct CategoriesView: View {
             errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
-    }
-}
-
-private struct CategoryTile: View {
-    let category: PublicSchema.CategoriesSelect
-
-    var body: some View {
-        VStack(spacing: AppTheme.Spacing.s) {
-            Image(systemName: category.icon)
-                .font(AppTheme.Typography.sectionTitle)
-                .foregroundStyle(AppTheme.Palette.textOnAccent)
-                .frame(width: AppTheme.Size.touchTarget, height: AppTheme.Size.touchTarget)
-                .background(Color(hex: category.color))
-                .clipShape(Circle())
-            Text(category.name)
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-                .lineLimit(1)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, AppTheme.Spacing.s)
     }
 }

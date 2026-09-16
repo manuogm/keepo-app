@@ -152,6 +152,14 @@ extension AppTheme {
         static let dim: Double = 0.35
         /// 0.5 — disabled, or half-there.
         static let muted: Double = 0.5
+        /// 0.6 — a coach mark's scrim. The only value on this scale that
+        /// exists to make the app behind it *unreadable* rather than
+        /// quieter, which is why it sits past `muted` and why nothing but
+        /// `SpotlightOverlay` uses it: a modal curtain in Keepo is
+        /// `.ultraThinMaterial` over `fill` (see `MappedCardSheet`), which
+        /// deliberately keeps its background legible as context. A spotlight
+        /// wants the opposite.
+        static let scrim: Double = 0.6
     }
 }
 

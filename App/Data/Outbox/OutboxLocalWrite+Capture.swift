@@ -30,12 +30,18 @@ extension OutboxLocalWrite {
 
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         let categoryKind = try categoryKind(database, categoryId: payload.categoryId.uuidString)
+        let original = payload.original?.against(payload.currency)
         try SyncApply.upsertRow(
             [
                 "id": .string(payload.id.uuidString), "account_id": .string(payload.accountId.uuidString),
                 "category_id": .string(payload.categoryId.uuidString),
                 "category_kind": categoryKind.map(AnyJSON.string) ?? .null,
                 "amount_e4": .integer(Int(payload.amountE4)), "currency": .string(payload.currency),
+                // Written even when nil, never omitted: an edit that names
+                // no original has to CLEAR one the row already carried, the
+                // same way the RPC does.
+                "original_amount_e4": original.map { AnyJSON.integer(Int($0.amountE4)) } ?? .null,
+                "original_currency": original.map { AnyJSON.string($0.currency) } ?? .null,
                 "occurred_at": .string(PostgresDate.sqliteTimestampBoundaryString(payload.occurredAt)),
                 "merchant_raw": payload.merchantRaw.map(AnyJSON.string) ?? .null,
                 "notes": payload.notes.map(AnyJSON.string) ?? .null, "status": .string("confirmed"),

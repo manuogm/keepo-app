@@ -1,97 +1,6 @@
 import Foundation
 import Supabase
 
-public enum CurrencyRepository {
-    public static func fetchAll(client: SupabaseClient) async throws -> [PublicSchema.CurrenciesSelect] {
-        try await client.from("currencies").select().order("code").execute().value
-    }
-}
-
-public enum ProfileRepository {
-    public static func fetchOwn(client: SupabaseClient, userId: UUID) async throws -> PublicSchema.ProfilesSelect {
-        try await client.from("profiles").select().eq("id", value: userId).single().execute().value
-    }
-
-    /// Sets base_currency and onboarded_at together — the DB's
-    /// onboarded_requires_base_currency CHECK constraint means these can
-    /// never be split into two calls without a moment of invalid state.
-    ///
-    /// The name rides along in the same patch rather than being written when
-    /// the user typed it, several steps earlier: onboarding can be abandoned
-    /// at any step, and a profile carrying a name but no base currency is a
-    /// half-signed-up user the rest of the app has no shape for.
-    public static func completeOnboarding(
-        client: SupabaseClient, userId: UUID, baseCurrency: String, displayName: String
-    ) async throws {
-        let patch = ProfileOnboardingPatch(
-            baseCurrency: baseCurrency,
-            displayName: displayName,
-            onboardedAt: PostgresDate.timestampString(Date())
-        )
-        try await client.from("profiles").update(patch).eq("id", value: userId).execute()
-    }
-
-    /// Online-only, deliberately, and the same for `updateBaseCurrency`
-    /// below: the app reads `session.profile` from the **server**, not from
-    /// the local mirror, so an offline write queued through the outbox would
-    /// land in a table nothing renders from while the name on screen stayed
-    /// stale. Both of a profile's editable fields behave the same way rather
-    /// than one of them being quietly special.
-    public static func updateDisplayName(client: SupabaseClient, userId: UUID, displayName: String) async throws {
-        let patch = ProfileDisplayNamePatch(displayName: displayName)
-        try await client.from("profiles").update(patch).eq("id", value: userId).execute()
-    }
-
-    /// `nil` clears it. The column's own CHECK requires any non-nil value to
-    /// start with the profile's id, so this cannot record another user's
-    /// object even if a caller tried.
-    public static func updateAvatarPath(client: SupabaseClient, userId: UUID, avatarPath: String?) async throws {
-        let patch = ProfileAvatarPathPatch(avatarPath: avatarPath)
-        try await client.from("profiles").update(patch).eq("id", value: userId).execute()
-    }
-
-    /// A plain RLS-scoped update — `profiles_update`'s policy already
-    /// allows this. Changing `base_currency` fires
-    /// `profiles_backfill_fx_on_base_currency_change` (Phase 13) server-side
-    /// automatically; nothing extra to trigger from here.
-    public static func updateBaseCurrency(client: SupabaseClient, userId: UUID, baseCurrency: String) async throws {
-        let patch = ProfileBaseCurrencyPatch(baseCurrency: baseCurrency)
-        try await client.from("profiles").update(patch).eq("id", value: userId).execute()
-    }
-}
-
-private struct ProfileOnboardingPatch: Encodable {
-    let baseCurrency: String
-    let displayName: String
-    let onboardedAt: String
-    enum CodingKeys: String, CodingKey {
-        case baseCurrency = "base_currency"
-        case displayName = "display_name"
-        case onboardedAt = "onboarded_at"
-    }
-}
-
-private struct ProfileDisplayNamePatch: Encodable {
-    let displayName: String
-    enum CodingKeys: String, CodingKey {
-        case displayName = "display_name"
-    }
-}
-
-private struct ProfileAvatarPathPatch: Encodable {
-    let avatarPath: String?
-    enum CodingKeys: String, CodingKey {
-        case avatarPath = "avatar_path"
-    }
-}
-
-private struct ProfileBaseCurrencyPatch: Encodable {
-    let baseCurrency: String
-    enum CodingKeys: String, CodingKey {
-        case baseCurrency = "base_currency"
-    }
-}
-
 public enum AccountRepository {
     public static func fetchAllWithBalances(
         client: SupabaseClient
@@ -219,7 +128,8 @@ public enum TransactionRepository {
         amountE4: Int64,
         currency: String,
         occurredAt: Date = Date(),
-        notes: String? = nil
+        notes: String? = nil,
+        original: ForeignOriginal? = nil
     ) async throws -> UUID {
         let row = NewTransactionRow(
             id: id,
@@ -230,7 +140,9 @@ public enum TransactionRepository {
             amountE4: amountE4,
             currency: currency,
             occurredAt: PostgresDate.timestampString(occurredAt),
-            notes: notes
+            notes: notes,
+            originalAmountE4: original?.amountE4,
+            originalCurrency: original?.currency
         )
         try await client.from("transactions").insert(row).execute()
         return id
@@ -257,7 +169,8 @@ public enum TransactionRepository {
         currency: String,
         occurredAt: Date = Date(),
         merchantRaw: String?,
-        notes: String? = nil
+        notes: String? = nil,
+        original: ForeignOriginal? = nil
     ) async throws -> WriteResult {
         let params = UpdateTransactionParams(
             id: id,
@@ -268,7 +181,9 @@ public enum TransactionRepository {
             currency: currency,
             occurredAt: PostgresDate.timestampString(occurredAt),
             merchantRaw: merchantRaw,
-            notes: notes
+            notes: notes,
+            originalAmountE4: original?.amountE4,
+            originalCurrency: original?.currency
         )
         let rows: [ConflictRow] = try await client.rpc("update_transaction", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict
@@ -333,6 +248,11 @@ private struct NewTransactionRow: Encodable {
     let currency: String
     let occurredAt: String
     let notes: String?
+    /// Flattened rather than nested: these are two columns in one row, and
+    /// PostgREST inserts columns. `ForeignOriginal` is the shape the app
+    /// passes them around in; this is the shape the table wants.
+    let originalAmountE4: Int64?
+    let originalCurrency: String?
     enum CodingKeys: String, CodingKey {
         case id, currency, notes
         case amountE4 = "amount_e4"
@@ -341,5 +261,7 @@ private struct NewTransactionRow: Encodable {
         case accountId = "account_id"
         case categoryId = "category_id"
         case occurredAt = "occurred_at"
+        case originalAmountE4 = "original_amount_e4"
+        case originalCurrency = "original_currency"
     }
 }

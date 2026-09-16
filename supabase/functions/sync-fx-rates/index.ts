@@ -1,6 +1,7 @@
 // sync-fx-rates — pulls EUR-pivoted rates from api.frankfurter.dev (NOT
 // frankfurter.app, which 301-redirects) for every currency actually in use
-// (accounts.currency ∪ profiles.base_currency), and upserts them via
+// (accounts.currency ∪ profiles.base_currency ∪ transactions.original_currency),
+// and upserts them via
 // upsert_fx_rate(), which owns the "later fetched_at wins" rule. A 5-day
 // trailing window means one missed run self-heals on the next.
 //
@@ -160,18 +161,29 @@ Deno.serve(async (req) => {
   );
 });
 
-// Currencies actually in use: every non-deleted account's currency, plus
-// every onboarded profile's base currency. Queried with the service-role
-// key deliberately — this needs every user's currencies, not just one.
+// Currencies actually in use: every non-deleted account's currency, every
+// onboarded profile's base currency, and every currency somebody has
+// actually PAID in. Queried with the service-role key deliberately — this
+// needs every user's currencies, not just one.
+//
+// The third source is not an extra: a currency you are travelling in is by
+// definition one you hold no account in, so without it a euro-account user
+// paying in baht would never get a THB rate and the conversion could never
+// resolve — see 20260923100000_transaction_original_currency.sql, whose
+// trigger asks for the backfill this query then has to satisfy. The two
+// halves only work together.
 async function currenciesInUse(supabase: SupabaseClient): Promise<string[]> {
-  const [{ data: accountCurrencies }, { data: baseCurrencies }] = await Promise.all([
-    supabase.from("accounts").select("currency").is("deleted_at", null),
-    supabase.from("profiles").select("base_currency").not("base_currency", "is", null),
-  ]);
+  const [{ data: accountCurrencies }, { data: baseCurrencies }, { data: paidCurrencies }] = await Promise
+    .all([
+      supabase.from("accounts").select("currency").is("deleted_at", null),
+      supabase.from("profiles").select("base_currency").not("base_currency", "is", null),
+      supabase.from("transactions").select("original_currency").not("original_currency", "is", null),
+    ]);
 
   const set = new Set<string>();
   for (const row of accountCurrencies ?? []) set.add(row.currency as string);
   for (const row of baseCurrencies ?? []) set.add(row.base_currency as string);
+  for (const row of paidCurrencies ?? []) set.add(row.original_currency as string);
   set.delete("EUR"); // implicit rate of 1 — never fetched or stored.
   return [...set];
 }

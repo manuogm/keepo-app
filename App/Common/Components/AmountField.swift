@@ -31,6 +31,12 @@ struct AmountField: View {
     /// symbol is part of the figure, not a label attached to it.
     var showsCurrencySymbol = true
     var isEnabled = true
+    /// When set, a chip carrying `currency`'s code sits beside the figure
+    /// and opens a picker. Absent everywhere the currency is not the user's
+    /// to choose — an account's balance is in that account's currency and
+    /// nothing else — which is why this is opt-in rather than a flag to
+    /// turn off.
+    var onPickCurrency: (() -> Void)?
     /// Point size of the whole part, from `AppTheme.Typography.Number`. The
     /// fraction and the symbol derive from it, so a caller only ever picks
     /// one number.
@@ -83,6 +89,9 @@ struct AmountField: View {
         // sat level with the digits' feet.
         HStack(spacing: AppTheme.Spacing.s) {
             figure
+            if let onPickCurrency, let currency {
+                currencyChip(code: currency.code, action: onPickCurrency)
+            }
             if isEnabled {
                 calculatorButton
             }
@@ -128,6 +137,28 @@ struct AmountField: View {
                 }
             }
         }
+    }
+
+    /// The currency the figure is in, and the way to change it. Deliberately
+    /// the same quiet weight as the calculator button beside it: it answers
+    /// a question most entries never ask, and the figure is what the screen
+    /// is about.
+    private func currencyChip(code: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: AppTheme.Spacing.xxs) {
+                Text(code)
+                    .font(AppTheme.Typography.captionEmphasis)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(AppTheme.Typography.nano)
+            }
+            .foregroundStyle(AppTheme.Palette.textSecondary)
+            .padding(.horizontal, AppTheme.Spacing.s)
+            .frame(height: AppTheme.Size.icon)
+            .background(AppTheme.Palette.fillSubtle, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Currency: \(code). Change it")
     }
 
     /// Deliberately quiet — a thin outline in the icon's own grey, no larger

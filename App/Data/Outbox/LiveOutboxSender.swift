@@ -26,7 +26,7 @@ public struct LiveOutboxSender: OutboxSending {
             try await TransactionRepository.create(
                 client: client, id: payload.id, ownerId: payload.ownerId, accountId: payload.accountId,
                 categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
-                occurredAt: payload.occurredAt, notes: payload.notes
+                occurredAt: payload.occurredAt, notes: payload.notes, original: payload.original
             )
         } catch {
             if Self.isDuplicateKey(error) { return }
@@ -51,7 +51,8 @@ public struct LiveOutboxSender: OutboxSending {
         let result = try await TransactionRepository.update(
             client: client, id: payload.id, expectedVersion: payload.expectedVersion, accountId: payload.accountId,
             categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
-            occurredAt: payload.occurredAt, merchantRaw: payload.merchantRaw, notes: payload.notes
+            occurredAt: payload.occurredAt, merchantRaw: payload.merchantRaw, notes: payload.notes,
+            original: payload.original
         )
         switch result {
         case .saved: return true
@@ -89,7 +90,7 @@ public struct LiveOutboxSender: OutboxSending {
                 client: client, id: payload.id, cardIdentifier: payload.cardIdentifier,
                 merchantRaw: payload.merchantRaw, merchantNormalized: payload.merchantNormalized,
                 amountE4: payload.amountE4, occurredAt: payload.occurredAt, externalId: payload.externalId,
-                notes: payload.notes
+                notes: payload.notes, detectedCurrency: payload.detectedCurrency
             )
         } catch {
             // A retried capture already landed under this id — the write

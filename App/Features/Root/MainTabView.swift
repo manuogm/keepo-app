@@ -32,6 +32,11 @@ struct MainTabView: View {
     /// a store per view would download and cache the same image twice, then
     /// disagree the moment one of them changed it.
     @State private var avatars = AvatarStore()
+    /// The first-time experience's one piece of hand-rolled state — the
+    /// scope-banner spotlight. Owned here because this is the view that can
+    /// overlay it, and because the Profile sheet's "Show me around" row
+    /// needs to reach the same instance to replay it.
+    @State private var ftux = FTUXCoordinator()
     /// Measured here and handed down, because this is the last view that
     /// still sees it — see `EnvironmentValues.topSafeAreaInset`.
     @State private var topSafeAreaInset: CGFloat = 0
@@ -83,7 +88,8 @@ struct MainTabView: View {
         // which is the whole point of the material.
         .overlay(alignment: .bottom) {
             KeepoTabBar(
-                tab: $navigation.tab, needsReviewCount: needsReviewCount, onAdd: { navigation.requestAdd() }
+                tab: $navigation.tab, needsReviewCount: needsReviewCount,
+                onAdd: { navigation.requestAdd() }, showsAddTip: navigation.tab == .transactions
             )
             // Negative on a home-indicator phone, and that is the point:
             // the margin is measured from the true screen edge, not from
@@ -104,6 +110,28 @@ struct MainTabView: View {
             }
             .preferredColorScheme(colorScheme)
         }
+        // The scope-banner coach mark, resolved here because this is the
+        // view that spans the whole screen — the hole has to be cut in the
+        // app, not inside the banner that publishes the anchor.
+        .spotlight(
+            isVisible: ftux.isSpotlightVisible,
+            lesson: ftux.spotlightLesson,
+            onDismiss: ftux.dismissSpotlight
+        )
+        // Suppressed while the Profile sheet is up — a coach mark under a
+        // modal points at something the user cannot see.
+        .task(id: navigation.isProfilePresented) {
+            guard !navigation.isProfilePresented else { return }
+            await ftux.showSpotlightIfNeeded()
+        }
+        // The one place in the app that asks for a rating, and the only
+        // one that can: `requestReview` needs a foreground-active scene and
+        // SwiftUI's environment. Deliberately **not** in onboarding — see
+        // `SetupAllSetView`.
+        .reviewPrompt(
+            signedUpAt: session.profile.flatMap { PostgresDate.date(fromTimestamp: $0.createdAt) },
+            isPresentingModal: navigation.isProfilePresented
+        )
         .task(id: session.refresh.token) {
             await loadNeedsReviewCount()
             await scopeContext.reload(session: session)
@@ -142,6 +170,8 @@ struct MainTabView: View {
         case .notifications: NotificationSettingsView()
         case .export: ExportView(session: session)
         case .archive: ArchiveAccountsView(session: session)
+        case .showMeAround:
+            ShowMeAroundView(ftux: ftux, onClose: { navigation.isProfilePresented = false })
         }
     }
 

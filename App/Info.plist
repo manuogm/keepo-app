@@ -13,6 +13,37 @@
 			</array>
 		</dict>
 	</array>
+	<!-- What iOS draws before any SwiftUI has run. A dictionary, which is
+	     why it is here rather than an INFOPLIST_KEY_* build setting — those
+	     can only carry scalars, and `INFOPLIST_KEY_UILaunchScreen_Generation`
+	     on its own builds an empty dict, i.e. a blank white screen.
+
+	     Same canvas colour and same mark `RootLoadingView` draws, in the
+	     same place, so the handoff from the OS's static image to the first
+	     SwiftUI frame is invisible — the spinner is the only thing that
+	     arrives, because it is the only thing a launch screen cannot have.
+
+	     `UIImageRespectsSafeAreaInsets` is false deliberately: the mark is
+	     the only thing on the screen, so honouring the insets would push it
+	     off-centre on a device with a home indicator and nowhere else. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>BGCanvas</string>
+		<key>UIImageName</key>
+		<string>LaunchMark</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<false/>
+	</dict>
+	<!-- `canOpenURL` returns false for any scheme not listed here, silently
+	     and with only a console warning — so a button gated on it never
+	     appears. Two live cases: sign-in's "Open Mail", and capture setup's
+	     "Open Shortcuts" plus the `x-callback-url` test round trip. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>shortcuts</string>
+		<string>message</string>
+	</array>
 	<!-- MultipeerConnectivity's Bonjour registrations. An ARRAY, which
 	     INFOPLIST_KEY_* cannot express — only well-known scalar keys go
 	     through build settings, so this one lives here beside the Supabase

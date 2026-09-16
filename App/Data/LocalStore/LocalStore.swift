@@ -80,6 +80,14 @@ public enum LocalSchemaV1 {
             table.column("category_kind", .text)
             table.column("amount_e4", .integer).notNull()
             table.column("currency", .text)
+            // What was actually paid, when that differs from the account's
+            // currency — provenance only, never summed (CLAUDE.md money
+            // rule 6). Both null for the ordinary same-currency row, so
+            // "is this foreign?" is a null check. Nullable together:
+            // `LocalMoneyConversion` and every money query here read
+            // `amount_e4`, which is always in the account's currency.
+            table.column("original_amount_e4", .integer)
+            table.column("original_currency", .text)
             table.column("occurred_at", .text).notNull()
             table.column("merchant_raw", .text)
             table.column("merchant_normalized", .text)

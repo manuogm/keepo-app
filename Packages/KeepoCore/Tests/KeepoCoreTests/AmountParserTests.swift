@@ -43,27 +43,70 @@ struct AmountParserTests {
 
 @Suite("AmountParser.parseFormattedCurrency")
 struct AmountParserFormattedCurrencyTests {
-    @Test("strips a dollar sign")
-    func stripsDollarSign() {
-        #expect(AmountParser.parseFormattedCurrency("$1.06", locale: Locale(identifier: "en_US")) == 10_600)
+    /// The bug this function was rewritten for: the separator used to come
+    /// from `Locale.current`, so `$1.06` on a comma-decimal device had its
+    /// `.` stripped as grouping and captured as **106**. Both conventions
+    /// are parsed correctly here, in one process, with no locale in sight —
+    /// which is the fix, not a symptom of it.
+    @Test("reads the separator out of the string, not off the device", arguments: [
+        ("$1.06", Int64(10_600)),
+        ("1,06 €", Int64(10_600)),
+        ("$1,234.56", Int64(12_345_600)),
+        ("€1.234,56", Int64(12_345_600))
+    ])
+    func infersSeparator(text: String, expected: Int64) {
+        #expect(AmountParser.parseFormattedCurrency(text) == expected)
     }
 
-    @Test("strips a euro sign and thousands grouping")
-    func stripsEuroAndGrouping() {
-        let result = AmountParser.parseFormattedCurrency("€1.234,56", locale: Locale(identifier: "de_DE"))
-        #expect(result == 12_345_600)
+    @Test("grouping marks that are never a decimal point are dropped", arguments: [
+        // Switzerland, whose CHF is in the supported set.
+        ("CHF 1'234.56", Int64(12_345_600)),
+        // Narrow no-break space (U+202F) — France, Sweden, Hungary.
+        ("1\u{202F}234,56 kr", Int64(12_345_600)),
+        ("1\u{00A0}234,56 kr", Int64(12_345_600))
+    ])
+    func dropsGroupingMarks(text: String, expected: Int64) {
+        #expect(AmountParser.parseFormattedCurrency(text) == expected)
     }
 
-    @Test("the stripped symbol never changes the parsed magnitude regardless of currency")
+    /// A zero-decimal currency's grouped thousands are the one genuinely
+    /// ambiguous shape, and the rule is safe because no supported currency
+    /// has 1 or 3 minor digits: three trailing digits cannot be a fraction.
+    @Test("a single separator with three digits behind it is grouping", arguments: [
+        ("¥1,234", Int64(12_340_000)),
+        ("1.234 Ft", Int64(12_340_000)),
+        ("1.234.567 Ft", Int64(12_345_670_000))
+    ])
+    func threeTrailingDigitsAreGrouping(text: String, expected: Int64) {
+        #expect(AmountParser.parseFormattedCurrency(text) == expected)
+    }
+
+    @Test("handles Indian two-digit grouping")
+    func indianGrouping() {
+        #expect(AmountParser.parseFormattedCurrency("₹1,23,456.78") == 1_234_567_800)
+    }
+
+    @Test("a refund keeps its sign, whichever minus the formatter used", arguments: [
+        "-$1.06", "$-1.06", "\u{2212}$1.06"
+    ])
+    func negativeAmounts(text: String) {
+        #expect(AmountParser.parseFormattedCurrency(text) == -10_600)
+    }
+
+    @Test("the symbol never changes the magnitude")
     func symbolIsIgnored() {
-        let dollars = AmountParser.parseFormattedCurrency("$1.06", locale: Locale(identifier: "en_US"))
-        let plain = AmountParser.parseFormattedCurrency("1.06", locale: Locale(identifier: "en_US"))
-        #expect(dollars == plain)
+        #expect(AmountParser.parseFormattedCurrency("$1.06") == AmountParser.parseFormattedCurrency("1.06"))
+        #expect(AmountParser.parseFormattedCurrency("CHF 1.06") == AmountParser.parseFormattedCurrency("1.06"))
     }
 
-    @Test("garbage-only input returns nil")
-    func garbageReturnsNil() {
-        #expect(AmountParser.parseFormattedCurrency("???", locale: Locale(identifier: "en_US")) == nil)
+    @Test("zero parses as zero, not nil")
+    func zeroParses() {
+        #expect(AmountParser.parseFormattedCurrency("$0.00") == 0)
+    }
+
+    @Test("input carrying no digits returns nil", arguments: ["???", "", "   ", "-", "$"])
+    func noDigitsReturnsNil(text: String) {
+        #expect(AmountParser.parseFormattedCurrency(text) == nil)
     }
 }
 

@@ -2,8 +2,9 @@ import KeepoCore
 import SwiftUI
 import UIKit
 
-/// Routes on SessionStore.phase: loading while signing in, OnboardingView
-/// until a base currency + first account exist, main TabView after.
+/// Routes on SessionStore.phase: loading while signing in, the intro and
+/// sign-in before there is a session, `SetupFlowView` until a base
+/// currency exists, main TabView after.
 struct RootView: View {
     @State private var session = SessionStore()
     /// `let`, not `@State`: `NetworkMonitor` is a process-wide singleton, so
@@ -70,17 +71,29 @@ struct RootView: View {
         }
     }
 
+    @AppStorage(AppSettingsKeys.hasSeenIntro) private var hasSeenIntro = false
+
     var body: some View {
         Group {
             switch session.phase {
             case .loading:
                 RootLoadingView()
             case .needsSignIn:
-                OTPSignInView(session: session)
-            case .needsOnboarding:
-                OnboardingView(session: session) {
-                    Task { try? await session.refreshProfile() }
+                // The intro sits in front of sign-in on a device that has
+                // not seen it, and never again after that — see
+                // `IntroFlowView` for why the flag is device-local and why
+                // it is set on reaching sign-in rather than on completing
+                // it.
+                if hasSeenIntro {
+                    OTPSignInView(session: session)
+                } else {
+                    IntroFlowView(session: session)
                 }
+            case .needsOnboarding:
+                // No completion closure: the setup flow refreshes the
+                // profile itself, at the very end of its own commit, and
+                // that refresh is what removes this branch from under it.
+                SetupFlowView(session: session)
             case .ready:
                 MainTabView(session: session, network: network, colorScheme: resolvedColorScheme)
             case .failed(let message):
@@ -90,6 +103,11 @@ struct RootView: View {
         .preferredColorScheme(appearanceMode.colorScheme)
         .task { await session.start() }
         .onOpenURL { url in
+            // Capture setup's `x-callback-url` answer comes back on the
+            // same scheme as the magic link, and `handleMagicLink` would
+            // read it as a malformed one and surface a sign-in error over
+            // a signed-in app. Claimed first, then.
+            guard !CaptureTestCoordinator.shared.handle(url) else { return }
             Task { await session.handleMagicLink(url: url) }
         }
         // C-09: a capture landing while this RootView is already running

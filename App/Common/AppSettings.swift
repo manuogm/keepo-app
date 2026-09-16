@@ -21,6 +21,19 @@ enum AppSettingsKeys {
     /// for the same reason the four above are: it is a convenience palette,
     /// not data about their money.
     static let customIconColors = "customIconColors"
+    /// The setup flow's in-progress draft, as JSON (see
+    /// `OnboardingDraftStore`). Device-local like the rest of this list, and
+    /// for the documented reason rather than by omission: **none of it has
+    /// reached the server yet** — it is a name, a photo and an account the
+    /// user has described but not committed — and it is deleted the moment
+    /// the commit succeeds. It exists at all because setup step 4 sends the
+    /// user to the Shortcuts app for minutes at a time, which iOS is free
+    /// to treat as grounds for terminating Keepo.
+    static let onboardingDraft = "onboardingDraft"
+    /// Whether the intro screens have been shown on this device. They sit
+    /// **before** sign-in — there is no account to hang the flag off yet —
+    /// so a returning signed-out user is not marketed to a second time.
+    static let hasSeenIntro = "hasSeenIntro"
     /// The Home dashboard's own widget arrangement, as JSON (see
     /// `DashboardStore`). Device-local by decision, not by omission: a grid
     /// laid out for one screen size is not obviously the right grid for
@@ -39,6 +52,56 @@ enum AppSettingsKeys {
     /// absence itself: a household this device was holding is gone from the
     /// mirror after a pull. Nothing to read, nothing to grant.
     static let lastKnownHouseholdId = "lastKnownHouseholdId"
+    /// When the first real Apple Pay capture arrived on this device.
+    ///
+    /// It is the only evidence Keepo can ever have that the **Wallet
+    /// automation** exists and is bound to the right cards — the one half
+    /// of capture setup no in-app test can check, because iOS exposes no
+    /// API to enumerate or inspect a personal automation. So it is set by
+    /// the write itself (`CaptureIntent`), not by a screen observing one,
+    /// and Profile → My Automations reads it to say "Working" rather than
+    /// "Waiting for your first purchase".
+    ///
+    /// Device-local because the automation is: it lives in this phone's
+    /// Shortcuts app, and a household's second device has its own.
+    static let captureVerifiedAt = "captureVerifiedAt"
+    /// How many captured purchases this user has reviewed, ever —
+    /// onboarding's own test capture excluded. The bar the rating ask sits
+    /// behind (`ReviewPolicy.lifetimeCapturesBar`).
+    static let capturesReviewed = "capturesReviewed"
+    /// Set by the write that left the pending inbox clear, read on the next
+    /// clean foreground beat. The two are separate events on purpose: a
+    /// capture resolved from a notification clears the inbox while the app
+    /// is backgrounded, where a prompt would be fired at nobody — and a
+    /// rule that watched the count instead would never see that clear at
+    /// all. See `ReviewPolicy.shouldArm`.
+    static let reviewPromptArmed = "reviewPromptArmed"
+    /// When `requestReview` was last called — not when a prompt was last
+    /// *shown*, which iOS never tells anyone.
+    static let lastReviewRequestAt = "lastReviewRequestAt"
+    /// Whether the scope-banner coach mark has been shown on this device.
+    ///
+    /// Device-local, and one-shot: it teaches a gesture, and a gesture only
+    /// needs teaching once. "Show me around" in Profile clears it, which is
+    /// the entire replay mechanism — everything else the first-time
+    /// experience does is TipKit's own persistence.
+    static let hasSeenScopeSpotlight = "hasSeenScopeSpotlight"
+}
+
+extension AppSettings {
+    /// The date the first capture landed, or `nil` while none has.
+    static var captureVerifiedAt: Date? {
+        UserDefaults.standard.object(forKey: AppSettingsKeys.captureVerifiedAt) as? Date
+    }
+
+    /// Written once and never moved. It answers "has this ever worked?",
+    /// not "when did it last run" — overwriting it on every capture would
+    /// lose the only date that means anything, and cost a `UserDefaults`
+    /// write on a path that runs at the register.
+    static func markCaptureVerifiedIfNeeded() {
+        guard captureVerifiedAt == nil else { return }
+        UserDefaults.standard.set(Date(), forKey: AppSettingsKeys.captureVerifiedAt)
+    }
 }
 
 enum AppearanceMode: String, CaseIterable, Hashable {

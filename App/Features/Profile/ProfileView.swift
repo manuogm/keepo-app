@@ -82,6 +82,16 @@ struct ProfileView: View {
                     } label: {
                         ProfileRowLabel(icon: "hammer", title: "Simulate Capture")
                     }
+                    // Walk the setup flow again on a real device without
+                    // deleting the app. Clears `onboarded_at` plus the
+                    // device-local draft and intro flag — and nothing else,
+                    // so the accounts and categories a previous run created
+                    // survive (see `ProfileRepository.resetOnboarding`).
+                    Button {
+                        Task { await replayOnboarding() }
+                    } label: {
+                        ProfileRowLabel(icon: "hammer", title: "Replay Onboarding")
+                    }
                 }
                 #endif
             }
@@ -114,36 +124,31 @@ struct ProfileView: View {
     /// **text field**, not a row that pushes a form: it is one line of text
     /// with nothing else to configure, so a form containing it would be a
     /// screen over a screen already showing the field.
+    #if DEBUG
+    private func replayOnboarding() async {
+        guard let userId = session.profile?.id else { return }
+        UserDefaults.standard.removeObject(forKey: AppSettingsKeys.onboardingDraft)
+        UserDefaults.standard.removeObject(forKey: AppSettingsKeys.hasSeenIntro)
+        try? await ProfileRepository.resetOnboarding(client: session.client, userId: userId)
+        // The phase is derived from the profile, so nothing moves until it
+        // is re-read — the sheet dismisses itself on the way out because
+        // `RootView` swaps the whole signed-in shell underneath it.
+        try? await session.refreshProfile()
+        dismiss()
+    }
+    #endif
+
     private var identity: some View {
         Section {
             VStack(spacing: AppTheme.Spacing.s) {
-                Button {
+                // Shared with onboarding's first step — see `AvatarButton`,
+                // which is where the camera badge's own reasoning now lives.
+                AvatarButton(
+                    name: session.profile?.displayName, email: session.userEmail,
+                    image: avatars.image, isBusy: avatars.isBusy
+                ) {
                     isPickingAvatar = true
-                } label: {
-                    ProfileAvatarView(
-                        name: session.profile?.displayName, email: session.userEmail,
-                        image: avatars.image, size: AppTheme.Size.illustration
-                    )
-                    // The one affordance saying the circle is tappable at
-                    // all. Overlaid rather than placed beside it, because a
-                    // camera button next to an avatar reads as a second
-                    // control rather than as this one's verb.
-                    .overlay(alignment: .bottomTrailing) {
-                        if avatars.isBusy {
-                            ProgressView()
-                        } else {
-                            KeepoIcon(name: "icon-camera", size: AppTheme.Size.glyphSmall)
-                                .foregroundStyle(AppTheme.Palette.textPrimary)
-                                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
-                                .background(AppTheme.Palette.textOnAccent, in: Circle())
-                                .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
-                                .offset(x: 8, y: 8)
-                        }
-                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(avatars.isBusy)
-                .accessibilityLabel("Change profile photo")
 
                 // Their own stack, tighter than the one around it. Name and
                 // email are one thing — who you are — and at the outer `s`

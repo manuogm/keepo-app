@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import TipKit
 
 /// The Needs Review inbox, as a drawer that drops out from underneath the
 /// scope banner on the Transactions screen.
@@ -71,6 +72,10 @@ struct NeedsReviewPanel: View {
         VStack(spacing: 0) {
             if isVisible {
                 panel
+                    // Attached to the panel, not the screen: the lesson is
+                    // "this thing here is what Keepo captured", and the
+                    // panel only exists when there is something to explain.
+                    .popoverTip(KeepoTips.needsReview)
             }
         }
         .frame(maxHeight: isExpanded ? .infinity : nil)

@@ -191,11 +191,26 @@ enum LocalMoneyQueries {
         try Row.fetchAll(
             database,
             sql: """
-            SELECT t.id, t.account_id, t.occurred_at, t.merchant_raw, t.amount_e4, t.currency,
+            SELECT t.id, t.account_id, t.occurred_at, t.merchant_raw, t.amount_e4,
+                   -- Mirrors needs_review's own coalesce. A capture held for
+                   -- an unmapped card or an unresolved rate has no account
+                   -- currency yet, and `amount_e4` is then what was PAID —
+                   -- so the inbox labels it in the currency it was paid in
+                   -- rather than against nothing at all.
+                   COALESCE(t.currency, t.original_currency) AS currency,
                    c.is_default, c.name
             FROM transactions t JOIN categories c ON c.id = t.category_id
             WHERE t.source = 'capture' AND t.status = 'pending' AND t.deleted_at IS NULL
-            """
+                  -- Onboarding's own test capture is not a thing to review.
+                  -- It is shown on the setup screen that created it, with
+                  -- Delete as its primary action, and again in Profile →
+                  -- My Automations until it is gone — so listing it here
+                  -- too would invite the user to confirm canned data into
+                  -- their real ledger, and would make the very first inbox
+                  -- clear (§3.10's rating trigger) fire on it.
+                  AND (t.card_identifier IS NULL OR t.card_identifier <> ?)
+            """,
+            arguments: [CaptureIdentity.testCardIdentifier]
         ).map { row in
             let isDefault: Bool = row["is_default"]
             let categoryName: String = row["name"]

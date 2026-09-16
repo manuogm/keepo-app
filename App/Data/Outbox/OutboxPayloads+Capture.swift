@@ -1,4 +1,5 @@
 import Foundation
+import KeepoCore
 
 // ReviewCaptureTransactionPayload, split out of OutboxPayloads.swift purely
 // to keep that file under the project's file-length lint threshold — same
@@ -24,10 +25,16 @@ public struct ReviewCaptureTransactionPayload: Codable, Sendable {
     public let occurredAt: Date
     public let merchantRaw: String?
     public let notes: String?
+    /// See `CreateTransactionPayload.original`. On a capture this is what
+    /// Wallet reported and the user could not edit; `amountE4` beside it is
+    /// what the user *could*, and usually should — a bank's spread is not
+    /// the ECB's rate.
+    public let original: ForeignOriginal?
 
     public init(
         id: UUID, expectedVersion: Int, accountId: UUID, categoryId: UUID,
-        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?, notes: String? = nil
+        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?, notes: String? = nil,
+        original: ForeignOriginal? = nil
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
@@ -38,5 +45,6 @@ public struct ReviewCaptureTransactionPayload: Codable, Sendable {
         self.occurredAt = occurredAt
         self.merchantRaw = merchantRaw
         self.notes = notes
+        self.original = original
     }
 }

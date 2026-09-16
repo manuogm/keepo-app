@@ -1,0 +1,194 @@
+import KeepoCore
+import SwiftUI
+
+/// Title, body, content, bottom bar — the shape every setup step takes.
+///
+/// It exists so eight screens cannot drift. Left to themselves they would:
+/// one would set `Spacing.xl` between its title and its field, the next
+/// `Spacing.l`, and nobody would notice until all eight were seen in
+/// sequence — which is the only way a user ever sees them. Screen edge is
+/// `Spacing.l` and block separation `Spacing.xxl`, per the brand doc.
+///
+/// The content slot is deliberately unopinionated. A scaffold that also
+/// tried to lay out its contents would be a second layout system competing
+/// with SwiftUI's, and the eight steps hold genuinely different things — a
+/// wheel, a grid, a form, a video.
+struct OnboardingScaffold<Content: View>: View {
+    let title: String
+    /// One or two lines under the title. Optional because some steps say
+    /// everything they need to in the title, and an empty subtitle that
+    /// still reserves its space is the drift this type prevents.
+    var subtitle: String?
+    let step: SetupStep
+    var onBack: (() -> Void)?
+    var onSkip: (() -> Void)?
+    /// Label and action for the forward button. Disabled when the step has
+    /// something it genuinely still needs.
+    var primaryTitle = "Next"
+    var isPrimaryEnabled = true
+    let onPrimary: () -> Void
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ZStack {
+            AppTheme.Palette.bgCanvas.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                OnboardingChrome(step: step, onBack: onBack, onSkip: onSkip)
+                    .padding(.top, AppTheme.Spacing.s)
+
+                // The heading stays at the top and the content floats in
+                // whatever is left, rather than both stacking against the
+                // top edge. The steps hold wildly different amounts — one
+                // field on the first, a wheel on the second, a whole form
+                // on the third — and top-stacking leaves the short ones
+                // looking like a screen that failed to finish loading.
+                // When the content is tall the two spacers collapse to
+                // nothing and this is an ordinary scroll view again.
+                GeometryReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
+                            heading
+                            Spacer(minLength: 0)
+                            content
+                            Spacer(minLength: 0)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, AppTheme.Spacing.l)
+                        .padding(.top, AppTheme.Spacing.xl)
+                        .padding(.bottom, AppTheme.Spacing.xxl)
+                        .frame(minHeight: proxy.size.height, alignment: .top)
+                    }
+                    // The content is short on most steps and long on two;
+                    // this is the same rule `TransactionFormView` uses, so
+                    // nothing rubber-bands until it genuinely overflows.
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollDismissesKeyboard(.interactively)
+                }
+
+                bottomBar
+            }
+        }
+    }
+
+    /// **Both lines are `fixedSize` vertically, and that is load-bearing.**
+    /// The content below sits between two flexible spacers, so SwiftUI is
+    /// free to negotiate this block's height — and given the chance it
+    /// compresses the title to a single line and truncates it with an
+    /// ellipsis rather than wrapping. It showed up as "Purchases, without
+    /// o…" on the capture step the moment that step's subtitle got shorter,
+    /// which is the worst shape of layout bug: invisible in code, and
+    /// triggered by editing a different string.
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
+            Text(title)
+                .font(AppTheme.Typography.screenTitle)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let subtitle {
+                Text(subtitle)
+                    .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    // The token exists for exactly this: prose stops being
+                    // readable past roughly this measure.
+                    .frame(maxWidth: AppTheme.Size.proseWidth, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Next bottom-right, Back bottom-left, as the brief specifies. Back is
+    /// *also* in the chrome — the same action in both places is not a
+    /// mistake here: the top one is where a user coming from the previous
+    /// screen expects it, the bottom one is where their thumb already is.
+    private var bottomBar: some View {
+        HStack {
+            if let onBack {
+                OnboardingSecondaryButton(title: "Back", action: onBack)
+            }
+            Spacer(minLength: 0)
+            OnboardingPrimaryButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: onPrimary)
+        }
+        .padding(.horizontal, AppTheme.Spacing.l)
+        .padding(.top, AppTheme.Spacing.m)
+        .padding(.bottom, AppTheme.Spacing.s)
+    }
+}
+
+/// The one forward action on a setup step — and on sign-in, which is the
+/// same button doing the same job at the same point in the same flow.
+///
+/// **Disabled is a neutral fill, not a faded accent.** A dimmed amber still
+/// reads as a coloured button with white text on it — as a live control
+/// someone will tap and be confused by — so the disabled state drops the
+/// accent entirely and takes `textSecondary` with it. The difference has to
+/// be a difference in *kind*, because "not yet" is what it means.
+struct OnboardingPrimaryButton: View {
+    let title: String
+    var isEnabled = true
+    /// Swaps the label for a spinner while a network call is in flight,
+    /// keeping the button's own size so nothing reflows around it.
+    var isLoading = false
+    /// Sign-in's button spans the field above it; a setup step's hugs its
+    /// label in the bottom bar.
+    var fillsWidth = false
+    let action: () -> Void
+
+    private var isActive: Bool { isEnabled && !isLoading }
+
+    var body: some View {
+        Button(action: action) {
+            label
+                .padding(.horizontal, fillsWidth ? 0 : AppTheme.Spacing.xl)
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
+                .frame(height: AppTheme.Size.touchTarget)
+                .background(
+                    isActive ? AppTheme.Palette.brandPrimary : AppTheme.Palette.fillStrong,
+                    in: Capsule()
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.pressableCard)
+        .disabled(!isActive)
+        .animation(AppTheme.Motion.colorSafe, value: isActive)
+        .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: title)
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if isLoading {
+            ProgressView().tint(AppTheme.Palette.textSecondary)
+        } else {
+            Text(title)
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(isActive ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textSecondary)
+        }
+    }
+}
+
+/// Back. Quiet on purpose — it is an escape hatch, not a second choice
+/// competing with the one the screen is asking for — but **outlined**, so
+/// it still reads as a control. Bare text on the canvas, with no fill and
+/// no border, read as a label that happened to be tappable.
+///
+/// The outline rather than a fill is what keeps the hierarchy: same
+/// capsule and same height as the primary beside it, so the pair looks
+/// deliberate, with the weight carried entirely by the primary's fill.
+struct OnboardingSecondaryButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .padding(.horizontal, AppTheme.Spacing.l)
+                .frame(height: AppTheme.Size.touchTarget)
+                .overlay(Capsule().stroke(AppTheme.Palette.textSecondary, lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}

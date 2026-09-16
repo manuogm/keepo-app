@@ -390,6 +390,14 @@ deno_version = 2
 [functions.sync-fx-rates]
 verify_jwt = false
 
+# capture-shortcut is a public 302 to the published "Keepo Capture" shortcut.
+# It has to be reachable with no JWT at all: the link is tapped from setup by
+# a signed-in user, but it is also shareable — from Safari, a support email,
+# or a device whose session has lapsed — and a 401 there would be the same
+# dead end the redirect exists to prevent.
+[functions.capture-shortcut]
+verify_jwt = false
+
 # alert-operator is gated by an X-Alert-Operator-Secret header — the caller
 # is ops_check_and_alert() via pg_net, never a signed-in user. Without this,
 # the platform's own JWT gate would 401 the call before it ever reached the

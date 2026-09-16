@@ -52,17 +52,87 @@ public enum AmountParser {
 }
 
 public extension AmountParser {
-    /// Wallet's `Amount` capture parameter is a formatted currency string
-    /// (e.g. "$1.06") — strips everything but digits, a leading minus, and
-    /// the locale's decimal separator before delegating to `parse(_:)`. The
-    /// stripped symbol is never used to infer currency — money rule: a
-    /// captured transaction's currency comes from the mapped account, the
-    /// symbol is a mismatch check only (app-architecture.md §4).
-    static func parseFormattedCurrency(_ text: String, locale: Locale = .current) -> Int64? {
-        let decimalSeparator = locale.decimalSeparator ?? "."
-        let allowed = CharacterSet(charactersIn: "0123456789-" + decimalSeparator)
-        let stripped = String(text.unicodeScalars.filter { allowed.contains($0) })
-        return parse(stripped, locale: locale)
+    /// Wallet's `Amount` capture parameter is a **machine-formatted**
+    /// currency string — "$1.06", "1.234,56 €", "CHF 1'234.56" — and that
+    /// makes it a different problem from `parse(_:locale:)` above, which
+    /// reads what a person typed on the locale's own decimalPad.
+    ///
+    /// **This function never consults a locale, deliberately.** It used to
+    /// take its decimal separator from `Locale.current`, which is a 100×
+    /// money bug the moment the string's convention and the device's differ:
+    /// `$1.06` on an `es_ES` device had its `.` stripped as grouping and was
+    /// captured as **106**. Nobody typed this string, so the device is the
+    /// wrong authority — the convention is read out of the string itself,
+    /// which is correct whichever way iOS formatted it.
+    ///
+    /// The symbol is discarded here. Detecting the currency from it — and
+    /// acting on a mismatch with the mapped account's — is the multi-currency
+    /// workstream, which is where the `original_amount`/`original_currency`
+    /// columns that give a detected currency somewhere to live are added.
+    ///
+    /// - Returns: `nil` for a string carrying no ASCII digits. Non-Latin
+    ///   digit shapes (Arabic-Indic and the rest) are a known, deliberate
+    ///   boundary: they fail loudly here rather than parsing to something
+    ///   wrong, and the capture surfaces "couldn't read the amount".
+    static func parseFormattedCurrency(_ text: String) -> Int64? {
+        guard let plain = plainDecimalString(fromFormatted: text) else { return nil }
+        return parse(plain, locale: .posix)
+    }
+}
+
+private extension AmountParser {
+    /// Reduces a formatted currency string to a plain POSIX decimal string
+    /// ("-1234.56"), inferring which of `.` and `,` is the decimal point
+    /// from the shape of the string.
+    static func plainDecimalString(fromFormatted text: String) -> String? {
+        let isNegative = text.contains { $0 == "-" || $0 == "\u{2212}" }
+
+        // Everything that is not an ASCII digit or one of the two separator
+        // characters is noise: the symbol or code ("$", "€", "CHF", "kr"),
+        // the sign (already read above), and every grouping mark that is
+        // never a decimal point — the Swiss apostrophe in `1'234.56`, and
+        // the plain, non-breaking and narrow spaces France, Sweden and
+        // Hungary group with.
+        let figures = String(text.filter { ($0.isASCII && $0.isNumber) || $0 == "." || $0 == "," })
+        guard figures.contains(where: \.isNumber) else { return nil }
+
+        let magnitude: String
+        if let decimalIndex = decimalSeparatorIndex(in: figures) {
+            let whole = String(figures[..<decimalIndex].filter(\.isNumber))
+            // Everything after the *last* separator is digits by
+            // construction, so no second filter is needed here.
+            let fraction = String(figures[figures.index(after: decimalIndex)...])
+            magnitude = (whole.isEmpty ? "0" : whole) + "." + fraction
+        } else {
+            magnitude = figures.filter(\.isNumber)
+        }
+        return isNegative ? "-" + magnitude : magnitude
+    }
+
+    /// The index of the separator that is the decimal point, or `nil` when
+    /// every separator in the string is a grouping mark.
+    static func decimalSeparatorIndex(in figures: String) -> String.Index? {
+        guard let last = figures.lastIndex(where: { $0 == "." || $0 == "," }) else { return nil }
+
+        // Both conventions present: the rightmost is the decimal point and
+        // the other is grouping. True of every locale, and the only case
+        // that needs no digit counting — `1.234,56` and `1,234.56` are each
+        // unambiguous the moment both marks are in play.
+        if figures.contains(".") && figures.contains(",") { return last }
+
+        // One convention used more than once is grouping: `1.234.567`.
+        guard figures.filter({ $0 == "." || $0 == "," }).count == 1 else { return nil }
+
+        // A single separator with one or two digits behind it is a decimal
+        // point; with exactly three it is grouping (`1.234` is one thousand
+        // two hundred thirty-four). That is only a judgement call because
+        // the currency is unknown here: **no supported currency has 1 or 3
+        // minor digits** — every row in `currencies` is 0 or 2 — so three
+        // trailing digits cannot be a fraction, and one or two cannot be a
+        // group. Anything else (`1.2345`, a trailing `1.`) is not a shape
+        // any formatter produces, and is treated as grouping.
+        let fractionDigits = figures.distance(from: figures.index(after: last), to: figures.endIndex)
+        return (1...2).contains(fractionDigits) ? last : nil
     }
 }
 

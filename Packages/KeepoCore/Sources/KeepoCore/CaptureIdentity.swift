@@ -9,6 +9,33 @@ import Foundation
 /// the server never re-derives it, it only enforces uniqueness on whatever
 /// arrives.
 public enum CaptureIdentity {
+    /// The card identifier the onboarding test capture is written under.
+    ///
+    /// **It is how every other part of the app recognises the test row**:
+    /// `card_identifier` is a real column on the local `transactions`
+    /// mirror, so the Needs Review query excludes exactly this value and
+    /// Profile → My Automations finds the row to delete by it. That is why
+    /// the marker is a card and not, say, a magic merchant string — the
+    /// card is the one field with a column of its own.
+    ///
+    /// Distinctive enough that no real Wallet card can collide: Wallet's
+    /// `Card or Pass` is the user's own label for a card they own (the
+    /// device probe returned `Revolut Mastercad`, typo included), and
+    /// nobody names a card this.
+    public static let testCardIdentifier = "__KEEPO_ONBOARDING_TEST_CARD__"
+
+    /// What the test capture says, since the shortcut arrives with all
+    /// three fields empty. Canned here rather than in the intent so the
+    /// success screen and the write agree without either reaching into the
+    /// other.
+    public static let testMerchant = "Keepo Test Purchase"
+
+    /// 12.34 in the `numeric(20,4)` integer form every amount uses. A
+    /// figure nobody mistakes for a real charge, and small enough that
+    /// leaving it in the ledger by accident is not alarming — though the
+    /// user is always asked to delete it.
+    public static let testAmountE4: Int64 = 123_400
+
     /// - Parameter date: the automation's fire time, bucketed to the
     ///   nearest minute so a near-instant automation re-fire (the same tap,
     ///   retried by Shortcuts) still hashes identically, while two genuinely

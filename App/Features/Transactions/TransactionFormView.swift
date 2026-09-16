@@ -51,6 +51,25 @@ struct TransactionFormView: View {
     @State var selectedToAccountId: UUID?
     @State var receivedAmountText = ""
 
+    /// What `amountText` is in. `nil` — the overwhelmingly common case —
+    /// means the account's own currency, so an ordinary entry carries no
+    /// extra state and behaves exactly as it did before any of this.
+    @State var paidCurrencyCode: String?
+    /// The account-currency figure when the two differ. Derived from the
+    /// rate until the user touches it, then theirs.
+    @State var chargedAmountText = ""
+    /// Set the moment the user edits the charge, and by the edit-mode
+    /// prefill. **Load-bearing**: without it, reopening a foreign
+    /// transaction would quietly replace what the bank actually took with
+    /// Keepo's reference-rate estimate — the exact drift money rule 6
+    /// exists to prevent.
+    @State var chargedAmountEdited = false
+    /// The day whose rate produced `chargedAmountText`; `nil` when none
+    /// resolved, which the form shows rather than guessing (money rule 5).
+    @State var conversionRateDate: Date?
+    @State var currencies: [PublicSchema.CurrenciesSelect] = []
+    @State var isPickingCurrency = false
+
     // Edit-mode versions the save call sends back for lost-update detection.
     @State var editingId: UUID?
     @State var editingFromVersion: Int?
@@ -152,6 +171,21 @@ struct TransactionFormView: View {
             .sheet(isPresented: $isPickingTags) {
                 TagPickerSheet(session: session, selectedTagIds: $selectedTagIds)
             }
+            .sheet(isPresented: $isPickingCurrency) {
+                CurrencyPickerSheet(currencies: currencies, selection: paidCurrencyBinding, title: "Paid In")
+            }
+            // One observer over one value rather than four separate ones:
+            // both the honest statement of the rule ("re-derive when any
+            // input to the conversion changes") and what keeps this body
+            // inside the SwiftUI type checker's budget — four more
+            // modifiers here pushed it past "unable to type-check this
+            // expression in reasonable time".
+            .onChange(of: conversionInputs) { previous, current in
+                // Changing the currency starts a new question, so a charge
+                // the user had corrected for the old one no longer applies.
+                if previous.paidCurrencyCode != current.paidCurrencyCode { chargedAmountEdited = false }
+                Task { await refreshConversion() }
+            }
             .navigationDestination(isPresented: $isCreatingRecurringRule) {
                 RecurringRuleFormView(session: session, mode: recurringSeedMode) {
                     session.refresh.bump()
@@ -186,6 +220,7 @@ struct TransactionFormView: View {
                 accounts: accounts,
                 categories: categoriesForKind,
                 isTransfer: kind == .transfer,
+                foreign: foreignAmount,
                 needsReceivedAmount: needsReceivedAmount
             )
 
@@ -324,16 +359,5 @@ struct TransactionFormView: View {
             isIncome: kind == .income,
             startingOn: occurredAt
         )
-    }
-
-    var isSaveDisabled: Bool {
-        if isSaving || selectedAccountId == nil || amountText.isEmpty { return true }
-        if kind == .transfer {
-            if selectedToAccountId == nil { return true }
-            if needsReceivedAmount && receivedAmountText.isEmpty { return true }
-        } else if selectedCategoryId == nil {
-            return true
-        }
-        return false
     }
 }

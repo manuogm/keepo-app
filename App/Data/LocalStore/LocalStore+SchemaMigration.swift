@@ -125,5 +125,15 @@ extension LocalStore {
         // device drops the column from its whitelist intersection, and every
         // pulled category then hits a NOT NULL violation on insert.
         migrator.registerMigration("v15_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260923100000 adds
+        // transactions.original_amount_e4/original_currency server-side.
+        // Additive, so nothing hard-fails; a stale device would silently
+        // drop both from every pulled transaction (`SyncApply` intersects
+        // its whitelist with the local schema), and a purchase made abroad
+        // would lose the record of what was actually paid — on that device
+        // only, while the other phone showed it. A mirror that quietly
+        // holds less than the server is the failure mode this whole list
+        // exists for.
+        migrator.registerMigration("v16_rebuild_syncable_tables", migrate: rebuildSyncableTables)
     }
 }

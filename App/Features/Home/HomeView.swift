@@ -1,5 +1,6 @@
 import KeepoCore
 import SwiftUI
+import TipKit
 
 /// Dashboard — a widget canvas the user arranges themselves, under the
 /// scope banner every main screen now shares.
@@ -44,6 +45,7 @@ struct HomeView: View {
                 ScopeBannerView(
                     title: "Dashboard",
                     session: session,
+                    showsPrivacyTip: true,
                     onOpenProfile: { navigation?.openProfileRoot() },
                     accessory: { doneButton }
                 )
@@ -108,6 +110,10 @@ struct HomeView: View {
                 session: session, store: store, data: data, isLoading: isLoading,
                 isEditing: $isEditing, isPickingWidget: $isPickingWidget
             )
+            // Not while the user is already rearranging: a tip explaining
+            // the gesture someone is mid-way through performing is the one
+            // moment it is certainly not needed.
+            .popoverTip(isEditing ? nil : KeepoTips.widgets)
         }
     }
 
