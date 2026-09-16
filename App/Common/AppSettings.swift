@@ -30,6 +30,11 @@ enum AppSettingsKeys {
     /// user to the Shortcuts app for minutes at a time, which iOS is free
     /// to treat as grounds for terminating Keepo.
     static let onboardingDraft = "onboardingDraft"
+    /// The same ticks for the Profile → My Automations setup flow, kept
+    /// under their own key: a user setting capture up from Profile is not
+    /// resuming onboarding, and one key would let either flow open with the
+    /// other's progress already applied.
+    static let captureSetupChecklist = "captureSetupChecklist"
     /// Which Shortcuts-walkthrough steps have been ticked, as a sorted
     /// comma-joined list of ids.
     ///
@@ -75,6 +80,18 @@ enum AppSettingsKeys {
     /// Device-local because the automation is: it lives in this phone's
     /// Shortcuts app, and a household's second device has its own.
     static let captureVerifiedAt = "captureVerifiedAt"
+    /// When the connection test last passed — i.e. the user has actually
+    /// been through the setup, whether during onboarding or from Profile.
+    ///
+    /// **Distinct from `captureVerifiedAt`**, and the difference matters.
+    /// That one means a *real* Apple Pay purchase arrived, which is the only
+    /// proof the Wallet automation exists; this one means the shortcut is
+    /// installed and reachable, which is all the test can ever prove. The
+    /// automations screen needs the weaker signal: it decides whether to
+    /// show setup instructions or the thing the user set up, and waiting
+    /// for a real purchase would keep showing setup instructions to someone
+    /// who had just finished setting up.
+    static let captureSetupCompletedAt = "captureSetupCompletedAt"
     /// How many captured purchases this user has reviewed, ever —
     /// onboarding's own test capture excluded. The bar the rating ask sits
     /// behind (`ReviewPolicy.lifetimeCapturesBar`).
@@ -108,6 +125,17 @@ extension AppSettings {
     /// not "when did it last run" — overwriting it on every capture would
     /// lose the only date that means anything, and cost a `UserDefaults`
     /// write on a path that runs at the register.
+    static var captureSetupCompletedAt: Date? {
+        UserDefaults.standard.object(forKey: AppSettingsKeys.captureSetupCompletedAt) as? Date
+    }
+
+    /// Set every time the test passes, not only the first — re-running it
+    /// after changing phones or re-importing the shortcut is exactly when
+    /// the freshest date is worth having.
+    static func markCaptureSetupCompleted() {
+        UserDefaults.standard.set(Date(), forKey: AppSettingsKeys.captureSetupCompletedAt)
+    }
+
     static func markCaptureVerifiedIfNeeded() {
         guard captureVerifiedAt == nil else { return }
         UserDefaults.standard.set(Date(), forKey: AppSettingsKeys.captureVerifiedAt)

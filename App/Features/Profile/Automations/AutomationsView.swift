@@ -21,7 +21,9 @@ struct AutomationsView: View {
                     NavigationLink {
                         WalletAutomationGuideView(session: session)
                     } label: {
-                        ProfileRowLabel(icon: "icon-tap", title: "Set Up Apple Pay Capture")
+                        ProfileRowLabel(
+                            icon: "icon-robot", title: "Automatically Captured Transactions"
+                        )
                     }
                 }
             }
