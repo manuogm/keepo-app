@@ -38,7 +38,7 @@ struct SetupWalkthroughSubStep: View {
             title: "Set up automatic capture",
             step: .capture,
             onBack: onBack,
-            primaryTitle: "I've done that",
+            primaryTitle: "Test Automation",
             isPrimaryEnabled: isFinished,
             onPrimary: onNext
         ) {

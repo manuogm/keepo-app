@@ -36,7 +36,7 @@ struct CaptureSetupFlowView: View {
                         case .checklist:
                             CaptureSetupChecklist(completed: completedBinding)
                             OnboardingPrimaryButton(
-                                title: "I've done that", isEnabled: isChecklistFinished, fillsWidth: true
+                                title: "Test Automation", isEnabled: isChecklistFinished, fillsWidth: true
                             ) {
                                 page = .test
                             }

@@ -85,22 +85,34 @@ struct WalletAutomationGuideView: View {
 
     private var configured: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
-            CaptureStatusCard(session: session)
             shortcutsSection
             mappedCardsSection
         }
     }
 
+    /// **The shortcut and its status share a row**, because they are one
+    /// subject: the card is the thing that was installed, and the panel
+    /// beside it is whether it has ever fired. Stacked, the status read as a
+    /// banner about the screen as a whole rather than as a fact about the
+    /// object directly under it — and it pushed the shortcut, the only thing
+    /// here you can act on, further down the screen for no reason.
+    ///
+    /// `minHeight` rather than a fixed height: the status panel grows when a
+    /// test purchase is still around and it has a Delete to offer.
     private var shortcutsSection: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
             sectionTitle("My Shortcuts")
-            Button {
-                openShortcuts()
-            } label: {
-                ShortcutCardTile(name: ShortcutsWalkthrough.shortcutName)
+            HStack(alignment: .top, spacing: AppTheme.Spacing.m) {
+                Button {
+                    openShortcuts()
+                } label: {
+                    ShortcutCardTile(name: ShortcutsWalkthrough.shortcutName)
+                }
+                .buttonStyle(.pressableCard)
+                .accessibilityLabel("Open \(ShortcutsWalkthrough.shortcutName) in the Shortcuts app")
+
+                CaptureStatusCard(session: session, minHeight: ShortcutCardTile.size.height)
             }
-            .buttonStyle(.pressableCard)
-            .accessibilityLabel("Open \(ShortcutsWalkthrough.shortcutName) in the Shortcuts app")
         }
     }
 
@@ -188,7 +200,8 @@ struct WalletAutomationGuideView: View {
 struct ShortcutCardTile: View {
     let name: String
 
-    private static let size = CGSize(width: 164, height: 164)
+    /// Internal so the status panel beside it can match its height.
+    static let size = CGSize(width: 164, height: 164)
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -220,25 +233,35 @@ struct ShortcutCardTile: View {
 /// the first capture that is not the test.
 struct CaptureStatusCard: View {
     let session: SessionStore
+    /// Matched to the card beside it. **Applied before the background, not
+    /// by the caller afterwards** — the surface is drawn inside this type,
+    /// so a frame wrapped around the finished view grows the space and not
+    /// the card, which left two panels of visibly different heights sitting
+    /// side by side.
+    var minHeight: CGFloat?
 
     @State private var hasTestCapture = false
     @State private var isDeleting = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
+            // A step down in size from what this used to be, because it now
+            // shares a row with the shortcut card rather than spanning the
+            // screen. At body size the waiting headline took three lines of a
+            // half-width column before its explanation even started.
             if let verifiedAt = AppSettings.captureVerifiedAt {
                 Label("Working", systemImage: "checkmark.circle.fill")
-                    .font(AppTheme.Typography.bodyEmphasis)
+                    .font(AppTheme.Typography.labelEmphasis)
                     .foregroundStyle(AppTheme.Palette.statusPositive)
                 Text("First purchase captured \(verifiedAt.formatted(.relative(presentation: .named))).")
-                    .font(AppTheme.Typography.caption)
+                    .font(AppTheme.Typography.nano)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
             } else {
                 Label("Waiting for your first purchase", systemImage: "clock")
-                    .font(AppTheme.Typography.bodyEmphasis)
+                    .font(AppTheme.Typography.labelEmphasis)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
                 Text("Keepo confirms the automation the moment a real tap-payment lands.")
-                    .font(AppTheme.Typography.caption)
+                    .font(AppTheme.Typography.nano)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
             }
 
@@ -255,15 +278,16 @@ struct CaptureStatusCard: View {
                         ProgressView()
                     } else {
                         Text("Delete test purchase")
-                            .font(AppTheme.Typography.labelEmphasis)
+                            .font(AppTheme.Typography.label)
                             .foregroundStyle(AppTheme.Palette.statusNegative)
+                            .multilineTextAlignment(.leading)
                     }
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(AppTheme.Spacing.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppTheme.Spacing.m)
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
         .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
         .task(id: session.refresh.token) {
             hasTestCapture = (try? await session.dbQueue.read { try TestCaptureQueries.exists($0) }) ?? false

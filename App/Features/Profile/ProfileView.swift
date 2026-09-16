@@ -67,7 +67,11 @@ struct ProfileView: View {
                         ProfileRowLabel(icon: "icon-home", title: "My Household")
                     }
                     NavigationLink(value: AppNavigation.ProfileDestination.automations) {
-                        ProfileRowLabel(icon: "icon-robot", title: "My Automations")
+                        // `bolt.fill`, not the robot: the robot moved down a
+                        // level to label automatic capture specifically, and
+                        // the same glyph on the row that contains it said the
+                        // parent and the child were the same thing.
+                        ProfileRowLabel(icon: "bolt.fill", title: "My Automations")
                     }
                 }
                 general
