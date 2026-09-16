@@ -35,12 +35,25 @@ struct SetupCaptureTestSubStep: View {
         case waiting
         case arrived(TestCaptureQueries.TestCapture)
         case failed(String)
+
+        /// Nothing to press while the test is about to run or running. The
+        /// bar comes back for the two outcomes that need an answer.
+        var showsForwardButton: Bool {
+            switch self {
+            case .idle, .waiting: return false
+            case .arrived, .failed: return true
+            }
+        }
     }
 
     /// Ten seconds. The round trip is a couple of seconds when it works;
     /// past this it is not slow, it is not coming.
     private static let timeout = Duration.seconds(10)
     private static let poll = Duration.milliseconds(400)
+    /// Long enough to read one sentence before the screen hands itself over
+    /// to Shortcuts, short enough that it never reads as the app having
+    /// stalled.
+    private static let readingDelay = Duration.milliseconds(1800)
 
     @State private var phase: Phase = .idle
     @State private var isDeleting = false
@@ -60,9 +73,9 @@ struct SetupCaptureTestSubStep: View {
             // mostly produces half-built automations.
             primaryTitle: primaryTitle,
             isPrimaryEnabled: isPrimaryEnabled,
-            // Idle puts the action in the middle of the screen instead, as
-            // the only thing on it. See `idleBlock`.
-            isPrimaryVisible: phase != .idle,
+            // Nothing to press while the test is running itself. See
+            // `idleBlock`.
+            isPrimaryVisible: phase.showsForwardButton,
             onPrimary: runPrimary
         ) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
@@ -72,6 +85,16 @@ struct SetupCaptureTestSubStep: View {
                 case .arrived(let capture): arrivedBlock(capture)
                 case .failed(let message): failedBlock(message)
                 }
+            }
+            // Fires once, on the way in. Keyed on nothing, so coming *back*
+            // to a completed test does not silently re-run it — `.task`
+            // re-runs on reappearance and the guard is what makes this a
+            // one-shot rather than a loop the Back button can restart.
+            .task {
+                guard phase == .idle, CaptureTestSession.canRunShortcuts else { return }
+                try? await Task.sleep(for: Self.readingDelay)
+                guard phase == .idle else { return }
+                await runTest()
             }
         }
     }
@@ -106,23 +129,27 @@ struct SetupCaptureTestSubStep: View {
 
     // MARK: - Idle
 
-    /// **One button, in the middle, and nothing else.** This screen used to
-    /// carry a subtitle and a caption explaining what the test does and
-    /// reassuring that nothing leaves the phone — three blocks of prose in
-    /// front of a single unmistakable action. The title already says what
-    /// is about to happen; everything after it was delaying the tap it was
-    /// describing.
+    /// **No button at all — the screen runs the test itself.**
     ///
-    /// The one case that still needs words is the one where the button
-    /// cannot work at all, because a dead control with no explanation is
-    /// the thing prose is actually for.
+    /// There was nothing else to do here. The user had just been told the
+    /// app was about to check the shortcut, and the only thing standing
+    /// between them and that was a tap on a button that said so a second
+    /// time. Removing it takes the last piece of ceremony out of the
+    /// longest step in setup; the short delay before it fires is there so
+    /// the sentence can be read before the screen starts changing.
+    ///
+    /// The one case that still needs words is the one where the test cannot
+    /// run at all, because a screen that silently does nothing is the thing
+    /// prose is actually for.
     @ViewBuilder
     private var idleBlock: some View {
         if CaptureTestSession.canRunShortcuts {
-            OnboardingPrimaryButton(
-                title: primaryTitle, isEnabled: isPrimaryEnabled, fillsWidth: true, action: runPrimary
-            )
-            .frame(maxWidth: .infinity)
+            Text("Testing the connection with your shortcut…")
+                .font(AppTheme.Typography.sectionTitle)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
         } else {
             Text("The Shortcuts app isn't installed, so there's nothing to test against. "
                  + "Install it from the App Store and you can run this from Profile → My Automations.")
@@ -132,13 +159,20 @@ struct SetupCaptureTestSubStep: View {
         }
     }
 
+    /// The same sentence as `idleBlock`, with the spinner that says it has
+    /// actually started. Keeping the wording identical means the screen does
+    /// not appear to change its mind about what it is doing the moment the
+    /// test fires.
     private var waitingRow: some View {
-        HStack(spacing: AppTheme.Spacing.m) {
+        VStack(spacing: AppTheme.Spacing.l) {
+            Text("Testing the connection with your shortcut…")
+                .font(AppTheme.Typography.sectionTitle)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             ProgressView()
-            Text("Waiting for the test purchase…")
-                .font(AppTheme.Typography.body)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Arrived

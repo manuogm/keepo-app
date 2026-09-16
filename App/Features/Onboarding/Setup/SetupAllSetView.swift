@@ -23,6 +23,10 @@ struct SetupAllSetView: View {
     let store: OnboardingDraftStore
 
     @State private var isFinishing = false
+    /// Revealed only if the automatic hand-off fails. This screen has no
+    /// button by design, and a screen with no button that cannot advance is
+    /// a dead end — `refreshProfile` is a network call and it can fail.
+    @State private var needsManualFinish = false
     /// Flipped once, a beat after the screen appears, and it drives all
     /// three of the celebration: the mark's pop, the burst, and the haptic.
     /// One trigger rather than three keeps them in step — the haptic landing
@@ -35,6 +39,10 @@ struct SetupAllSetView: View {
     /// is still animating out, and a burst that starts during that
     /// transition is a burst nobody sees the start of.
     private static let celebrationDelay = Duration.milliseconds(250)
+    /// How long the screen stays after the burst. Long enough to read six
+    /// words and watch the confetti land, short enough that it never feels
+    /// like the app is waiting for something the user has not done.
+    private static let lingerDelay = Duration.milliseconds(2600)
 
     var body: some View {
         ZStack {
@@ -69,14 +77,29 @@ struct SetupAllSetView: View {
                         ))
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                         .multilineTextAlignment(.center)
+
+                    // Same size as the line above it, because it is the
+                    // same sentence finishing — a smaller second line would
+                    // turn a send-off into a caption.
+                    Text("Enjoy Keepo!")
+                        .font(AppTheme.Typography.Number.display(
+                            AppTheme.Typography.Number.metricCompact, weight: .bold, scale: typeScale
+                        ))
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
+                        .multilineTextAlignment(.center)
                 }
 
-                // Centred with the mark rather than pinned to the bottom
-                // edge. There is nothing else on this screen and nothing
-                // left to answer, so a button held at arm's length from the
-                // only other thing present just looked stranded.
-                OnboardingPrimaryButton(title: "Go to my Keepo", isLoading: isFinishing, fillsWidth: true) {
-                    Task { await finish() }
+                // **No button.** There is nothing to answer here, and a
+                // button asking someone to confirm that they would like to
+                // use the app they just spent two minutes setting up is
+                // ceremony. The screen shows its celebration and then gets
+                // out of the way on its own.
+                if needsManualFinish {
+                    OnboardingPrimaryButton(
+                        title: "Go to my Keepo", isLoading: isFinishing, fillsWidth: true
+                    ) {
+                        Task { await finish() }
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -91,6 +114,8 @@ struct SetupAllSetView: View {
         .task {
             try? await Task.sleep(for: Self.celebrationDelay)
             hasLanded = true
+            try? await Task.sleep(for: Self.lingerDelay)
+            await finish()
         }
     }
 
@@ -110,8 +135,18 @@ struct SetupAllSetView: View {
     /// its own teardown. Everything in the draft is already committed by
     /// the time this screen exists, so there is nothing left to lose.
     private func finish() async {
+        guard !isFinishing else { return }
         isFinishing = true
         store.clear()
-        try? await session.refreshProfile()
+        do {
+            try await session.refreshProfile()
+        } catch {
+            // The refresh is what tears this view down, so a failure leaves
+            // the user sitting on a screen that was built never to need a
+            // button. Give them one rather than a dead end — everything is
+            // already committed, so this only has to succeed once.
+            isFinishing = false
+            needsManualFinish = true
+        }
     }
 }

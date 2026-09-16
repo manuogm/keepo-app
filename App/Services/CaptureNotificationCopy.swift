@@ -108,3 +108,34 @@ enum CaptureNotificationCopy {
         return formatter.string(from: magnitude as NSDecimalNumber) ?? "\(magnitude)"
     }
 }
+
+extension CaptureNotificationCopy {
+    /// The example onboarding shows, produced by the **same** function that
+    /// writes the real thing.
+    ///
+    /// The preview card used to invent its own wording — "Logged $12.34",
+    /// "Groceries · Checking. Tap to change anything." — which is not a
+    /// string this app has ever sent. The real happy-path copy leads with a
+    /// ✅ and the amount and ends with the press-and-hold hint, and that
+    /// hint is most of the reason the notification is worth allowing at
+    /// all. Showing someone one notification to win the permission and then
+    /// sending them a different one is the cheapest possible way to lose it
+    /// back again.
+    static var sample: Content {
+        appliedLocally(
+            CaptureLocalWrite.Resolution(
+                accountName: "Checking",
+                categoryName: "Groceries",
+                categoryIsDefault: false,
+                currency: "USD",
+                minorUnit: 2,
+                categoryId: "",
+                accountId: nil,
+                suggestedCategories: [],
+                suggestedAccounts: [],
+                isPossibleDuplicate: false
+            ),
+            amountE4: 123_400
+        )
+    }
+}

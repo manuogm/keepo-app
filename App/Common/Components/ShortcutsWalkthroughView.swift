@@ -23,11 +23,9 @@ struct ShortcutsWalkthroughView: View {
     /// that setup is the one that also offers the test.
     var onInstallFailed: (() -> Void)?
 
-    @State private var isShowingManualFallback = false
-
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
-            installButton
+            ShortcutInstallButton(onInstallFailed: onInstallFailed)
 
             ForEach(ShortcutsWalkthrough.steps) { step in
                 stepRow(step)
@@ -35,63 +33,9 @@ struct ShortcutsWalkthroughView: View {
 
             openShortcutsButton
         }
-        .alert("Add it by hand", isPresented: $isShowingManualFallback) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(
-                "In Shortcuts, tap + and add the Keepo action “\(ShortcutsWalkthrough.actionName)”, then map "
-                    + "Merchant, Amount and Card or Pass to the Wallet trigger's matching fields. "
-                    + "Name the shortcut “\(ShortcutsWalkthrough.shortcutName)” exactly."
-            )
-        }
     }
 
     // MARK: - Pieces
-
-    /// Where the install button points: the `capture-shortcut` Edge
-    /// Function's 302, falling back to the published iCloud link when there
-    /// is no project configured to redirect through.
-    ///
-    /// **Read from `SupabaseConfig` rather than hardcoded**, because the
-    /// function's URL contains the project ref — which this repo keeps out
-    /// of git and injects through the xcconfig. `try?` because a build with
-    /// no configuration should still show a working button, not a dead one:
-    /// that is exactly what the fallback is for.
-    private var configuredURL: URL? { (try? SupabaseConfig.fromInfoPlist())?.url }
-
-    /// The one tap that replaces what used to be the whole procedure. A
-    /// failure to open drops straight to written instructions rather than
-    /// leaving the user on a dead button — the redirect removed the *stale
-    /// link* failure, not every failure.
-    private var installButton: some View {
-        Button {
-            Task {
-                // `ShortcutsInstaller` tries the direct import first and
-                // drops to this view's own `installURL` — the icloud.com
-                // page — on its own. Only the case where *neither* opened
-                // reaches here, which is still what the written
-                // instructions are for.
-                if await ShortcutsInstaller.install(functionsBaseURL: configuredURL) == .failed {
-                    isShowingManualFallback = true
-                    onInstallFailed?()
-                }
-            }
-        } label: {
-            HStack(spacing: AppTheme.Spacing.s) {
-                Image(systemName: "square.and.arrow.down")
-                Text("Get the Keepo Capture shortcut")
-            }
-            .font(AppTheme.Typography.labelEmphasis)
-            .foregroundStyle(AppTheme.Palette.textOnAccent)
-            .padding(.horizontal, AppTheme.Spacing.l)
-            .frame(maxWidth: .infinity)
-            .frame(height: AppTheme.Size.touchTarget)
-            .background(AppTheme.Palette.brandPrimary, in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.pressableCard)
-        .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: isShowingManualFallback)
-    }
 
     private func stepRow(_ step: WalkthroughStep) -> some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.m) {

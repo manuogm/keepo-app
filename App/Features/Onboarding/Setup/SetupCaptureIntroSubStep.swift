@@ -38,28 +38,77 @@ struct SetupCaptureIntroSubStep: View {
         }
     }
 
-    /// Three lines, and the middle one is the whole argument. The feature is
-    /// not "Keepo can read your payments" — it is "you stop typing them in",
-    /// and the user only cares about the first because of the second.
+    /// **A picture of the mechanism, then three lines under it.**
+    ///
+    /// This screen opened with three paragraphs. They were accurate and
+    /// nobody was going to read them: it is the fifth screen of a setup
+    /// flow, and it is asking for the only genuinely effortful minute in
+    /// it. The argument — you tap your phone, Keepo writes it down — is
+    /// three nouns and an arrow, and a diagram makes it in the time it
+    /// takes to look at the screen.
+    ///
+    /// The lines that survive are the three facts the diagram cannot
+    /// carry: what exactly gets captured, how much of your spending that
+    /// turns out to be, and what it costs you to set up.
     private var pitch: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
-            Text("Pay with your phone and Keepo logs it — the merchant, the amount and the card, "
-                + "the moment the payment goes through.")
-            Text("That is most of your day-to-day spending entered without you typing anything. "
-                + "The coffee, the metro, the supermarket: they are simply already there when you "
-                + "open the app.")
-            Text("It takes about a minute to set up, once.")
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
+            flow
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
+                point("creditcard.fill", "The merchant, the amount and the card, as the payment goes through")
+                point("bolt.fill", "Most of your day-to-day spending, entered without you typing")
+                point("clock.fill", "About a minute to set up, once")
+            }
         }
-        .font(AppTheme.Typography.body)
-        .foregroundStyle(AppTheme.Palette.textSecondary)
-        .fixedSize(horizontal: false, vertical: true)
-        // **No `Size.proseWidth` here**, deliberately. That token is for an
-        // info popover — a bubble floating over other content — and applied
-        // to a full screen it wrapped this into a narrow column beside two
-        // full-width buttons, which read as a layout mistake rather than as
-        // a measure. A screen whose whole job is three paragraphs gets the
-        // screen's own width.
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Tap, Keepo, logged. Three discs and two chevrons, which is the whole
+    /// feature.
+    private var flow: some View {
+        HStack(spacing: AppTheme.Spacing.s) {
+            Spacer(minLength: 0)
+            disc { Image(systemName: "wave.3.right") }
+            chevron
+            disc(isBrand: true) { Text("K").font(AppTheme.Typography.cardTitle) }
+            chevron
+            disc(tint: AppTheme.Palette.statusPositive) { Image(systemName: "checkmark") }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("You pay, Keepo logs it")
+    }
+
+    private func disc<Glyph: View>(
+        isBrand: Bool = false, tint: Color? = nil, @ViewBuilder glyph: () -> Glyph
+    ) -> some View {
+        glyph()
+            .font(AppTheme.Typography.sectionTitle)
+            .foregroundStyle(isBrand ? AppTheme.Palette.textOnAccent : (tint ?? AppTheme.Palette.textPrimary))
+            .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
+            .background(
+                isBrand ? AppTheme.Palette.brandPrimary : AppTheme.Palette.bgSurface,
+                in: Circle()
+            )
+    }
+
+    private var chevron: some View {
+        Image(systemName: "chevron.right")
+            .font(AppTheme.Typography.body)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
+    }
+
+    private func point(_ symbol: String, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.m) {
+            Image(systemName: symbol)
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.brandPrimary)
+                .frame(width: AppTheme.Size.glyphSmall)
+            Text(text)
+                .font(AppTheme.Typography.body)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     /// Both full width and stacked, rather than a pair in a bottom bar. They

@@ -71,6 +71,10 @@ final class OnboardingDraftStore {
     func clear() {
         draft = OnboardingDraft()
         defaults.removeObject(forKey: AppSettingsKeys.onboardingDraft)
+        // Lives outside the draft — see the key's own comment — so it has to
+        // be cleared alongside it, or replaying onboarding opens on a
+        // checklist that is already ticked.
+        defaults.removeObject(forKey: AppSettingsKeys.walkthroughCompleted)
     }
 
     private func persist() {

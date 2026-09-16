@@ -30,6 +30,16 @@ enum AppSettingsKeys {
     /// user to the Shortcuts app for minutes at a time, which iOS is free
     /// to treat as grounds for terminating Keepo.
     static let onboardingDraft = "onboardingDraft"
+    /// Which Shortcuts-walkthrough steps have been ticked, as a sorted
+    /// comma-joined list of ids.
+    ///
+    /// **Not a field on `OnboardingDraft`**, deliberately. That type has no
+    /// custom decoder, so a new non-optional key would make every draft
+    /// already on disk fail to decode — and `OnboardingDraftStore` decodes
+    /// with `try?`, which turns that failure into a silent reset to step
+    /// one. A separate key cannot break a draft that predates it. Cleared
+    /// with the draft in `OnboardingDraftStore.clear()`.
+    static let walkthroughCompleted = "walkthroughCompleted"
     /// Whether the intro screens have been shown on this device. They sit
     /// **before** sign-in — there is no account to hang the flag off yet —
     /// so a returning signed-out user is not marketed to a second time.
