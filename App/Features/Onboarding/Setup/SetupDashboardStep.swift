@@ -18,10 +18,14 @@ import SwiftUI
 /// `DashboardStore.replace(kinds:)` appends in this order and
 /// `DashboardArrangement.append` puts each tile in the first free slot in
 /// reading order — so a half-width widget will happily slide up beside an
-/// earlier one rather than leave a hole in the grid. That is deliberate and
-/// it is why the note under the list exists: a complete dashboard beats a
-/// literal reading of the order, and the user can rearrange anything
-/// afterwards by dragging on the dashboard itself.
+/// earlier one rather than leave a hole in the grid. A complete dashboard
+/// beats a literal reading of the order.
+///
+/// That is deliberately **not** explained on screen. A line warning that
+/// the order might not be honoured spends the user's attention on a
+/// discrepancy most of them will never notice — the packer only reorders
+/// when the alternative is a visible gap — and the dashboard is drag-
+/// rearrangeable the moment they reach it.
 struct SetupDashboardStep: View {
     let store: OnboardingDraftStore
 
@@ -69,10 +73,6 @@ struct SetupDashboardStep: View {
                         chosenPill(kind)
                     }
                 }
-                Text("Keepo may nudge these to keep the grid full — you can rearrange it any time.")
-                    .font(AppTheme.Typography.nano)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

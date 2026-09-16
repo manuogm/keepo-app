@@ -35,6 +35,14 @@ const FALLBACK_SHORTCUT_URL =
 // open redirect here would be a phishing primitive with Keepo's domain on it.
 const ALLOWED_PREFIX = "https://www.icloud.com/shortcuts/";
 
+// Where a resolved `.shortcut` file is allowed to live. Signed shortcut
+// assets are served from `cvws.icloud-content.com` — **not** from an
+// apple.com host, which an earlier version of this assumed and which made
+// every resolution fail closed onto the redirect. Checked as a suffix on
+// the parsed hostname, never as a substring of the URL: "…icloud.com.evil"
+// contains the string and is not the host.
+const DOWNLOAD_HOST_SUFFIXES = [".icloud-content.com", ".icloud.com"];
+
 function resolveDestination(): string {
   const configured = Deno.env.get("KEEPO_CAPTURE_SHORTCUT_URL")?.trim();
   if (!configured || !configured.startsWith(ALLOWED_PREFIX)) {
@@ -63,13 +71,29 @@ async function resolveDownloadURL(shareURL: string): Promise<string | null> {
     });
     if (!response.ok) return null;
     const record = await response.json();
-    const download = record?.fields?.shortcut?.value?.downloadURL;
-    // Must be an Apple-hosted https URL. This value is handed to the client
-    // to open with the `shortcuts://import-shortcut` scheme, so anything
-    // that is not plainly Apple's own CDN is refused rather than passed on.
+    const fields = record?.fields;
+
+    // **`signedShortcut`, not `shortcut`.** iOS refuses to import an
+    // unsigned shortcut unless the user has turned on "Allow Untrusted
+    // Shortcuts" in Settings — a toggle nobody in onboarding has touched,
+    // and one that only appears after you have run a shortcut at all. The
+    // signed asset is the one an ordinary device will accept, so the
+    // unsigned one is a last resort rather than the default, and only
+    // reached when Apple has not finished signing this share yet.
+    const signed = fields?.signingStatus?.value === "APPROVED"
+      ? fields?.signedShortcut?.value?.downloadURL
+      : undefined;
+    const download = typeof signed === "string" ? signed : fields?.shortcut?.value?.downloadURL;
     if (typeof download !== "string") return null;
+
+    // This value is handed to the client to open with the
+    // `shortcuts://import-shortcut` scheme, so anything not plainly on
+    // iCloud's own asset CDN is refused rather than passed on — the
+    // record is fetched over the network and a compromised or changed
+    // response must not be able to point the Shortcuts app anywhere.
     const parsed = new URL(download);
-    if (parsed.protocol !== "https:" || !parsed.hostname.endsWith(".apple.com")) return null;
+    const allowedHost = DOWNLOAD_HOST_SUFFIXES.some((suffix) => parsed.hostname.endsWith(suffix));
+    if (parsed.protocol !== "https:" || !allowedHost) return null;
     return download;
   } catch {
     return null;

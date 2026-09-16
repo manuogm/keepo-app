@@ -148,39 +148,8 @@ struct SetupAccountStep: View {
                 .padding(AppTheme.Spacing.m)
             }
             .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
-
-            starterChips
         }
         .frame(maxWidth: .infinity)
-    }
-
-    /// The shapes almost every first account actually is. They fill in a
-    /// name and an icon and nothing else — the user is still looking at an
-    /// editable field, so a chip is a head start rather than a decision
-    /// made for them.
-    private var starterChips: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: AppTheme.Spacing.s) {
-                ForEach(StarterAccount.all(for: kind ?? .regular), id: \.name) { starter in
-                    Button {
-                        name = starter.name
-                        icon = starter.icon
-                    } label: {
-                        Text(starter.name)
-                            .font(AppTheme.Typography.label)
-                            .foregroundStyle(AppTheme.Palette.textSecondary)
-                            .padding(.horizontal, AppTheme.Spacing.m)
-                            .frame(height: AppTheme.Size.icon)
-                            .background(AppTheme.Palette.fillSubtle, in: Capsule())
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .sensoryFeedback(AppTheme.Feedback.selection, trigger: name)
-                }
-            }
-        }
-        .scrollIndicators(.hidden)
-        .scrollClipDisabled()
     }
 
     // MARK: - State
@@ -238,29 +207,5 @@ struct SetupAccountStep: View {
             )
         }
         store.advance()
-    }
-}
-
-/// The three (or two) shapes a first account usually takes. Data rather
-/// than three copy-pasted buttons, and per kind because offering "Checking"
-/// to someone who just said "Investment" is offering the wrong list.
-private struct StarterAccount {
-    let name: String
-    let icon: String
-
-    static func all(for kind: PublicSchema.AccountKind) -> [StarterAccount] {
-        switch kind {
-        case .regular:
-            return [
-                StarterAccount(name: "Checking", icon: "banknote.fill"),
-                StarterAccount(name: "Cash", icon: "dollarsign.circle.fill"),
-                StarterAccount(name: "Credit Card", icon: "creditcard.fill")
-            ]
-        case .investment:
-            return [
-                StarterAccount(name: "Brokerage", icon: "chart.line.uptrend.xyaxis"),
-                StarterAccount(name: "Retirement", icon: "building.columns.fill")
-            ]
-        }
     }
 }
