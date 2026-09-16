@@ -69,6 +69,11 @@ public final class SessionStore {
         // that already chooses the provider itself, mirrored here for
         // storage. Never biometric-gated (see `KeychainSessionStorage`'s
         // own header comment for why that broke real-device use entirely).
+        // Before the client is built, because building it is what reads the
+        // stored session. A Keychain item outlives the app that wrote it, so
+        // without this a delete-and-reinstall silently restores the previous
+        // identity — see `purgeSessionIfReinstalled`.
+        KeychainSessionStorage.purgeSessionIfReinstalled()
         let client = makeSupabaseClient(config: config, localStorage: config.isLocal ? nil : KeychainSessionStorage())
         self.client = client
         // The only place this branches: StubAuthProvider refuses to run
