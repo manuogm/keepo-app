@@ -106,6 +106,11 @@ extension AppTheme {
         static let avatar: CGFloat = 56
         /// 80 — the mark an empty state is built around.
         static let illustration: CGFloat = 80
+        /// 140 — an avatar that is the subject of the screen rather than a
+        /// marker on it: onboarding's profile step, where it and one text
+        /// field are the only things present and `illustration` left the
+        /// screen looking mostly empty.
+        static let avatarHero: CGFloat = 140
         /// 280 — how wide a bubble of wrapping prose may be: an info
         /// popover. The one member here that is not a square, and it earns
         /// its place for the same reason as the rest — the alternative is

@@ -39,12 +39,21 @@ struct AvatarButton: View {
 
     /// The white disc and its canvas-coloured ring are what keep the badge
     /// legible over a photograph of anything at all.
+    ///
+    /// Sized as a fraction of the disc rather than a fixed token, so it
+    /// still reads as a camera on a hero-sized avatar instead of shrinking
+    /// to a speck in the corner of one. The ratios are not arbitrary: at
+    /// the default `Size.illustration` they land exactly on `Size.icon`,
+    /// `Size.glyphSmall` and an 8pt offset, which is what this drew before
+    /// it could scale.
     private var badge: some View {
-        KeepoIcon(name: "icon-camera", size: AppTheme.Size.glyphSmall)
+        KeepoIcon(name: "icon-camera", size: badgeDiameter / 2)
             .foregroundStyle(AppTheme.Palette.textPrimary)
-            .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+            .frame(width: badgeDiameter, height: badgeDiameter)
             .background(AppTheme.Palette.textOnAccent, in: Circle())
             .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
-            .offset(x: 8, y: 8)
+            .offset(x: badgeDiameter / 4, y: badgeDiameter / 4)
     }
+
+    private var badgeDiameter: CGFloat { size * 0.4 }
 }

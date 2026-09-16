@@ -10,23 +10,22 @@ import SwiftUI
 /// step has something reasonable behind it; this one does not, which is
 /// what `SetupStep.isSkippable` encodes.
 ///
-/// Almost everything on it is reused: the icon well is
-/// `IconPickerButton`, the figure is `AmountField`, and the currency
-/// override is `CurrencyPickerSheet`. The starter chips are the one new
-/// thing, and they are a shortcut past the naming rather than a different
-/// way to make an account.
+/// **Two stages on one step, and the first one is a question.** The kind is
+/// asked on its own, as `AccountKindPicker`'s two cards, and the form does
+/// not exist until it is answered. That is a reversal: this step used to
+/// compress the kind into a segmented control precisely so the form could
+/// share the screen with it, on the argument that the two cards took sixty
+/// percent of a screen that had a form to fit. The argument was right about
+/// the space and wrong about the conclusion — the fix is not to shrink the
+/// question but to stop asking both at once. Each stage now gets the whole
+/// screen, the cards get to be the cards they are everywhere else, and the
+/// form opens with the kind already decided, which is also what lets it put
+/// the Investment badge beside the name.
 ///
-/// **The kind is a segmented control here, not `AccountKindPicker`'s two
-/// cards.** Those cards are sized to be the whole of a screen whose only
-/// job is that choice, which is what the Add Account sheet roots on — put
-/// on this step they took sixty percent of it and pushed the name, icon
-/// and balance below the fold, under a Next button that was disabled for
-/// reasons the user could not see. The cards' own doc comment is the
-/// argument for shrinking it: the two kinds behave identically, the choice
-/// is reversible by dragging a row on the Accounts list, and it drives a
-/// badge rather than a capability. It does not deserve the screen. The
-/// wording is still `AccountKindPicker`'s, read from it, so the two places
-/// that ask this question cannot describe it differently.
+/// Everything else is reused: the icon well is `IconPickerButton`, the
+/// figure is `AmountField`, the currency override is `AmountField`'s own
+/// code chip, and the wording of the two kinds is `AccountKindPicker`'s, so
+/// the two places that ask this question cannot describe it differently.
 struct SetupAccountStep: View {
     let store: OnboardingDraftStore
     let currencies: [PublicSchema.CurrenciesSelect]
@@ -35,14 +34,18 @@ struct SetupAccountStep: View {
     /// forward is still describing the same account rather than a second
     /// one — and so a retried commit lands on the same row.
     @State private var accountId = UUID()
-    @State private var kind: PublicSchema.AccountKind = .regular
+    /// **Optional, and that is the stage marker.** `nil` is "has not chosen
+    /// yet" and shows the cards; anything else shows the form. A separate
+    /// `hasChosenKind` flag would be the same state stored twice, and the
+    /// two would eventually disagree.
+    @State private var kind: PublicSchema.AccountKind?
     @State private var name = ""
     @State private var balanceText = ""
     @State private var icon = AccountAppearance.defaultIcon(forKind: .regular)
     @State private var color = Color(hex: CategoryAppearance.randomColor())
     @State private var currency = ""
-    /// Stops the kind cards from overwriting an icon the user chose
-    /// themselves — switching Everyday → Investment should not silently
+    /// Stops the kind from overwriting an icon the user chose themselves —
+    /// going back and switching Everyday → Investment should not silently
     /// undo a deliberate pick.
     @State private var hasChosenIcon = false
     @State private var isPickingIcon = false
@@ -50,20 +53,20 @@ struct SetupAccountStep: View {
 
     var body: some View {
         OnboardingScaffold(
-            title: "Your first account",
-            subtitle: "Where your money actually is. You can add the rest later.",
+            title: "Create your first account",
             step: .account,
-            onBack: store.goBack,
+            onBack: back,
             isPrimaryEnabled: isComplete,
+            isPrimaryVisible: kind != nil,
             onPrimary: next
         ) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
-                kindPicker
-                starterChips
-                identityRow
-                balanceBlock
+            if kind == nil {
+                kindChoice
+            } else {
+                accountForm
             }
         }
+        .animation(AppTheme.Motion.standard, value: kind)
         .sheet(isPresented: $isPickingIcon) {
             IconCatalogView(icon: $icon, color: $color)
         }
@@ -71,37 +74,94 @@ struct SetupAccountStep: View {
             CurrencyPickerSheet(currencies: currencies, selection: $currency, title: "Account currency")
         }
         .onChange(of: icon) { _, _ in hasChosenIcon = true }
-        .onChange(of: kind) { _, newKind in adoptDefaultIcon(for: newKind) }
         .task { restore() }
     }
 
-    // MARK: - Pieces
+    // MARK: - Stage one
 
-    private var kindPicker: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            Picker("Account kind", selection: $kind) {
-                ForEach([PublicSchema.AccountKind.regular, .investment], id: \.self) { candidate in
-                    Text(AccountKindPicker.title(for: candidate)).tag(candidate)
-                }
-            }
-            .pickerStyle(.segmented)
-            .sensoryFeedback(AppTheme.Feedback.selection, trigger: kind)
+    private var kindChoice: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
+            Text("Choose an account type")
+                .font(AppTheme.Typography.bodyEmphasis)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
 
-            Text(AccountKindPicker.subtitle(for: kind))
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            AccountKindPicker(onSelect: choose(_:))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The three shapes almost every first account actually is. They fill
-    /// in a name and an icon and nothing else — the user is still looking
-    /// at an editable field, so a chip is a head start rather than a
-    /// decision made for them.
+    /// Picking a card *is* the forward action, which is why this step has no
+    /// Next button until there is a form to advance from.
+    private func choose(_ chosen: PublicSchema.AccountKind) {
+        if !hasChosenIcon {
+            icon = AccountAppearance.defaultIcon(forKind: chosen)
+            // `onChange(of: icon)` fires for that assignment too, so the
+            // flag has to be put back — the pick was this line's, not the
+            // user's.
+            hasChosenIcon = false
+        }
+        kind = chosen
+    }
+
+    // MARK: - Stage two
+
+    /// Icon, then name, then figure, straight down the middle. The name and
+    /// the balance share one card because they are one thing being
+    /// described — two separate fills read as two unrelated questions that
+    /// happen to be stacked.
+    private var accountForm: some View {
+        VStack(spacing: AppTheme.Spacing.xl) {
+            IconPickerButton(icon: icon, color: color, diameter: AppTheme.Size.illustration) {
+                isPickingIcon = true
+            }
+
+            VStack(spacing: 0) {
+                HStack(spacing: AppTheme.Spacing.s) {
+                    TextField("Account name", text: $name)
+                        .font(AppTheme.Typography.body)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
+                        .textInputAutocapitalization(.words)
+                    // The same marker this account will carry on every
+                    // screen it ever appears on, shown at the moment the
+                    // user names it rather than as a surprise afterwards.
+                    if kind == .investment {
+                        InvestmentBadge()
+                    }
+                }
+                .padding(.horizontal, AppTheme.Spacing.m)
+                .frame(minHeight: AppTheme.Size.touchTarget)
+
+                Divider()
+                    .padding(.leading, AppTheme.Spacing.m)
+
+                // `onPickCurrency` replaces the sentence that used to sit
+                // under this figure explaining that the account could be in
+                // another currency. The capability was worth keeping and
+                // the paragraph was not: the code chip beside the number is
+                // the same offer in the place the answer belongs.
+                AmountField(
+                    text: $balanceText,
+                    currency: selectedCurrencyInfo,
+                    onPickCurrency: currencies.isEmpty ? nil : { isPickingCurrency = true },
+                    size: AppTheme.Typography.Number.balance
+                )
+                .padding(AppTheme.Spacing.m)
+            }
+            .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
+
+            starterChips
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// The shapes almost every first account actually is. They fill in a
+    /// name and an icon and nothing else — the user is still looking at an
+    /// editable field, so a chip is a head start rather than a decision
+    /// made for them.
     private var starterChips: some View {
         ScrollView(.horizontal) {
             HStack(spacing: AppTheme.Spacing.s) {
-                ForEach(StarterAccount.all(for: kind), id: \.name) { starter in
+                ForEach(StarterAccount.all(for: kind ?? .regular), id: \.name) { starter in
                     Button {
                         name = starter.name
                         icon = starter.icon
@@ -123,51 +183,6 @@ struct SetupAccountStep: View {
         .scrollClipDisabled()
     }
 
-    private var identityRow: some View {
-        HStack(spacing: AppTheme.Spacing.l) {
-            IconPickerButton(icon: icon, color: color, diameter: AppTheme.Size.illustration) {
-                isPickingIcon = true
-            }
-            TextField("Account name", text: $name)
-                .font(AppTheme.Typography.body)
-                .textInputAutocapitalization(.words)
-                .padding(AppTheme.Spacing.m)
-                .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
-        }
-    }
-
-    private var balanceBlock: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            AmountField(
-                text: $balanceText, currency: selectedCurrencyInfo, size: AppTheme.Typography.Number.balance
-            )
-            Text("What's in it right now. Every balance from here is this figure plus everything you log after it.")
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            // Quiet, and offered rather than asked: most first accounts are
-            // in the base currency, but the feature deck sells multi-
-            // currency two screens earlier, and an expat whose salary lands
-            // in another currency should not have to finish setup wrong and
-            // fix it afterwards.
-            Button {
-                isPickingCurrency = true
-            } label: {
-                // Only the verb carries the accent. A whole amber sentence
-                // reads as something being wrong, and nothing is — this is
-                // an answer most accounts never need.
-                Text("This account is in \(currency). ")
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    + Text("Change")
-                    .foregroundStyle(AppTheme.Palette.brandPrimary)
-            }
-            .font(AppTheme.Typography.caption)
-            .buttonStyle(.plain)
-            .disabled(currencies.isEmpty)
-        }
-    }
-
     // MARK: - State
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -177,7 +192,7 @@ struct SetupAccountStep: View {
     }
 
     private var isComplete: Bool {
-        !trimmedName.isEmpty && balanceE4 != nil && !currency.isEmpty
+        kind != nil && !trimmedName.isEmpty && balanceE4 != nil && !currency.isEmpty
     }
 
     private var selectedCurrencyInfo: CurrencyInfo? {
@@ -185,12 +200,16 @@ struct SetupAccountStep: View {
         return CurrencyInfo(code: match.code, minorUnit: Int(match.minorUnit))
     }
 
-    private func adoptDefaultIcon(for newKind: PublicSchema.AccountKind) {
-        guard !hasChosenIcon else { return }
-        icon = AccountAppearance.defaultIcon(forKind: newKind)
-        // `onChange(of: icon)` fires for that assignment too, so the flag
-        // has to be put back — the pick was this function's, not the user's.
-        hasChosenIcon = false
+    /// Back out of the form to the type cards first, and only then out of
+    /// the step. Changing your mind about the kind is the likeliest reason
+    /// to press Back here, and sending the user two screens away to do it
+    /// would be answering a smaller question with a bigger undo.
+    private func back() {
+        if kind != nil {
+            kind = nil
+        } else {
+            store.goBack()
+        }
     }
 
     private func restore() {
@@ -210,7 +229,7 @@ struct SetupAccountStep: View {
     }
 
     private func next() {
-        guard let balanceE4, !currency.isEmpty else { return }
+        guard let kind, let balanceE4, !currency.isEmpty else { return }
         store.update {
             $0.account = DraftAccount(
                 id: accountId, name: trimmedName, kind: kind, currency: currency,

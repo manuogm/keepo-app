@@ -30,35 +30,45 @@ struct SetupProfileStep: View {
 
     var body: some View {
         OnboardingScaffold(
-            title: "Your profile",
-            subtitle: "The name Keepo greets you with. Both this and your photo are editable any time.",
+            title: "Set up your profile",
             step: .profile,
             onSkip: skip,
             isPrimaryEnabled: true,
             onPrimary: next
         ) {
             VStack(spacing: AppTheme.Spacing.xl) {
+                // Hero-sized, because this screen holds two things and one
+                // of them is a text field. At `Size.illustration` the disc
+                // read as a list-row avatar that had wandered onto an empty
+                // screen; at `avatarHero` it is the subject, and the camera
+                // badge scales with it rather than staying a corner speck.
                 AvatarButton(
                     name: trimmedName.isEmpty ? nil : trimmedName,
                     email: session.userEmail,
-                    image: image
+                    image: image,
+                    size: AppTheme.Size.avatarHero
                 ) {
                     isEditingName = false
                     isPickingAvatar = true
                 }
 
+                // **No background, centred, and set at `sectionTitle`.** A
+                // filled rounded rect around a single field made the screen
+                // look like a form with one row missing. Without it the name
+                // reads as the name — the thing being written, sitting under
+                // the face it belongs to — and the placeholder is the only
+                // affordance the field needs when it is the sole control on
+                // screen.
                 TextField("Your name", text: $name)
-                    .font(AppTheme.Typography.body)
+                    .font(AppTheme.Typography.sectionTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                    .multilineTextAlignment(.center)
                     .textContentType(.givenName)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .submitLabel(.continue)
                     .focused($isEditingName)
                     .onSubmit(next)
-                    .padding(AppTheme.Spacing.m)
-                    .background(
-                        AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control)
-                    )
                     .onChange(of: name) { _, typed in
                         guard typed.count > Self.nameLimit else { return }
                         name = String(typed.prefix(Self.nameLimit))

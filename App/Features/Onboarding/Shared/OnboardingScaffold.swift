@@ -26,6 +26,13 @@ struct OnboardingScaffold<Content: View>: View {
     /// something it genuinely still needs.
     var primaryTitle = "Next"
     var isPrimaryEnabled = true
+    /// Hidden on the steps that own their own forward action: the account
+    /// step's type choice (picking a card *is* the action), the category
+    /// grid (whose Next scrolls with the content), and the capture intro
+    /// (which offers two choices rather than one). A bar holding a
+    /// permanently disabled button is worse than no bar — it reads as a
+    /// control the user has somehow failed to satisfy.
+    var isPrimaryVisible = true
     let onPrimary: () -> Void
     @ViewBuilder var content: Content
 
@@ -98,21 +105,25 @@ struct OnboardingScaffold<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Next bottom-right, Back bottom-left, as the brief specifies. Back is
-    /// *also* in the chrome — the same action in both places is not a
-    /// mistake here: the top one is where a user coming from the previous
-    /// screen expects it, the bottom one is where their thumb already is.
+    /// **Next, and nothing else.** This bar used to carry a second Back
+    /// beside it, on the argument that the chevron is where a user expects
+    /// the way back and the bottom-left is where their thumb already is.
+    /// Both halves of that are true and it was still wrong: two controls
+    /// performing the identical action on one screen read as two different
+    /// actions, and on a six-screen flow the question "what does the other
+    /// one do?" gets asked once and costs more than the reach ever saved.
+    /// The chevron in `OnboardingChrome` is the only way back.
+    @ViewBuilder
     private var bottomBar: some View {
-        HStack {
-            if let onBack {
-                OnboardingSecondaryButton(title: "Back", action: onBack)
+        if isPrimaryVisible {
+            HStack {
+                Spacer(minLength: 0)
+                OnboardingPrimaryButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: onPrimary)
             }
-            Spacer(minLength: 0)
-            OnboardingPrimaryButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: onPrimary)
+            .padding(.horizontal, AppTheme.Spacing.l)
+            .padding(.top, AppTheme.Spacing.m)
+            .padding(.bottom, AppTheme.Spacing.s)
         }
-        .padding(.horizontal, AppTheme.Spacing.l)
-        .padding(.top, AppTheme.Spacing.m)
-        .padding(.bottom, AppTheme.Spacing.s)
     }
 }
 
