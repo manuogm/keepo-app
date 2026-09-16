@@ -14,25 +14,26 @@ import SwiftUI
 /// of a widget teaches them nothing a name does not, and it cost the whole
 /// screen to say it. A pill per widget asks the question at its actual size.
 ///
-/// **Order is the hierarchy, and Keepo may still overrule it.**
-/// `DashboardStore.replace(kinds:)` appends in this order and
-/// `DashboardArrangement.append` puts each tile in the first free slot in
-/// reading order — so a half-width widget will happily slide up beside an
-/// earlier one rather than leave a hole in the grid. A complete dashboard
-/// beats a literal reading of the order.
+/// **The order is not the user's to set, and it should not have been.**
+/// This step used to collect a sequence — tap order was layout order, with
+/// a number on every chosen pill and drag-to-reorder between them. It asked
+/// somebody who has never seen the dashboard to make a decision about it,
+/// and it let them produce a grid with a hole in the middle. Now they
+/// choose a set and `OnboardingDashboardPlan` arranges it at the commit,
+/// which is the only place that has the finished selection to work from.
 ///
-/// That is deliberately **not** explained on screen. A line warning that
-/// the order might not be honoured spends the user's attention on a
-/// discrepancy most of them will never notice — the packer only reorders
-/// when the alternative is a visible gap — and the dashboard is drag-
-/// rearrangeable the moment they reach it.
+/// Three groups rather than two. **Unavailable is its own section**, not a
+/// dimmed pill among the available ones: a widget that cannot draw anything
+/// yet is a different kind of thing from one the user has simply not picked,
+/// and mixing them made the Available list look like it contained broken
+/// entries.
 struct SetupDashboardStep: View {
     let store: OnboardingDraftStore
 
     var body: some View {
         OnboardingScaffold(
             title: "Build your dashboard",
-            subtitle: "Pick what you want to see. Drag to set the order.",
+            subtitle: "Pick what you want to see.",
             step: .dashboard,
             onBack: store.goBack,
             onSkip: skip,
@@ -42,6 +43,7 @@ struct SetupDashboardStep: View {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
                 chosenSection
                 availableSection
+                unavailableSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .sensoryFeedback(AppTheme.Feedback.selection, trigger: store.draft.selectedMetrics)
@@ -70,41 +72,23 @@ struct SetupDashboardStep: View {
             } else {
                 TagFlowLayout(spacing: AppTheme.Spacing.s) {
                     ForEach(chosen, id: \.self) { kind in
-                        chosenPill(kind)
+                        pill(kind.title, isSelected: true)
+                            .onTapGesture { toggle(kind) }
+                            .accessibilityLabel(kind.title)
+                            .accessibilityAddTraits(.isSelected)
+                            .accessibilityHint("Double tap to remove")
                     }
                 }
             }
         }
     }
 
-    /// Carries its position rather than a tick: the number *is* the second
-    /// decision this screen collects, and a checkmark would throw it away.
-    private func chosenPill(_ kind: DashboardWidgetKind) -> some View {
-        let position = (chosen.firstIndex(of: kind) ?? 0) + 1
-        return pill(kind.title, position: position, isSelected: true)
-            .onTapGesture { toggle(kind) }
-            // The raw value, because it is already the stable identity this
-            // enum persists under — inventing a Transferable wrapper for a
-            // string that crosses four points of screen would be machinery
-            // for its own sake.
-            .draggable(kind.rawValue) {
-                pill(kind.title, position: position, isSelected: true)
-            }
-            .dropDestination(for: String.self) { items, _ in
-                guard let raw = items.first, let moved = DashboardWidgetKind(rawValue: raw) else { return false }
-                move(moved, before: kind)
-                return true
-            }
-            .accessibilityLabel(kind.title)
-            .accessibilityValue("Position \(position)")
-            .accessibilityAddTraits(.isSelected)
-            .accessibilityHint("Double tap to remove")
-    }
-
     // MARK: - Available
 
     private var available: [DashboardWidgetKind] {
-        DashboardWidgetKind.allCases.filter { !chosen.contains($0) }
+        DashboardWidgetKind.allCases.filter {
+            !chosen.contains($0) && capabilities.unavailability(for: $0) == nil
+        }
     }
 
     @ViewBuilder
@@ -117,45 +101,56 @@ struct SetupDashboardStep: View {
 
                 TagFlowLayout(spacing: AppTheme.Spacing.s) {
                     ForEach(available, id: \.self) { kind in
-                        availablePill(kind)
+                        pill(kind.title, isSelected: false)
+                            .onTapGesture { toggle(kind) }
+                            .accessibilityLabel(kind.title)
+                            .accessibilityHint("Double tap to add")
                     }
                 }
             }
         }
     }
 
-    /// A widget with nothing to draw is shown and disabled rather than
-    /// hidden. Hiding it makes the catalogue look shorter than it is and
-    /// leaves the user wondering where a feature went; showing it with its
-    /// reason answers the question before it is asked.
-    private func availablePill(_ kind: DashboardWidgetKind) -> some View {
-        let reason = capabilities.unavailability(for: kind)
-        return pill(kind.title, reason: reason, position: nil, isSelected: false)
-            .opacity(reason == nil ? 1 : AppTheme.Opacity.dim)
-            .onTapGesture { if reason == nil { toggle(kind) } }
-            .accessibilityLabel(kind.title)
-            .accessibilityHint(reason ?? "Double tap to add")
+    // MARK: - Unavailable
+
+    private var unavailable: [(kind: DashboardWidgetKind, reason: String)] {
+        DashboardWidgetKind.allCases.compactMap { kind in
+            capabilities.unavailability(for: kind).map { (kind, $0) }
+        }
+    }
+
+    /// Shown, never hidden. Hiding a widget that cannot draw anything yet
+    /// makes the catalogue look shorter than it is and leaves the user
+    /// wondering where a feature went; naming it with its reason answers the
+    /// question before it is asked, and tells them what to do if they want
+    /// it — add an investment account, add one in another currency.
+    @ViewBuilder
+    private var unavailableSection: some View {
+        if !unavailable.isEmpty {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
+                Text("Not yet")
+                    .font(AppTheme.Typography.rowTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
+
+                TagFlowLayout(spacing: AppTheme.Spacing.s) {
+                    ForEach(unavailable, id: \.kind) { entry in
+                        pill(entry.kind.title, reason: entry.reason, isSelected: false)
+                            .opacity(AppTheme.Opacity.dim)
+                            .accessibilityLabel(entry.kind.title)
+                            .accessibilityHint(entry.reason)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - The pill itself
 
-    private func pill(
-        _ title: String, reason: String? = nil, position: Int?, isSelected: Bool
-    ) -> some View {
+    private func pill(_ title: String, reason: String? = nil, isSelected: Bool) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
-            HStack(spacing: AppTheme.Spacing.xs) {
-                if let position {
-                    Text(verbatim: "\(position)")
-                        .font(AppTheme.Typography.captionEmphasis)
-                        .monospacedDigit()
-                        .foregroundStyle(AppTheme.Palette.textOnAccent)
-                        .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.glyph)
-                        .background(AppTheme.Palette.brandPrimary, in: Circle())
-                }
-                Text(title)
-                    .font(AppTheme.Typography.label)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-            }
+            Text(title)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
             if let reason {
                 Text(reason)
                     .font(AppTheme.Typography.nano)
@@ -195,28 +190,18 @@ struct SetupDashboardStep: View {
         store.update { $0.selectedMetrics = kept }
     }
 
+    /// Still an array rather than a set, because `OnboardingDraft` persists
+    /// it and an array's order is stable across encode/decode. Nothing reads
+    /// that order any more — `OnboardingDashboardPlan` re-derives its own
+    /// from the catalogue — so two users who pick the same widgets get the
+    /// same dashboard whatever sequence they tapped them in.
     private func toggle(_ kind: DashboardWidgetKind) {
         store.update { draft in
             if let index = draft.selectedMetrics.firstIndex(of: kind) {
-                // Removing renumbers everything after it, which is the
-                // point of showing positions rather than ticks.
                 draft.selectedMetrics.remove(at: index)
             } else {
                 draft.selectedMetrics.append(kind)
             }
-        }
-    }
-
-    /// Insert-before rather than swap. A swap moves two things when the user
-    /// dragged one, which is exactly the behaviour that makes reordering
-    /// feel like it is fighting back.
-    private func move(_ moved: DashboardWidgetKind, before target: DashboardWidgetKind) {
-        guard moved != target else { return }
-        store.update { draft in
-            guard let from = draft.selectedMetrics.firstIndex(of: moved) else { return }
-            draft.selectedMetrics.remove(at: from)
-            let destination = draft.selectedMetrics.firstIndex(of: target) ?? draft.selectedMetrics.count
-            draft.selectedMetrics.insert(moved, at: destination)
         }
     }
 

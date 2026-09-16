@@ -44,7 +44,13 @@ struct SetupCommitPlan {
             avatarJPEG: draft.avatarJPEG,
             account: accountPayload(from: draft.account, ownerId: userId),
             categories: categoryPayloads(for: draft.selectedCategories, ownerId: userId),
-            widgets: deduplicated(draft.selectedMetrics)
+            // **Arranged here, not on the step.** The user chooses a set;
+            // `OnboardingDashboardPlan` decides the order that packs
+            // without leaving a hole in the grid. Doing it at the commit
+            // rather than as they tap means the draft keeps what they
+            // actually chose, and the layout is one decision made once from
+            // the finished selection.
+            widgets: OnboardingDashboardPlan.arrange(deduplicated(draft.selectedMetrics))
         )
     }
 

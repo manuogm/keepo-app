@@ -73,6 +73,19 @@ struct SetupProfileStep: View {
                         guard typed.count > Self.nameLimit else { return }
                         name = String(typed.prefix(Self.nameLimit))
                     }
+                    // **The one thing lost with the fill.** Without a
+                    // background the name reads as a label that happens to
+                    // be there, and a filled name looks identical to a
+                    // heading — so the field needs to say "field" some
+                    // other way. A rule under it is the oldest answer there
+                    // is, and the only one that does not put a second
+                    // control beside a centred single line of text.
+                    .overlay(alignment: .bottom) {
+                        Capsule()
+                            .fill(AppTheme.Palette.textSecondary.opacity(AppTheme.Opacity.fillStrong))
+                            .frame(width: AppTheme.Size.proseWidth, height: 1)
+                            .offset(y: AppTheme.Spacing.s)
+                    }
             }
             .frame(maxWidth: .infinity)
         }

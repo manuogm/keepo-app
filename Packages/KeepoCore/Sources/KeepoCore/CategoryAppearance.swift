@@ -47,9 +47,25 @@ public enum CategoryAppearance {
     /// Public because it is also the swatch row `IconCatalogView` offers —
     /// the colours a new category is assigned and the colours a user can
     /// pick must be the same set, not two lists that drift.
+    ///
+    /// **Twenty-four, in two bands.** The first twelve are the originals and
+    /// stay first, so every existing category keeps its colour and the
+    /// swatch row opens on the same familiar set. The second twelve are
+    /// deeper variants of the same hues, added because the default
+    /// catalogue grew to twenty-three categories and a twelve-colour
+    /// palette cannot give twenty-three of anything a colour of its own —
+    /// seven pairs were sharing one, and in a grid that is scanned rather
+    /// than read, two identical discs are read as the same thing twice.
+    ///
+    /// Deeper rather than more hues on purpose: there are only so many
+    /// distinguishable hues, and a second one of each at a different weight
+    /// separates cleanly where a twenty-fourth hue would have sat between
+    /// two neighbours and muddied both.
     public static let palette = [
         "#FF3B30", "#FF9500", "#FFCC00", "#34C759", "#00C7BE", "#30B0C7",
-        "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#A2845E", "#8E8E93"
+        "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#A2845E", "#8E8E93",
+        "#922B21", "#7E5109", "#B7950B", "#1D8348", "#117864", "#5D6D7E",
+        "#1A5276", "#4A235A", "#6C3483", "#FF6FB5", "#C98A3C", "#5AC8FA"
     ]
 
     public static func randomColor() -> String {

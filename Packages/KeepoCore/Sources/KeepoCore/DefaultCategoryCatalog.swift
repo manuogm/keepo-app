@@ -33,21 +33,40 @@ public enum DefaultCategoryCatalog {
         .init(key: .travel, name: "Travel", kind: .expense, icon: "airplane", color: "#30B0C7"),
         .init(key: .subscriptions, name: "Subscriptions", kind: .expense, icon: "repeat", color: "#00C7BE"),
         .init(key: .fitness, name: "Fitness", kind: .expense, icon: "figure.run", color: "#FF3B30"),
-        .init(key: .education, name: "Education", kind: .expense, icon: "book.fill", color: "#007AFF"),
-        .init(key: .gifts, name: "Gifts", kind: .expense, icon: "gift.fill", color: "#FF2D55"),
-        .init(key: .pets, name: "Pets", kind: .expense, icon: "pawprint.fill", color: "#A2845E")
+        .init(key: .education, name: "Education", kind: .expense, icon: "book.fill", color: "#5AC8FA"),
+        .init(key: .gifts, name: "Gifts", kind: .expense, icon: "gift.fill", color: "#FF6FB5"),
+        .init(key: .pets, name: "Pets", kind: .expense, icon: "pawprint.fill", color: "#C98A3C")
     ]
 
-    /// Six. Income has fewer genuinely common shapes than expense does, and
-    /// a list padded to match would be offering guesses.
+    /// Nine, and a deliberately **darker** band than the expense list.
+    ///
+    /// No two categories anywhere in this catalogue share a colour any
+    /// more. They used to: Transport and Education were both `#007AFF`,
+    /// Housing and Pets and Rental were all `#A2845E`, and six of the seven
+    /// original income rows simply borrowed an expense colour. In a grid
+    /// scanned rather than read, two identical discs are read as the same
+    /// thing twice — and the colour is the only part of a tile the eye uses
+    /// at that speed.
+    ///
+    /// Income taking the deeper end of each hue is what makes twenty-three
+    /// distinct colours possible without any pair sitting close: the two
+    /// groups are never on screen at the same moment as peers, so they can
+    /// occupy the same hues at different weights.
     public static let income: [DefaultCategory] = [
-        .init(key: .salary, name: "Salary", kind: .income, icon: "banknote.fill", color: "#34C759"),
-        .init(key: .freelance, name: "Freelance", kind: .income, icon: "briefcase.fill", color: "#007AFF"),
+        .init(key: .salary, name: "Salary", kind: .income, icon: "banknote.fill", color: "#1D8348"),
+        .init(key: .freelance, name: "Freelance", kind: .income, icon: "briefcase.fill", color: "#1A5276"),
         .init(key: .investments, name: "Investments", kind: .income, icon: "chart.line.uptrend.xyaxis",
-              color: "#5856D6"),
-        .init(key: .rental, name: "Rental", kind: .income, icon: "house.fill", color: "#A2845E"),
-        .init(key: .refunds, name: "Refunds", kind: .income, icon: "arrow.uturn.left.circle.fill", color: "#30B0C7"),
-        .init(key: .bonus, name: "Bonus", kind: .income, icon: "star.fill", color: "#FFCC00")
+              color: "#6C3483"),
+        .init(key: .rental, name: "Rental", kind: .income, icon: "house.fill", color: "#7E5109"),
+        .init(key: .refunds, name: "Refunds", kind: .income, icon: "arrow.uturn.left.circle.fill", color: "#117864"),
+        .init(key: .bonus, name: "Bonus", kind: .income, icon: "star.fill", color: "#B7950B"),
+        // Money arriving as a present, which is a different thing from the
+        // expense row of the same name and needs its own key — the two are
+        // opposite signs and can both exist on one account.
+        .init(key: .giftsReceived, name: "Gifts", kind: .income, icon: "gift.fill", color: "#922B21"),
+        .init(key: .interest, name: "Interest", kind: .income, icon: "percent", color: "#5D6D7E"),
+        .init(key: .pension, name: "Pension", kind: .income, icon: "figure.and.child.holdinghands",
+              color: "#4A235A")
     ]
 
     /// What the step starts with selected. Everything else is one tap away,
@@ -70,6 +89,10 @@ public enum DefaultCategoryKey: String, Codable, Sendable, CaseIterable, Hashabl
     case groceries, diningOut, transport, housing, utilities, health, shopping
     case entertainment, travel, subscriptions, fitness, education, gifts, pets
     case salary, freelance, investments, rental, refunds, bonus
+    // Added after the catalogue shipped. Cases are only ever appended: a
+    // draft persisted mid-onboarding decodes this list by raw value, so
+    // removing or renaming one would strand a half-finished setup.
+    case giftsReceived, interest, pension
 }
 
 public struct DefaultCategory: Sendable, Equatable, Identifiable, Codable {

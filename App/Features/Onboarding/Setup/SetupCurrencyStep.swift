@@ -24,7 +24,7 @@ struct SetupCurrencyStep: View {
     var body: some View {
         OnboardingScaffold(
             title: "Choose your base currency",
-            subtitle: "Every balance gets converted to it. Don't worry, it can be changed anytime",
+            subtitle: "Every balance converts to it — changeable any time.",
             step: .currency,
             onBack: store.goBack,
             isPrimaryEnabled: !code.isEmpty,

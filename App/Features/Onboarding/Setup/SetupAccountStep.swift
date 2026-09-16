@@ -58,6 +58,11 @@ struct SetupAccountStep: View {
             onBack: back,
             isPrimaryEnabled: isComplete,
             isPrimaryVisible: kind != nil,
+            // The type cards are the whole of their stage, so they are
+            // centred on the screen rather than in the space left under the
+            // heading — which put them visibly low, with the heading's own
+            // height as the offset.
+            centersContentOnScreen: kind == nil,
             onPrimary: next
         ) {
             if kind == nil {
@@ -70,8 +75,11 @@ struct SetupAccountStep: View {
         .sheet(isPresented: $isPickingIcon) {
             IconCatalogView(icon: $icon, color: $color)
         }
+        // The wheel, not the searchable list. Picking a currency is the
+        // same act here as it is in My Profile, and two different controls
+        // for it was the drift `CurrencyWheel` exists to prevent.
         .sheet(isPresented: $isPickingCurrency) {
-            CurrencyPickerSheet(currencies: currencies, selection: $currency, title: "Account currency")
+            BaseCurrencySheet(currencies: currencies, selection: $currency)
         }
         .onChange(of: icon) { _, _ in hasChosenIcon = true }
         .task { restore() }
@@ -83,7 +91,9 @@ struct SetupAccountStep: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
             Text("Choose an account type")
                 .font(AppTheme.Typography.bodyEmphasis)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
+                // Secondary: it is a prompt for the two cards under it, not
+                // a second title competing with the one above.
+                .foregroundStyle(AppTheme.Palette.textSecondary)
 
             AccountKindPicker(onSelect: choose(_:))
         }
@@ -111,7 +121,7 @@ struct SetupAccountStep: View {
     /// happen to be stacked.
     private var accountForm: some View {
         VStack(spacing: AppTheme.Spacing.xl) {
-            IconPickerButton(icon: icon, color: color, diameter: AppTheme.Size.illustration) {
+            IconPickerButton(icon: icon, color: color, diameter: AppTheme.Size.avatarHero) {
                 isPickingIcon = true
             }
 
@@ -143,6 +153,7 @@ struct SetupAccountStep: View {
                     text: $balanceText,
                     currency: selectedCurrencyInfo,
                     onPickCurrency: currencies.isEmpty ? nil : { isPickingCurrency = true },
+                    showsCalculator: false,
                     size: AppTheme.Typography.Number.balance
                 )
                 .padding(AppTheme.Spacing.m)

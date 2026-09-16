@@ -38,7 +38,13 @@ struct CategoryTile: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, AppTheme.Spacing.s)
+        // Taller than the content needs, to bring the tile closer to square.
+        // At `s` it was a wide, flat strip — which reads as a table row, and
+        // this grid is meant to read as a set of things to pick. Stopped at
+        // `l` rather than the ~24 an exactly square tile wants: twenty-three
+        // categories at that height add a third again to an already long
+        // scroll, and the shape is the point rather than the arithmetic.
+        .padding(.vertical, AppTheme.Spacing.l)
         .background(tileFill, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
         .animation(AppTheme.Motion.quick, value: isSelected)
     }

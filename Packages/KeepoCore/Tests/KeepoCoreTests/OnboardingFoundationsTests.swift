@@ -104,7 +104,7 @@ struct DefaultCategoryCatalogTests {
         #expect(DefaultCategoryCatalog.expenses.allSatisfy { $0.kind == .expense })
         #expect(DefaultCategoryCatalog.income.allSatisfy { $0.kind == .income })
         #expect(DefaultCategoryCatalog.expenses.count == 14)
-        #expect(DefaultCategoryCatalog.income.count == 6)
+        #expect(DefaultCategoryCatalog.income.count == 9)
     }
 
     @Test("everything preselected is really in the catalogue")

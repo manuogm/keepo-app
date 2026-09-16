@@ -37,6 +37,12 @@ struct AmountField: View {
     /// nothing else — which is why this is opt-in rather than a flag to
     /// turn off.
     var onPickCurrency: (() -> Void)?
+    /// Off on onboarding's first-account step. The calculator is a
+    /// convenience for an amount that needs working out, and an opening
+    /// balance is a number the user reads off their bank — a second control
+    /// beside the figure there is one more thing to explain on the one
+    /// screen that cannot be skipped.
+    var showsCalculator = true
     /// Point size of the whole part, from `AppTheme.Typography.Number`. The
     /// fraction and the symbol derive from it, so a caller only ever picks
     /// one number.
@@ -93,7 +99,9 @@ struct AmountField: View {
                 currencyChip(code: currency.code, action: onPickCurrency)
             }
             if isEnabled {
-                calculatorButton
+                if showsCalculator {
+                    calculatorButton
+                }
             }
         }
         .foregroundStyle(isEnabled ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
@@ -146,6 +154,11 @@ struct AmountField: View {
     private func currencyChip(code: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: AppTheme.Spacing.xxs) {
+                // The same disc every other currency control in the app
+                // draws, at chip size. A three-letter code is the thing you
+                // read *after* recognising the flag, and the chip carried
+                // only the code.
+                CurrencyBadge(code: code, diameter: AppTheme.Size.glyphSmall, showsCode: false)
                 Text(code)
                     .font(AppTheme.Typography.captionEmphasis)
                 Image(systemName: "chevron.up.chevron.down")

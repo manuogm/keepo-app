@@ -49,20 +49,28 @@ struct IconPickerButton: View {
         Button(action: action) {
             CategoryIconView(icon: icon, color: color, diameter: diameter)
                 .overlay(alignment: .bottomTrailing) {
-                    KeepoIcon(name: "icon-edit", size: AppTheme.Size.glyphSmall)
+                    KeepoIcon(name: "icon-edit", size: badgeDiameter / 2)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
-                        .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                        .frame(width: badgeDiameter, height: badgeDiameter)
                         .background(AppTheme.Palette.bgSurface, in: Circle())
                         .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
                         // Nudged out along the diagonal so the badge rides the
                         // circle's rim instead of sitting on top of the chosen
                         // glyph.
-                        .offset(x: 8, y: 8)
+                        .offset(x: badgeDiameter / 4, y: badgeDiameter / 4)
                 }
         }
         .buttonStyle(.pressableCard)
         .accessibilityLabel("Change icon and colour")
     }
+
+    /// **`max`, not a bare ratio.** The badge has to grow with a hero-sized
+    /// well — onboarding's first account draws this at `Size.avatarHero`,
+    /// where a fixed 32pt disc reads as a speck — without shrinking or
+    /// nudging the badge on every form that already uses the 88pt default.
+    /// At that default the ratio lands just under `Size.icon`, so the floor
+    /// is what every existing caller keeps drawing.
+    private var badgeDiameter: CGFloat { max(AppTheme.Size.icon, diameter * 0.36) }
 }
 
 /// The "shared with your household" marker. One component so the Accounts

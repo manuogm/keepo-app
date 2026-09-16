@@ -33,6 +33,19 @@ struct OnboardingScaffold<Content: View>: View {
     /// permanently disabled button is worse than no bar — it reads as a
     /// control the user has somehow failed to satisfy.
     var isPrimaryVisible = true
+    /// Centres the content in the **whole** screen rather than in the space
+    /// left under the heading, by drawing the heading over the top of it
+    /// instead of above it.
+    ///
+    /// The default is right for a step whose content is a form or a list:
+    /// it belongs under the words that introduce it. It is wrong for a step
+    /// whose content *is* the screen — the account step's two type cards —
+    /// where centring below a two-line heading put them a heading's height
+    /// too low and left the bottom of the screen conspicuously empty.
+    ///
+    /// Only for content short enough that it cannot reach the heading. A
+    /// tall block would draw straight through it.
+    var centersContentOnScreen = false
     let onPrimary: () -> Void
     @ViewBuilder var content: Content
 
@@ -54,12 +67,18 @@ struct OnboardingScaffold<Content: View>: View {
                 // nothing and this is an ordinary scroll view again.
                 GeometryReader { proxy in
                     ScrollView {
-                        VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
-                            heading
-                            Spacer(minLength: 0)
-                            content
-                            Spacer(minLength: 0)
-                        }
+                        // **`spacing: 0`, with the gap carried by the top
+                        // spacer's `minLength`.** A `VStack(spacing: xxl)`
+                        // puts a gap on *both* sides of each spacer, so on a
+                        // step whose content overflows — where the spacers
+                        // collapse to zero height and should therefore
+                        // disappear — the heading was still separated from
+                        // the content by two gaps rather than one. Visible on
+                        // the category grid and the dashboard as an
+                        // unexplained band of empty canvas under the
+                        // subtitle, and invisible in code because nothing
+                        // there says 32 twice.
+                        layout
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, AppTheme.Spacing.l)
                         .padding(.top, AppTheme.Spacing.xl)
@@ -74,6 +93,25 @@ struct OnboardingScaffold<Content: View>: View {
                 }
 
                 bottomBar
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var layout: some View {
+        if centersContentOnScreen {
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                content
+                Spacer(minLength: 0)
+            }
+            .overlay(alignment: .topLeading) { heading }
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                heading
+                Spacer(minLength: AppTheme.Spacing.xxl)
+                content
+                Spacer(minLength: 0)
             }
         }
     }
