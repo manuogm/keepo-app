@@ -57,9 +57,7 @@ struct ShortcutsWalkthroughView: View {
     /// of git and injects through the xcconfig. `try?` because a build with
     /// no configuration should still show a working button, not a dead one:
     /// that is exactly what the fallback is for.
-    private var installURL: URL? {
-        ShortcutsWalkthrough.installURL(functionsBaseURL: (try? SupabaseConfig.fromInfoPlist())?.url)
-    }
+    private var configuredURL: URL? { (try? SupabaseConfig.fromInfoPlist())?.url }
 
     /// The one tap that replaces what used to be the whole procedure. A
     /// failure to open drops straight to written instructions rather than
@@ -67,13 +65,13 @@ struct ShortcutsWalkthroughView: View {
     /// link* failure, not every failure.
     private var installButton: some View {
         Button {
-            guard let url = installURL, UIApplication.shared.canOpenURL(url) else {
-                isShowingManualFallback = true
-                onInstallFailed?()
-                return
-            }
-            UIApplication.shared.open(url) { opened in
-                if !opened {
+            Task {
+                // `ShortcutsInstaller` tries the direct import first and
+                // drops to this view's own `installURL` — the icloud.com
+                // page — on its own. Only the case where *neither* opened
+                // reaches here, which is still what the written
+                // instructions are for.
+                if await ShortcutsInstaller.install(functionsBaseURL: configuredURL) == .failed {
                     isShowingManualFallback = true
                     onInstallFailed?()
                 }

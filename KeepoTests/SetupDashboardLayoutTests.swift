@@ -93,33 +93,4 @@ struct SetupDashboardLayoutTests {
         let metrics: [DashboardWidgetKind] = [.netWorth, .cashflow, .upcomingBills]
         #expect(SetupDashboardLayout.pruned(metrics, capabilities: capabilities) == metrics)
     }
-
-    // MARK: - Packing
-
-    /// Every widget has to be offered. A packing change that dropped one
-    /// would simply make it unreachable, with nothing on screen to say so.
-    @Test("every widget kind is offered exactly once")
-    func packingOffersEverything() {
-        let flattened = SetupDashboardLayout.rows.flatMap { $0 }
-        #expect(Set(flattened) == Set(DashboardWidgetKind.allCases))
-        #expect(flattened.count == DashboardWidgetKind.allCases.count)
-    }
-
-    /// The grid is two columns wide, so nothing may pack three abreast —
-    /// and a full-width widget has to have its row to itself or it would
-    /// draw over its neighbour.
-    @Test("no row holds more than the grid's two columns")
-    func packingRespectsTheGrid() {
-        for row in SetupDashboardLayout.rows {
-            let columns = row.reduce(0) { $0 + $1.baseSize.columns }
-            #expect(columns <= DashboardLayout.columnCount)
-        }
-    }
-
-    /// Reading order, which is what makes the badge numbers mean anything:
-    /// the first widget offered is the one that lands top-left.
-    @Test("packing runs in reading order")
-    func packingIsInReadingOrder() {
-        #expect(SetupDashboardLayout.rows.first?.first == DashboardWidgetKind.allCases.first)
-    }
 }

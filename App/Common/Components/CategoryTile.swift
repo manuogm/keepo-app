@@ -31,13 +31,6 @@ struct CategoryTile: View {
                 .frame(width: AppTheme.Size.touchTarget, height: AppTheme.Size.touchTarget)
                 .background(Color(hex: color))
                 .clipShape(Circle())
-                .overlay {
-                    if isSelected == true {
-                        Circle()
-                            .stroke(AppTheme.Palette.textPrimary, lineWidth: 2)
-                            .padding(-AppTheme.Spacing.xxs)
-                    }
-                }
             Text(name)
                 .font(AppTheme.Typography.caption)
                 .foregroundStyle(AppTheme.Palette.textPrimary)
@@ -46,7 +39,29 @@ struct CategoryTile: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, AppTheme.Spacing.s)
+        .background(tileFill, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
         .animation(AppTheme.Motion.quick, value: isSelected)
+    }
+}
+
+extension CategoryTile {
+    /// **The tile itself is the selected state**, not a ring around the
+    /// icon. A 2pt stroke on a 44pt circle is a detail you have to look for,
+    /// and this grid is scanned rather than read — across three columns and
+    /// twenty tiles the ring was genuinely hard to count.
+    ///
+    /// `nil` is the Categories tab, where a tile is a thing you open rather
+    /// than a thing you choose: it keeps the bare canvas it has always had,
+    /// so that screen does not inherit a surface it never asked for.
+    /// Everywhere the tile *is* a control it gets one — white while
+    /// unchosen, and a wash of the icon's own colour once it is, so the
+    /// selection is coloured by the thing selected.
+    fileprivate var tileFill: Color {
+        switch isSelected {
+        case .none: return .clear
+        case .some(true): return Color(hex: color).opacity(AppTheme.Opacity.fill)
+        case .some(false): return AppTheme.Palette.bgSurface
+        }
     }
 }
 

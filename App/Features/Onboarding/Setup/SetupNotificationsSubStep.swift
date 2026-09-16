@@ -26,7 +26,7 @@ struct SetupNotificationsSubStep: View {
 
     var body: some View {
         OnboardingScaffold(
-            title: "Purchases, without opening Keepo",
+            title: "Stay on top of your spending",
             subtitle: "A captured purchase arrives as a notification you can confirm or fix "
                 + "without opening the app.",
             step: .capture,

@@ -48,17 +48,21 @@ struct SetupCaptureTestSubStep: View {
     var body: some View {
         OnboardingScaffold(
             title: "Let's check it works",
-            subtitle: subtitle,
             step: .capture,
             onBack: onBack,
-            // The escape stays in the chrome, where every other step's is.
-            // It used to be the bottom-right button as well, which put
-            // "Skip the test" in the accent fill — giving the way *out* the
-            // weight of the action the screen exists for, directly beside
-            // the real one. One primary, and it is the test.
-            onSkip: onNext,
+            // **No Skip, and no subtitle.** The escape was here twice over
+            // — once in the chrome and once as the bottom-right button,
+            // which put "Skip the test" in the accent fill beside the real
+            // action. Both are gone: the way out of capture setup is the
+            // intro's "Set up later", which Back reaches in two taps, and a
+            // user who has already installed the shortcut is one tap from
+            // finding out whether it works. An escape offered at this point
+            // mostly produces half-built automations.
             primaryTitle: primaryTitle,
             isPrimaryEnabled: isPrimaryEnabled,
+            // Idle puts the action in the middle of the screen instead, as
+            // the only thing on it. See `idleBlock`.
+            isPrimaryVisible: phase != .idle,
             onPrimary: runPrimary
         ) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
@@ -100,31 +104,25 @@ struct SetupCaptureTestSubStep: View {
         }
     }
 
-    private var subtitle: String {
-        switch phase {
-        case .arrived:
-            // Both halves true, and the second one is the honest limit of
-            // what any in-app test can claim.
-            return "Keepo received a test purchase. We'll confirm your automation itself the moment your "
-                + "first real tap-payment lands."
-        default:
-            return "Nothing is sent anywhere — the test purchase stays on this phone."
-        }
-    }
-
     // MARK: - Idle
 
+    /// **One button, in the middle, and nothing else.** This screen used to
+    /// carry a subtitle and a caption explaining what the test does and
+    /// reassuring that nothing leaves the phone — three blocks of prose in
+    /// front of a single unmistakable action. The title already says what
+    /// is about to happen; everything after it was delaying the tap it was
+    /// describing.
+    ///
+    /// The one case that still needs words is the one where the button
+    /// cannot work at all, because a dead control with no explanation is
+    /// the thing prose is actually for.
     @ViewBuilder
     private var idleBlock: some View {
         if CaptureTestSession.canRunShortcuts {
-            Label {
-                Text("Keepo runs the shortcut itself. If a purchase comes back, everything between "
-                     + "Shortcuts and Keepo is wired correctly.")
-            } icon: {
-                Image(systemName: "arrow.triangle.2.circlepath")
-            }
-            .font(AppTheme.Typography.caption)
-            .foregroundStyle(AppTheme.Palette.textSecondary)
+            OnboardingPrimaryButton(
+                title: primaryTitle, isEnabled: isPrimaryEnabled, fillsWidth: true, action: runPrimary
+            )
+            .frame(maxWidth: .infinity)
         } else {
             Text("The Shortcuts app isn't installed, so there's nothing to test against. "
                  + "Install it from the App Store and you can run this from Profile → My Automations.")

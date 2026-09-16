@@ -15,14 +15,8 @@ import SwiftUI
 /// renders, so there is one copy of these instructions in the app and
 /// re-recording the clips is the only cost when Shortcuts moves a button.
 struct SetupWalkthroughSubStep: View {
-    let store: OnboardingDraftStore
     let onNext: () -> Void
     let onBack: () -> Void
-    /// Skipping here skips the **whole** of step 4, not just this screen —
-    /// the test that follows has nothing to test if the shortcut was never
-    /// added, and offering it anyway would guarantee a failure the user
-    /// already told us to expect.
-    let onSkipStep: () -> Void
 
     var body: some View {
         OnboardingScaffold(
@@ -31,19 +25,10 @@ struct SetupWalkthroughSubStep: View {
                 + "app for a minute — Keepo picks up right here.",
             step: .capture,
             onBack: onBack,
-            onSkip: skip,
             primaryTitle: "I've done that",
             onPrimary: onNext
         ) {
             ShortcutsWalkthroughView()
         }
-    }
-
-    /// Skipping is genuinely fine and the copy says so elsewhere: capture
-    /// lives in Profile → My Automations, unchanged, and the rest of Keepo
-    /// works without it. Skipping past the walkthrough also skips the test,
-    /// which has nothing to test.
-    private func skip() {
-        onSkipStep()
     }
 }

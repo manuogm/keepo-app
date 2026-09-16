@@ -23,11 +23,29 @@ struct SetupAllSetView: View {
     let store: OnboardingDraftStore
 
     @State private var isFinishing = false
+    /// Flipped once, a beat after the screen appears, and it drives all
+    /// three of the celebration: the mark's pop, the burst, and the haptic.
+    /// One trigger rather than three keeps them in step — the haptic landing
+    /// a frame before the confetti is the difference between a celebration
+    /// and a glitch.
+    @State private var hasLanded = false
     @ScaledMetric(relativeTo: .largeTitle) private var typeScale: CGFloat = 1
+
+    /// A breath before it fires. The view appears while the previous screen
+    /// is still animating out, and a burst that starts during that
+    /// transition is a burst nobody sees the start of.
+    private static let celebrationDelay = Duration.milliseconds(250)
 
     var body: some View {
         ZStack {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
+
+            // Full-bleed and behind everything: the pieces start at the
+            // centre — where the mark is — and have to be free to travel
+            // past the safe area, or the burst stops in a rectangle that
+            // is visibly not the screen.
+            ConfettiBurst(isActive: hasLanded)
+                .ignoresSafeArea()
 
             VStack(spacing: AppTheme.Spacing.xxl) {
                 Spacer(minLength: 0)
@@ -38,6 +56,12 @@ struct SetupAllSetView: View {
                             AppTheme.Typography.Number.metric, weight: .regular, scale: typeScale
                         ))
                         .foregroundStyle(AppTheme.Palette.statusPositive)
+                        // Lands rather than appears. The spring overshoots
+                        // slightly, which is what makes it read as a stamp
+                        // coming down instead of an image fading in.
+                        .scaleEffect(hasLanded ? 1 : 0.5)
+                        .opacity(hasLanded ? 1 : 0)
+                        .animation(AppTheme.Motion.standard, value: hasLanded)
 
                     Text(greeting)
                         .font(AppTheme.Typography.Number.display(
@@ -45,22 +69,28 @@ struct SetupAllSetView: View {
                         ))
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                         .multilineTextAlignment(.center)
-
-                    Text(summary)
-                        .font(AppTheme.Typography.body)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: AppTheme.Size.proseWidth)
                 }
 
-                Spacer(minLength: 0)
-
+                // Centred with the mark rather than pinned to the bottom
+                // edge. There is nothing else on this screen and nothing
+                // left to answer, so a button held at arm's length from the
+                // only other thing present just looked stranded.
                 OnboardingPrimaryButton(title: "Go to my Keepo", isLoading: isFinishing, fillsWidth: true) {
                     Task { await finish() }
                 }
+
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, AppTheme.Spacing.l)
             .padding(.vertical, AppTheme.Spacing.xxl)
+        }
+        // Fires whether or not the confetti does: Reduce Motion suppresses
+        // the pieces, and a success the user cannot see is exactly when the
+        // one they can feel matters most.
+        .sensoryFeedback(AppTheme.Feedback.success, trigger: hasLanded)
+        .task {
+            try? await Task.sleep(for: Self.celebrationDelay)
+            hasLanded = true
         }
     }
 
@@ -73,25 +103,6 @@ struct SetupAllSetView: View {
             return "You're all set"
         }
         return "You're all set, \(name)"
-    }
-
-    /// Says what was actually built, from the draft — so it cannot promise
-    /// an account or categories a skipped step never created.
-    private var summary: String {
-        var built: [String] = []
-        if let account = store.draft.account, !account.name.trimmingCharacters(in: .whitespaces).isEmpty {
-            built.append(account.name)
-        }
-        let categories = store.draft.selectedCategories.count
-        if categories > 0 {
-            built.append("\(categories) categories")
-        }
-        let widgets = store.draft.selectedMetrics.count
-        if widgets > 0 {
-            built.append(widgets == 1 ? "1 widget" : "\(widgets) widgets")
-        }
-        guard !built.isEmpty else { return "Keepo is ready." }
-        return "\(ListFormatter.localizedString(byJoining: built)) — ready and waiting."
     }
 
     /// Clears the draft **before** the refresh, not after: the refresh is
