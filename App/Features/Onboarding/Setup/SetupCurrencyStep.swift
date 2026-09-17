@@ -31,6 +31,12 @@ struct SetupCurrencyStep: View {
             step: .currency,
             onBack: store.goBack,
             isPrimaryEnabled: !code.isEmpty,
+            // Under the heading, not floating below it. The shortcuts are a
+            // continuation of the question — three answers to "which one?" —
+            // and a band of empty canvas between the subtitle and the first
+            // of them read as the screen having two unrelated halves.
+            pinsContentToTop: true,
+            contentGap: AppTheme.Spacing.l,
             onPrimary: commitAndAdvance
         ) {
             // A spinner rather than an empty wheel over a dead button: on a

@@ -43,6 +43,20 @@ struct OnboardingScaffold<Content: View>: View {
     /// opens a band of empty canvas under the subtitle and pushes the first
     /// item down for no reason the user can see.
     var pinsContentToTop = false
+    /// **Every step that holds a text field must pin.** The floating layout
+    /// derives its spacers from the scroll viewport, and the viewport shrinks
+    /// when the keyboard opens — so the content re-centres inside it, and
+    /// `GeometryReader` publishes the new size a layout pass behind the
+    /// change that caused it. The re-centring therefore runs a beat late
+    /// while the keyboard slides on time, which on the account step read as
+    /// the figure and its currency chip arriving after the rest of the
+    /// screen had settled. Pinned, the trailing spacer absorbs the whole
+    /// change and the content does not move at all.
+    ///
+    /// Freezing the viewport instead (`ignoresSafeArea(.keyboard)`) fixes the
+    /// lag and is wrong: the profile step's name field then sits behind the
+    /// keyboard, because the re-centring is also what was lifting it clear.
+    ///
     /// The gap between the heading and the content. `xxl` is the brand's
     /// block separation and the right default; the steps that pin to the top
     /// generally want less, because the content is what the heading is

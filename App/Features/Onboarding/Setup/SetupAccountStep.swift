@@ -60,8 +60,10 @@ struct SetupAccountStep: View {
             isPrimaryVisible: kind != nil,
             // The cards belong under the question, not floating in the
             // middle distance below it. Centring them looked deliberate on
-            // paper and, on the device, simply looked low.
-            pinsContentToTop: kind == nil,
+            // paper and, on the device, simply looked low. The form pins for
+            // a second reason: it holds the keyboard, and floating content
+            // re-centres a beat behind it (`OnboardingScaffold.contentGap`).
+            pinsContentToTop: true,
             contentGap: AppTheme.Spacing.l,
             onPrimary: next
         ) {

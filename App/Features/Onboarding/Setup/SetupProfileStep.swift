@@ -34,6 +34,11 @@ struct SetupProfileStep: View {
             step: .profile,
             onSkip: skip,
             isPrimaryEnabled: true,
+            // Pinned because this screen has a keyboard — see
+            // `OnboardingScaffold.contentGap`. Floating, the avatar and the
+            // field re-centred every time the keyboard opened and closed,
+            // and arrived a beat after it.
+            pinsContentToTop: true,
             onPrimary: next
         ) {
             VStack(spacing: AppTheme.Spacing.xl) {
