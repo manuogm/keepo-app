@@ -95,13 +95,15 @@ struct BaseCurrencySheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft = ""
 
-    /// The wheel's own fixed 216pt, plus the inline title bar above it and a
-    /// little air either side. Written out rather than taken from
-    /// `AppTheme`: its scales size glyphs, gaps and corners, and a sheet
+    /// `CurrencyWheel`'s own height, plus the inline title bar above it and
+    /// a little air either side. The chrome is written out rather than taken
+    /// from `AppTheme`: its scales size glyphs, gaps and corners, and a sheet
     /// detent is none of those — inventing a token for one screen's height
     /// would put a number on the scale that nothing else could ever reach
-    /// for.
-    private static let sheetHeight: CGFloat = 320
+    /// for. The wheel's half is **asked for**, though, so adding a control
+    /// above the picker cannot leave this sheet clipping it.
+    private static let chromeHeight: CGFloat = 104
+    private static let sheetHeight: CGFloat = CurrencyWheel.height + chromeHeight
 
     var body: some View {
         NavigationStack {
@@ -110,9 +112,19 @@ struct BaseCurrencySheet: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     CurrencyWheel(currencies: currencies, selection: $draft, label: "Base Currency")
+                        // The picker runs full-bleed on its own; the two
+                        // controls above it are ordinary content and take the
+                        // screen edge. Applied by the caller because
+                        // onboarding's scaffold has already inset its content
+                        // by the same amount.
+                        .padding(.horizontal, AppTheme.Spacing.l)
                     Spacer(minLength: 0)
                 }
             }
+            // The search field's return key says Done, but a sheet this size
+            // is mostly keyboard once one is up, and a tap on what is left of
+            // it should be a way out.
+            .dismissesKeyboardOnTap()
             .navigationTitle("Base Currency")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -146,7 +158,9 @@ struct BaseCurrencySheet: View {
         // is a fixed 216pt however much room it has — at half a screen it
         // floated in an empty field, and the rows cannot be made taller to
         // fill one (`UIPickerView` sets its own row height, and SwiftUI
-        // exposes no way in).
+        // exposes no way in). The shortcuts and the search field above it are
+        // fixed for the same reason, which is why the whole block can be
+        // measured rather than guessed at.
         .presentationDetents([.height(Self.sheetHeight)])
         .presentationDragIndicator(.visible)
     }
