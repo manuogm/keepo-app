@@ -21,6 +21,17 @@
 // 302 to an `icloud.com/shortcuts/...` URL. Returning the URL for the app
 // to open itself would work, but only for the app — and the whole point is
 // that the link is also shareable.
+//
+// **This served a `?format=json` branch and no longer does.** It resolved
+// the signed `.shortcut` asset behind the share link, through the same
+// undocumented record API the icloud.com page calls, so the app could skip
+// the preview page with `shortcuts://import-shortcut`. That scheme checks
+// its `url` against an `icloud.com` host allowlist and rejects anything
+// else before it fetches — and every asset on the record is served from
+// `icloud-content.com`. There is no URL that satisfies both, so the branch
+// could never succeed and was removed rather than left looking optional.
+// The measurements are in `ShortcutsInstaller`; do not re-add this without
+// reading them.
 
 // The link as published on 2026-09-16, and the value the app already ships
 // as its offline fallback. Kept here as the default so this function is
@@ -35,14 +46,6 @@ const FALLBACK_SHORTCUT_URL =
 // open redirect here would be a phishing primitive with Keepo's domain on it.
 const ALLOWED_PREFIX = "https://www.icloud.com/shortcuts/";
 
-// Where a resolved `.shortcut` file is allowed to live. Signed shortcut
-// assets are served from `cvws.icloud-content.com` — **not** from an
-// apple.com host, which an earlier version of this assumed and which made
-// every resolution fail closed onto the redirect. Checked as a suffix on
-// the parsed hostname, never as a substring of the URL: "…icloud.com.evil"
-// contains the string and is not the host.
-const DOWNLOAD_HOST_SUFFIXES = [".icloud-content.com", ".icloud.com"];
-
 function resolveDestination(): string {
   const configured = Deno.env.get("KEEPO_CAPTURE_SHORTCUT_URL")?.trim();
   if (!configured || !configured.startsWith(ALLOWED_PREFIX)) {
@@ -51,79 +54,9 @@ function resolveDestination(): string {
   return configured;
 }
 
-// The signed `.shortcut` file behind an iCloud share link, resolved through
-// the same record API the icloud.com page itself calls.
-//
-// **This is the undocumented half of this function and it is allowed to
-// fail.** Apple publishes no supported way to install a shared shortcut
-// without the user landing on the icloud.com page and pressing "Get
-// Shortcut" — so the app's one-tap path asks here first, and drops to the
-// 302 above the instant anything about this is not exactly as expected.
-// Nothing downstream treats a null as an error: it is the normal answer on
-// the day Apple changes the shape of this response.
-async function resolveDownloadURL(shareURL: string): Promise<string | null> {
-  const id = shareURL.slice(ALLOWED_PREFIX.length).split(/[/?#]/)[0];
-  if (!/^[0-9a-f]{16,64}$/i.test(id)) return null;
-
-  try {
-    const response = await fetch(`${ALLOWED_PREFIX}api/records/${id}`, {
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!response.ok) return null;
-    const record = await response.json();
-    const fields = record?.fields;
-
-    // **`signedShortcut`, not `shortcut`.** iOS refuses to import an
-    // unsigned shortcut unless the user has turned on "Allow Untrusted
-    // Shortcuts" in Settings — a toggle nobody in onboarding has touched,
-    // and one that only appears after you have run a shortcut at all. The
-    // signed asset is the one an ordinary device will accept, so the
-    // unsigned one is a last resort rather than the default, and only
-    // reached when Apple has not finished signing this share yet.
-    const signed = fields?.signingStatus?.value === "APPROVED"
-      ? fields?.signedShortcut?.value?.downloadURL
-      : undefined;
-    const download = typeof signed === "string" ? signed : fields?.shortcut?.value?.downloadURL;
-    if (typeof download !== "string") return null;
-
-    // This value is handed to the client to open with the
-    // `shortcuts://import-shortcut` scheme, so anything not plainly on
-    // iCloud's own asset CDN is refused rather than passed on — the
-    // record is fetched over the network and a compromised or changed
-    // response must not be able to point the Shortcuts app anywhere.
-    const parsed = new URL(download);
-    const allowedHost = DOWNLOAD_HOST_SUFFIXES.some((suffix) => parsed.hostname.endsWith(suffix));
-    if (parsed.protocol !== "https:" || !allowedHost) return null;
-    return download;
-  } catch {
-    return null;
-  }
-}
-
-Deno.serve(async (req) => {
+Deno.serve((req) => {
   if (req.method !== "GET" && req.method !== "HEAD") {
     return new Response(null, { status: 405, headers: { allow: "GET, HEAD" } });
-  }
-
-  // `?format=json` is the app's one-tap path: it wants the file, not the
-  // page. Everything else — a browser, a QR code, a pasted link — keeps
-  // getting the redirect it always got.
-  if (new URL(req.url).searchParams.get("format") === "json") {
-    const destination = resolveDestination();
-    const download = await resolveDownloadURL(destination);
-    return new Response(
-      JSON.stringify({ downloadURL: download, shareURL: destination }),
-      {
-        status: 200,
-        headers: {
-          "content-type": "application/json",
-          // Shorter than the redirect's: this one carries a signed URL,
-          // and a signature outliving its cache entry is the failure that
-          // would be hardest to reproduce.
-          "cache-control": "public, max-age=60",
-        },
-      },
-    );
   }
 
   return new Response(null, {

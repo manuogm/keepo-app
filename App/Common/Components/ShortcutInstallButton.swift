@@ -10,9 +10,9 @@ import UIKit
 /// re-adding it later. All three must offer the identical button, including
 /// the written fallback behind it.
 ///
-/// `ShortcutsInstaller` tries the direct `shortcuts://import-shortcut` path
-/// and drops to the icloud.com share page on its own, so only the case where
-/// *neither* opened reaches the alert here.
+/// `ShortcutsInstaller` opens the icloud.com share page — the only route
+/// iOS 26 still allows, for reasons recorded there — so the alert here is
+/// reached only when that page could not be opened at all.
 struct ShortcutInstallButton: View {
     var onInstallFailed: (() -> Void)?
 

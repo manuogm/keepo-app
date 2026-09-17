@@ -29,6 +29,7 @@
 		12A356D345021336EACE2540 /* UnmappedCardLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58EC8D21829E6A9DDBC381D8 /* UnmappedCardLifecycleTests.swift */; };
 		14134599FBFF0BA0BB84AC41 /* KeepoIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BF15D55D3521FD9A1E4BBEC /* KeepoIcon.swift */; };
 		1422E9D10EA7EBCE4F82B38E /* SyncApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0692E171C05E5C17DF39EB68 /* SyncApply.swift */; };
+		15B25EAEE76C90C03AD09A4B /* Keepo Capture.shortcut in Resources */ = {isa = PBXBuildFile; fileRef = 3B6AE3E5B9F0DA8303A9519B /* Keepo Capture.shortcut */; };
 		1725F1A36170343D573E57B9 /* OutboxSending.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6882A009B70A74B987B3AD38 /* OutboxSending.swift */; };
 		1890EC0309624822079FFF28 /* OTPSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3AF9A7AEAB1809042F92E29 /* OTPSignInView.swift */; };
 		197652F2F5196F4A4487FB4F /* DashboardGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C80AB872EF3B66A5C757E62D /* DashboardGeometryTests.swift */; };
@@ -423,6 +424,7 @@
 		381C86A1757C8FE0027AD476 /* Outbox+Tags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+Tags.swift"; sourceTree = "<group>"; };
 		38B6CBC83F5E74A9BDA5DCA7 /* LocalAccountRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAccountRowTests.swift; sourceTree = "<group>"; };
 		3A638A85B40E4E4DA1C175FD /* SetupAccountStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupAccountStep.swift; sourceTree = "<group>"; };
+		3B6AE3E5B9F0DA8303A9519B /* Keepo Capture.shortcut */ = {isa = PBXFileReference; path = "Keepo Capture.shortcut"; sourceTree = "<group>"; };
 		3BD32E93474AC4DE074C67F9 /* HouseholdPairingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdPairingSession.swift; sourceTree = "<group>"; };
 		3BF15D55D3521FD9A1E4BBEC /* KeepoIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoIcon.swift; sourceTree = "<group>"; };
 		3C4399D180113EC51C5FA34A /* LocalStore+SchemaMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalStore+SchemaMigration.swift"; sourceTree = "<group>"; };
@@ -682,6 +684,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		018FAABDCB865286F9C2A802 /* Shortcuts */ = {
+			isa = PBXGroup;
+			children = (
+				3B6AE3E5B9F0DA8303A9519B /* Keepo Capture.shortcut */,
+			);
+			path = Shortcuts;
+			sourceTree = "<group>";
+		};
 		050342BA3DE341BA002FCD9C /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -689,6 +699,7 @@
 				E295FB8FA96C3DCCA8C8F7E2 /* Flags.xcassets */,
 				2EC49551604711746D0B4870 /* ThirdPartyLicenses */,
 				ED71AD8A44F7C042AC7B0525 /* Videos */,
+				018FAABDCB865286F9C2A802 /* Shortcuts */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -1470,6 +1481,7 @@
 			files = (
 				826E1EAAC66ED6E48DA2840E /* Assets.xcassets in Resources */,
 				0220A9F776F78B53B42FA8F2 /* Flags.xcassets in Resources */,
+				15B25EAEE76C90C03AD09A4B /* Keepo Capture.shortcut in Resources */,
 				7453B3F21C072B008B7C4E67 /* ThirdPartyLicenses in Resources */,
 				0785B84EBC19FDE87AEEB1A3 /* Videos in Resources */,
 			);
