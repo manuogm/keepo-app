@@ -114,7 +114,25 @@ struct SetupDashboardStep: View {
                     ForEach(unavailable, id: \.kind) { entry in
                         pill(entry.kind.title, isSelected: false, isEnabled: false)
                             .onTapGesture { explained = entry.kind }
-                            .popover(isPresented: popoverBinding(for: entry.kind)) {
+                            // **`arrowEdge: .top` puts the popover *below*
+                            // the pill**, which reads backwards until you
+                            // know the edge names the side of the popover
+                            // the arrow is on, not the side of the anchor it
+                            // points at. `.bottom` puts the box above.
+                            //
+                            // Pinned rather than left to UIKit, which placed
+                            // it wherever it found room: the same tap gave a
+                            // box to the right of one pill and above another,
+                            // and a callout that moves has to be found before
+                            // it can be read. Still a preference, not a
+                            // guarantee — UIKit repositions when there is
+                            // genuinely no room — but these pills sit high
+                            // with the whole page beneath them.
+                            .popover(
+                                isPresented: popoverBinding(for: entry.kind),
+                                attachmentAnchor: .rect(.bounds),
+                                arrowEdge: .top
+                            ) {
                                 Text(entry.reason)
                                     .font(AppTheme.Typography.caption)
                                     .foregroundStyle(AppTheme.Palette.textPrimary)
