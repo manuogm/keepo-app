@@ -91,6 +91,13 @@ struct OnboardingScaffold<Content: View>: View {
                         .padding(.top, AppTheme.Spacing.xl)
                         .padding(.bottom, AppTheme.Spacing.xxl)
                         .frame(minHeight: proxy.size.height, alignment: .top)
+                        // Applied to the content rather than the scroll
+                        // view, so the tappable area is the full
+                        // `minHeight` block and not just the rows that
+                        // happen to be drawn — the empty canvas under a
+                        // short step is exactly where a user aims when
+                        // they want the keyboard gone.
+                        .dismissesKeyboardOnTap()
                     }
                     // The content is short on most steps and long on two;
                     // this is the same rule `TransactionFormView` uses, so
