@@ -58,11 +58,11 @@ struct SetupAccountStep: View {
             onBack: back,
             isPrimaryEnabled: isComplete,
             isPrimaryVisible: kind != nil,
-            // The type cards are the whole of their stage, so they are
-            // centred on the screen rather than in the space left under the
-            // heading — which put them visibly low, with the heading's own
-            // height as the offset.
-            centersContentOnScreen: kind == nil,
+            // The cards belong under the question, not floating in the
+            // middle distance below it. Centring them looked deliberate on
+            // paper and, on the device, simply looked low.
+            pinsContentToTop: kind == nil,
+            contentGap: AppTheme.Spacing.l,
             onPrimary: next
         ) {
             if kind == nil {
@@ -120,7 +120,7 @@ struct SetupAccountStep: View {
     /// described — two separate fills read as two unrelated questions that
     /// happen to be stacked.
     private var accountForm: some View {
-        VStack(spacing: AppTheme.Spacing.xl) {
+        VStack(spacing: AppTheme.Spacing.xxl) {
             IconPickerButton(icon: icon, color: color, diameter: AppTheme.Size.avatarHero) {
                 isPickingIcon = true
             }

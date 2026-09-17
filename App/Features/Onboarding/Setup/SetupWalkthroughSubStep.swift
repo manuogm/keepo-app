@@ -38,12 +38,24 @@ struct SetupWalkthroughSubStep: View {
             title: "Set up automatic capture",
             step: .capture,
             onBack: onBack,
-            primaryTitle: "Test Automation",
-            isPrimaryEnabled: isFinished,
-            onPrimary: onNext
-        ) {
-            CaptureSetupChecklist(completed: completedBinding)
-        }
+            // **Not in the bottom bar.** A permanently disabled button
+            // sitting under an unfinished checklist is a control the user
+            // keeps being told they have failed to satisfy. It arrives when
+            // the list is finished, under the last thing they ticked.
+            isPrimaryVisible: false,
+            pinsContentToTop: true,
+            contentGap: AppTheme.Spacing.l,
+            onPrimary: onNext,
+            content: {
+                VStack(spacing: AppTheme.Spacing.xl) {
+                    CaptureSetupChecklist(completed: completedBinding)
+                    if isFinished {
+                        OnboardingPrimaryButton(title: "Test Automation", fillsWidth: true, action: onNext)
+                    }
+                }
+                .animation(AppTheme.Motion.standard, value: isFinished)
+            }
+        )
     }
 
     private var completed: Set<Int> {

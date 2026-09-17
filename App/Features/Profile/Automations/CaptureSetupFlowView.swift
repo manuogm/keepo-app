@@ -35,10 +35,13 @@ struct CaptureSetupFlowView: View {
                         switch page {
                         case .checklist:
                             CaptureSetupChecklist(completed: completedBinding)
-                            OnboardingPrimaryButton(
-                                title: "Test Automation", isEnabled: isChecklistFinished, fillsWidth: true
-                            ) {
-                                page = .test
+                            // Appears with the finished list rather than
+                            // sitting disabled underneath it — same reason
+                            // as onboarding's copy of this screen.
+                            if isChecklistFinished {
+                                OnboardingPrimaryButton(title: "Test Automation", fillsWidth: true) {
+                                    page = .test
+                                }
                             }
                         case .test:
                             CaptureConnectionTestView(session: session) { dismiss() }

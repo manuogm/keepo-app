@@ -24,7 +24,10 @@ struct SetupCurrencyStep: View {
     var body: some View {
         OnboardingScaffold(
             title: "Choose your base currency",
-            subtitle: "Every balance converts to it — changeable any time.",
+            // Two lines, deliberately. One sentence with a dash in it read
+            // as a single dense line at the top of a screen whose only job
+            // is one choice; as two it is a fact and a reassurance.
+            subtitle: "Every balance converts to it\nChangeable any time",
             step: .currency,
             onBack: store.goBack,
             isPrimaryEnabled: !code.isEmpty,

@@ -33,19 +33,21 @@ struct OnboardingScaffold<Content: View>: View {
     /// permanently disabled button is worse than no bar — it reads as a
     /// control the user has somehow failed to satisfy.
     var isPrimaryVisible = true
-    /// Centres the content in the **whole** screen rather than in the space
-    /// left under the heading, by drawing the heading over the top of it
-    /// instead of above it.
+    /// Puts the content **directly under the heading** instead of letting it
+    /// float in the space below it.
     ///
-    /// The default is right for a step whose content is a form or a list:
-    /// it belongs under the words that introduce it. It is wrong for a step
-    /// whose content *is* the screen — the account step's two type cards —
-    /// where centring below a two-line heading put them a heading's height
-    /// too low and left the bottom of the screen conspicuously empty.
-    ///
-    /// Only for content short enough that it cannot reach the heading. A
-    /// tall block would draw straight through it.
-    var centersContentOnScreen = false
+    /// The default floats: the content sits between two flexible spacers, so
+    /// a short block lands near the middle of the screen. That is right for
+    /// a step holding one field or one wheel, and wrong for a step holding a
+    /// list — the account type cards, the capture checklist — where floating
+    /// opens a band of empty canvas under the subtitle and pushes the first
+    /// item down for no reason the user can see.
+    var pinsContentToTop = false
+    /// The gap between the heading and the content. `xxl` is the brand's
+    /// block separation and the right default; the steps that pin to the top
+    /// generally want less, because the content is what the heading is
+    /// introducing rather than a separate block.
+    var contentGap = AppTheme.Spacing.xxl
     let onPrimary: () -> Void
     @ViewBuilder var content: Content
 
@@ -99,20 +101,19 @@ struct OnboardingScaffold<Content: View>: View {
 
     @ViewBuilder
     private var layout: some View {
-        if centersContentOnScreen {
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                content
-                Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 0) {
+            heading
+            // **A fixed gap, not a flexible one, when pinning.** Two
+            // `Spacer`s share whatever slack is going equally, so a
+            // `minLength` on the first one sets a floor and then grows past
+            // it — which is exactly the floating behaviour being avoided.
+            if pinsContentToTop {
+                Spacer().frame(height: contentGap)
+            } else {
+                Spacer(minLength: contentGap)
             }
-            .overlay(alignment: .topLeading) { heading }
-        } else {
-            VStack(alignment: .leading, spacing: 0) {
-                heading
-                Spacer(minLength: AppTheme.Spacing.xxl)
-                content
-                Spacer(minLength: 0)
-            }
+            content
+            Spacer(minLength: 0)
         }
     }
 

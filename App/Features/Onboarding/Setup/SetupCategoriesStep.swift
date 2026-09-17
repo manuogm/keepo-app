@@ -25,26 +25,16 @@ struct SetupCategoriesStep: View {
 
     var body: some View {
         OnboardingScaffold(
-            title: "Choose your starting categories",
-            subtitle: "You can add, rename and customize them later",
+            title: "Pick your categories",
+            subtitle: "You can always add more or customize your selection later.",
             step: .categories,
             onBack: store.goBack,
             onSkip: skip,
-            isPrimaryVisible: false,
             onPrimary: store.advance
         ) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
                 group("Expenses", DefaultCategoryCatalog.expenses)
                 group("Income", DefaultCategoryCatalog.income)
-
-                // **In the scroll, not the bar.** This is the one step whose
-                // content reliably runs past the fold, and a pinned Next sat
-                // over the last row of tiles — so the twentieth category was
-                // permanently half-covered by the button that meant "done
-                // choosing". Here it arrives when the list does, which is
-                // also when the user is finished with it.
-                OnboardingPrimaryButton(title: "Next", fillsWidth: true, action: store.advance)
-                    .padding(.top, AppTheme.Spacing.s)
             }
             .sensoryFeedback(AppTheme.Feedback.selection, trigger: store.draft.selectedCategories)
         }

@@ -1,6 +1,7 @@
 import KeepoCore
 import SwiftUI
 import UIKit
+import os
 
 /// A real cross-process round trip through Shortcuts, and a claim that is
 /// exactly as strong as what it proves.
@@ -54,6 +55,11 @@ struct CaptureConnectionTestView: View {
 
     @State private var phase: Phase = .idle
     @State private var isDeleting = false
+
+    /// Shortcuts' own message no longer reaches the screen, so it has to
+    /// reach somewhere — a failure nobody can reproduce is one nobody can
+    /// diagnose.
+    private let logger = Logger(subsystem: "app.keepo", category: "CaptureTest")
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
@@ -150,31 +156,59 @@ struct CaptureConnectionTestView: View {
 
     // MARK: - Failed
 
+    /// **One cause, named.** This used to print Shortcuts' own error
+    /// verbatim and then explain the likeliest reason underneath it — two
+    /// blocks of prose, one of them written by another app, in front of
+    /// somebody who wanted to know what to fix. Nearly every failure here is
+    /// the same thing: the automation points at a shortcut whose name is not
+    /// the one Keepo runs, usually because importing it twice left a copy
+    /// called "Keepo Capture 1". So the screen says that, and offers the two
+    /// things that act on it.
+    ///
+    /// The underlying message is not lost — it still reaches the console
+    /// through the phase — it is just no longer the first thing a user reads
+    /// when something breaks.
     private func failedBlock(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
-            Label("That didn't come back", systemImage: "exclamationmark.triangle")
+            Text("Upss, that didn't work…")
                 .font(AppTheme.Typography.cardTitle)
                 .foregroundStyle(AppTheme.Palette.statusNegative)
-
-            // Shortcuts' own wording, verbatim. It names the real problem —
-            // "the shortcut Keepo Capture was not found", an action that
-            // failed — and any paraphrase of ours would be a guess at which
-            // of those it was.
-            Text(message)
-                .font(AppTheme.Typography.body)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("The commonest cause is the shortcut being named something else. Importing it twice "
-                 + "leaves the second copy called “\(ShortcutsWalkthrough.shortcutName) 1”.")
-                .font(AppTheme.Typography.caption)
+            Text("The shortcut wasn't found. Make sure the name of the shortcut inside your automation "
+                 + "is: \(ShortcutsWalkthrough.shortcutName)")
+                .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             OnboardingPrimaryButton(title: "Try again", fillsWidth: true) {
                 Task { await runTest() }
             }
+
+            // Under the retry, because it is the thing you do *before*
+            // retrying — the name has to be fixed in Shortcuts first, and
+            // the fix is two taps away in an app the user has to leave for
+            // anyway.
+            Button {
+                openShortcuts()
+            } label: {
+                Text("Open Shortcuts")
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: AppTheme.Size.touchTarget)
+                    .overlay(Capsule().stroke(AppTheme.Palette.textSecondary, lineWidth: 1))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the Shortcuts app so you can check the name")
         }
+        .onAppear { logger.error("Capture test failed: \(message, privacy: .public)") }
+    }
+
+    private func openShortcuts() {
+        guard let url = URL(string: "shortcuts://"), UIApplication.shared.canOpenURL(url) else { return }
+        UIApplication.shared.open(url)
     }
 
     // MARK: - The round trip

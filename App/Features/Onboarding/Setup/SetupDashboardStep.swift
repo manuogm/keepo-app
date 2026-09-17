@@ -22,27 +22,38 @@ import SwiftUI
 /// choose a set and `OnboardingDashboardPlan` arranges it at the commit,
 /// which is the only place that has the finished selection to work from.
 ///
-/// Three groups rather than two. **Unavailable is its own section**, not a
-/// dimmed pill among the available ones: a widget that cannot draw anything
-/// yet is a different kind of thing from one the user has simply not picked,
-/// and mixing them made the Available list look like it contained broken
-/// entries.
+/// **One group of choices, not two.** Chosen and unchosen widgets used to
+/// sit in separate labelled sections, which made picking one move it across
+/// the screen — a list that rearranges itself under the finger is a list you
+/// have to re-read after every tap. They are one set now, in catalogue
+/// order, and selection is a state a pill is in rather than a section it
+/// belongs to.
+///
+/// Unavailable widgets keep their own section, because they are a different
+/// kind of thing: not "you have not picked this" but "this cannot say
+/// anything yet". They are drawn on a filled surface at full opacity rather
+/// than dimmed — a dimmed white pill on an off-white canvas was very close
+/// to invisible, which is the wrong way to say "disabled".
 struct SetupDashboardStep: View {
     let store: OnboardingDraftStore
 
     var body: some View {
         OnboardingScaffold(
             title: "Build your dashboard",
-            subtitle: "Pick what you want to see.",
+            subtitle: "Select all metrics you are interested in",
             step: .dashboard,
             onBack: store.goBack,
             onSkip: skip,
             isPrimaryEnabled: true,
+            // The pills are a list, and a list belongs under the words
+            // introducing it. Floating left a band of empty canvas between
+            // the subtitle and the first thing there is to tap.
+            pinsContentToTop: true,
+            contentGap: AppTheme.Spacing.l,
             onPrimary: store.advance
         ) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
-                chosenSection
-                availableSection
+                choicesSection
                 unavailableSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -51,64 +62,31 @@ struct SetupDashboardStep: View {
         }
     }
 
-    // MARK: - Chosen
+    // MARK: - The choices
 
     private var chosen: [DashboardWidgetKind] { store.draft.selectedMetrics }
 
-    @ViewBuilder
-    private var chosenSection: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
-            Text("On your dashboard")
-                .font(AppTheme.Typography.rowTitle)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-
-            if chosen.isEmpty {
-                // Not an error, and phrased so it does not read as one:
-                // Skip commits Net Worth alone and the dashboard is
-                // editable forever afterwards.
-                Text("Nothing yet — tap one below.")
-                    .font(AppTheme.Typography.caption)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            } else {
-                TagFlowLayout(spacing: AppTheme.Spacing.s) {
-                    ForEach(chosen, id: \.self) { kind in
-                        pill(kind.title, isSelected: true)
-                            .onTapGesture { toggle(kind) }
-                            .accessibilityLabel(kind.title)
-                            .accessibilityAddTraits(.isSelected)
-                            .accessibilityHint("Double tap to remove")
-                    }
-                }
+    /// **No heading.** The subtitle above already says what to do, and a
+    /// label over the only interactive thing on the screen is a label for
+    /// its own sake.
+    private var choicesSection: some View {
+        TagFlowLayout(spacing: AppTheme.Spacing.s) {
+            ForEach(selectable, id: \.self) { kind in
+                let isSelected = chosen.contains(kind)
+                pill(kind.title, isSelected: isSelected)
+                    .onTapGesture { toggle(kind) }
+                    .accessibilityLabel(kind.title)
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityHint(isSelected ? "Double tap to remove" : "Double tap to add")
             }
         }
     }
 
-    // MARK: - Available
-
-    private var available: [DashboardWidgetKind] {
-        DashboardWidgetKind.allCases.filter {
-            !chosen.contains($0) && capabilities.unavailability(for: $0) == nil
-        }
-    }
-
-    @ViewBuilder
-    private var availableSection: some View {
-        if !available.isEmpty {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
-                Text("Available")
-                    .font(AppTheme.Typography.rowTitle)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-
-                TagFlowLayout(spacing: AppTheme.Spacing.s) {
-                    ForEach(available, id: \.self) { kind in
-                        pill(kind.title, isSelected: false)
-                            .onTapGesture { toggle(kind) }
-                            .accessibilityLabel(kind.title)
-                            .accessibilityHint("Double tap to add")
-                    }
-                }
-            }
-        }
+    /// Catalogue order, always — including for the ones already chosen. A
+    /// pill that jumps to a different place on the screen when tapped makes
+    /// the next tap a search.
+    private var selectable: [DashboardWidgetKind] {
+        DashboardWidgetKind.allCases.filter { capabilities.unavailability(for: $0) == nil }
     }
 
     // MARK: - Unavailable
@@ -128,14 +106,13 @@ struct SetupDashboardStep: View {
     private var unavailableSection: some View {
         if !unavailable.isEmpty {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
-                Text("Not yet")
+                Text("Not available yet")
                     .font(AppTheme.Typography.rowTitle)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
 
                 TagFlowLayout(spacing: AppTheme.Spacing.s) {
                     ForEach(unavailable, id: \.kind) { entry in
-                        pill(entry.kind.title, reason: entry.reason, isSelected: false)
-                            .opacity(AppTheme.Opacity.dim)
+                        unavailablePill(entry.kind.title, reason: entry.reason)
                             .accessibilityLabel(entry.kind.title)
                             .accessibilityHint(entry.reason)
                     }
@@ -146,32 +123,56 @@ struct SetupDashboardStep: View {
 
     // MARK: - The pill itself
 
-    private func pill(_ title: String, reason: String? = nil, isSelected: Bool) -> some View {
+    private func pill(_ title: String, isSelected: Bool) -> some View {
+        Text(title)
+            .font(AppTheme.Typography.label)
+            .foregroundStyle(AppTheme.Palette.textPrimary)
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .padding(.vertical, AppTheme.Spacing.s)
+            .background(
+                isSelected
+                    ? AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill)
+                    : AppTheme.Palette.bgSurface,
+                in: Capsule()
+            )
+            .overlay {
+                if isSelected {
+                    Capsule().strokeBorder(AppTheme.Palette.brandPrimary, lineWidth: 1)
+                }
+            }
+            .contentShape(Capsule())
+            .animation(AppTheme.Motion.quick, value: isSelected)
+    }
+
+    /// **Not a dimmed version of the pill above.** Reducing opacity on a
+    /// white capsule sitting on an off-white canvas took the edge away and
+    /// left grey text apparently floating on nothing — the pill stopped
+    /// reading as a pill, which is a strange way to say "this one is a
+    /// widget you cannot have yet".
+    ///
+    /// Full opacity, on the canvas's own fill instead of a raised surface,
+    /// with a dashed edge. Dashed is the app's existing vocabulary for "a
+    /// slot with nothing in it" (`CreditCardTile.addPlaceholder`,
+    /// the dashboard's own empty tile), so it says unavailable without
+    /// having to be faint to do it.
+    private func unavailablePill(_ title: String, reason: String) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
             Text(title)
                 .font(AppTheme.Typography.label)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-            if let reason {
-                Text(reason)
-                    .font(AppTheme.Typography.nano)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+            Text(reason)
+                .font(AppTheme.Typography.nano)
+                .foregroundStyle(AppTheme.Palette.textTertiary)
         }
         .padding(.horizontal, AppTheme.Spacing.m)
         .padding(.vertical, AppTheme.Spacing.s)
-        .background(
-            isSelected
-                ? AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill)
-                : AppTheme.Palette.bgSurface,
-            in: Capsule()
-        )
+        .background(AppTheme.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
         .overlay {
-            if isSelected {
-                Capsule().strokeBorder(AppTheme.Palette.brandPrimary, lineWidth: 1)
-            }
+            RoundedRectangle(cornerRadius: AppTheme.Radius.control)
+                .strokeBorder(
+                    AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                )
         }
-        .contentShape(Capsule())
-        .animation(AppTheme.Motion.quick, value: isSelected)
     }
 
     // MARK: - State
