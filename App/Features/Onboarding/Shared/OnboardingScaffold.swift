@@ -51,6 +51,11 @@ struct OnboardingScaffold<Content: View>: View {
     let onPrimary: () -> Void
     @ViewBuilder var content: Content
 
+    /// The home-indicator inset, so the forward button can be positioned
+    /// from the **screen** edge the way `KeepoTabBar` is. Read the same way
+    /// `MainTabView` reads it, for the same reason.
+    @State private var bottomSafeAreaInset: CGFloat = 0
+
     var body: some View {
         ZStack {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
@@ -159,16 +164,21 @@ struct OnboardingScaffold<Content: View>: View {
                 Spacer(minLength: 0)
                 OnboardingPrimaryButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: onPrimary)
             }
-            .padding(.horizontal, AppTheme.Spacing.l)
+            // **`KeepoTabBarMetrics.margin`, on both edges.** The forward
+            // button and the tab bar are the same thing in two halves of the
+            // app — the one floating control in the bottom corner — so they
+            // sit in the same place, and onboarding handing over to the app
+            // does not move it. The margin is measured from the true screen
+            // edge rather than the safe area, which is what makes the gap
+            // under the button equal the gap beside it and its curve sit
+            // concentrically inside the device's own corner. Negative on a
+            // home-indicator phone, exactly as it is for the bar.
+            .padding(.horizontal, KeepoTabBarMetrics.margin)
             .padding(.top, AppTheme.Spacing.m)
-            // **Equal to the horizontal inset, not half of it.** The button
-            // sits in the corner of the screen, and the eye reads the gap
-            // around it as one shape: at `s` below and `l` beside, the
-            // capsule was visibly closer to the bottom edge than to the
-            // trailing one and looked as though it had slipped. Matching
-            // them lets its curve sit concentrically inside the device's
-            // own corner instead of cutting across it.
-            .padding(.bottom, AppTheme.Spacing.l)
+            .padding(.bottom, KeepoTabBarMetrics.margin - bottomSafeAreaInset)
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { inset in
+                bottomSafeAreaInset = inset
+            }
         }
     }
 }

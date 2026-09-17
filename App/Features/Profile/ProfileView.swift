@@ -71,7 +71,7 @@ struct ProfileView: View {
                         // level to label automatic capture specifically, and
                         // the same glyph on the row that contains it said the
                         // parent and the child were the same thing.
-                        ProfileRowLabel(icon: "bolt.fill", title: "My Automations")
+                        ProfileRowLabel(icon: "bolt", title: "My Automations")
                     }
                 }
                 general

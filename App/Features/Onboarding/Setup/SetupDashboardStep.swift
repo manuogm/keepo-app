@@ -112,19 +112,24 @@ struct SetupDashboardStep: View {
 
                 TagFlowLayout(spacing: AppTheme.Spacing.s) {
                     ForEach(unavailable, id: \.kind) { entry in
-                        pill(entry.kind.title, isSelected: false)
-                            .onTapGesture { explain(entry.kind) }
+                        pill(entry.kind.title, isSelected: false, isEnabled: false)
+                            .onTapGesture { explained = entry.kind }
+                            .popover(isPresented: popoverBinding(for: entry.kind)) {
+                                Text(entry.reason)
+                                    .font(AppTheme.Typography.caption)
+                                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(AppTheme.Spacing.m)
+                                    .frame(maxWidth: AppTheme.Size.proseWidth)
+                                    // Without this a popover becomes a sheet
+                                    // on iPhone, which loses the arrow — and
+                                    // the arrow is the whole point: it says
+                                    // *which* pill is being explained.
+                                    .presentationCompactAdaptation(.popover)
+                            }
                             .accessibilityLabel(entry.kind.title)
                             .accessibilityHint(entry.reason)
                     }
-                }
-
-                if let explained, let reason = capabilities.unavailability(for: explained) {
-                    Text(reason)
-                        .font(AppTheme.Typography.caption)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .transition(.opacity)
                 }
             }
         }
@@ -132,16 +137,19 @@ struct SetupDashboardStep: View {
 
     // MARK: - The pill itself
 
-    private func pill(_ title: String, isSelected: Bool) -> some View {
+    /// `isEnabled: false` is the "not available yet" state: the same pill,
+    /// on the canvas's own fill rather than a raised white surface, with
+    /// secondary text. Grey-on-grey reads as disabled the way a disabled
+    /// control always has — and unlike the faded white it replaced, it is
+    /// still legible against an off-white canvas.
+    private func pill(_ title: String, isSelected: Bool, isEnabled: Bool = true) -> some View {
         Text(title)
             .font(AppTheme.Typography.label)
-            .foregroundStyle(AppTheme.Palette.textPrimary)
+            .foregroundStyle(isEnabled ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
             .padding(.horizontal, AppTheme.Spacing.m)
             .padding(.vertical, AppTheme.Spacing.s)
             .background(
-                isSelected
-                    ? AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill)
-                    : AppTheme.Palette.bgSurface,
+                pillFill(isSelected: isSelected, isEnabled: isEnabled),
                 in: Capsule()
             )
             .overlay {
@@ -153,19 +161,27 @@ struct SetupDashboardStep: View {
             .animation(AppTheme.Motion.quick, value: isSelected)
     }
 
+    private func pillFill(isSelected: Bool, isEnabled: Bool) -> Color {
+        guard isEnabled else { return AppTheme.Palette.fillSubtle }
+        return isSelected
+            ? AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill)
+            : AppTheme.Palette.bgSurface
+    }
+
     /// **Ask, rather than annotate.** Each unavailable widget used to carry
     /// its reason inside the pill, which made them a different shape and a
     /// different size from every other pill on the screen — two rows of tall
     /// two-line blocks under a row of short ones, for an explanation most
-    /// people do not need and nobody needs twice. They look like the rest
-    /// now, and the reason appears under the group when one is tapped.
+    /// people do not need and nobody needs twice.
     ///
-    /// The group's own heading is what says these cannot be chosen, so the
-    /// pill does not have to look broken to say it.
-    private func explain(_ kind: DashboardWidgetKind) {
-        withAnimation(AppTheme.Motion.quick) {
-            explained = explained == kind ? nil : kind
-        }
+    /// A popover rather than a line under the group, because with two of
+    /// them a line underneath cannot say which one it is about without
+    /// repeating the name. The arrow does that for free.
+    private func popoverBinding(for kind: DashboardWidgetKind) -> Binding<Bool> {
+        Binding(
+            get: { explained == kind },
+            set: { isPresented in if !isPresented { explained = nil } }
+        )
     }
 
     // MARK: - State
