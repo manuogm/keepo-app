@@ -110,32 +110,82 @@ enum CaptureNotificationCopy {
 }
 
 extension CaptureNotificationCopy {
-    /// The example onboarding shows, produced by the **same** function that
-    /// writes the real thing.
+    /// The four notifications onboarding shows, as the **resolutions that
+    /// produce them** rather than as four hand-written cards.
     ///
-    /// The preview card used to invent its own wording — "Logged $12.34",
-    /// "Groceries · Checking. Tap to change anything." — which is not a
-    /// string this app has ever sent. The real happy-path copy leads with a
-    /// ✅ and the amount and ends with the press-and-hold hint, and that
-    /// hint is most of the reason the notification is worth allowing at
-    /// all. Showing someone one notification to win the permission and then
-    /// sending them a different one is the cheapest possible way to lose it
-    /// back again.
-    static var sample: Content {
-        appliedLocally(
-            CaptureLocalWrite.Resolution(
-                accountName: "Checking",
-                categoryName: "Groceries",
-                categoryIsDefault: false,
-                currency: "USD",
-                minorUnit: 2,
-                categoryId: "",
-                accountId: nil,
-                suggestedCategories: [],
-                suggestedAccounts: [],
-                isPossibleDuplicate: false
+    /// A capture's notification is not one message: what it says, and which
+    /// buttons a long press reveals, is decided entirely by what resolved —
+    /// whether the card is mapped to an account, whether the merchant taught
+    /// Keepo a category, and whether it looks like a duplicate. The
+    /// permission screen is asking the user to accept all four, so it shows
+    /// all four; and it shows them by handing these to the same
+    /// `appliedLocally` and `CaptureQuickActions.build` that production
+    /// calls, so a card here cannot promise a shape the real thing does not
+    /// have.
+    ///
+    /// - Parameter currency: the user's own base currency where it is known
+    ///   yet. Setting up in euros and being shown four dollar amounts is a
+    ///   small thing that makes the whole screen read as stock artwork.
+    static func showcase(currency: String?) -> [CaptureLocalWrite.Resolution] {
+        let code = currency ?? "USD"
+        return [
+            // Everything resolved: the case most captures land in once
+            // Keepo has seen a merchant before.
+            resolution(
+                account: "Checking", category: "Groceries", categoryIsDefault: false, currency: code,
+                suggestedCategories: [suggestion("Dining"), suggestion("Household")]
             ),
-            amountE4: 123_400
+            // Account known, category not — the buttons are the guesses.
+            resolution(
+                account: "Checking", category: "Other", categoryIsDefault: true, currency: code,
+                suggestedCategories: [suggestion("Groceries"), suggestion("Dining"), suggestion("Transport")]
+            ),
+            // A card Keepo has never seen. Nothing is wrong; it just does
+            // not know which account paid yet.
+            resolution(
+                account: nil, category: "Groceries", categoryIsDefault: false, currency: code,
+                suggestedAccounts: [suggestion("Checking"), suggestion("Savings"), suggestion("Credit Card")]
+            ),
+            // The one that overrides every branch above, and the one worth
+            // having notifications on for: the same card, merchant and
+            // amount twice inside fifteen minutes.
+            resolution(
+                account: "Checking", category: "Groceries", categoryIsDefault: false, currency: code,
+                suggestedCategories: [suggestion("Dining")], isPossibleDuplicate: true
+            )
+        ]
+    }
+
+    /// The amount every showcase card carries. One figure across all four,
+    /// so the eye compares the *messages* rather than re-reading a number
+    /// that changed for no reason.
+    static let showcaseAmountE4: Int64 = 123_400
+
+    private static func suggestion(_ name: String) -> CaptureLocalWrite.Suggestion {
+        CaptureLocalWrite.Suggestion(id: name, name: name)
+    }
+
+    private static func resolution(
+        account: String?, category: String, categoryIsDefault: Bool, currency: String,
+        suggestedCategories: [CaptureLocalWrite.Suggestion] = [],
+        suggestedAccounts: [CaptureLocalWrite.Suggestion] = [],
+        isPossibleDuplicate: Bool = false
+    ) -> CaptureLocalWrite.Resolution {
+        CaptureLocalWrite.Resolution(
+            accountName: account,
+            categoryName: category,
+            categoryIsDefault: categoryIsDefault,
+            currency: currency,
+            minorUnit: 2,
+            categoryId: category,
+            // `CaptureQuickActions` decides "account known" on the *id*
+            // while the copy decides it on the name, so both have to agree
+            // or a card would show one branch's words over another's
+            // buttons.
+            accountId: account,
+            suggestedCategories: suggestedCategories,
+            suggestedAccounts: suggestedAccounts,
+            isPossibleDuplicate: isPossibleDuplicate
         )
     }
 }
