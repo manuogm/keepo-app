@@ -31,7 +31,7 @@ struct ShortcutInstallButton: View {
         } label: {
             HStack(spacing: AppTheme.Spacing.s) {
                 Image(systemName: "square.and.arrow.down")
-                Text("Get the Keepo Capture shortcut")
+                Text("Add Shortcut")
             }
             .font(AppTheme.Typography.labelEmphasis)
             .foregroundStyle(AppTheme.Palette.textOnAccent)

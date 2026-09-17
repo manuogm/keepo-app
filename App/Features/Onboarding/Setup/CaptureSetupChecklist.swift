@@ -82,10 +82,12 @@ struct CaptureSetupChecklist: View {
             }
 
             if isOpen {
-                Text(step.detail)
-                    .font(AppTheme.Typography.caption)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let detail = step.detail {
+                    Text(detail)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 // The first step is the only one with something to press —
                 // every other step happens inside the Shortcuts app, where

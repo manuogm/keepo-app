@@ -79,30 +79,49 @@ public enum ShortcutsWalkthrough {
     /// nearly every setup went wrong. Shipping the shortcut prebuilt
     /// deleted that entire half: there is now nothing to map and nothing to
     /// mistype.
+    ///
+    /// The six that remain are one screen of Shortcuts each. They were four
+    /// until the last two — picking the trigger's run behaviour, and then
+    /// picking Keepo Capture itself — turned out to be two separate screens
+    /// with two separate ways to get them wrong, and a single step covering
+    /// both was a step people ticked having done half of it.
     public static let steps: [WalkthroughStep] = [
         WalkthroughStep(
             id: 1,
             title: "Add the Keepo Capture shortcut",
-            detail: "Tap Add Shortcut. It arrives ready to use — there is nothing to set up inside it.",
             clip: "walkthrough-1-add-shortcut"
         ),
         WalkthroughStep(
             id: 2,
-            title: "In Shortcuts, open Automation and tap +",
-            detail: "Automation is the middle tab at the bottom of the Shortcuts app.",
+            title: "Create a New Automation",
             clip: "walkthrough-2-new-automation"
         ),
         WalkthroughStep(
             id: 3,
-            title: "Choose Wallet, then pick the cards to track",
-            detail: "Pick every card you want Keepo to see. You can change this later.",
+            title: "Select the Wallet trigger",
+            // The one caption that is load-bearing: the trigger was renamed
+            // in iOS 26, and somebody on an older phone looking for "Wallet"
+            // will not find it and will assume they have the wrong app.
+            detail: "For iOS under 26, find Transaction trigger instead",
             clip: "walkthrough-3-choose-wallet"
         ),
         WalkthroughStep(
             id: 4,
-            title: "Choose Run Immediately, then Run Shortcut → Keepo Capture",
-            detail: "Run Immediately is what makes a purchase arrive without you confirming anything.",
+            title: "Choose all cards to track",
+            detail: "Keep all categories selected"
+        ),
+        WalkthroughStep(
+            id: 5,
+            title: "Select Run Immediately",
+            // Off, not on: the automation firing silently is the whole
+            // point, and a notification from Shortcuts on every purchase
+            // arrives on top of Keepo's own.
+            detail: "Keep the Notify When Run toggle OFF",
             clip: "walkthrough-4-run-shortcut"
+        ),
+        WalkthroughStep(
+            id: 6,
+            title: "Find Keepo Capture shortcut and tap it"
         )
     ]
 }
@@ -112,16 +131,19 @@ public enum ShortcutsWalkthrough {
 public struct WalkthroughStep: Identifiable, Sendable, Equatable {
     public let id: Int
     public let title: String
-    /// One line. The clip shows the *where*; this says the *why*, which is
-    /// the part a video cannot carry.
-    public let detail: String
+    /// One line, or none. The clip shows the *where*; this says the *why*,
+    /// which is the part a video cannot carry — but several steps have no
+    /// why worth writing down, and a caption restating the title in longer
+    /// words is noise on a list somebody is working through while holding
+    /// the phone in the other app.
+    public let detail: String?
     /// The bundled resource's base name, or `nil` for a step whose clip has
     /// not been recorded yet. A name here is **not** a promise the file
     /// exists — the view checks, and falls back to a poster — so the flow
     /// builds and runs against an empty `videos/` folder.
     public let clip: String?
 
-    public init(id: Int, title: String, detail: String, clip: String? = nil) {
+    public init(id: Int, title: String, detail: String? = nil, clip: String? = nil) {
         self.id = id
         self.title = title
         self.detail = detail

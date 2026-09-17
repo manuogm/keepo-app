@@ -161,7 +161,14 @@ struct OnboardingScaffold<Content: View>: View {
             }
             .padding(.horizontal, AppTheme.Spacing.l)
             .padding(.top, AppTheme.Spacing.m)
-            .padding(.bottom, AppTheme.Spacing.s)
+            // **Equal to the horizontal inset, not half of it.** The button
+            // sits in the corner of the screen, and the eye reads the gap
+            // around it as one shape: at `s` below and `l` beside, the
+            // capsule was visibly closer to the bottom edge than to the
+            // trailing one and looked as though it had slipped. Matching
+            // them lets its curve sit concentrically inside the device's
+            // own corner instead of cutting across it.
+            .padding(.bottom, AppTheme.Spacing.l)
         }
     }
 }

@@ -40,7 +40,7 @@ struct SetupDashboardStep: View {
     var body: some View {
         OnboardingScaffold(
             title: "Build your dashboard",
-            subtitle: "Select all metrics you are interested in",
+            subtitle: "Tap all metrics you're interested in",
             step: .dashboard,
             onBack: store.goBack,
             onSkip: skip,
@@ -112,10 +112,19 @@ struct SetupDashboardStep: View {
 
                 TagFlowLayout(spacing: AppTheme.Spacing.s) {
                     ForEach(unavailable, id: \.kind) { entry in
-                        unavailablePill(entry.kind.title, reason: entry.reason)
+                        pill(entry.kind.title, isSelected: false)
+                            .onTapGesture { explain(entry.kind) }
                             .accessibilityLabel(entry.kind.title)
                             .accessibilityHint(entry.reason)
                     }
+                }
+
+                if let explained, let reason = capabilities.unavailability(for: explained) {
+                    Text(reason)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
                 }
             }
         }
@@ -144,38 +153,25 @@ struct SetupDashboardStep: View {
             .animation(AppTheme.Motion.quick, value: isSelected)
     }
 
-    /// **Not a dimmed version of the pill above.** Reducing opacity on a
-    /// white capsule sitting on an off-white canvas took the edge away and
-    /// left grey text apparently floating on nothing — the pill stopped
-    /// reading as a pill, which is a strange way to say "this one is a
-    /// widget you cannot have yet".
+    /// **Ask, rather than annotate.** Each unavailable widget used to carry
+    /// its reason inside the pill, which made them a different shape and a
+    /// different size from every other pill on the screen — two rows of tall
+    /// two-line blocks under a row of short ones, for an explanation most
+    /// people do not need and nobody needs twice. They look like the rest
+    /// now, and the reason appears under the group when one is tapped.
     ///
-    /// Full opacity, on the canvas's own fill instead of a raised surface,
-    /// with a dashed edge. Dashed is the app's existing vocabulary for "a
-    /// slot with nothing in it" (`CreditCardTile.addPlaceholder`,
-    /// the dashboard's own empty tile), so it says unavailable without
-    /// having to be faint to do it.
-    private func unavailablePill(_ title: String, reason: String) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
-            Text(title)
-                .font(AppTheme.Typography.label)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-            Text(reason)
-                .font(AppTheme.Typography.nano)
-                .foregroundStyle(AppTheme.Palette.textTertiary)
-        }
-        .padding(.horizontal, AppTheme.Spacing.m)
-        .padding(.vertical, AppTheme.Spacing.s)
-        .background(AppTheme.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.Radius.control)
-                .strokeBorder(
-                    AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3])
-                )
+    /// The group's own heading is what says these cannot be chosen, so the
+    /// pill does not have to look broken to say it.
+    private func explain(_ kind: DashboardWidgetKind) {
+        withAnimation(AppTheme.Motion.quick) {
+            explained = explained == kind ? nil : kind
         }
     }
 
     // MARK: - State
+
+    /// Which unavailable widget the user last asked about, if any.
+    @State private var explained: DashboardWidgetKind?
 
     private var capabilities: DashboardCapabilities {
         DashboardCapabilities(onboarding: store.draft)

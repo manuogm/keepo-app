@@ -49,10 +49,12 @@ struct ShortcutsWalkthroughView: View {
                 Text(step.title)
                     .font(AppTheme.Typography.bodyEmphasis)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
-                Text(step.detail)
-                    .font(AppTheme.Typography.caption)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let detail = step.detail {
+                    Text(detail)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 // Sits beside its written step, never instead of it — a
                 // video-only instruction excludes VoiceOver users and
                 // anyone with Reduce Motion on, and Shortcuts' UI will move
