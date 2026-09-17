@@ -23,6 +23,11 @@ enum TestCaptureQueries {
         let currency: String?
         let minorUnit: Int
         let categoryName: String
+        /// So the card can draw the same `CategoryIconView` every other
+        /// transaction row draws, rather than a stand-in that happens to
+        /// look similar.
+        let categoryIcon: String
+        let categoryColor: String
         let accountName: String?
         let occurredAt: Date
     }
@@ -33,7 +38,8 @@ enum TestCaptureQueries {
             sql: """
             SELECT t.id, t.merchant_raw, t.amount_e4, t.occurred_at,
                    COALESCE(t.currency, t.original_currency) AS currency,
-                   cur.minor_unit, c.name AS category_name, a.name AS account_name
+                   cur.minor_unit, c.name AS category_name,
+                   c.icon AS category_icon, c.color AS category_color, a.name AS account_name
             FROM transactions t
             JOIN categories c ON c.id = t.category_id
             LEFT JOIN accounts a ON a.id = t.account_id
@@ -55,6 +61,8 @@ enum TestCaptureQueries {
             // its card is by construction mapped to nothing.
             minorUnit: (row["minor_unit"] as Int?) ?? 2,
             categoryName: row["category_name"],
+            categoryIcon: row["category_icon"],
+            categoryColor: row["category_color"],
             accountName: row["account_name"],
             occurredAt: PostgresDate.date(fromTimestamp: occurredAt) ?? Date()
         )

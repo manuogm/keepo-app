@@ -28,7 +28,7 @@ public enum CaptureIdentity {
     /// three fields empty. Canned here rather than in the intent so the
     /// success screen and the write agree without either reaching into the
     /// other.
-    public static let testMerchant = "Keepo Test Purchase"
+    public static let testMerchant = "Test purchase"
 
     /// 12.34 in the `numeric(20,4)` integer form every amount uses. A
     /// figure nobody mistakes for a real charge, and small enough that

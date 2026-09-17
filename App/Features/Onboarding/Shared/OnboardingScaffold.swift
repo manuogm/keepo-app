@@ -14,7 +14,11 @@ import SwiftUI
 /// with SwiftUI's, and the eight steps hold genuinely different things — a
 /// wheel, a grid, a form, a video.
 struct OnboardingScaffold<Content: View>: View {
-    let title: String
+    /// `nil` on the connection test, the one step whose content is already
+    /// a headline — it says what it is doing while it runs and celebrates
+    /// when it lands, and a heading over that was a second, quieter title
+    /// saying the same thing first.
+    let title: String?
     /// One or two lines under the title. Optional because some steps say
     /// everything they need to in the title, and an empty subtitle that
     /// still reserves its space is the drift this type prevents.
@@ -153,10 +157,12 @@ struct OnboardingScaffold<Content: View>: View {
     /// triggered by editing a different string.
     private var heading: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            Text(title)
-                .font(AppTheme.Typography.screenTitle)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
+            if let title {
+                Text(title)
+                    .font(AppTheme.Typography.screenTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let subtitle {
                 Text(subtitle)
                     .font(AppTheme.Typography.body)
@@ -265,6 +271,9 @@ struct OnboardingPrimaryButton: View {
 /// deliberate, with the weight carried entirely by the primary's fill.
 struct OnboardingSecondaryButton: View {
     let title: String
+    /// Matches `OnboardingPrimaryButton`'s own flag, for the one place the
+    /// two sit side by side and have to share a row equally.
+    var fillsWidth = false
     let action: () -> Void
 
     var body: some View {
@@ -272,7 +281,8 @@ struct OnboardingSecondaryButton: View {
             Text(title)
                 .font(AppTheme.Typography.label)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
-                .padding(.horizontal, AppTheme.Spacing.l)
+                .padding(.horizontal, fillsWidth ? 0 : AppTheme.Spacing.l)
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
                 .frame(height: AppTheme.Size.touchTarget)
                 .overlay(Capsule().stroke(AppTheme.Palette.textSecondary, lineWidth: 1))
                 .contentShape(Capsule())

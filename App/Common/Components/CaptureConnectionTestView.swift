@@ -54,7 +54,33 @@ struct CaptureConnectionTestView: View {
     private static let readingDelay = Duration.milliseconds(1800)
 
     @State private var phase: Phase = .idle
-    @State private var isDeleting = false
+    /// Flipped a beat after the capture lands, and it drives all three
+    /// parts of the celebration at once — the mark's pop, the burst and the
+    /// haptic. One trigger rather than three keeps them in step; the haptic
+    /// landing a frame before the confetti is the difference between a
+    /// celebration and a glitch. Same shape as `SetupAllSetView`.
+    @State private var hasLanded = false
+    @State private var isAskingAboutTestPurchase = false
+    @State private var decision: TestPurchaseDecision?
+    @ScaledMetric(relativeTo: .largeTitle) private var typeScale: CGFloat = 1
+
+    /// Keep or delete, and `nil` until the user says. A swipe down without
+    /// answering counts as Keep: nothing is destroyed, the flow moves on,
+    /// and the same offer stays in Profile → My Automations for as long as
+    /// a test purchase exists.
+    enum TestPurchaseDecision {
+        case keep
+        case delete
+    }
+
+    /// A breath before the burst fires. The block appears while the waiting
+    /// spinner is still on its way out, and a burst that starts during that
+    /// transition is a burst nobody sees the start of.
+    private static let celebrationDelay = Duration.milliseconds(250)
+    /// How long the celebration has to itself before the sheet asks its
+    /// question. Long enough to watch the confetti land, short enough that
+    /// it never reads as the app waiting for something.
+    private static let questionDelay = Duration.milliseconds(2000)
 
     /// Shortcuts' own message no longer reaches the screen, so it has to
     /// reach somewhere — a failure nobody can reproduce is one nobody can
@@ -131,26 +157,77 @@ struct CaptureConnectionTestView: View {
 
     // MARK: - Arrived
 
+    /// **The payoff, and then the question — never both at once.** Delete
+    /// and Keep used to sit under the tile on this screen, which meant the
+    /// moment capture started working was also the moment the user was
+    /// asked to tidy up after it. The celebration gets the screen to itself
+    /// and the housekeeping arrives in a sheet once it is over.
     private func arrivedBlock(_ capture: TestCaptureQueries.TestCapture) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
-            Label("It works", systemImage: "checkmark.circle.fill")
-                .font(AppTheme.Typography.cardTitle)
+        VStack(spacing: AppTheme.Spacing.l) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: AppTheme.Size.illustration * typeScale))
                 .foregroundStyle(AppTheme.Palette.statusPositive)
+                // Lands rather than appears. The spring overshoots slightly,
+                // which is what makes it read as a stamp coming down instead
+                // of an image fading in.
+                .scaleEffect(hasLanded ? 1 : 0.5)
+                .opacity(hasLanded ? 1 : 0)
+                .animation(AppTheme.Motion.standard, value: hasLanded)
 
-            TestCaptureCard(capture: capture)
-
-            // Delete is the primary action and the test capture is **never**
-            // auto-deleted — the user made it, so the user removes it. The
-            // same affordance lives in Profile → My Automations for as long
-            // as one exists, so backgrounding the app here cannot strand a
-            // fake purchase with nothing left pointing at it.
-            OnboardingPrimaryButton(title: "Delete the test purchase", isLoading: isDeleting, fillsWidth: true) {
-                Task { await deleteTestCapture() }
+            VStack(spacing: AppTheme.Spacing.s) {
+                Text("You made it!")
+                    .font(AppTheme.Typography.screenTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                // A step down, because it is the same sentence finishing.
+                // Kept short enough to hold one line on a phone — the point
+                // of the pair is that it reads at a glance.
+                Text("Auto capturing is ready to go")
+                    .font(AppTheme.Typography.sectionTitle)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
             }
-            Button("Keep it for now", action: onFinished)
-                .font(AppTheme.Typography.label)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+        // **Behind the mark and bigger than the block it decorates.** The
+        // pieces start where the checkmark is and have to be free to travel;
+        // sized to this stack alone they would stop in a rectangle around
+        // the words. The scroll view still clips them at its own bounds,
+        // which is most of the screen and the most this view can reach
+        // without knowing where it is drawn.
+        .background {
+            ConfettiBurst(isActive: hasLanded)
+                .frame(width: AppTheme.Size.illustration * 12, height: AppTheme.Size.illustration * 12)
+                .allowsHitTesting(false)
+        }
+        // Fires whether or not the confetti does: Reduce Motion suppresses
+        // the pieces, and a success the user cannot see is exactly when the
+        // one they can feel matters most.
+        .sensoryFeedback(AppTheme.Feedback.success, trigger: hasLanded)
+        .task {
+            try? await Task.sleep(for: Self.celebrationDelay)
+            hasLanded = true
+            try? await Task.sleep(for: Self.questionDelay)
+            isAskingAboutTestPurchase = true
+        }
+        .sheet(isPresented: $isAskingAboutTestPurchase, onDismiss: act) {
+            TestPurchaseDecisionSheet(
+                capture: capture,
+                baseCurrency: session.profile?.baseCurrency,
+                onDecide: { decision = $0 }
+            )
+        }
+    }
+
+    /// Runs after the sheet is gone rather than from inside it: `onFinished`
+    /// tears this view down, and doing that while a sheet is still on screen
+    /// leaves the sheet without a presenter.
+    private func act() {
+        switch decision ?? .keep {
+        case .keep:
+            onFinished()
+        case .delete:
+            Task { await deleteTestCapture() }
         }
     }
 
@@ -270,42 +347,8 @@ struct CaptureConnectionTestView: View {
     }
 
     private func deleteTestCapture() async {
-        isDeleting = true
         try? await session.dbQueue.write { try TestCaptureQueries.delete($0) }
         session.refresh.bump()
-        isDeleting = false
         onFinished()
-    }
-}
-
-/// The captured test purchase, drawn the way the app draws a transaction —
-/// because what it is demonstrating is that a real row was written, and a
-/// bespoke "success" panel would demonstrate nothing.
-struct TestCaptureCard: View {
-    let capture: TestCaptureQueries.TestCapture
-
-    var body: some View {
-        HStack(spacing: AppTheme.Spacing.m) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
-                Text(capture.merchant)
-                    .font(AppTheme.Typography.bodyEmphasis)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                Text(capture.accountName.map { "\(capture.categoryName) · \($0)" } ?? capture.categoryName)
-                    .font(AppTheme.Typography.caption)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
-            Spacer(minLength: 0)
-            Text(MoneyFormatter.format(
-                capture.amountE4,
-                currency: CurrencyInfo(code: capture.currency ?? "USD", minorUnit: capture.minorUnit)
-            ))
-            .font(AppTheme.Typography.bodyEmphasis)
-            .monospacedDigit()
-            .foregroundStyle(AppTheme.Palette.textPrimary)
-        }
-        .padding(AppTheme.Spacing.m)
-        .frame(maxWidth: .infinity)
-        .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
-        .accessibilityElement(children: .combine)
     }
 }

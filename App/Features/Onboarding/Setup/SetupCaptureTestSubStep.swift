@@ -21,7 +21,10 @@ struct SetupCaptureTestSubStep: View {
 
     var body: some View {
         OnboardingScaffold(
-            title: "Let's check it works",
+            // **No heading.** The content is the headline: it says it is
+            // testing while it runs, and celebrates when it lands. A title
+            // over that was a second, quieter version of the same sentence.
+            title: nil,
             step: .capture,
             onBack: onBack,
             isPrimaryVisible: false,

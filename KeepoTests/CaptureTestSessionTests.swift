@@ -43,11 +43,16 @@ struct CaptureTestSessionTests {
                 currency, occurred_at, merchant_raw, merchant_normalized, card_identifier, source,
                 status, external_id, version, created_at, updated_at, sync_seq)
             VALUES (?, ?, ?, NULL, ?, -123400, NULL, '2026-09-16T10:00:00.000000+00:00',
-                'Keepo Test Purchase', 'KEEPO TEST PURCHASE', ?, 'capture', 'pending', ?, 1,
+                ?, ?, ?, 'capture', 'pending', ?, 1,
                 '2026-09-16T10:00:00.000000+00:00', '2026-09-16T10:00:00.000000+00:00', 0)
             """,
             arguments: [
                 id.uuidString, ownerId.uuidString, ownerId.uuidString, categoryId.uuidString,
+                // Bound rather than typed out: the merchant was spelled here
+                // *and* asserted against `CaptureIdentity.testMerchant`
+                // below, so renaming the constant failed a test that was only
+                // ever checking the seed against itself.
+                CaptureIdentity.testMerchant, MerchantNormalizer.normalize(CaptureIdentity.testMerchant),
                 card, id.uuidString
             ]
         )
