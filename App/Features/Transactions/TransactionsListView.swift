@@ -77,6 +77,8 @@ struct TransactionsListView: View {
     /// instead. Not `private` — read from TransactionsListView+Period.swift.
     @Environment(AppNavigation.self) var navigation: AppNavigation?
     @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
+    /// Optional for the same reason as `navigation` above.
+    @Environment(FTUXCoordinator.self) private var ftux: FTUXCoordinator?
 
     // Not `private` — read from TransactionsListView+Filters.swift.
     var scope: PublicSchema.AccountScope { session.scope }
@@ -169,6 +171,10 @@ struct TransactionsListView: View {
             // tab switch, and this screen may not have been on screen to
             // observe the change.
             .onAppear { applyPendingRequest() }
+            // Only with a row to point at. The inbox drawer offers its own
+            // lesson when it has something in it — see `NeedsReviewPanel`.
+            .onAppear { Task { await offerLessons() } }
+            .task(id: firstTransactionId) { await offerLessons() }
             .onChange(of: navigation?.transactionsRequest) { _, _ in applyPendingRequest() }
     }
 
@@ -254,6 +260,23 @@ struct TransactionsListView: View {
                             )
                         }
                         .buttonStyle(.pressableRow)
+                        // The top row is what the swipe coach mark cuts its
+                        // hole around, and it stays swipeable underneath —
+                        // so a touch on it is the lesson being performed,
+                        // and ends it. Zero distance for the reason the
+                        // accounts row uses zero: a list claims a drag
+                        // before a competing gesture reaches any threshold.
+                        .ftuxAnchor(
+                            transaction.transactionId == firstTransactionId
+                                ? FTUXLessons.swipeDelete : nil,
+                            expandedBy: Self.rowTileExpansion
+                        )
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { _ in ftux?.dismiss(FTUXLessons.swipeDelete) },
+                            including: transaction.transactionId == firstTransactionId
+                                && ftux?.isVisible(FTUXLessons.swipeDelete) == true ? .all : .none
+                        )
                         .swipeActions(edge: .trailing) {
                             // A second, quick path to confirm a capture,
                             // alongside the full review form's Save — only
@@ -280,6 +303,28 @@ struct TransactionsListView: View {
         .scrollContentBackground(.hidden)
         .contentMargins(.bottom, KeepoTabBarMetrics.clearance, for: .scrollContent)
         .refreshable { await load() }
+    }
+
+    // MARK: - Coach marks
+
+    /// How far the white tile reaches past the row's own bounds.
+    ///
+    /// Unlike the Accounts list, this one lets the system draw each row's
+    /// card, and an inset-grouped `List` insets the content a good way
+    /// inside it. Without this the hole was 44×338 inside a tile of 55×369
+    /// — a highlight visibly smaller than the thing it highlights, which is
+    /// the one mistake a cut-out cannot get away with. Measured from a
+    /// screenshot rather than reasoned from the row's padding, because half
+    /// of it is the system's and not ours to read.
+    private static let rowTileExpansion = CGSize(width: AppTheme.Spacing.l, height: 6)
+
+    private var firstTransactionId: UUID? {
+        groupedByDay.first?.items.first?.transaction.transactionId
+    }
+
+    private func offerLessons() async {
+        guard firstTransactionId != nil else { return }
+        await ftux?.offer([FTUXLessons.swipeDelete])
     }
 
     // MARK: - Transaction helpers

@@ -112,6 +112,11 @@ struct DashboardGridView<TileContent: View>: View {
                 let size = geometry.size(rows: resolved.size.rows, columns: resolved.size.columns)
                 let origin = geometry.origin(row: resolved.row, column: resolved.column)
                 tile(resolved)
+                    // The first tile in the arrangement is what the edit
+                    // mode coach mark cuts its hole around. Here rather
+                    // than in the canvas's tile builder because this is the
+                    // one place that knows which tile is first.
+                    .ftuxAnchor(resolved.id == layout.tiles.first?.id ? FTUXLessons.widgets : nil)
                     .frame(width: size.width, height: size.height)
                     .offset(x: origin.x + displacement(of: resolved), y: origin.y)
                     .opacity(resolved.isDisplaced ? 0 : 1)

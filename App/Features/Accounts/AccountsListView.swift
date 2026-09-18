@@ -1,6 +1,5 @@
 import KeepoCore
 import SwiftUI
-import TipKit
 
 /// UI labels are "Everyday" and "Investments" — the groups still split by
 /// `kind`, and each investment row carries its own `InvestmentBadge`, per
@@ -46,6 +45,9 @@ struct AccountsListView: View {
 
     @Environment(AppNavigation.self) private var navigation: AppNavigation?
     @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
+    /// Optional for the same reason as `navigation`: a preview never
+    /// installs one, and a coach mark is the last thing a preview needs.
+    @Environment(FTUXCoordinator.self) private var ftux: FTUXCoordinator?
 
     /// Dragging rearranges — and converts between Everyday and Investments —
     /// only in Total. `reorder_accounts` writes each account's `sort_order`
@@ -55,6 +57,19 @@ struct AccountsListView: View {
     /// gesture isn't disabled because a subset is hard to drag; it's
     /// disabled because a subset cannot express the thing being written.
     var isReorderable: Bool { session.scope == .total }
+
+    /// Drag first, then Add — the order is `FTUXLessons.all`'s, not this
+    /// array's, so it holds however these arrive.
+    private var lessons: [FTUXLesson] {
+        firstAccountId == nil ? [FTUXLessons.add] : [FTUXLessons.accounts, FTUXLessons.add]
+    }
+
+    /// Whether this row is the one the drag coach mark is pointing at right
+    /// now — which is the only row, and the only moment, that needs a
+    /// gesture recogniser of its own.
+    private func isSpotlit(_ row: LocalAccountRow) -> Bool {
+        row.id == firstAccountId && ftux?.isVisible(FTUXLessons.accounts) == true
+    }
 
     var body: some View {
         ZStack {
@@ -100,6 +115,14 @@ struct AccountsListView: View {
             }
         }
         .task(id: AccountsLoadKey(token: session.refresh.token, scope: session.scope)) { await load() }
+        // Asked for from here because this screen is the only thing that
+        // knows there is a row to point at — the drag lesson is a gesture
+        // performed on an account, and an empty list cannot teach it. Add
+        // is offered either way: the button is there whatever the list
+        // holds, and an empty Accounts screen is exactly when somebody
+        // needs to know how to fill it.
+        .onAppear { Task { await ftux?.offer(lessons) } }
+        .task(id: firstAccountId) { await ftux?.offer(lessons) }
         .alert(
             "Archive \"\(archiveCandidate?.name ?? "")\"?",
             isPresented: archiveConfirmationBinding
@@ -151,11 +174,6 @@ struct AccountsListView: View {
             .onMove { offsets, destination in
                 Task { await handleMove(from: offsets, to: destination) }
             }
-            // On the rows themselves, because the lesson is about dragging
-            // one — a tip anchored to the screen would point at nothing in
-            // particular.
-            .popoverTip(KeepoTips.accounts)
-
             if !archived.isEmpty {
                 archivedRow
                     .listRowBackground(Color.clear)
@@ -193,6 +211,33 @@ struct AccountsListView: View {
                     )
             }
             .buttonStyle(.pressableRow)
+            // The first account is what the coach mark cuts its hole
+            // around: the lesson is about dragging *a row*, and the top one
+            // is the one certain to be on screen.
+            .ftuxAnchor(row.id == firstAccountId ? FTUXLessons.accounts : nil)
+            // **Learning by doing ends the lesson.** The hole in the scrim
+            // passes touches through, so this row is draggable while the
+            // coach mark is up — and once the finger moves, the card
+            // explaining the gesture is in the way of watching it. Attached
+            // to the row rather than to the overlay because the overlay
+            // deliberately cannot see a touch that went through its hole.
+            //
+            // **Zero distance, so this is really "a finger landed on the
+            // row".** At 10pt it never fired: the list's own pan claims a
+            // vertical drag inside a `List` before a competing gesture
+            // reaches its threshold, which is precisely the drag being
+            // taught. Touch-down is the one moment nothing else can take
+            // first, and it is the right moment anyway — a tap, a long
+            // press and a lift all mean the same thing here, which is that
+            // the reading is over.
+            //
+            // `including: .none` while the mark is down, so nothing extra
+            // is competing with the list's own drag in normal use.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in ftux?.dismiss(FTUXLessons.accounts) },
+                including: isSpotlit(row) ? .all : .none
+            )
             .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
             // Without this the lift preview snapshots the whole row rect —
             // a full-bleed, square-cornered slab that looks nothing like the

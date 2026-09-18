@@ -1,5 +1,5 @@
+import KeepoCore
 import SwiftUI
-import TipKit
 
 /// The app's own floating tab bar: four icon-only destinations in one
 /// capsule, and the Add button as a **separate** object beside it.
@@ -28,13 +28,6 @@ struct KeepoTabBar: View {
     /// something is waiting.
     let needsReviewCount: Int
     let onAdd: () -> Void
-    /// Whether the Add button carries its first-run tip.
-    ///
-    /// Opt-in for the same reason `ScopeBannerView.showsPrivacyTip` is: the
-    /// bar is on every tab, so an unconditional tip would fire on whichever
-    /// one the user opened first. Transactions is where adding one is the
-    /// obvious next thing to want.
-    var showsAddTip = false
 
     @State private var addTick = 0
 
@@ -115,7 +108,10 @@ struct KeepoTabBar: View {
         // it stay silent — a bar that buzzed on every tab would make this
         // one stop meaning anything.
         .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: addTick)
-        .popoverTip(showsAddTip ? KeepoTips.add : nil)
+        // Published unconditionally — the anchor says *where the button
+        // is*, not that anything should be shown. Whether the coach mark
+        // appears, and on which tab, is `MainTabView`'s call.
+        .ftuxAnchor(FTUXLessons.add)
         .accessibilityLabel(tab.addLabel)
     }
 }

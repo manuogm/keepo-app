@@ -76,6 +76,10 @@ struct MainTabView: View {
         .environment(navigation)
         .environment(scopeContext)
         .environment(avatars)
+        // Read by the screens that host a coach-marked control — Accounts
+        // asks for its own, because only it knows whether there is a row to
+        // point at.
+        .environment(ftux)
         .environment(\.isPrivacyMode, session.isPrivacyMode)
         .environment(\.topSafeAreaInset, topSafeAreaInset)
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets in
@@ -89,7 +93,13 @@ struct MainTabView: View {
         .overlay(alignment: .bottom) {
             KeepoTabBar(
                 tab: $navigation.tab, needsReviewCount: needsReviewCount,
-                onAdd: { navigation.requestAdd() }, showsAddTip: navigation.tab == .transactions
+                // Pressing the button *is* the lesson, so pressing it ends
+                // the lesson — the hole in the scrim passes the tap
+                // straight through to here.
+                onAdd: {
+                    ftux.dismiss(FTUXLessons.add)
+                    navigation.requestAdd()
+                }
             )
             // Negative on a home-indicator phone, and that is the point:
             // the margin is measured from the true screen edge, not from
@@ -110,20 +120,24 @@ struct MainTabView: View {
             }
             .preferredColorScheme(colorScheme)
         }
-        // The scope-banner coach mark, resolved here because this is the
-        // view that spans the whole screen — the hole has to be cut in the
-        // app, not inside the banner that publishes the anchor.
-        .spotlight(
-            isVisible: ftux.isSpotlightVisible,
-            lesson: ftux.spotlightLesson,
-            onDismiss: ftux.dismissSpotlight
-        )
+        // Every coach mark is resolved here, because this is the view that
+        // spans the whole screen — the hole has to be cut in the app, not
+        // inside the banner or the row that publishes the anchor.
+        .spotlight(ftux.visible, onDismiss: { ftux.dismiss() }, onUnanchored: { ftux.suspend() })
         // Suppressed while the Profile sheet is up — a coach mark under a
-        // modal points at something the user cannot see.
+        // modal points at something the user cannot see, and it would spend
+        // its one showing doing it.
         .task(id: navigation.isProfilePresented) {
+            ftux.isModalPresented = navigation.isProfilePresented
             guard !navigation.isProfilePresented else { return }
-            await ftux.showSpotlightIfNeeded()
+            // The screen is its own again, so whatever it was offering can
+            // have another go.
+            await ftux.retry()
         }
+        // A tab change replaces every control on screen at once, which is
+        // the one moment an offer is definitely stale — each screen offers
+        // its own again as it appears.
+        .onChange(of: navigation.tab) { _, _ in ftux.clearQueue() }
         // The one place in the app that asks for a rating, and the only
         // one that can: `requestReview` needs a foreground-active scene and
         // SwiftUI's environment. Deliberately **not** in onboarding — see

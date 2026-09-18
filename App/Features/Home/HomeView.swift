@@ -1,6 +1,5 @@
 import KeepoCore
 import SwiftUI
-import TipKit
 
 /// Dashboard — a widget canvas the user arranges themselves, under the
 /// scope banner every main screen now shares.
@@ -36,6 +35,9 @@ struct HomeView: View {
 
     @Environment(AppNavigation.self) private var navigation: AppNavigation?
     @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
+    /// Optional for the same reason as `navigation`: a preview never
+    /// installs one, and a coach mark is the last thing a preview needs.
+    @Environment(FTUXCoordinator.self) private var ftux: FTUXCoordinator?
 
     var body: some View {
         ZStack {
@@ -45,7 +47,7 @@ struct HomeView: View {
                 ScopeBannerView(
                     title: "Dashboard",
                     session: session,
-                    showsPrivacyTip: true,
+                    showsPrivacyLesson: true,
                     onOpenProfile: { navigation?.openProfileRoot() },
                     accessory: { doneButton }
                 )
@@ -78,6 +80,30 @@ struct HomeView: View {
         .onChange(of: navigation?.pendingAdd) { _, _ in
             if navigation?.consumeAdd(.home) == true { isPickingWidget = true }
         }
+        // The Dashboard's three, in `FTUXLessons.all` order: the header
+        // swipe, the eye, then edit mode. `onAppear` rather than `task`
+        // because a tab that is returned to does not re-run its tasks, and
+        // a lesson skipped once (a sheet was up, another mark was showing)
+        // should get another chance on the next visit.
+        .onAppear { Task { await ftux?.offer(lessons) } }
+        // **Entering edit mode is the lesson being performed**, so it ends
+        // it — the long press that opens edit mode is the gesture the card
+        // is describing, and a scrim over the result would be in the way of
+        // the thing just learned.
+        .onChange(of: isEditing) { _, editing in
+            if editing { ftux?.dismiss(FTUXLessons.widgets) }
+        }
+    }
+
+    /// The widget lesson is offered only when there is a widget to point
+    /// at: an empty scope draws a blank state, and a blank canvas has
+    /// nothing to long-press.
+    private var lessons: [FTUXLesson] {
+        var offered = [FTUXLessons.scope, FTUXLessons.privacy]
+        if scopeContext?.emptiness(for: session.scope) == nil, !store.mountedKinds.isEmpty {
+            offered.append(FTUXLessons.widgets)
+        }
+        return offered
     }
 
     /// The way out of edit mode. It borrows the banner's accessory slot
@@ -110,10 +136,6 @@ struct HomeView: View {
                 session: session, store: store, data: data, isLoading: isLoading,
                 isEditing: $isEditing, isPickingWidget: $isPickingWidget
             )
-            // Not while the user is already rearranging: a tip explaining
-            // the gesture someone is mid-way through performing is the one
-            // moment it is certainly not needed.
-            .popoverTip(isEditing ? nil : KeepoTips.widgets)
         }
     }
 

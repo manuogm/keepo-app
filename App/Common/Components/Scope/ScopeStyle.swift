@@ -38,13 +38,19 @@ extension PublicSchema.AccountScope {
         }
     }
 
-    /// One line under the screen title saying what the scope actually
-    /// filters. The carousel teaches the model; this is where it says so.
+    /// One line saying what this scope actually filters, written to be read
+    /// beside the other two rather than alone — which is where it is used:
+    /// the scope coach mark lists all three, each against its own colour.
+    ///
+    /// Here rather than in the coach mark because the words and the colour
+    /// have to come from the same place. A legend that named the scopes
+    /// itself would be a second vocabulary, free to drift from the badge on
+    /// the banner the moment either changed.
     var caption: String {
         switch self {
-        case .total: return "Everything you can see"
-        case .me: return "Only your unshared accounts"
-        case .household: return "Only accounts you share"
+        case .total: return "Everything you own (Household + Private)"
+        case .me: return "Only what you choose not to share"
+        case .household: return "What you choose to share"
         }
     }
 

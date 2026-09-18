@@ -18,11 +18,20 @@ struct FTUXLessonsTests {
 
     /// The tour is the complete list — a lesson that exists but is not on
     /// it is one nobody can ever go back and read.
-    @Test("the tour lists every lesson that exists")
+    ///
+    /// **And its order is load-bearing now**, not just editorial: the
+    /// coordinator shows whichever of the lessons a screen offers comes
+    /// first here, so this array is what sequences the Dashboard's three
+    /// and the two on each of Accounts and Transactions.
+    @Test("the tour lists every lesson that exists, screen by screen")
     func tourIsComplete() {
         let named = [
-            FTUXLessons.scope, FTUXLessons.accounts, FTUXLessons.categories,
-            FTUXLessons.widgets, FTUXLessons.needsReview, FTUXLessons.privacy, FTUXLessons.add
+            // Dashboard
+            FTUXLessons.scope, FTUXLessons.privacy, FTUXLessons.widgets,
+            // Accounts
+            FTUXLessons.accounts, FTUXLessons.add,
+            // Transactions
+            FTUXLessons.swipeDelete, FTUXLessons.needsReview
         ]
         #expect(FTUXLessons.all == named)
     }

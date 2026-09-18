@@ -48,6 +48,16 @@ extension AccountsListView {
         return result
     }
 
+    /// The top account row, whichever group it is in — what the drag
+    /// coach mark points at, and `nil` while both groups are empty, which
+    /// is what stops it being shown at all.
+    var firstAccountId: UUID? {
+        for item in items {
+            if case .account(let row) = item { return row.id }
+        }
+        return nil
+    }
+
     /// The entire drag model. Rebuilds the flat list, applies SwiftUI's move
     /// to it, then reads the result back out: each account's kind is the
     /// kind of the nearest header above it, and its order is its position in

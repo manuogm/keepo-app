@@ -216,7 +216,6 @@
 		A91D573436DB3670A85B7632 /* CategoryMergeTiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB53E034FD3042637C97381 /* CategoryMergeTiles.swift */; };
 		AB95F8EE581EE512211B1275 /* ScopeContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323D6E84BA1E735B53FDE6E7 /* ScopeContext.swift */; };
 		AD2A7DB89BBDB050452CA807 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE9D5EF2222D3BBB7A7C333C /* Outbox.swift */; };
-		AE2CFDAE53C8F04BCA3A611B /* KeepoTips.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B24C7FAA715FA379C8168D /* KeepoTips.swift */; };
 		AEDA7863DFF287EA9CB7BE1A /* TransactionsListView+Loading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12323049CBBB834E1978A81E /* TransactionsListView+Loading.swift */; };
 		B00B2A03D82D0237A6D9DB11 /* CategoryTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB1C58405432F114141B208 /* CategoryTile.swift */; };
 		B03FB07E318C04AE8F7EC30D /* LocalTransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBF6795112FAE14AF6A9964 /* LocalTransactionRow.swift */; };
@@ -259,6 +258,7 @@
 		CC59625186FAFA1CCCD6480C /* HouseholdSetupFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 791B69045C75E082FC09B489 /* HouseholdSetupFlow.swift */; };
 		CD8D3443804EBD1B5E4A6BE4 /* DashboardScopeFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3FEA59391FE97D8365A918F /* DashboardScopeFixture.swift */; };
 		CDEAFC8D83E97D3B04E20CFD /* LocalStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */; };
+		CF7632BB3A1B0551894DCCB0 /* FTUXLessonDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3AC53C0B5E14F58AC31BA0 /* FTUXLessonDetail.swift */; };
 		D15A1D633F72688611DDF354 /* ReviewPrompter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E53170A30B0E65B4F55C184 /* ReviewPrompter.swift */; };
 		D17D97C911F003E95B24DD2D /* TransferLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B92B44899D6DDB44851A8E /* TransferLocalWriteTests.swift */; };
 		D18BF57535C0B1A56DE160CC /* SetupCaptureIntroSubStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B5A82829163C74F5130CB7D /* SetupCaptureIntroSubStep.swift */; };
@@ -411,7 +411,6 @@
 		2C8A2B60812458C648EACE96 /* SetupCommitPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupCommitPlan.swift; sourceTree = "<group>"; };
 		2EC49551604711746D0B4870 /* ThirdPartyLicenses */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ThirdPartyLicenses; path = App/Resources/ThirdPartyLicenses; sourceTree = SOURCE_ROOT; };
 		30916B8D3671A5BD1B620655 /* AppTheme+Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTheme+Typography.swift"; sourceTree = "<group>"; };
-		30B24C7FAA715FA379C8168D /* KeepoTips.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoTips.swift; sourceTree = "<group>"; };
 		30B8E976E97E2B97A613D5C1 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 		30FBEDFDA4FF666C8FA61FF8 /* CaptureNotificationCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationCopyTests.swift; sourceTree = "<group>"; };
 		323D6E84BA1E735B53FDE6E7 /* ScopeContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeContext.swift; sourceTree = "<group>"; };
@@ -480,6 +479,7 @@
 		5B0A8C2BEF10788227677E2A /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		5BC83C733F39438E3322B2FF /* AppTheme+Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTheme+Palette.swift"; sourceTree = "<group>"; };
 		5C2A3D881245B0A0B054AFA7 /* CardMappingLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardMappingLocalWriteTests.swift; sourceTree = "<group>"; };
+		5C3AC53C0B5E14F58AC31BA0 /* FTUXLessonDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTUXLessonDetail.swift; sourceTree = "<group>"; };
 		5CB53E034FD3042637C97381 /* CategoryMergeTiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryMergeTiles.swift; sourceTree = "<group>"; };
 		5E2B99129C4E07F0E402F157 /* HighlightableChart+Axis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HighlightableChart+Axis.swift"; sourceTree = "<group>"; };
 		5F3C84D2874D1565E0E6C005 /* CaptureConnectionTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureConnectionTestView.swift; sourceTree = "<group>"; };
@@ -1308,7 +1308,7 @@
 			isa = PBXGroup;
 			children = (
 				ED624A5EC4CE214399DB494E /* FTUXCoordinator.swift */,
-				30B24C7FAA715FA379C8168D /* KeepoTips.swift */,
+				5C3AC53C0B5E14F58AC31BA0 /* FTUXLessonDetail.swift */,
 				18A387EFD494F3E23B5C3978 /* ShowMeAroundView.swift */,
 				C4E7B4D19CE8F0298795084A /* SpotlightOverlay.swift */,
 			);
@@ -1646,6 +1646,7 @@
 				70127DD81CE7AC78BD52FAE3 /* ErrorAlert.swift in Sources */,
 				DCEFB45D20BC131FA0C9519B /* ExportView.swift in Sources */,
 				5865DCBD730A1A6676CB888B /* FTUXCoordinator.swift in Sources */,
+				CF7632BB3A1B0551894DCCB0 /* FTUXLessonDetail.swift in Sources */,
 				124124D5FCC9AB799601F076 /* FadingEdges.swift in Sources */,
 				CBF08EDBE62EFB84D2F1CE04 /* FeatureDeckView.swift in Sources */,
 				E035D81A41952DFA11DEBB47 /* FormPrimitives.swift in Sources */,
@@ -1686,7 +1687,6 @@
 				14134599FBFF0BA0BB84AC41 /* KeepoIcon.swift in Sources */,
 				5FC731892AD76F621D409CEB /* KeepoShortcuts.swift in Sources */,
 				60349D9D98A83C5D45F25F98 /* KeepoTabBar.swift in Sources */,
-				AE2CFDAE53C8F04BCA3A611B /* KeepoTips.swift in Sources */,
 				609F9032D22FB12CE197C6B7 /* KindTabBar.swift in Sources */,
 				581E09E6D236BB73E9A99B64 /* LiveOutboxSender.swift in Sources */,
 				48B57064BBC55CA213316957 /* LocalAccountRow.swift in Sources */,

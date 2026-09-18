@@ -106,13 +106,15 @@ enum AppSettingsKeys {
     /// When `requestReview` was last called — not when a prompt was last
     /// *shown*, which iOS never tells anyone.
     static let lastReviewRequestAt = "lastReviewRequestAt"
-    /// Whether the scope-banner coach mark has been shown on this device.
+    /// Prefix for "this coach mark has been shown on this device", one key
+    /// per lesson — `spotlightSeen.scope`, `.accounts`, `.add`.
     ///
-    /// Device-local, and one-shot: it teaches a gesture, and a gesture only
-    /// needs teaching once. "Show me around" in Profile clears it, which is
-    /// the entire replay mechanism — everything else the first-time
-    /// experience does is TipKit's own persistence.
-    static let hasSeenScopeSpotlight = "hasSeenScopeSpotlight"
+    /// Device-local, and one-shot each: a coach mark teaches a gesture, and
+    /// a gesture only needs teaching once. Keyed by `FTUXLesson.id` rather
+    /// than listed here so adding a coach mark is adding a lesson, not
+    /// remembering to add a constant beside it — see
+    /// `FTUXCoordinator.seenKey`.
+    static let spotlightSeenPrefix = "spotlightSeen."
 }
 
 extension AppSettings {

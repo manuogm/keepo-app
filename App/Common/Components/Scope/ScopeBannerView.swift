@@ -1,6 +1,5 @@
 import KeepoCore
 import SwiftUI
-import TipKit
 
 /// The top of every main screen: one full-bleed colour card per scope,
 /// dragged horizontally to change which slice of the user's money the whole
@@ -56,15 +55,15 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     /// that opts out — every other caller keeps the toggle by leaving this
     /// at its default.
     var showsPrivacyToggle = true
-    /// Whether the privacy toggle carries its first-run tip.
+    /// Whether the privacy toggle is the thing its coach mark points at.
     ///
     /// Opt-in, and only Home opts in — the banner renders on all four tabs,
-    /// so a tip attached unconditionally would fire on whichever tab the
-    /// user happened to open first rather than on "the screen where it
-    /// matters". Home is where the figures are largest and where hiding
-    /// them is most obviously worth knowing about. Same shape as
+    /// so an anchor published unconditionally would put the hole on
+    /// whichever tab happened to register first rather than on "the screen
+    /// where it matters". Home is where the figures are largest and where
+    /// hiding them is most obviously worth knowing about. Same shape as
     /// `showsPrivacyToggle` above, for the same reason.
-    var showsPrivacyTip = false
+    var showsPrivacyLesson = false
     let onOpenProfile: () -> Void
     /// Rendered immediately before the privacy toggle. Home puts "Done"
     /// here while the dashboard is being rearranged; Transactions puts the
@@ -113,11 +112,10 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
             }
         }
         .elevation(.resting)
-        // What the one coach mark in the app points at. Published from
-        // here rather than measured by the overlay, because the banner is
-        // the only thing that knows where the banner is — see
-        // `SpotlightOverlay`.
-        .ftuxAnchor()
+        // What the scope coach mark points at. Published from here rather
+        // than measured by the overlay, because the banner is the only
+        // thing that knows where the banner is — see `SpotlightOverlay`.
+        .ftuxAnchor(FTUXLessons.scope)
         .animation(AppTheme.Motion.standard, value: isFiltersExpanded)
         // The one moment worth a bump: the card breaking free. Not the
         // finger touching down, not the spring settling — the instant the
@@ -177,7 +175,14 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
             if showsPrivacyToggle {
                 PrivacyToggleButton(session: session, tint: .white)
                     .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
-                    .popoverTip(showsPrivacyTip ? KeepoTips.privacy : nil)
+                    // **Only the card the user is actually looking at.**
+                    // The carousel keeps all three mounted, side by side
+                    // and off-screen, so anchoring every card's eye would
+                    // let a neighbour win the anchor and cut the hole
+                    // somewhere past the edge of the display.
+                    .ftuxAnchor(
+                        showsPrivacyLesson && scope == session.scope ? FTUXLessons.privacy : nil
+                    )
             }
         }
         .padding(.horizontal, AppTheme.Spacing.l)
@@ -335,12 +340,12 @@ extension ScopeBannerView where Filters == EmptyView {
     init(
         title: String,
         session: SessionStore,
-        showsPrivacyTip: Bool = false,
+        showsPrivacyLesson: Bool = false,
         onOpenProfile: @escaping () -> Void,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.init(
-            title: title, session: session, showsPrivacyTip: showsPrivacyTip,
+            title: title, session: session, showsPrivacyLesson: showsPrivacyLesson,
             onOpenProfile: onOpenProfile, accessory: accessory, filters: { EmptyView() }
         )
     }

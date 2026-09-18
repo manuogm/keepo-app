@@ -1,6 +1,5 @@
 import KeepoCore
 import SwiftUI
-import TipKit
 
 /// The Needs Review inbox, as a drawer that drops out from underneath the
 /// scope banner on the Transactions screen.
@@ -49,6 +48,9 @@ struct NeedsReviewPanel: View {
     /// see `isVisible`.
     @State private var showSuccess = false
 
+    /// Optional so a preview never has to install one.
+    @Environment(FTUXCoordinator.self) private var ftux: FTUXCoordinator?
+
     /// The app's one accent. An inbox is a reminder, so it must catch the
     /// eye *without* reading as an error — which is why this is mango and
     /// not `statusNegative`, the only other colour that would pull a glance.
@@ -73,13 +75,21 @@ struct NeedsReviewPanel: View {
             if isVisible {
                 panel
                     // Attached to the panel, not the screen: the lesson is
-                    // "this thing here is what Keepo captured", and the
-                    // panel only exists when there is something to explain.
-                    .popoverTip(KeepoTips.needsReview)
+                    // "this thing here is the inbox", and the panel only
+                    // exists when there is something to explain.
+                    .ftuxAnchor(FTUXLessons.needsReview)
             }
         }
         .frame(maxHeight: isExpanded ? .infinity : nil)
         .task(id: session.refresh.token) { await load() }
+        // Offered from here rather than from the screen, because whether
+        // there *is* an inbox to point at is this view's own answer — and
+        // the coordinator sorts what it is offered, so arriving after the
+        // ledger's own lesson does not put this one first.
+        .task(id: isVisible) {
+            guard isVisible else { return }
+            await ftux?.offer([FTUXLessons.needsReview])
+        }
         .onChange(of: items.isEmpty) { _, isEmpty in
             guard isEmpty, isExpanded else { return }
             showSuccess = true
