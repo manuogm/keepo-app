@@ -8,18 +8,17 @@ import UIKit
 /// `RootView.onOpenURL`, which calls `SessionStore.handleMagicLink(url:)` and
 /// advances the phase automatically — this view does nothing to complete auth.
 ///
-/// **This is the highest-attrition moment in the whole flow**, and it sits
-/// immediately after four screens that just built enthusiasm: the user has
-/// to leave Keepo, find an email, and come back. Nothing here can fix that
-/// — only Sign in with Apple can, and it is the single highest-value
-/// unblock for this redesign. What this screen can do is not waste the
-/// enthusiasm: the mark and tagline carry the intro's tone into it, the
-/// waiting state says exactly what is happening, and every dead end has an
-/// escape (resend, open Mail, wrong address).
+/// **This is the first thing anyone sees, and the highest-attrition moment
+/// in the whole flow**: the user has to leave Keepo, find an email, and
+/// come back, with nothing before it to have earned that. Nothing here can
+/// fix the round trip — only Sign in with Apple can, and it is the single
+/// highest-value unblock for this flow. What this screen can do is carry
+/// the whole first impression on its own: the mark and tagline say what
+/// Keepo is, the waiting state says exactly what is happening, and every
+/// dead end has an escape (resend, open Mail, wrong address).
 ///
 /// The mark is `Typography.Number.hero` — the 48pt size whose own doc
-/// comment calls it "the sign-in screen's mark", and which the sign-in
-/// screen did not use until now.
+/// comment calls it "the sign-in screen's mark".
 struct OTPSignInView: View {
     let session: SessionStore
 
@@ -101,9 +100,9 @@ struct OTPSignInView: View {
                 .padding(AppTheme.Spacing.m)
                 .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
 
-            // The same button the intro and every setup step use — this is
-            // one step of one flow, and a sign-in button that looked like a
-            // different product's would say so.
+            // The same button every setup step uses — this is one step of
+            // one flow, and a sign-in button that looked like a different
+            // product's would say so.
             OnboardingPrimaryButton(
                 title: "Continue", isEnabled: !trimmedEmail.isEmpty, isLoading: isLoading, fillsWidth: true
             ) {

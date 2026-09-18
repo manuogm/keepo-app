@@ -45,10 +45,6 @@ enum AppSettingsKeys {
     /// one. A separate key cannot break a draft that predates it. Cleared
     /// with the draft in `OnboardingDraftStore.clear()`.
     static let walkthroughCompleted = "walkthroughCompleted"
-    /// Whether the intro screens have been shown on this device. They sit
-    /// **before** sign-in — there is no account to hang the flag off yet —
-    /// so a returning signed-out user is not marketed to a second time.
-    static let hasSeenIntro = "hasSeenIntro"
     /// The Home dashboard's own widget arrangement, as JSON (see
     /// `DashboardStore`). Device-local by decision, not by omission: a grid
     /// laid out for one screen size is not obviously the right grid for

@@ -387,13 +387,15 @@ Notation: **[R]** = reuse existing code, **[N]** = new.
 
 ### 4.1 Intro — `App/Features/Onboarding/Intro/`
 
+> **Removed 2026-09-18 — see §10.20.** The welcome screen and the four-slide deck are gone; `.needsSignIn` renders `OTPSignInView` directly. The table below is kept as the record of what was built, not as something to build.
+
 | # | Screen | Build |
 |---|---|---|
 | 1 | **Welcome + problem** (merged, §3.1) | **[N]** `WelcomeView`. Hero mark at `Typography.Number.hero`, tagline, the problem framing, "Let's go". |
 | 2–5 | **Features 1–4** as a swipeable deck | **[N]** `FeatureDeckView` + `FeatureSlide` (icon, title, three-or-fewer lines, page dots). Copy per §3.3 / §3.4. Icons from `Assets.xcassets/Icons` — `icon-lock`/`icon-faceID` (privacy), `icon-tap` (capture), `icon-slider` (customise), `icon-shared` (household). |
 | — | **Sign in** | **[R]** `OTPSignInView`, revisualised (§3.5c): hero mark, tagline, one field, one button, the waiting state given a resend cooldown and a "wrong address?" escape. |
 
-Intro screens show **before** sign-in, so they render on `SessionStore.phase == .needsSignIn`. `RootView` gains one `@AppStorage` flag (`hasSeenIntro`) so a returning signed-out user is not re-marketed.
+~~Intro screens show **before** sign-in, so they render on `SessionStore.phase == .needsSignIn`. `RootView` gains one `@AppStorage` flag (`hasSeenIntro`) so a returning signed-out user is not re-marketed.~~ **Superseded 2026-09-18:** there are no intro screens, and `hasSeenIntro` no longer exists.
 
 ### 4.2 Setup — `App/Features/Onboarding/Setup/`
 
@@ -477,7 +479,7 @@ Failure handling: 2 failing is the only hard stop — show the error, offer retr
 ### 5.4 Routing
 
 `RootView` currently switches on `SessionStore.Phase` and hands `.needsOnboarding` to `OnboardingView`. It gains:
-- `.needsSignIn` → `hasSeenIntro ? OTPSignInView : IntroFlowView` (which ends in `OTPSignInView`).
+- `.needsSignIn` → `OTPSignInView`. (Was `hasSeenIntro ? OTPSignInView : IntroFlowView` — the intro was removed 2026-09-18, §10.20.)
 - `.needsOnboarding` → `SetupFlowView` (new), restoring from the draft.
 - `.ready` → `MainTabView`, which gains the FTUX layer.
 
@@ -492,7 +494,7 @@ Failure handling: 2 failing is the only hard stop — show the error, offer retr
 
 ```
 App/Features/Onboarding/
-  Intro/        WelcomeView, FeatureDeckView, FeatureSlide
+  (Intro/      removed 2026-09-18 — sign-in is the first screen)
   Setup/        SetupFlowView, Step1Profile … Step9AllSet, CommitView
   Shared/       OnboardingChrome, OnboardingScaffold, DelayedSkipButton, buttons
 App/Features/FTUX/        FTUXCoordinator, SpotlightOverlay, Tips
@@ -528,7 +530,7 @@ Each stage ends with the repo's standard gate: `xcodebuild -scheme Keepo build` 
 | Stage | Contents | Review stop |
 |---|---|---|
 | **0 — Foundations** ✅ **delivered 2026-09-16** | `OnboardingDraft` + `SetupStep` + `DraftAccount`, `OnboardingDraftStore`, `DisplayNameSuggestion`, `DefaultCategoryCatalog`, `ShortcutsWalkthrough` (brought forward — the user supplied the iCloud link), chrome (`OnboardingChrome`/`ProgressDots`/`DelayedSkipButton`/`OnboardingScaffold`/the two buttons), `CategoryTile`/`CurrencyWheel`/`AvatarButton` extractions, DEBUG "Replay Onboarding" + `ProfileRepository.resetOnboarding`, `App/Resources/Videos/` folder reference. 26 new tests. Nothing user-visible. | no |
-| **1 — Intro + Sign-in** ✅ **delivered 2026-09-16** | `WelcomeView` (merged), `FeatureDeckView`/`FeatureSlide`, `IntroFlowView`, the `OTPSignInView` revisual, `hasSeenIntro` routing in `RootView`. Reviewed on the simulator with the user watching; two changes came out of it (see §10.1/§10.2). | **yes** — done 2026-09-16 |
+| **1 — Intro + Sign-in** ✅ **delivered 2026-09-16**, intro half **removed 2026-09-18 (§10.20)** | ~~`WelcomeView` (merged), `FeatureDeckView`/`FeatureSlide`, `IntroFlowView`~~, the `OTPSignInView` revisual, ~~`hasSeenIntro` routing in `RootView`~~. Reviewed on the simulator with the user watching; two changes came out of it (see §10.1/§10.2). | **yes** — done 2026-09-16 |
 | **2 — Setup 1–3** ✅ **delivered 2026-09-16** | `SetupFlowView`, `SetupProfileStep`, `SetupCurrencyStep`, `SetupAccountStep`, `SetupCommitPlan` + `SetupCommitView` — the commit end-to-end, short-circuited after step 3. `BaseCurrencyDefault` (new, in `KeepoCore`), `DashboardStore.replace(kinds:)`, `AccountKindPicker` becomes the single source of the two kinds' copy, `completeOnboarding`'s `displayName` becomes optional, `OnboardingView` and `SessionStore.completeOnboarding` deleted. 20 new tests. Walked on the simulator through to a live dashboard; three changes came out of that (see §10.12). | no |
 | **3 — Setup 4** ✅ **delivered 2026-09-16** | `SetupCaptureStep` + its three sub-steps, `NotificationPermission` (the one place that asks), `ShortcutsWalkthroughView` + `WalkthroughClipView` (shared with a rewritten `WalletAutomationGuideView`), `CaptureTestSession` + `CaptureTestCoordinator`, `CaptureIntent`'s empty-invocation test branch, `Outbox.submitTestCaptureTransaction` (local-only), `TestCaptureQueries`, the Needs Review exclusion, `AppSettings.captureVerifiedAt` + `CaptureStatusCard`, `KeepoShortcuts` (`AppShortcutsProvider`), `LSApplicationQueriesSchemes`. 9 new tests. **The `x-callback-url` round trip is verified**, including on the Simulator — see §10.14. **Restored the notification ask, which stage 2 removed** — deleting `OnboardingView` took `requestNotificationAuthorizationIfNeeded()` with it, so until this lands the only place that asks is Profile → Notifications, and a fresh user has `.full` selected with no iOS permission behind it (C-06). §4.3a's primed, explicit-button ask is the replacement; calling it from the commit instead would be precisely the ambush §4.3a rejects. **Prerequisites: (a) the capture-hygiene and multi-currency workstreams, which precede this entire plan — see the master plan's shipping-order section; (b) Manu publishes the "Keepo Capture" iCloud link, which also determines the video script.** The device probe is done — see §3.8. Largest stage; split if it runs long. | **yes** — needs a real device |
 | **4 — Setup 5–6** ✅ **delivered 2026-09-16** | `SetupCategoriesStep`, `SetupDashboardStep` + `SetupDashboardLayout` + `DashboardCapabilities.init(onboarding:)`. Every widget is the **real** `DashboardWidgetView` against `DashboardData.sample`, packed by `DashboardArrangement` itself, with the catalogue's own unavailability reasons derived from the draft. 10 new tests. Walked to a committed dashboard on the simulator; two layout defects came out of that (see §10.16). | no |
@@ -643,3 +645,11 @@ Per `CLAUDE.md`: add an **"Onboarding redesign workstream"** section to `keepo-v
     - **The replay button only popped back to Profile.** `@Environment(\.dismiss)` dismisses the pushed screen, not the sheet — so the spotlight was replayed behind a modal covering the banner it points at, and the button appeared to do nothing. It closes the whole sheet now.
 
     Also added: **`AppTheme.Opacity.scrim` (0.6)**, the first value on that scale whose job is to make the app behind it *unreadable* rather than quieter. Keepo's modal curtain is `.ultraThinMaterial` over `fill` and deliberately keeps its background legible as context; a spotlight wants the opposite, so it gets its own token rather than a literal.
+
+20. **The intro is gone — sign-in is the first screen (Manu, 2026-09-18).**
+
+    `WelcomeView`, `FeatureDeckView`/`FeatureSlide` and `IntroFlowView` are deleted, along with `AppSettingsKeys.hasSeenIntro` and its reset in DEBUG "Replay Onboarding". `RootView`'s `.needsSignIn` renders `OTPSignInView` with nothing in front of it, so a first launch lands on the email field.
+
+    Nothing about the pitch was found wrong — this is a decision that five screens of it before anyone has an account is five screens too many. The load that removal puts back on sign-in is why `OTPSignInView` already carries the mark and the tagline: it is the whole first impression now, and its doc comment says so. The copy itself is recoverable from git (`b72f9c4~`) if a marketing surface ever wants it.
+
+    **Do not rebuild it from §4.1 or §3.3/§3.4** — those sections stand as the record of what was built and why the copy read the way it did, not as work outstanding.

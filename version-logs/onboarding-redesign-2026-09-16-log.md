@@ -6,7 +6,10 @@ every screen is client-only, on RPCs and payloads that already existed.
 
 ## What shipped
 
-**Intro (before sign-in).** `WelcomeView` (welcome + problem merged),
+**Intro (before sign-in) — deleted 2026-09-18.** Manu's call: sign-in is the
+first screen, `hasSeenIntro` is gone, and `.needsSignIn` renders `OTPSignInView`
+directly. Recorded in §10.20 of the plan; kept below as what was built, not as
+what is there. `WelcomeView` (welcome + problem merged),
 `FeatureDeckView` — four slides, paged, **one** button reading "I'm in. Take
 me to Keepo" that stays disabled until all four have been seen. `IntroFlowView`
 routes on `AppSettingsKeys.hasSeenIntro`, set on *reaching* sign-in, so a

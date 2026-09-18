@@ -88,8 +88,8 @@ struct ProfileView: View {
                     }
                     // Walk the setup flow again on a real device without
                     // deleting the app. Clears `onboarded_at` plus the
-                    // device-local draft and intro flag — and nothing else,
-                    // so the accounts and categories a previous run created
+                    // device-local draft — and nothing else, so the
+                    // accounts and categories a previous run created
                     // survive (see `ProfileRepository.resetOnboarding`).
                     Button {
                         Task { await replayOnboarding() }
@@ -160,7 +160,6 @@ struct ProfileView: View {
     private func replayOnboarding() async {
         guard let userId = session.profile?.id else { return }
         UserDefaults.standard.removeObject(forKey: AppSettingsKeys.onboardingDraft)
-        UserDefaults.standard.removeObject(forKey: AppSettingsKeys.hasSeenIntro)
         try? await ProfileRepository.resetOnboarding(client: session.client, userId: userId)
         // The phase is derived from the profile, so nothing moves until it
         // is re-read — the sheet dismisses itself on the way out because

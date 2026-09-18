@@ -71,24 +71,13 @@ struct RootView: View {
         }
     }
 
-    @AppStorage(AppSettingsKeys.hasSeenIntro) private var hasSeenIntro = false
-
     var body: some View {
         Group {
             switch session.phase {
             case .loading:
                 RootLoadingView()
             case .needsSignIn:
-                // The intro sits in front of sign-in on a device that has
-                // not seen it, and never again after that — see
-                // `IntroFlowView` for why the flag is device-local and why
-                // it is set on reaching sign-in rather than on completing
-                // it.
-                if hasSeenIntro {
-                    OTPSignInView(session: session)
-                } else {
-                    IntroFlowView(session: session)
-                }
+                OTPSignInView(session: session)
             case .needsOnboarding:
                 // No completion closure: the setup flow refreshes the
                 // profile itself, at the very end of its own commit, and
