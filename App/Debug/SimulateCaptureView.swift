@@ -93,7 +93,8 @@ struct SimulateCaptureView: View {
                 + "Notification scheduled — background the app, long-press it to test the quick actions."
             session.refresh.bump()
             await CaptureNotificationScheduler.scheduleAppliedLocally(
-                resolution: resolution, amountE4: parsedAmount, transactionId: payload.id
+                resolution: resolution, symbolHint: CurrencyDetector.symbol(in: amount),
+                transactionId: payload.id
             )
         case .applied:
             resultMessage = "Captured — check Needs Review."

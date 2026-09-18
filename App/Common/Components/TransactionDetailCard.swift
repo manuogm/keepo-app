@@ -33,6 +33,10 @@ struct TransactionDetailCard: View {
     /// in their own account's currency, so there is no third one to name —
     /// `needsReceivedAmount` below is that case, and it predates this.
     var foreign: ForeignAmount?
+    /// Off for a captured transaction — see `TransactionDetailContainer
+    /// .showsAmountCalculator`. Transfers never carry it: a transfer is
+    /// always hand-entered.
+    var showsAmountCalculator = true
     /// Only meaningful for a transfer, and only when the two accounts hold
     /// different currencies — otherwise the received amount is the sent
     /// amount and asking for it twice is asking the user to agree with
@@ -81,6 +85,7 @@ struct TransactionDetailCard: View {
                 amountText: $amountText,
                 accounts: accounts,
                 excluding: nil,
+                showsAmountCalculator: showsAmountCalculator,
                 foreign: foreign
             )
 
@@ -151,6 +156,10 @@ struct ForeignAmount {
     /// left empty for the user to fill rather than guessed at.
     let rateDate: Date?
     let onPickCurrency: () -> Void
+    /// Fetches fresh rates and re-derives the charge. Offered only in the
+    /// no-rate case, and only while the user has not already typed the
+    /// figure themselves — see `chargedBlock`.
+    let onRefreshRates: () async -> Void
 }
 
 /// One account + its amount. The account row on top doubles as the picker,
@@ -170,6 +179,11 @@ struct TransactionDetailContainer: View {
     let accounts: [LocalAccountRow]
     var excluding: UUID?
     var isAmountEditable = true
+    /// Off for a captured transaction. The paid figure came out of the
+    /// Wallet automation's `Amount` string, so there is nothing to work
+    /// out — and the charged field below keeps its own calculator either
+    /// way, because that one IS typed, off a bank statement.
+    var showsAmountCalculator = true
     /// Absent on a transfer, whose two legs are each already in their own
     /// account's currency — there is no third currency to name.
     var foreign: ForeignAmount?
@@ -190,6 +204,8 @@ struct TransactionDetailContainer: View {
         return code != account.currency
     }
 
+    @State private var isRefreshingRates = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             AccountPickerRow(selection: $accountId, accounts: accounts, excluding: excluding)
@@ -199,11 +215,15 @@ struct TransactionDetailContainer: View {
                 currency: paidCurrency,
                 isEnabled: isAmountEditable,
                 onPickCurrency: foreign?.onPickCurrency,
+                showsCalculator: showsAmountCalculator,
                 size: AppTheme.Typography.Number.balance
             )
 
-            if isForeign, let foreign {
-                chargedBlock(foreign)
+            // Both codes are non-nil whenever `isForeign` is — unwrapping
+            // them here rather than inside the block is what lets the
+            // no-rate caption name the actual pair instead of a fallback.
+            if isForeign, let foreign, let paid = foreign.paidCurrencyCode, let account = selected?.currency {
+                chargedBlock(foreign, paidCode: paid, accountCode: account)
             }
         }
         .padding(AppTheme.Spacing.l)
@@ -211,37 +231,68 @@ struct TransactionDetailContainer: View {
         .background(AppTheme.Palette.bgSurfaceRaised, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
     }
 
-    /// Named after the account rather than the currency — "Charged to A
-    /// Dollars" is the sentence the figure completes, and it is the account
-    /// the user is reconciling against, not an abstract currency.
-    private func chargedBlock(_ foreign: ForeignAmount) -> some View {
+    /// **The caption carries the provenance, not a note off the right
+    /// edge.** Which rate produced this figure — or that none could be
+    /// found — is what decides whether the user accepts the number or
+    /// replaces it with what their bank actually charged (money rule 6), so
+    /// it belongs in the line that introduces the figure rather than
+    /// trailing it. The account's name comes out with it: the picker row
+    /// naming the account sits directly above, and repeating it here spent
+    /// the caption on something already on screen.
+    private func chargedBlock(_ foreign: ForeignAmount, paidCode: String, accountCode: String) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
-            Text("Charged to \(selected?.name ?? "this account")")
-                .font(AppTheme.Typography.nano)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-
             HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
-                AmountField(
-                    text: foreign.$chargedText,
-                    currency: selected?.currencyInfo,
-                    size: AppTheme.Typography.Number.metricCompact
-                )
-                Spacer(minLength: 0)
-                Text(rateNote(foreign))
+                Text(chargedCaption(foreign, paidCode: paidCode, accountCode: accountCode))
                     .font(AppTheme.Typography.nano)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .multilineTextAlignment(.trailing)
+                if foreign.rateDate == nil && foreign.chargedText.isEmpty {
+                    Spacer(minLength: 0)
+                    refreshRatesButton(foreign)
+                }
             }
+
+            AmountField(
+                text: foreign.$chargedText,
+                currency: selected?.currencyInfo,
+                size: AppTheme.Typography.Number.metricCompact
+            )
         }
         .padding(.top, AppTheme.Spacing.xs)
     }
 
-    /// Says where the number came from, so replacing it is an obvious thing
-    /// to do — and says plainly when there is no number at all rather than
-    /// showing a zero (money rule 5).
-    private func rateNote(_ foreign: ForeignAmount) -> String {
-        guard let rateDate = foreign.rateDate else { return "No rate — enter what you were charged" }
-        return "Rate \(PostgresDate.dateOnlyLabel(rateDate, calendar: .current))"
+    /// Says where the number came from, and says plainly when there is no
+    /// number at all rather than showing a zero (money rule 5). The no-rate
+    /// wording names the actual pair, because "no rate" on its own reads as
+    /// a fault in the app rather than a gap in the ECB's table for the two
+    /// currencies this particular purchase happens to span.
+    private func chargedCaption(_ foreign: ForeignAmount, paidCode: String, accountCode: String) -> String {
+        guard let rateDate = foreign.rateDate else { return "\(paidCode)/\(accountCode) rate not available" }
+        return "Charged to account based on \(PostgresDate.dateOnlyLabel(rateDate, calendar: .current)) Rate"
+    }
+
+    /// Only ever drawn when there is no rate **and** the field is still
+    /// empty. A rate that resolved needs no refreshing, and once the user
+    /// has typed what their bank charged, that figure is theirs — a fresh
+    /// rate would not be allowed to replace it (money rule 6), so offering
+    /// to fetch one would be offering a button that changes nothing.
+    private func refreshRatesButton(_ foreign: ForeignAmount) -> some View {
+        Button {
+            Task {
+                isRefreshingRates = true
+                await foreign.onRefreshRates()
+                isRefreshingRates = false
+            }
+        } label: {
+            if isRefreshingRates {
+                ProgressView()
+            } else {
+                Text("Refresh FX rates")
+                    .font(AppTheme.Typography.nanoEmphasis)
+                    .foregroundStyle(AppTheme.Palette.brandPrimary)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isRefreshingRates)
     }
 }
 

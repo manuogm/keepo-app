@@ -82,6 +82,12 @@ struct CaptureIntent: AppIntent {
                     in: amount, supported: try LocalTableQueries.currencies(database).map(\.code)
                 )
             }
+            // The mark as Wallet printed it, kept apart from `detect`
+            // above: detection refuses an ambiguous `$` because acting on
+            // it would convert an amount wrongly, but *showing* it back is
+            // never wrong, and an unmapped card in an ambiguous currency
+            // has nothing else left to name the figure with.
+            let symbolHint = CurrencyDetector.symbol(in: amount)
             let merchantNormalized = MerchantNormalizer.normalize(merchant)
             let externalId = CaptureIdentity.externalId(
                 card: card, amount: parsedAmount, merchant: merchantNormalized, at: occurredAt
@@ -111,7 +117,9 @@ struct CaptureIntent: AppIntent {
             // lands regardless of `result` (Phase 12), so this fires
             // unconditionally rather than only on the network-backed cases.
             CaptureNotify.post()
-            await notify(for: result, transactionId: payload.id, amountE4: parsedAmount)
+            await notify(
+                for: result, transactionId: payload.id, amountE4: parsedAmount, symbolHint: symbolHint
+            )
         } catch {
             await notify(title: "Capture failed", body: UserFacingError.describe(error))
         }
@@ -178,11 +186,14 @@ struct CaptureIntent: AppIntent {
         // purchase looks like, and a special-cased "test succeeded" alert
         // would demonstrate nothing.
         await CaptureNotificationScheduler.scheduleAppliedLocally(
-            resolution: resolution, amountE4: CaptureIdentity.testAmountE4, transactionId: payload.id
+            resolution: resolution, transactionId: payload.id
         )
     }
 
-    private func notify(for result: OutboxCaptureResult, transactionId: UUID, amountE4: Int64) async {
+    private func notify(
+        for result: OutboxCaptureResult, transactionId: UUID, amountE4: Int64,
+        symbolHint: CurrencyDetector.SymbolHint?
+    ) async {
         switch result {
         case .appliedLocally(let resolution):
             // The row exists locally either way now (account-resolved or
@@ -192,16 +203,16 @@ struct CaptureIntent: AppIntent {
             // file's own `notify(title:body:transactionId:)` — this is the
             // one branch that gets quick-action buttons.
             await CaptureNotificationScheduler.scheduleAppliedLocally(
-                resolution: resolution, amountE4: amountE4, transactionId: transactionId
+                resolution: resolution, symbolHint: symbolHint, transactionId: transactionId
             )
         case .applied:
             // Landed server-side; nothing local to deep-link into yet (the
             // next sync pull brings the row down) — same reasoning as the
             // `.queued` case below, just without the wait.
-            let content = CaptureNotificationCopy.applied(amountE4: amountE4)
+            let content = CaptureNotificationCopy.applied(amountE4: amountE4, symbolHint: symbolHint)
             await notify(title: content.title, body: content.body)
         case .queued:
-            let content = CaptureNotificationCopy.queued(amountE4: amountE4)
+            let content = CaptureNotificationCopy.queued(amountE4: amountE4, symbolHint: symbolHint)
             await notify(title: content.title, body: content.body)
         }
     }

@@ -38,6 +38,7 @@
 		1A1C0635A50FD4CE595F9E6D /* CaptureTestSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19305D314ACB43EAC4C42E04 /* CaptureTestSession.swift */; };
 		1A627C469E88842C26A53B4E /* HouseholdReportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 055F0CA818A2CD7154B84071 /* HouseholdReportFlow.swift */; };
 		1B63ACEEE01F0CCB514750A2 /* CashflowBreakdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB7B5D9A55A42FEA71159568 /* CashflowBreakdownView.swift */; };
+		1D704BAE22582F48C476BEBC /* FXRateSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8FFECC5948E8F48BA0801E /* FXRateSync.swift */; };
 		1D72C8A65447173CB61AD1DC /* CaptureSetupFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0D96E1ADBDF42EE075941B /* CaptureSetupFlowView.swift */; };
 		1DADF558B92916D9422C6775 /* DashboardAutoScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC736156629A07A285FE7514 /* DashboardAutoScroll.swift */; };
 		1DB92785E30A6058264C94B1 /* WidgetChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026F2BBB34E4C63B1C1CBB3F /* WidgetChrome.swift */; };
@@ -426,6 +427,7 @@
 		3BD32E93474AC4DE074C67F9 /* HouseholdPairingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdPairingSession.swift; sourceTree = "<group>"; };
 		3BF15D55D3521FD9A1E4BBEC /* KeepoIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoIcon.swift; sourceTree = "<group>"; };
 		3C4399D180113EC51C5FA34A /* LocalStore+SchemaMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalStore+SchemaMigration.swift"; sourceTree = "<group>"; };
+		3F8FFECC5948E8F48BA0801E /* FXRateSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXRateSync.swift; sourceTree = "<group>"; };
 		3FB16A0FBB8E0356AFBB7D47 /* WalletAutomationGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAutomationGuideView.swift; sourceTree = "<group>"; };
 		429EDEB71C3725F0838B5333 /* HouseholdKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdKit.swift; sourceTree = "<group>"; };
 		42DD908C92224E7C61E6275F /* SetupCaptureTestSubStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupCaptureTestSubStep.swift; sourceTree = "<group>"; };
@@ -1281,6 +1283,7 @@
 				46D622D3BC234133CBEBEA83 /* CaptureQuickActionRegistry.swift */,
 				49DCBD1F245670538FB816D3 /* CaptureQuickActions.swift */,
 				19305D314ACB43EAC4C42E04 /* CaptureTestSession.swift */,
+				3F8FFECC5948E8F48BA0801E /* FXRateSync.swift */,
 				4AA9B22F962B4A7D5F8A6A64 /* KeepoShortcuts.swift */,
 				C2304E1D42EB8B69A267C0AC /* MetricKitSubscriber.swift */,
 				F8FFFB68D3B0A85C78FA1E56 /* NotificationPermission.swift */,
@@ -1636,6 +1639,7 @@
 				DCEFB45D20BC131FA0C9519B /* ExportView.swift in Sources */,
 				5865DCBD730A1A6676CB888B /* FTUXCoordinator.swift in Sources */,
 				CF7632BB3A1B0551894DCCB0 /* FTUXLessonDetail.swift in Sources */,
+				1D704BAE22582F48C476BEBC /* FXRateSync.swift in Sources */,
 				124124D5FCC9AB799601F076 /* FadingEdges.swift in Sources */,
 				E035D81A41952DFA11DEBB47 /* FormPrimitives.swift in Sources */,
 				29A9DAF6B04FAC0AE4F55FE5 /* FxRateWidget.swift in Sources */,

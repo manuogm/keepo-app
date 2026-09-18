@@ -65,13 +65,32 @@ public enum CaptureLocalWrite {
         /// "not really known." Drives the notification copy's "category
         /// unknown" branch (`CaptureNotificationCopy`).
         public let categoryIsDefault: Bool
-        /// **The currency `amount_e4` is in**, which is the account's once
-        /// one is known and the currency the purchase was paid in while it
-        /// is not. Display only (`CaptureNotificationCopy`) — "account
-        /// unknown" is decided by `accountName`, so a held foreign capture
-        /// still says so while showing "€50.00" rather than a bare number.
-        public let currency: String?
-        public let minorUnit: Int?
+        /// **What the purchase was charged in, and the figure in it** —
+        /// the pair the notification always leads with, because it is the
+        /// one the user just watched the terminal print. Never converted,
+        /// never the account's.
+        ///
+        /// `paidCurrency` is nil only when nothing could name it: an
+        /// unmapped card whose mark `CurrencyDetector` would not resolve.
+        /// That case renders through `SymbolHint` instead — "account
+        /// unknown" is decided by `accountName`, never by this.
+        public let paidAmountE4: Int64
+        public let paidCurrency: String?
+        public let paidMinorUnit: Int?
+        /// **The account-currency figure, and only when one exists** —
+        /// non-nil exactly when the purchase was foreign *and* a rate
+        /// resolved, which is also exactly when the row stores an
+        /// `original_amount_e4`/`original_currency` pair. Nil for every
+        /// same-currency capture (there is no second figure) and for every
+        /// held one (there is no account).
+        ///
+        /// Carried separately from `paidAmountE4` rather than as one
+        /// "display amount" because collapsing them is the bug this
+        /// replaced: the copy was handed the paid figure and the account's
+        /// currency, and rendered a ¥5,000 purchase as "€5,000.00".
+        public let chargedAmountE4: Int64?
+        public let accountCurrency: String?
+        public let accountMinorUnit: Int?
         /// The resolved ids themselves — `accountName`/`categoryName` alone
         /// are display-only; `CaptureQuickActions` needs the actual ids to
         /// build `ReviewCaptureTransactionPayload` and to exclude the
@@ -104,10 +123,8 @@ public enum CaptureLocalWrite {
         let resolved = try resolveCurrency(database, payload: payload, account: account)
         let accountId = resolved.accountId
         let accountName = resolved.accountName
-        let currency = resolved.displayCurrency
-        let minorUnit: Int? = try currency.flatMap {
-            try Int.fetchOne(database, sql: "SELECT minor_unit FROM currencies WHERE code = ?", arguments: [$0])
-        }
+        let paidMinorUnit = try minorUnit(database, of: resolved.paidCurrency)
+        let accountMinorUnit = try minorUnit(database, of: resolved.accountCurrency)
 
         let quickActions = try quickActionData(
             database, ownerId: ownerId, payload: payload, accountId: accountId, category: category
@@ -134,7 +151,10 @@ public enum CaptureLocalWrite {
 
         return Resolution(
             accountName: accountName, categoryName: categoryName, categoryIsDefault: categoryIsDefault,
-            currency: currency, minorUnit: minorUnit, categoryId: categoryId, accountId: accountId,
+            paidAmountE4: resolved.paidAmountE4, paidCurrency: resolved.paidCurrency,
+            paidMinorUnit: paidMinorUnit, chargedAmountE4: resolved.chargedAmountE4,
+            accountCurrency: resolved.accountCurrency, accountMinorUnit: accountMinorUnit,
+            categoryId: categoryId, accountId: accountId,
             suggestedCategories: quickActions.categories, suggestedAccounts: quickActions.accounts,
             isPossibleDuplicate: quickActions.isPossibleDuplicate
         )
@@ -178,8 +198,20 @@ public enum CaptureLocalWrite {
         let accountCurrency: String?
         let amountE4: Int64
         let original: ForeignOriginal?
-        /// The currency `amountE4` is in, for display.
-        var displayCurrency: String? { accountCurrency ?? original?.currency }
+
+        /// What the purchase was actually charged in — the stored figure
+        /// itself whenever no conversion happened, and the held original
+        /// whenever one did. The two are never the same number, which is
+        /// why the notification reads these rather than `amountE4`.
+        var paidAmountE4: Int64 { original?.amountE4 ?? amountE4 }
+        var paidCurrency: String? { original?.currency ?? accountCurrency }
+        /// The converted figure, and nil unless a conversion actually
+        /// produced one: an `original` with no account currency is a held
+        /// capture, which has nothing to have been charged to yet.
+        var chargedAmountE4: Int64? {
+            guard original != nil, accountCurrency != nil else { return nil }
+            return amountE4
+        }
     }
 
     private static func resolveCurrency(
@@ -227,6 +259,12 @@ public enum CaptureLocalWrite {
             accountId: accountId, accountName: accountName, accountCurrency: accountCurrency,
             amountE4: converted, original: ForeignOriginal(amountE4: paid, currency: detected)
         )
+    }
+
+    private static func minorUnit(_ database: Database, of code: String?) throws -> Int? {
+        try code.flatMap {
+            try Int.fetchOne(database, sql: "SELECT minor_unit FROM currencies WHERE code = ?", arguments: [$0])
+        }
     }
 
     private static func supportedCurrency(_ database: Database, _ code: String?) throws -> String? {

@@ -101,6 +101,11 @@ struct TransactionFormView: View {
 
     @State var isSaving = false
     @State var errorMessage: String?
+    /// A failed *action* — today only the FX refresh — as an alert, which
+    /// is what the rest of the app does with work that was asked for and
+    /// did not happen. `errorMessage` above stays inline because it is
+    /// validation: a field that is wrong while you are looking at it.
+    @State var actionError: ActionError?
     @State var divergenceWarning: RateDivergence?
     @State var transferDivergenceConfirmed = false
 
@@ -193,6 +198,7 @@ struct TransactionFormView: View {
                 }
             }
         }
+        .errorAlert($actionError)
         .task { await load() }
     }
 
@@ -221,6 +227,10 @@ struct TransactionFormView: View {
                 categories: categoriesForKind,
                 isTransfer: kind == .transfer,
                 foreign: foreignAmount,
+                // A capture's paid figure came out of the Wallet
+                // automation's `Amount` string, so there is nothing to work
+                // out; a hand-entered one still gets the calculator.
+                showsAmountCalculator: !isCaptured,
                 needsReceivedAmount: needsReceivedAmount
             )
 

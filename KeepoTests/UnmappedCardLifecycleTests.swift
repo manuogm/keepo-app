@@ -131,7 +131,7 @@ struct UnmappedCardLifecycleTests {
             return
         }
         #expect(resolution.accountName == nil)
-        #expect(resolution.currency == nil)
+        #expect(resolution.accountCurrency == nil)
 
         let row = try await dbQueue.read { database in
             try Row.fetchOne(

@@ -53,8 +53,33 @@ extension TransactionFormView {
             chargedText: chargedAmountBinding,
             currencies: currencyInfos,
             rateDate: conversionRateDate,
-            onPickCurrency: { isPickingCurrency = true }
+            onPickCurrency: { isPickingCurrency = true },
+            onRefreshRates: { await refreshRates() }
         )
+    }
+
+    /// The no-rate escape hatch, offered on the one screen where a missing
+    /// rate actually stops someone: a purchase in a currency nobody has
+    /// held before, whose rate the server trigger asked for but which has
+    /// not arrived yet.
+    ///
+    /// Goes through `FXRateSync` rather than invoking the function here, so
+    /// this and Profile's "Sync Exchange Rates" row cannot drift — the
+    /// mirror pull that makes a fetched rate *visible* to
+    /// `LocalMoneyConversion` is the easy half to forget, and it lives
+    /// there once.
+    ///
+    /// `chargedAmountEdited` is deliberately not reset: if the user has
+    /// already typed what their bank charged, a freshly fetched reference
+    /// rate must not overwrite it (money rule 6). `refreshConversion` holds
+    /// that line on its own, which is why this can simply call it.
+    func refreshRates() async {
+        do {
+            try await FXRateSync.run(session: session, invalidatesScreens: false)
+            await refreshConversion()
+        } catch {
+            actionError = ActionError("Couldn't Refresh Exchange Rates", error)
+        }
     }
 
     /// Everything the derived charge depends on, as one `Equatable` value.

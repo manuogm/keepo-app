@@ -186,3 +186,34 @@ not this code: look for `code = 'missing_vault_secret'` in `ops_events`.
   screen now runs detection on whatever is typed, so `€50,00` there
   exercises detection → conversion → the two-amount form without needing a
   foreign card in Wallet.
+
+## Amended 2026-09-18 — the notification was never converted with the row
+
+This workstream got `capture_transaction`, `CaptureLocalWrite` and the form
+right and then handed the **notification** the wrong pair, which nothing
+caught because no test in either suite built a resolution whose currency
+differed from the currency its amount was in. Two defects, both shipped
+here, both fixed on 2026-09-18:
+
+- `Resolution` carried a single collapsed `currency` — "the currency
+  `amount_e4` is in", which was the account's after a conversion — while
+  `CaptureIntent` handed `CaptureNotificationCopy` the *paid* figure as a
+  separate argument. A $1,234.56 purchase on a EUR account announced itself
+  as **"€1,234.56"**. The fix is the seam, not the arithmetic: `Resolution`
+  now carries `paidAmountE4`/`paidCurrency` and
+  `chargedAmountE4`/`accountCurrency` as separate fields, and the copy
+  takes **no amount parameter at all**, so no caller can pair them wrongly
+  again. The notification leads with what was paid; the account figure
+  follows in the body.
+- An unmapped card in a currency `CurrencyDetector` refuses to name has
+  neither an account currency nor a detected one, and rendered a bare
+  `1,234.56`. `CurrencyDetector.symbol(in:)` now echoes the mark Wallet
+  printed, **verbatim and mapped to nothing** — the distinction that makes
+  it safe where `detect` is not is that showing the input back has no wrong
+  answer, while acting on it does. Display only; it reaches no payload, no
+  column, and no `fx_convert` call.
+
+**The lesson for the next agent:** a currency conversion has *two* figures,
+and every surface that shows money after one has to say which of the two it
+is showing. Grep for call sites that take an amount and a currency as
+separate arguments — that shape is the bug.

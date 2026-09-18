@@ -90,3 +90,82 @@ public enum CurrencyDetector {
         return table
     }
 }
+
+public extension CurrencyDetector {
+    /// The currency mark as it literally appeared in Wallet's string, with
+    /// no attempt to say what it means — `"$"`, `"US$"`, `"CHF"`, `"kr"`.
+    ///
+    /// **This is not detection and must never be treated as it.** `detect`
+    /// above answers "which supported currency is this?" and refuses
+    /// whenever the honest answer is more than one, because a wrong answer
+    /// there converts an amount that never needed converting. This answers
+    /// only "what characters did Wallet print next to the digits?", which
+    /// has no wrong answer — it is the input, echoed back.
+    ///
+    /// That distinction is what makes it safe to show a mark Keepo cannot
+    /// resolve. A capture on an unmapped card in an ambiguous currency has
+    /// no account currency to fall back on and no detected code either, so
+    /// the notification used to render a bare `5,000.00`. It can now render
+    /// `$5,000.00` — the same glyph the user just saw on the terminal —
+    /// while the stored row still, correctly, claims no currency at all.
+    ///
+    /// Display only. It never reaches a payload, a column, or `fx_convert`.
+    struct SymbolHint: Equatable, Sendable {
+        /// Every character that was neither a digit nor formatting noise,
+        /// in the order it appeared.
+        public let token: String
+        /// Whether it led the digits (`$5.00`) or trailed them (`5,00 €`).
+        public let isPrefix: Bool
+
+        public init(token: String, isPrefix: Bool) {
+            self.token = token
+            self.isPrefix = isPrefix
+        }
+
+        /// The mark reattached to an already-formatted figure, spaced the
+        /// way the conventions that use each shape space it: a glyph sits
+        /// tight against a leading figure (`$5.00`) and a code does not
+        /// (`CHF 5.00`), and anything trailing takes a non-breaking space
+        /// so the pair cannot wrap apart in a notification title.
+        public func applied(to formattedAmount: String) -> String {
+            guard isPrefix else { return formattedAmount + "\u{00A0}" + token }
+            let separator = token.allSatisfy(\.isLetter) ? "\u{00A0}" : ""
+            return token + separator + formattedAmount
+        }
+    }
+
+    /// - Returns: `nil` when the string carries no digits, no mark at all
+    ///   (a bare `50.00`), or a mark too long to be one — see below.
+    static func symbol(in text: String) -> SymbolHint? {
+        var token = ""
+        var firstSymbol: Int?
+        var firstDigit: Int?
+
+        for (offset, character) in text.enumerated() {
+            if character.isASCII && character.isNumber {
+                if firstDigit == nil { firstDigit = offset }
+            } else if !isFormattingNoise(character) {
+                if firstSymbol == nil { firstSymbol = offset }
+                token.append(character)
+            }
+        }
+
+        guard let firstDigit, let firstSymbol, !token.isEmpty else { return nil }
+        // No currency renders as more than four characters (`MOP$`, `CHF`,
+        // `US$`, `kr`), so a longer run is not a currency mark — it is a
+        // string that was never a machine-formatted amount in the first
+        // place, and echoing it into a notification title would be worse
+        // than the bare figure this exists to replace.
+        guard token.count <= 4 else { return nil }
+        return SymbolHint(token: token, isPrefix: firstSymbol < firstDigit)
+    }
+
+    /// Everything `AmountParser.plainDecimalString` also discards: the two
+    /// separator characters, every grouping mark that is not one (the Swiss
+    /// apostrophe, the spaces France, Sweden and Hungary group with), and
+    /// the sign in both its ASCII and typographic forms.
+    private static func isFormattingNoise(_ character: Character) -> Bool {
+        character == "." || character == "," || character == "'" || character == "\u{2019}"
+            || character == "-" || character == "\u{2212}" || character.isWhitespace
+    }
+}

@@ -22,14 +22,30 @@ enum CaptureNotificationCopy {
         let body: String
     }
 
+    /// - Parameter symbolHint: the currency mark Wallet printed, for the
+    ///   one case nothing else can name the currency — an unmapped card
+    ///   charged in a mark `CurrencyDetector` would not resolve. Ignored
+    ///   whenever a real currency is known, which is almost always.
     static func appliedLocally(
-        _ resolution: CaptureLocalWrite.Resolution, amountE4: Int64, locale: Locale = .current
+        _ resolution: CaptureLocalWrite.Resolution,
+        symbolHint: CurrencyDetector.SymbolHint? = nil,
+        locale: Locale = .current
     ) -> Content {
-        let accountKnown = resolution.accountName != nil && resolution.currency != nil
+        let accountKnown = resolution.accountName != nil && resolution.accountCurrency != nil
         let categoryKnown = !resolution.categoryIsDefault
+        // **Always what was paid**, never the converted figure. The user is
+        // reading this seconds after watching the terminal print it, and a
+        // notification that answers with a different number in a different
+        // currency cannot be checked at a glance — which is the only thing
+        // a capture notification is for.
         let amount = amountText(
-            currency: resolution.currency, minorUnit: resolution.minorUnit, amountE4: amountE4, locale: locale
+            resolution.paidAmountE4, currency: resolution.paidCurrency, minorUnit: resolution.paidMinorUnit,
+            symbolHint: symbolHint, locale: locale
         )
+        // Empty unless a conversion actually happened, which needs a known
+        // account — so the two account-unknown branches below never carry
+        // it and do not ask.
+        let charged = chargedText(resolution, locale: locale)
 
         // Overrides every branch below, including "both unknown" (which
         // otherwise shows no quick-action buttons at all) — a suspected
@@ -37,7 +53,8 @@ enum CaptureNotificationCopy {
         // wins the headline regardless of what else did or didn't resolve.
         guard !resolution.isPossibleDuplicate else {
             return Content(
-                title: "⚠️ \(amount) — Possible duplicate", body: "Press for quick actions or tap to open in app"
+                title: "⚠️ \(amount) — Possible duplicate",
+                body: charged + "Press for quick actions or tap to open in app"
             )
         }
 
@@ -45,7 +62,7 @@ enum CaptureNotificationCopy {
         case (true, true):
             return Content(
                 title: "✅ \(amount) Logged successfully",
-                body: "\(resolution.categoryName) · \(resolution.accountName ?? "") "
+                body: charged + "\(resolution.categoryName) · \(resolution.accountName ?? "") "
                     + "— Press for quick actions or tap to open in app"
             )
         case (false, true):
@@ -56,30 +73,62 @@ enum CaptureNotificationCopy {
         case (true, false):
             return Content(
                 title: "🏷️ \(amount) Logged to \(resolution.accountName ?? "")",
-                body: "What did you buy? Press for quick actions or tap to open in app"
+                body: charged + "What did you buy? Press for quick actions or tap to open in app"
             )
         case (false, false):
             return Content(title: "❓ \(amount) Logged automatically", body: "Tap to add missing details")
         }
     }
 
+    /// What the account was actually charged, as a body prefix — the half
+    /// of a foreign purchase the title deliberately does not show.
+    ///
+    /// The title answers "did Keepo see what I just paid?"; this answers
+    /// "and what did that cost the account?", which is the figure the
+    /// balance moved by and the one worth correcting against the bank's
+    /// own. Both are needed and neither fits in one line, so they split
+    /// across the notification's two.
+    private static func chargedText(_ resolution: CaptureLocalWrite.Resolution, locale: Locale) -> String {
+        guard let charged = resolution.chargedAmountE4, let currency = resolution.accountCurrency else { return "" }
+        let amount = MoneyFormatter.format(
+            abs(charged), currency: CurrencyInfo(code: currency, minorUnit: resolution.accountMinorUnit ?? 2),
+            locale: locale
+        )
+        return "\(amount) charged · "
+    }
+
     /// The rare RPC-only fallback (`OutboxCaptureResult.applied`) — the row
     /// landed server-side with nothing local to describe it yet, so
     /// neither account nor category is knowable here either. Same copy as
     /// the both-unknown branch above.
-    static func applied(amountE4: Int64, locale: Locale = .current) -> Content {
-        let amount = amountText(currency: nil, minorUnit: nil, amountE4: amountE4, locale: locale)
+    static func applied(
+        amountE4: Int64, symbolHint: CurrencyDetector.SymbolHint? = nil, locale: Locale = .current
+    ) -> Content {
+        let amount = amountText(
+            amountE4, currency: nil, minorUnit: nil, symbolHint: symbolHint, locale: locale
+        )
         return Content(title: "❓ \(amount) Logged automatically", body: "Tap to add missing details")
     }
 
-    static func queued(amountE4: Int64, locale: Locale = .current) -> Content {
-        let amount = amountText(currency: nil, minorUnit: nil, amountE4: amountE4, locale: locale)
+    static func queued(
+        amountE4: Int64, symbolHint: CurrencyDetector.SymbolHint? = nil, locale: Locale = .current
+    ) -> Content {
+        let amount = amountText(
+            amountE4, currency: nil, minorUnit: nil, symbolHint: symbolHint, locale: locale
+        )
         return Content(title: "⚠️ \(amount) Saved Locally", body: "Sign back in to sync this expense")
     }
 
-    /// A real currency renders with `MoneyFormatter`; an unresolved one
-    /// falls back to a plain, unsigned decimal — money rule 5, never a
-    /// guessed currency symbol for a value that isn't actually known.
+    /// A real currency renders with `MoneyFormatter`. An unresolved one
+    /// falls back to the mark Wallet itself printed, which is not a guess —
+    /// it is the input echoed back, and `CurrencyDetector.symbol` never
+    /// turns it into a code (money rule 5 is about inventing a *value*, and
+    /// nothing here does). Only a string that carried no mark at all still
+    /// renders as a bare decimal.
+    ///
+    /// Without a code there is no `minor_unit` either, so the fallback is
+    /// fixed at 2 — every supported currency's own value, and wrong only
+    /// for a zero-decimal one Keepo does not yet support.
     ///
     /// The fallback deliberately does NOT reuse `AmountFormatter
     /// .editableString` — that formatter is for an editable form field
@@ -91,11 +140,17 @@ enum CaptureNotificationCopy {
     /// purely depending on whether that particular card happened to be
     /// mapped yet. This uses the same grouped decimal style
     /// `MoneyFormatter` itself applies, just without a currency symbol.
-    private static func amountText(currency: String?, minorUnit: Int?, amountE4: Int64, locale: Locale) -> String {
-        guard let currency else { return plainAmountText(amountE4, locale: locale) }
-        return MoneyFormatter.format(
-            abs(amountE4), currency: CurrencyInfo(code: currency, minorUnit: minorUnit ?? 2), locale: locale
-        )
+    private static func amountText(
+        _ amountE4: Int64, currency: String?, minorUnit: Int?,
+        symbolHint: CurrencyDetector.SymbolHint?, locale: Locale
+    ) -> String {
+        if let currency {
+            return MoneyFormatter.format(
+                abs(amountE4), currency: CurrencyInfo(code: currency, minorUnit: minorUnit ?? 2), locale: locale
+            )
+        }
+        let plain = plainAmountText(amountE4, locale: locale)
+        return symbolHint?.applied(to: plain) ?? plain
     }
 
     private static func plainAmountText(_ amountE4: Int64, locale: Locale) -> String {
@@ -158,8 +213,9 @@ extension CaptureNotificationCopy {
 
     /// The amount every showcase card carries. One figure across all four,
     /// so the eye compares the *messages* rather than re-reading a number
-    /// that changed for no reason.
-    static let showcaseAmountE4: Int64 = 123_400
+    /// that changed for no reason. Private: the resolutions carry it
+    /// themselves now, so the card view never has to name an amount.
+    private static let showcaseAmountE4: Int64 = 123_400
 
     private static func suggestion(_ name: String) -> CaptureLocalWrite.Suggestion {
         CaptureLocalWrite.Suggestion(id: name, name: name)
@@ -175,8 +231,16 @@ extension CaptureNotificationCopy {
             accountName: account,
             categoryName: category,
             categoryIsDefault: categoryIsDefault,
-            currency: currency,
-            minorUnit: 2,
+            paidAmountE4: -showcaseAmountE4,
+            paidCurrency: currency,
+            paidMinorUnit: 2,
+            // No showcase card is a foreign purchase: four cards already
+            // carry four different resolutions, and a fifth axis on top of
+            // them would teach the currency rule at the cost of the one
+            // the screen is actually about (which buttons a press reveals).
+            chargedAmountE4: nil,
+            accountCurrency: account != nil ? currency : nil,
+            accountMinorUnit: account != nil ? 2 : nil,
             categoryId: category,
             // `CaptureQuickActions` decides "account known" on the *id*
             // while the copy decides it on the name, so both have to agree

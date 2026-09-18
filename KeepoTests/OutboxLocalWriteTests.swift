@@ -233,7 +233,7 @@ struct OutboxLocalWriteTests {
         #expect(resolution.accountName == "Test")
         #expect(resolution.categoryName == "Other")
         #expect(resolution.categoryIsDefault == true)
-        #expect(resolution.currency == "EUR")
+        #expect(resolution.accountCurrency == "EUR")
 
         let row = try await dbQueue.read { database in
             try Row.fetchOne(
@@ -267,7 +267,7 @@ struct OutboxLocalWriteTests {
         #expect(resolution.accountName == nil)
         #expect(resolution.categoryName == "Other")
         #expect(resolution.categoryIsDefault == true)
-        #expect(resolution.currency == nil)
+        #expect(resolution.accountCurrency == nil)
 
         let row = try await dbQueue.read { database in
             try Row.fetchOne(

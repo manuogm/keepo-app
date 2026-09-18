@@ -118,12 +118,7 @@ extension ProfileView {
     func syncFXRates() async {
         isSyncingFX = true
         do {
-            struct SyncBody: Encodable { let days: Int }
-            try await session.client.functions.invoke(
-                "sync-fx-rates",
-                options: FunctionInvokeOptions(body: SyncBody(days: 400))
-            )
-            session.refresh.bump()
+            try await FXRateSync.run(session: session)
             await loadLastFXSyncedAt()
         } catch {
             actionError = ActionError("Couldn't Sync Exchange Rates", error)

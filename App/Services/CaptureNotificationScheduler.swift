@@ -20,14 +20,20 @@ enum CaptureNotificationScheduler {
     /// than erroring when it hasn't. Mirrors `CaptureIntent`'s own
     /// `notify(title:body:transactionId:)` guard exactly, since this
     /// bypasses that method entirely to build its own richer content.
+    /// - Parameter symbolHint: see `CaptureNotificationCopy.appliedLocally`.
+    ///   The amount is no longer a parameter at all — the resolution
+    ///   carries both figures, which is what stopped a caller from pairing
+    ///   the paid amount with the account's currency.
     static func scheduleAppliedLocally(
-        resolution: CaptureLocalWrite.Resolution, amountE4: Int64, transactionId: UUID
+        resolution: CaptureLocalWrite.Resolution,
+        symbolHint: CurrencyDetector.SymbolHint? = nil,
+        transactionId: UUID
     ) async {
         guard AppSettings.notificationLevel != .none else { return }
         guard await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .authorized
         else { return }
 
-        let copy = CaptureNotificationCopy.appliedLocally(resolution, amountE4: amountE4)
+        let copy = CaptureNotificationCopy.appliedLocally(resolution, symbolHint: symbolHint)
         let actionSet = CaptureQuickActions.build(for: resolution)
 
         let content = UNMutableNotificationContent()

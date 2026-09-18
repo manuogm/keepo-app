@@ -101,3 +101,59 @@ struct CurrencyDetectorTests {
         #expect(CurrencyDetector.detect(in: "€50", supported: [], locale: Locale(identifier: "en_US")) == nil)
     }
 }
+
+/// `symbol(in:)` is the opposite question to `detect`: not "which currency
+/// is this?" but "what did Wallet print?". It consults no locale, no
+/// supported set and no table — it partitions the characters — so these
+/// cases are the same on every device.
+@Suite("Currency mark extraction")
+struct CurrencySymbolHintTests {
+    @Test(
+        "the mark is read back verbatim, on whichever side of the digits it sat",
+        arguments: [
+            ("$1.06", "$", true),
+            ("1.234,56 €", "€", false),
+            ("CHF 1'234.56", "CHF", true),
+            ("1,06 US$", "US$", false),
+            ("SEK 1,06", "SEK", true),
+            ("-$5.00", "$", true),
+            // The narrow no-break space France and Sweden group with is
+            // noise, not part of the mark.
+            ("1\u{202F}234,56\u{00A0}kr", "kr", false)
+        ]
+    )
+    func marks(text: String, token: String, isPrefix: Bool) {
+        #expect(CurrencyDetector.symbol(in: text) == CurrencyDetector.SymbolHint(token: token, isPrefix: isPrefix))
+    }
+
+    /// Nothing to echo, so the caller keeps rendering a bare figure —
+    /// exactly the behaviour that shipped before this existed.
+    @Test("a bare figure, or no figure at all, yields no mark", arguments: ["1234.56", "1 234,56", "", "€"])
+    func noMark(text: String) {
+        #expect(CurrencyDetector.symbol(in: text) == nil)
+    }
+
+    /// A run this long is not a currency mark — it is a string that was
+    /// never a machine-formatted amount, and echoing it into a
+    /// notification title would be worse than the bare figure.
+    @Test("a run too long to be a mark is refused")
+    func overlongRunRefused() {
+        #expect(CurrencyDetector.symbol(in: "Walmart Supercenter 50.00") == nil)
+    }
+
+    /// A glyph sits tight against a leading figure; a code does not. Both
+    /// take a non-breaking space when trailing, so the pair cannot wrap
+    /// apart across a notification title's two lines.
+    @Test("the mark is reattached the way its own shape is spaced")
+    func spacing() {
+        #expect(CurrencyDetector.SymbolHint(token: "$", isPrefix: true).applied(to: "1,234.56") == "$1,234.56")
+        #expect(
+            CurrencyDetector.SymbolHint(token: "CHF", isPrefix: true)
+                .applied(to: "1,234.56") == "CHF\u{00A0}1,234.56"
+        )
+        #expect(
+            CurrencyDetector.SymbolHint(token: "kr", isPrefix: false)
+                .applied(to: "1,234.56") == "1,234.56\u{00A0}kr"
+        )
+    }
+}

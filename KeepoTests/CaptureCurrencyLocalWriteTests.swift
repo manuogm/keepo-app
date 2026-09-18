@@ -277,7 +277,36 @@ struct CaptureCurrencyLocalWriteTests {
             Issue.record("expected .appliedLocally, got \(result)")
             return
         }
-        #expect(resolution.currency == "EUR")
+        #expect(resolution.paidCurrency == "EUR")
+        #expect(resolution.accountCurrency == nil)
+        #expect(resolution.chargedAmountE4 == nil)
         #expect(resolution.accountName == nil)
+    }
+
+    /// The two figures a converted capture produces, kept apart all the way
+    /// from the SQLite write to the copy. Before the split, the resolution
+    /// carried one "display currency" — the account's — and the intent
+    /// handed the copy the paid amount alongside it, so this purchase
+    /// announced itself as "$50.00": the euros paid, wearing a dollar sign.
+    @Test("a converted capture carries what was paid and what was charged, separately")
+    func convertedCaptureCarriesBothFigures() async throws {
+        let fixture = try await makeFixture()
+        let result = await capture(
+            fixture.outbox, ownerId: fixture.ownerId, id: UUID(), detected: "EUR",
+            occurredAt: date("2026-01-15T12:00:00.000000+00:00")
+        )
+
+        guard case .appliedLocally(let resolution) = result else {
+            Issue.record("expected .appliedLocally, got \(result)")
+            return
+        }
+        #expect(resolution.paidAmountE4 == -500_000)
+        #expect(resolution.paidCurrency == "EUR")
+        #expect(resolution.chargedAmountE4 == -540_000)
+        #expect(resolution.accountCurrency == "USD")
+
+        let copy = CaptureNotificationCopy.appliedLocally(resolution, locale: Locale(identifier: "en_US"))
+        #expect(copy.title.contains("€50.00"))
+        #expect(copy.body.hasPrefix("$54.00 charged · "))
     }
 }

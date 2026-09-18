@@ -215,9 +215,7 @@ private struct NotificationStill: View {
     let resolution: CaptureLocalWrite.Resolution
 
     private var copy: CaptureNotificationCopy.Content {
-        CaptureNotificationCopy.appliedLocally(
-            resolution, amountE4: CaptureNotificationCopy.showcaseAmountE4
-        )
+        CaptureNotificationCopy.appliedLocally(resolution)
     }
 
     private var actions: [UNNotificationAction] {
