@@ -32,6 +32,7 @@
 		15B25EAEE76C90C03AD09A4B /* Keepo Capture.shortcut in Resources */ = {isa = PBXBuildFile; fileRef = 3B6AE3E5B9F0DA8303A9519B /* Keepo Capture.shortcut */; };
 		1725F1A36170343D573E57B9 /* OutboxSending.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6882A009B70A74B987B3AD38 /* OutboxSending.swift */; };
 		1890EC0309624822079FFF28 /* OTPSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3AF9A7AEAB1809042F92E29 /* OTPSignInView.swift */; };
+		18BFB9F139515A49E698192E /* NeedsReviewRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760153CF7092D823E920BBFF /* NeedsReviewRow.swift */; };
 		197652F2F5196F4A4487FB4F /* DashboardGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C80AB872EF3B66A5C757E62D /* DashboardGeometryTests.swift */; };
 		1979678A5304703AB79F5093 /* ConfirmCaptureLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */; };
 		1A1C0635A50FD4CE595F9E6D /* CaptureTestSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19305D314ACB43EAC4C42E04 /* CaptureTestSession.swift */; };
@@ -130,6 +131,7 @@
 		610B068DBE2C22A3C45B085E /* ProfileView+Sections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C5A444304241F495436350 /* ProfileView+Sections.swift */; };
 		625F861035030FD85FA5D8A4 /* ChartAxisLabels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18D7EDAF6788363C5C9CB5C9 /* ChartAxisLabels.swift */; };
 		63744FB4D48DDE55313798B5 /* ScopeStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22D4FBF2E43E2FC47CDE590B /* ScopeStyle.swift */; };
+		661EBFAB33171BA6FBFC2BE9 /* NeedsReviewPanel+Chrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCFE635AA4C784F92926E54B /* NeedsReviewPanel+Chrome.swift */; };
 		6623338915D4C55BA3E3536A /* CaptureQuickActionSuggestionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB633A420FD5674DE9E465B /* CaptureQuickActionSuggestionsTests.swift */; };
 		6816EB621F86C2FCE0861C70 /* CategoryLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04390E921137B01C4EBB45D2 /* CategoryLocalWrite.swift */; };
 		6823B51CF7AC1FDD1404192D /* RecurringRuleFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26113BDE0659689A35B7B28 /* RecurringRuleFormView.swift */; };
@@ -502,6 +504,7 @@
 		72B742559A84DE1F35A4FCDE /* Outbox+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+Capture.swift"; sourceTree = "<group>"; };
 		756BC1493636418DB21F41D6 /* ProfileAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAvatarView.swift; sourceTree = "<group>"; };
 		75BE797DD17C18848D3232ED /* OutboxLocalWrite+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OutboxLocalWrite+Capture.swift"; sourceTree = "<group>"; };
+		760153CF7092D823E920BBFF /* NeedsReviewRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsReviewRow.swift; sourceTree = "<group>"; };
 		7742491A185D240463F3F936 /* KeepoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeepoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmCaptureLocalWriteTests.swift; sourceTree = "<group>"; };
 		791B69045C75E082FC09B489 /* HouseholdSetupFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdSetupFlow.swift; sourceTree = "<group>"; };
@@ -610,6 +613,7 @@
 		DAF46EB442E01DD2B8E91911 /* SetupCurrencyStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupCurrencyStep.swift; sourceTree = "<group>"; };
 		DB9CECAAD0FDD59289F89DAC /* OutboxItemRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxItemRecord.swift; sourceTree = "<group>"; };
 		DC736156629A07A285FE7514 /* DashboardAutoScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardAutoScroll.swift; sourceTree = "<group>"; };
+		DCFE635AA4C784F92926E54B /* NeedsReviewPanel+Chrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NeedsReviewPanel+Chrome.swift"; sourceTree = "<group>"; };
 		DE76797B503A0D4F8F1EDF56 /* PrivateText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateText.swift; sourceTree = "<group>"; };
 		DEA5F7A5638575941827DEC1 /* SyncCursorStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCursorStore.swift; sourceTree = "<group>"; };
 		DFF5FF94A9B92F9C82977605 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -887,6 +891,8 @@
 				B81CEAFFB8092FE202B4DB40 /* ConflictResolution.swift */,
 				44DEBA10D23CE56C2C8D9F1E /* NeedsReviewPanel.swift */,
 				B51126A63F6BCA2B3BB3778E /* NeedsReviewPanel+Actions.swift */,
+				DCFE635AA4C784F92926E54B /* NeedsReviewPanel+Chrome.swift */,
+				760153CF7092D823E920BBFF /* NeedsReviewRow.swift */,
 			);
 			path = NeedsReview;
 			sourceTree = "<group>";
@@ -1689,7 +1695,9 @@
 				A555CBC0A7E4DF1310CA27F9 /* MetricKitSubscriber.swift in Sources */,
 				5DC2D1D35EFB73B320818B18 /* MetricPoint.swift in Sources */,
 				DF2251AD169556468232895D /* NeedsReviewPanel+Actions.swift in Sources */,
+				661EBFAB33171BA6FBFC2BE9 /* NeedsReviewPanel+Chrome.swift in Sources */,
 				05059254B7DFDDBBC00F1B26 /* NeedsReviewPanel.swift in Sources */,
+				18BFB9F139515A49E698192E /* NeedsReviewRow.swift in Sources */,
 				3081F610263348FB89AFB5FE /* NetWorthWidget.swift in Sources */,
 				7EDE33A4F6222B26E379DFCC /* NetworkMonitor.swift in Sources */,
 				4D8CA7FC2700469419786FB5 /* NotificationPermission.swift in Sources */,

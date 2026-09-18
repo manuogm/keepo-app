@@ -20,6 +20,16 @@ struct TransactionRow: View {
     /// "money left Checking" into "money moved Checking → Savings".
     var counterpart: PublicSchema.TransactionsWithDetailsSelect?
     var isPendingUpdate: Bool = false
+    /// Set only by the Needs Review inbox, which renders this exact row so
+    /// that an item waiting for review looks like the transaction it is
+    /// about to become.
+    ///
+    /// The ledger deliberately leads with the **category**, not the
+    /// merchant, and nothing here changes that. But the inbox is where the
+    /// user *decides*, and "Groceries, on Amex" is not enough to decide
+    /// whether a capture is real — the merchant is. So the inbox, and only
+    /// the inbox, puts it ahead of the account on the second line.
+    var merchant: String?
 
     @Environment(\.isPrivacyMode) private var isPrivacyMode
 
@@ -81,7 +91,7 @@ struct TransactionRow: View {
                 }
 
                 HStack(spacing: AppTheme.Spacing.xs) {
-                    Text(accountLine)
+                    Text(detailLine)
                         .font(AppTheme.Typography.micro)
                         .foregroundStyle(AppTheme.Palette.textSecondary)
                         .lineLimit(1)
@@ -135,6 +145,13 @@ struct TransactionRow: View {
     private var accountLine: String {
         guard let legs else { return transaction.accountName ?? "—" }
         return "\(legs.from.accountName ?? "—") → \(legs.to.accountName ?? "—")"
+    }
+
+    /// The second line as drawn: the account alone on the ledger, the
+    /// merchant and then the account in the inbox. See `merchant`.
+    private var detailLine: String {
+        guard let merchant, !merchant.isEmpty else { return accountLine }
+        return "\(merchant) · \(accountLine)"
     }
 
     private var formattedAmount: String {

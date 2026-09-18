@@ -173,21 +173,39 @@ enum LocalTransactionRow {
         return try rows.map { try build($0, database: database, base: base) }
     }
 
-    /// The one place a null-account pending capture (an unmapped Wallet
-    /// automation, or one whose card mapping hasn't resolved to an account
-    /// yet) must still be reachable — this is what both `RootView`'s
-    /// notification deep-link and `NeedsReviewView.openForReview` call to
-    /// open the review form. `LEFT JOIN` (not the `INNER JOIN` every other
-    /// query here keeps) so the row survives having no account yet; the
-    /// `WHERE` clause replaces what the join's `visibleAccountClause` used
-    /// to enforce on its own — a real, inaccessible `account_id` must still
-    /// exclude the row (`a.id IS NOT NULL` proves the join found a
-    /// *visible* account), while a genuinely unresolved capture is allowed
-    /// through only when it's the caller's own (`t.owner_id = ?`).
+    /// One row by id — `RootView`'s notification deep-link and
+    /// `NeedsReviewPanel.openForReview` both opening the review form.
     static func fetchOne(
         _ database: Database, id: String, baseCurrency: String, ownerId: String
     ) throws -> PublicSchema.TransactionsWithDetailsSelect? {
-        guard let row = try Row.fetchOne(
+        try fetch(database, ids: [id], baseCurrency: baseCurrency, ownerId: ownerId).first
+    }
+
+    /// Rows by id — **the one place a null-account pending capture** (an
+    /// unmapped Wallet automation, or one whose card mapping hasn't resolved
+    /// to an account yet) must still be reachable. `LEFT JOIN` (not the
+    /// `INNER JOIN` every other query here keeps) so the row survives having
+    /// no account yet; the `WHERE` clause replaces what the join's
+    /// `visibleAccountClause` used to enforce on its own — a real,
+    /// inaccessible `account_id` must still exclude the row (`a.id IS NOT
+    /// NULL` proves the join found a *visible* account), while a genuinely
+    /// unresolved capture is allowed through only when it's the caller's own
+    /// (`t.owner_id = ?`).
+    ///
+    /// Several ids in one statement, behind one `BaseCurrency` and therefore
+    /// one shared FX cache, because Needs Review draws each pending capture
+    /// with `TransactionRow` — the ledger's own row, rather than a second
+    /// transaction row that would drift from it — and `needs_review`'s
+    /// eight-column contract carries nothing like enough for that. Looping
+    /// `fetchOne` would have re-derived the base currency and thrown away
+    /// the rate cache once per row, the exact waste `BaseCurrency` exists to
+    /// stop.
+    static func fetch(
+        _ database: Database, ids: [String], baseCurrency: String, ownerId: String
+    ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
+        guard !ids.isEmpty else { return [] }
+        let arguments: [any DatabaseValueConvertible] = [ownerId, ownerId] + ids + [ownerId]
+        let rows = try Row.fetchAll(
             database,
             sql: """
             SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
@@ -202,12 +220,13 @@ enum LocalTransactionRow {
             LEFT JOIN categories c ON c.id = t.category_id
             LEFT JOIN currencies cur ON cur.code = t.currency
             LEFT JOIN currencies ocur ON ocur.code = t.original_currency
-            WHERE t.deleted_at IS NULL AND t.id = ?
+            WHERE t.deleted_at IS NULL AND t.id IN (\(databaseQuestionMarks(count: ids.count)))
               AND (t.account_id IS NULL AND t.owner_id = ? OR a.id IS NOT NULL)
             """,
-            arguments: [ownerId, ownerId, id, ownerId]
-        ) else { return nil }
-        return try build(row, database: database, base: try BaseCurrency(database, code: baseCurrency))
+            arguments: StatementArguments(arguments)
+        )
+        let base = try BaseCurrency(database, code: baseCurrency)
+        return try rows.map { try build($0, database: database, base: base) }
     }
 
     /// The base currency and its minor unit — looked up **once per fetch**,
