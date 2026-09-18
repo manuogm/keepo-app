@@ -80,7 +80,7 @@ struct ProfileView: View {
                 legal
                 exits
                 #if DEBUG
-                Section("Developer") {
+                Section {
                     NavigationLink {
                         SimulateCaptureView(session: session)
                     } label: {
@@ -96,6 +96,22 @@ struct ProfileView: View {
                     } label: {
                         ProfileRowLabel(icon: "hammer", title: "Replay Onboarding")
                     }
+                    // The other half of the first-time experience, and the
+                    // half that cannot be replayed by walking setup again:
+                    // every coach mark fires once per device and then never
+                    // again. The same thing Show Me Around's button does —
+                    // this is the shortcut that skips the navigation. See
+                    // `FTUXCoordinator.replayAllLessons`.
+                    Button {
+                        replayLessons()
+                    } label: {
+                        ProfileRowLabel(icon: "hammer", title: "Replay Tips")
+                    }
+                } header: {
+                    Text("Developer")
+                } footer: {
+                    Text("Replay Tips arms every coach mark again. "
+                        + "Each one appears as you visit the screen it belongs to.")
                 }
                 #endif
             }
@@ -150,6 +166,16 @@ struct ProfileView: View {
         // is re-read — the sheet dismisses itself on the way out because
         // `RootView` swaps the whole signed-in shell underneath it.
         try? await session.refreshProfile()
+        dismiss()
+    }
+
+    /// Closes the **whole sheet**, for the reason `ShowMeAroundView` does:
+    /// the coach mark it just re-armed points at the scope banner on the
+    /// tab underneath, so left up, this button would appear to do nothing.
+    /// Dismissing is also what re-runs `retry()` in `MainTabView`, which
+    /// is what actually puts the first coach mark up.
+    private func replayLessons() {
+        FTUXCoordinator.replayAllLessons()
         dismiss()
     }
     #endif
