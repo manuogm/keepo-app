@@ -142,15 +142,12 @@ struct CurrencyWheel: View {
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
-    /// The fill under a selected pill is `textPrimary` itself — dark ink in
-    /// light mode, a near-white in dark — so the letters on it cannot reuse
-    /// that adaptive token without vanishing into their own background.
-    /// Light mode's ink needs fixed white; dark mode's near-white needs
-    /// fixed ink. `NotificationSettingsView` derives the same pair for the
-    /// same reason; a third place doing it is the one that should extract a
-    /// shared helper.
+    /// The fill under a selected pill is `textPrimary` itself, so the
+    /// letters on it cannot reuse that adaptive token without vanishing
+    /// into their own background. The third caller is what finally
+    /// extracted the pair into `inkOnPrimaryFill`.
     private var selectedInk: Color {
-        colorScheme == .dark ? AppTheme.Palette.textOnLight : AppTheme.Palette.textOnAccent
+        AppTheme.Palette.inkOnPrimaryFill(colorScheme)
     }
 
     // MARK: - Search

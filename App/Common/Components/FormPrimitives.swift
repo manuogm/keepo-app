@@ -137,3 +137,98 @@ struct FormErrorText: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+/// The one forward action on a screen — a setup step, sign-in, or the
+/// transaction form's "Save and Add Another". Named for the job rather
+/// than for onboarding, which is where it started and has not been the
+/// only caller for a long time: it now lives beside the other shapes
+/// every form reaches for.
+///
+/// **Disabled is a neutral fill, not a faded accent.** A dimmed amber still
+/// reads as a coloured button with white text on it — as a live control
+/// someone will tap and be confused by — so the disabled state drops the
+/// accent entirely and takes `textSecondary` with it. The difference has to
+/// be a difference in *kind*, because "not yet" is what it means.
+struct PrimaryActionButton: View {
+    let title: String
+    var isEnabled = true
+    /// Swaps the label for a spinner while a network call is in flight,
+    /// keeping the button's own size so nothing reflows around it.
+    var isLoading = false
+    /// Sign-in's button and the transaction form's span their content; a
+    /// setup step's hugs its label in the bottom bar.
+    var fillsWidth = false
+    let action: () -> Void
+
+    private var isActive: Bool { isEnabled && !isLoading }
+
+    var body: some View {
+        Button(action: action) {
+            label
+                .padding(.horizontal, fillsWidth ? 0 : AppTheme.Spacing.xl)
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
+                .frame(height: AppTheme.Size.touchTarget)
+                .background(
+                    isActive ? AppTheme.Palette.brandPrimary : AppTheme.Palette.fillStrong,
+                    in: Capsule()
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.pressableCard)
+        .disabled(!isActive)
+        .animation(AppTheme.Motion.colorSafe, value: isActive)
+        .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: title)
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if isLoading {
+            ProgressView().tint(AppTheme.Palette.textSecondary)
+        } else {
+            Text(title)
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(isActive ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textSecondary)
+        }
+    }
+}
+
+/// The quieter of the two actions on a screen — onboarding's Back, and
+/// the transaction form's "Save and Add Another". An escape hatch or a
+/// second path, not the thing the screen is asking for — but
+/// **outlined**, so it still reads as a control. Bare text on the
+/// canvas, with no fill and no border, read as a label that happened to
+/// be tappable.
+///
+/// The outline rather than a fill is what keeps the hierarchy: same
+/// capsule and same height as the primary beside it, so the pair looks
+/// deliberate, with the weight carried entirely by the primary's fill.
+struct SecondaryActionButton: View {
+    let title: String
+    /// Matches `PrimaryActionButton`'s own flag, for the one place the
+    /// two sit side by side and have to share a row equally.
+    var fillsWidth = false
+    /// Disabled drops to the neutral `fillStrong` in both the outline and
+    /// the label, for the same reason the primary drops its accent: "not
+    /// yet" has to look like a different KIND of control, not a faded one.
+    var isEnabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(isEnabled ? AppTheme.Palette.textSecondary : AppTheme.Palette.fillStrong)
+                .padding(.horizontal, fillsWidth ? 0 : AppTheme.Spacing.l)
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
+                .frame(height: AppTheme.Size.touchTarget)
+                .overlay(
+                    Capsule().stroke(
+                        isEnabled ? AppTheme.Palette.textSecondary : AppTheme.Palette.fillStrong, lineWidth: 1
+                    )
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+    }
+}

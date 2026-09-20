@@ -50,7 +50,7 @@ struct SetupWalkthroughSubStep: View {
                 VStack(spacing: AppTheme.Spacing.xl) {
                     CaptureSetupChecklist(completed: completedBinding)
                     if isFinished {
-                        OnboardingPrimaryButton(title: "Test Automation", fillsWidth: true, action: onNext)
+                        PrimaryActionButton(title: "Test Automation", fillsWidth: true, action: onNext)
                     }
                 }
                 .animation(AppTheme.Motion.standard, value: isFinished)

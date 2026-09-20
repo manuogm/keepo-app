@@ -70,6 +70,20 @@ extension AppTheme {
         /// `textPrimary` itself already flips to supply the background.
         static let textOnLight = Color("TextOnLight")
 
+        /// Text and glyphs drawn on a fill that is `textPrimary` itself —
+        /// an inverted selected row, the currency wheel's chosen pill, the
+        /// range calendar's endpoint discs.
+        ///
+        /// It has to be a function of the colour scheme rather than one
+        /// more asset, because the fill underneath is *already* adaptive:
+        /// dark ink in light mode, near-white in dark. One fixed colour can
+        /// only ever be right for one half of that. Three screens derived
+        /// this same pair privately before it moved here — which is the
+        /// signal CLAUDE.md names for extracting a shared helper.
+        static func inkOnPrimaryFill(_ scheme: ColorScheme) -> Color {
+            scheme == .dark ? textOnLight : textOnAccent
+        }
+
         // MARK: Neutral fills
         /// A neutral wash behind a chip or an icon well. Replaces
         /// `Color.secondary.opacity(0.08...0.15)` and

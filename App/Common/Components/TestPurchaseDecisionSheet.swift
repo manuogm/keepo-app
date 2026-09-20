@@ -51,8 +51,8 @@ struct TestPurchaseDecisionSheet: View {
                 TestCaptureCard(capture: capture, baseCurrency: baseCurrency)
 
                 HStack(spacing: AppTheme.Spacing.m) {
-                    OnboardingSecondaryButton(title: "Keep it", fillsWidth: true) { answer(.keep) }
-                    OnboardingPrimaryButton(title: "Delete it", fillsWidth: true) { answer(.delete) }
+                    SecondaryActionButton(title: "Keep it", fillsWidth: true) { answer(.keep) }
+                    PrimaryActionButton(title: "Delete it", fillsWidth: true) { answer(.delete) }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

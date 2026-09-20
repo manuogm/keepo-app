@@ -109,10 +109,10 @@ struct SetupCommitView: View {
                 .font(AppTheme.Typography.caption)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
 
-            OnboardingPrimaryButton(title: "Try Again", fillsWidth: true) {
+            PrimaryActionButton(title: "Try Again", fillsWidth: true) {
                 Task { await run() }
             }
-            OnboardingSecondaryButton(title: "Back") {
+            SecondaryActionButton(title: "Back") {
                 errorMessage = nil
                 store.update { $0.step = .account }
             }

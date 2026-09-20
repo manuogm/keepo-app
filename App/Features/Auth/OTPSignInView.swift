@@ -103,7 +103,7 @@ struct OTPSignInView: View {
             // The same button every setup step uses — this is one step of
             // one flow, and a sign-in button that looked like a different
             // product's would say so.
-            OnboardingPrimaryButton(
+            PrimaryActionButton(
                 title: "Continue", isEnabled: !trimmedEmail.isEmpty, isLoading: isLoading, fillsWidth: true
             ) {
                 Task { await sendLink() }

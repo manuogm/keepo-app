@@ -189,7 +189,7 @@ struct OnboardingScaffold<Content: View>: View {
         if isPrimaryVisible {
             HStack {
                 Spacer(minLength: 0)
-                OnboardingPrimaryButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: onPrimary)
+                PrimaryActionButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: onPrimary)
             }
             // **`KeepoTabBarMetrics.margin`, on both edges.** The forward
             // button and the tab bar are the same thing in two halves of the
@@ -207,86 +207,5 @@ struct OnboardingScaffold<Content: View>: View {
                 bottomSafeAreaInset = inset
             }
         }
-    }
-}
-
-/// The one forward action on a setup step — and on sign-in, which is the
-/// same button doing the same job at the same point in the same flow.
-///
-/// **Disabled is a neutral fill, not a faded accent.** A dimmed amber still
-/// reads as a coloured button with white text on it — as a live control
-/// someone will tap and be confused by — so the disabled state drops the
-/// accent entirely and takes `textSecondary` with it. The difference has to
-/// be a difference in *kind*, because "not yet" is what it means.
-struct OnboardingPrimaryButton: View {
-    let title: String
-    var isEnabled = true
-    /// Swaps the label for a spinner while a network call is in flight,
-    /// keeping the button's own size so nothing reflows around it.
-    var isLoading = false
-    /// Sign-in's button spans the field above it; a setup step's hugs its
-    /// label in the bottom bar.
-    var fillsWidth = false
-    let action: () -> Void
-
-    private var isActive: Bool { isEnabled && !isLoading }
-
-    var body: some View {
-        Button(action: action) {
-            label
-                .padding(.horizontal, fillsWidth ? 0 : AppTheme.Spacing.xl)
-                .frame(maxWidth: fillsWidth ? .infinity : nil)
-                .frame(height: AppTheme.Size.touchTarget)
-                .background(
-                    isActive ? AppTheme.Palette.brandPrimary : AppTheme.Palette.fillStrong,
-                    in: Capsule()
-                )
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.pressableCard)
-        .disabled(!isActive)
-        .animation(AppTheme.Motion.colorSafe, value: isActive)
-        .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: title)
-    }
-
-    @ViewBuilder
-    private var label: some View {
-        if isLoading {
-            ProgressView().tint(AppTheme.Palette.textSecondary)
-        } else {
-            Text(title)
-                .font(AppTheme.Typography.labelEmphasis)
-                .foregroundStyle(isActive ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textSecondary)
-        }
-    }
-}
-
-/// Back. Quiet on purpose — it is an escape hatch, not a second choice
-/// competing with the one the screen is asking for — but **outlined**, so
-/// it still reads as a control. Bare text on the canvas, with no fill and
-/// no border, read as a label that happened to be tappable.
-///
-/// The outline rather than a fill is what keeps the hierarchy: same
-/// capsule and same height as the primary beside it, so the pair looks
-/// deliberate, with the weight carried entirely by the primary's fill.
-struct OnboardingSecondaryButton: View {
-    let title: String
-    /// Matches `OnboardingPrimaryButton`'s own flag, for the one place the
-    /// two sit side by side and have to share a row equally.
-    var fillsWidth = false
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(AppTheme.Typography.label)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .padding(.horizontal, fillsWidth ? 0 : AppTheme.Spacing.l)
-                .frame(maxWidth: fillsWidth ? .infinity : nil)
-                .frame(height: AppTheme.Size.touchTarget)
-                .overlay(Capsule().stroke(AppTheme.Palette.textSecondary, lineWidth: 1))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
     }
 }

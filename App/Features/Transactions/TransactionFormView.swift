@@ -18,6 +18,13 @@ struct TransactionFormView: View {
     /// kind — changing kind is delete-and-recreate, never an in-place edit
     /// (app-architecture.md §2).
     var mode: Mode = .create
+    /// What a **new** transaction opens on, from whoever presented the
+    /// sheet. The Transactions screen hands over its own filters, so
+    /// narrowing the ledger to an account, a category, a type or a period
+    /// and then adding to it is one gesture rather than the same set of
+    /// answers given twice. Empty by default, which is the form's original
+    /// behaviour exactly — see `seedCreateDefaults`.
+    var seed = TransactionSeed()
     var onSaved: () -> Void
 
     enum Mode {
@@ -40,6 +47,9 @@ struct TransactionFormView: View {
     @State var kind: Kind = .expense
     @State var accounts: [LocalAccountRow] = []
     @State var categories: [PublicSchema.CategoriesSelect] = []
+    /// The three the user reaches for most on this account, for this kind.
+    /// Re-read whenever either changes — see `adoptContext()`.
+    @State var suggestedCategories: [PublicSchema.CategoriesSelect] = []
 
     @State var selectedAccountId: UUID?
     @State var selectedCategoryId: UUID?
@@ -100,6 +110,12 @@ struct TransactionFormView: View {
     @State var isPickingTags = false
 
     @State var isSaving = false
+    /// How many transactions this sheet has written without closing —
+    /// "Save and Add Another"'s counter. Drives the success haptic and the
+    /// line under the button, which is the only proof a run of entries is
+    /// landing, since the sheet never goes away to show the ledger behind
+    /// it.
+    @State var savedCount = 0
     @State var errorMessage: String?
     /// A failed *action* — today only the FX refresh — as an alert, which
     /// is what the rest of the app does with work that was asked for and
@@ -109,7 +125,9 @@ struct TransactionFormView: View {
     @State var divergenceWarning: RateDivergence?
     @State var transferDivergenceConfirmed = false
 
-    @State private var isPickingDate = false
+    // Not `private` — read/written from TransactionFormView+Date.swift,
+    // an extension in a different file (kept there purely for file-length).
+    @State var isPickingDate = false
     @State private var isCreatingRecurringRule = false
 
     var isEditing: Bool {
@@ -200,6 +218,12 @@ struct TransactionFormView: View {
         }
         .errorAlert($actionError)
         .task { await load() }
+        // One observer over one value, for the reason `conversionInputs`
+        // gives above: this body is already close to the SwiftUI type
+        // checker's limit, and both of these questions have the same two
+        // inputs anyway — which categories this account is used for, and
+        // where a transfer out of it could possibly go.
+        .task(id: EntryContext(accountId: selectedAccountId, kind: kind)) { await adoptContext() }
     }
 
     // MARK: - The card
@@ -225,6 +249,7 @@ struct TransactionFormView: View {
                 onEditTags: { isPickingTags = true },
                 accounts: accounts,
                 categories: categoriesForKind,
+                suggestedCategories: suggestedCategories,
                 isTransfer: kind == .transfer,
                 foreign: foreignAmount,
                 // A capture's paid figure came out of the Wallet
@@ -261,6 +286,8 @@ struct TransactionFormView: View {
                     Task { await deleteTransaction() }
                 }
                 .padding(.top, AppTheme.Spacing.xs)
+            } else {
+                addAnotherAction
             }
         }
         .padding(AppTheme.Spacing.l)
@@ -268,37 +295,30 @@ struct TransactionFormView: View {
         .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
     }
 
-    /// Outlined rather than filled: it sits on the card's own surface, and a
-    /// second filled capsule there competed with the amount for weight. The
-    /// two most recent days get their names instead of their dates — "Today"
-    /// is what the user is actually thinking, and it is also the value they
-    /// most need to be able to confirm at a glance.
-    private var datePill: some View {
-        Button {
-            isPickingDate = true
-        } label: {
-            HStack(spacing: AppTheme.Spacing.xs) {
-                Image(systemName: "calendar")
-                    .font(AppTheme.Typography.micro)
-                Text(dateLabel)
-                    .font(AppTheme.Typography.label)
-            }
-            .foregroundStyle(AppTheme.Palette.textPrimary)
-            .padding(.horizontal, AppTheme.Spacing.m)
-            .padding(.vertical, AppTheme.Spacing.s)
-            .overlay {
-                Capsule().strokeBorder(AppTheme.Palette.fillStrong, lineWidth: 1)
-            }
-            .contentShape(Capsule())
+    /// A second save that keeps the sheet open, for the run of entries
+    /// that manual capture actually is — an evening of cash spending, a
+    /// receipt pile, a month being caught up on. The loop used to be
+    /// "+, type, save, sheet closes, + again"; what the run shares (the
+    /// account, the category, the day) now survives between rows and only
+    /// the amount is typed each time.
+    ///
+    /// **Outlined, not filled.** The checkmark in the navigation bar is
+    /// still the form's primary action; this is the other way out of the
+    /// same screen, and two filled buttons would make the sheet argue with
+    /// itself about which one finishes it.
+    ///
+    /// The save confirms itself by clearing the amount, and by the haptic
+    /// — no running count. A tally of what this sheet has written is a
+    /// number the user did not ask for on a form that is about the next
+    /// transaction, not the last one.
+    private var addAnotherAction: some View {
+        SecondaryActionButton(
+            title: "Save and Add Another", fillsWidth: true, isEnabled: !isSaveDisabled
+        ) {
+            Task { await save(thenAddAnother: true) }
         }
-        .buttonStyle(.pressableCard)
-    }
-
-    private var dateLabel: String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(occurredAt) { return "Today" }
-        if calendar.isDateInYesterday(occurredAt) { return "Yesterday" }
-        return occurredAt.formatted(date: .abbreviated, time: .omitted)
+        .padding(.top, AppTheme.Spacing.xs)
+        .sensoryFeedback(AppTheme.Feedback.success, trigger: savedCount)
     }
 
     /// One grey line that answers "where did this come from, and can it
@@ -340,22 +360,6 @@ struct TransactionFormView: View {
         }
         .font(AppTheme.Typography.micro)
         .foregroundStyle(AppTheme.Palette.textSecondary)
-    }
-
-    private var datePickerSheet: some View {
-        NavigationStack {
-            DatePicker("Date", selection: $occurredAt, displayedComponents: [.date])
-                .datePickerStyle(.graphical)
-                .padding()
-                .navigationTitle("Date")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { isPickingDate = false }.fontWeight(.semibold)
-                    }
-                }
-        }
-        .presentationDetents([.medium])
     }
 
     /// Seeds the recurring-rule form from what is already on screen, so

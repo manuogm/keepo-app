@@ -28,6 +28,11 @@ struct TransactionDetailCard: View {
 
     let accounts: [LocalAccountRow]
     let categories: [PublicSchema.CategoriesSelect]
+    /// Up to three, most-used first, for the account and kind on screen —
+    /// `LocalCategoryRanking`. Empty is fine and simply means the row
+    /// draws nothing but "More": a ledger with no history has no habits to
+    /// read off it yet.
+    let suggestedCategories: [PublicSchema.CategoriesSelect]
     let isTransfer: Bool
     /// Only ever set for expense/income. A transfer's legs are each already
     /// in their own account's currency, so there is no third one to name —
@@ -89,10 +94,9 @@ struct TransactionDetailCard: View {
                 foreign: foreign
             )
 
-            HStack(spacing: AppTheme.Spacing.s) {
-                CategoryPickerRow(selection: $categoryId, categories: categories)
-                Spacer(minLength: 0)
-            }
+            CategorySuggestionRow(
+                selection: $categoryId, suggestions: suggestedCategories, categories: categories
+            )
 
             tagRow
         }

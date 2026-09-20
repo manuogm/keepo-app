@@ -12,10 +12,15 @@ extension TransactionsListView {
         }
         let dbQueue = session.dbQueue
         let scope = session.scope
+        // The period is folded in here rather than being held on the
+        // filter: the panel owns "which slice", the period track owns
+        // "which window", and only the query needs them as one value. A
+        // nil range is All Time — both bounds simply go unset, which is
+        // exactly what an unbounded `TransactionFilter` already means.
         let effectiveFilter: TransactionFilter = {
             var effective = filter
-            effective.from = range.start
-            effective.through = range.end
+            effective.from = range?.start
+            effective.through = range?.end
             return effective
         }()
         do {

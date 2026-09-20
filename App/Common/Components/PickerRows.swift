@@ -1,12 +1,18 @@
 import KeepoCore
 import SwiftUI
 
-/// The two "tap this row to change it" controls the transaction form is
-/// built from. Both follow the same rule, which is the point of having them
-/// as a pair: **the row that displays the value is the row that changes
-/// it**, with identical layout in both states. A `Picker` with a label on
-/// the left and a grey value on the right would have meant the account you
-/// are looking at and the account you are choosing look nothing alike.
+/// The "tap this row to change it" control the transaction form is built
+/// from. It follows one rule: **the row that displays the value is the row
+/// that changes it**, with identical layout in both states. A `Picker` with
+/// a label on the left and a grey value on the right would have meant the
+/// account you are looking at and the account you are choosing look nothing
+/// alike.
+///
+/// Its category counterpart used to live here and was a second copy of the
+/// same idea. It is now `CategorySuggestionRow` — three ranked chips rather
+/// than a menu — because the two questions turned out not to be the same
+/// one: an account is picked from a handful the user can see at a glance,
+/// a category from dozens where three of them cover most days.
 
 /// An account, shown exactly as the Accounts list shows one — icon, name,
 /// shared marker, Investment badge underneath.
@@ -71,67 +77,6 @@ struct AccountPickerRow: View {
         }
         .menuStyle(.button)
         .buttonStyle(.pressableRow)
-        .sensoryFeedback(AppTheme.Feedback.selection, trigger: selection)
-    }
-}
-
-/// A category, shown as its icon and name. Only ever handed the categories
-/// valid for the current kind — an expense can never be filed under an
-/// income category (`sign_matches_category_kind` enforces that server-side
-/// anyway, but offering the choice and then rejecting it would be a trap).
-struct CategoryPickerRow: View {
-    @Binding var selection: UUID?
-    let categories: [PublicSchema.CategoriesSelect]
-
-    private var selected: PublicSchema.CategoriesSelect? {
-        categories.first { $0.id == selection }
-    }
-
-    private var pillFill: Color {
-        guard let selected else { return AppTheme.Palette.bgSurfaceRaised }
-        return Color(hex: selected.color).opacity(AppTheme.Opacity.fillStrong)
-    }
-
-    var body: some View {
-        Menu {
-            ForEach(categories, id: \.id) { category in
-                Button {
-                    selection = category.id
-                } label: {
-                    if selection == category.id {
-                        Label(category.name, systemImage: "checkmark")
-                    } else {
-                        Text(category.name)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: AppTheme.Spacing.s) {
-                CategoryIconView(category: selected, diameter: AppTheme.Size.glyph)
-                Text(selected?.name ?? "Category")
-                    // Same weight and size as the account name above it —
-                    // they are peers in the hierarchy, both answering "which
-                    // one", and typographic parity is what says so.
-                    .font(AppTheme.Typography.labelEmphasis)
-                    .foregroundStyle(selected == nil ? AppTheme.Palette.textSecondary : AppTheme.Palette.textPrimary)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, AppTheme.Spacing.m)
-            .padding(.vertical, AppTheme.Spacing.s)
-            // Tinted with the category's own colour rather than a neutral
-            // fill, so the pill and the icon inside it are visibly the same
-            // thing. Low opacity, not the solid colour: the label has to stay
-            // readable in both appearances, and a saturated chip would also
-            // outshout the amount directly above it.
-            .background(pillFill, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
-            .contentShape(Rectangle())
-            // Same reason the transactions filter pills and
-            // `FxRateWidget.quotePicker` opt out — see
-            // `TransactionsListView.pillLabel` for the traced explanation.
-            .transaction { $0.animation = nil }
-        }
-        .menuStyle(.button)
-        .buttonStyle(.pressableCard)
         .sensoryFeedback(AppTheme.Feedback.selection, trigger: selection)
     }
 }

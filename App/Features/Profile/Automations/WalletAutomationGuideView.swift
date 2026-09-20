@@ -75,7 +75,7 @@ struct WalletAutomationGuideView: View {
     private var blankState: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
             CapturePitchView()
-            OnboardingPrimaryButton(title: "Set up now", fillsWidth: true) {
+            PrimaryActionButton(title: "Set up now", fillsWidth: true) {
                 isSettingUp = true
             }
         }

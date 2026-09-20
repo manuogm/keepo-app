@@ -258,7 +258,7 @@ struct CaptureConnectionTestView: View {
                 .foregroundStyle(AppTheme.Palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            OnboardingPrimaryButton(title: "Try again", fillsWidth: true) {
+            PrimaryActionButton(title: "Try again", fillsWidth: true) {
                 Task { await runTest() }
             }
 

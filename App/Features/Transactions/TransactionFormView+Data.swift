@@ -30,6 +30,11 @@ extension TransactionFormView {
             await loadAppliedTags()
         } else {
             seedCreateDefaults()
+            // Explicitly, rather than leaving it to the `.task(id:)`
+            // observer: that one fires before this load has an account to
+            // rank against, and whether it fires again depends on whether
+            // seeding happened to change the value it keys on.
+            await adoptContext()
         }
     }
 
@@ -88,31 +93,12 @@ extension TransactionFormView {
         }
     }
 
-    /// A new transaction opens on something rather than on nothing: the
-    /// first account and the first category of the current kind. Both are
-    /// changeable in one tap, and pre-selecting them means the common case
-    /// (an expense on the account you use most) is amount-then-save.
-    private func seedCreateDefaults() {
-        if selectedAccountId == nil {
-            selectedAccountId = accounts.first { $0.archivedAt == nil }?.id
-        }
-        if selectedCategoryId == nil {
-            selectedCategoryId = categoriesForKind.first?.id
-        }
-    }
-
     /// Populates the form from a server row — the initial edit-mode prefill.
     func apply(
         transaction: PublicSchema.TransactionsWithDetailsSelect,
         sibling: PublicSchema.TransactionsWithDetailsSelect?
     ) {
-        kind = {
-            switch transaction.kind {
-            case "income": return .income
-            case "transfer": return .transfer
-            default: return .expense
-            }
-        }()
+        kind = Kind(ledgerKind: transaction.kind)
 
         if let occurredAtString = transaction.occurredAt,
            let date = PostgresDate.date(fromTimestamp: occurredAtString) {
@@ -187,7 +173,12 @@ extension TransactionFormView {
         return false
     }
 
-    func save() async {
+    /// `thenAddAnother` is the only difference between the two saves: one
+    /// dismisses, the other clears what belonged to the transaction just
+    /// written and leaves the sheet standing. Everything before that point
+    /// — validation, signing, the write, the tags — is deliberately the
+    /// same code, because two save paths is how two save paths drift.
+    func save(thenAddAnother: Bool = false) async {
         guard let accountId = selectedAccountId else {
             errorMessage = "Choose an account."
             return
@@ -216,8 +207,14 @@ extension TransactionFormView {
             // later via Needs Review, not as a reason to keep this sheet
             // open; `divergenceWarning` is the one remaining pre-write gate.
             if divergenceWarning == nil {
+                // `onSaved()` either way: the ledger behind the sheet is
+                // refreshed whether or not this one closes it.
                 onSaved()
-                dismiss()
+                if thenAddAnother {
+                    resetForNextEntry()
+                } else {
+                    dismiss()
+                }
             }
         } catch {
             errorMessage = UserFacingError.describe(error)

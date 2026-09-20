@@ -32,13 +32,11 @@ struct NotificationSettingsView: View {
     @State private var isSystemPermissionDenied = false
     @Environment(\.colorScheme) private var colorScheme
 
-    /// The selected card's fill is `textPrimary` itself — dark ink in light
-    /// mode, a darker shade of white in dark mode — so its own text can't
-    /// reuse that same adaptive token without disappearing into it. Light
-    /// mode's ink fill needs fixed white text (`textOnAccent`); dark mode's
-    /// near-white fill needs fixed dark ink (`textOnLight`) instead.
+    /// The selected card's fill is `textPrimary` itself, which is adaptive
+    /// — so its own text cannot reuse that token without disappearing into
+    /// it. `inkOnPrimaryFill` is that pair, in one place.
     private var selectedTextColor: Color {
-        colorScheme == .dark ? AppTheme.Palette.textOnLight : AppTheme.Palette.textOnAccent
+        AppTheme.Palette.inkOnPrimaryFill(colorScheme)
     }
 
     var body: some View {

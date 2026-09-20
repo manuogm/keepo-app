@@ -58,6 +58,10 @@ struct TransactionsListView: View {
     @State var anchor = Date()
     @State var customFrom = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State var customThrough = Date()
+    /// Custom's third state: no bounds at all. Not a sixth period pill —
+    /// six options do not fit the track's one row — and not a very wide
+    /// range either, which is the point: see `range`.
+    @State var isAllTime = false
     @State var isCustomRangePresented = false
 
     /// The filter pills' fixed width — the fix for the distortion
@@ -82,13 +86,6 @@ struct TransactionsListView: View {
 
     // Not `private` — read from TransactionsListView+Filters.swift.
     var scope: PublicSchema.AccountScope { session.scope }
-
-    var range: DateInterval {
-        guard let component = period.component else {
-            return DateInterval(start: calendar.startOfDay(for: customFrom), end: customThrough)
-        }
-        return calendar.dateInterval(of: component, for: anchor) ?? DateInterval(start: anchor, duration: 0)
-    }
 
     /// Computed once per load into `@State`, never as a computed property
     /// read from `body`. SwiftUI re-evaluates a body on every unrelated
@@ -136,7 +133,7 @@ struct TransactionsListView: View {
                 if navigation?.consumeAdd(.transactions) == true { isAddingTransaction = true }
             }
             .sheet(isPresented: $isAddingTransaction) {
-                TransactionFormView(session: session) {
+                TransactionFormView(session: session, seed: newTransactionSeed) {
                     session.refresh.bump()
                 }
             }
@@ -327,6 +324,22 @@ struct TransactionsListView: View {
         await ftux?.offer([FTUXLessons.swipeDelete])
     }
 
+    // MARK: - Adding
+
+    /// What the ledger is currently narrowed to, handed to the form so that
+    /// filtering and adding are one gesture instead of the same answers
+    /// given twice. Read at presentation time, so it is whatever the panel
+    /// says the moment the sheet opens rather than whatever it said when
+    /// this screen was built.
+    ///
+    /// The period travels as a **date**, clamped into the range on screen:
+    /// the list filters on `occurred_at`, so a transaction added while
+    /// looking at March and dated today would save and then vanish. See
+    /// `TransactionSeed.date(in:now:calendar:)`.
+    private var newTransactionSeed: TransactionSeed {
+        TransactionSeed(filter: filter, visible: range)
+    }
+
     // MARK: - Transaction helpers
 
     func sibling(
@@ -369,5 +382,7 @@ private struct TransactionsLoadKey: Equatable {
     let token: Int
     let scope: PublicSchema.AccountScope
     let filter: TransactionFilter
-    let range: DateInterval
+    /// Optional for the same reason `range` is — All Time re-keys the load
+    /// exactly like any other change of period.
+    let range: DateInterval?
 }

@@ -95,7 +95,7 @@ struct SetupAllSetView: View {
                 // ceremony. The screen shows its celebration and then gets
                 // out of the way on its own.
                 if needsManualFinish {
-                    OnboardingPrimaryButton(
+                    PrimaryActionButton(
                         title: "Go to my Keepo", isLoading: isFinishing, fillsWidth: true
                     ) {
                         Task { await finish() }

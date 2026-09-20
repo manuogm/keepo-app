@@ -39,7 +39,7 @@ struct CaptureSetupFlowView: View {
                             // sitting disabled underneath it — same reason
                             // as onboarding's copy of this screen.
                             if isChecklistFinished {
-                                OnboardingPrimaryButton(title: "Test Automation", fillsWidth: true) {
+                                PrimaryActionButton(title: "Test Automation", fillsWidth: true) {
                                     page = .test
                                 }
                             }

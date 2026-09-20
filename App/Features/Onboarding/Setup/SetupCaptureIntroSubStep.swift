@@ -45,7 +45,7 @@ struct SetupCaptureIntroSubStep: View {
     /// genuinely not.
     private var choices: some View {
         VStack(spacing: AppTheme.Spacing.m) {
-            OnboardingPrimaryButton(title: "Set up now", fillsWidth: true, action: onSetUpNow)
+            PrimaryActionButton(title: "Set up now", fillsWidth: true, action: onSetUpNow)
             Button(action: onSetUpLater) {
                 Text("Set up later")
                     .font(AppTheme.Typography.label)
