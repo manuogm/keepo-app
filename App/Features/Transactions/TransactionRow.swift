@@ -181,8 +181,9 @@ struct TransactionRow: View {
     }
 }
 
-/// A capture still waiting on review. Its own type because the transaction
-/// form shows the identical badge, and two copies would drift.
+/// A capture still waiting on review, in the ledger — where a row has
+/// neighbours and has to say for itself which of them is the unreviewed
+/// one. `PendingEdgeStrip` is the same fact on the form, where it isn't.
 struct PendingBadge: View {
     var body: some View {
         Text("Pending")
@@ -191,5 +192,34 @@ struct PendingBadge: View {
             .padding(.horizontal, AppTheme.Spacing.xs)
             .padding(.vertical, AppTheme.Spacing.xxs)
             .background(AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill), in: Capsule())
+    }
+}
+
+/// The same "still waiting on review", said with a band across the top of
+/// the form's card.
+///
+/// The form used to show `PendingBadge` beside the date, which made the
+/// header a two-item row for a fact that belongs to the whole entry rather
+/// than to anything in it — and took the space the day stepper now uses.
+/// The band states it once, across the edge, and stands in nothing's way.
+///
+/// It carries the word as well as the colour for the same reason the badge
+/// did: `brandPrimary` at `Opacity.fill` is a wash, and a wash alone is a
+/// status only the people who already know the convention can read.
+///
+/// Full-bleed by design — it has no corner radius of its own and relies on
+/// the card clipping it, which is why the card composes it **in the stack**
+/// rather than as an overlay. An overlay version of this shipped for about
+/// an hour and ate every tap on the card: it was the card's own shape with
+/// only its *drawing* masked to the top edge, and a mask does not narrow
+/// hit testing.
+struct PendingEdgeStrip: View {
+    var body: some View {
+        Text("Pending")
+            .font(AppTheme.Typography.nanoEmphasis)
+            .foregroundStyle(AppTheme.Palette.brandPrimary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, AppTheme.Spacing.xs)
+            .background(AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill))
     }
 }

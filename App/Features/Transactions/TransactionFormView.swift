@@ -128,6 +128,10 @@ struct TransactionFormView: View {
     // Not `private` — read/written from TransactionFormView+Date.swift,
     // an extension in a different file (kept there purely for file-length).
     @State var isPickingDate = false
+    /// Bumped by the day chevrons, and only by them, so their haptic fires
+    /// on the tap rather than on everything else that sets `occurredAt` —
+    /// the seed, an edit's prefill, the calendar (which has its own).
+    @State var dateSteps = 0
     @State private var isCreatingRecurringRule = false
 
     var isEditing: Bool {
@@ -228,15 +232,24 @@ struct TransactionFormView: View {
 
     // MARK: - The card
 
+    /// The form's one surface. A capture waiting on review gets a band
+    /// along its top edge — **in the stack, not over it**, so the card
+    /// clips the band to its own corners and the band displaces the
+    /// content instead of covering it.
     private var detailCard: some View {
+        VStack(spacing: 0) {
+            if isPendingReview { PendingEdgeStrip() }
+            cardBody
+                .padding(AppTheme.Spacing.l)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.Palette.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
+    }
+
+    private var cardBody: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
-            HStack {
-                datePill
-                Spacer()
-                if isPendingReview {
-                    PendingBadge()
-                }
-            }
+            dateStepper
 
             TransactionDetailCard(
                 fromAccountId: $selectedAccountId,
@@ -290,9 +303,6 @@ struct TransactionFormView: View {
                 addAnotherAction
             }
         }
-        .padding(AppTheme.Spacing.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
     }
 
     /// A second save that keeps the sheet open, for the run of entries

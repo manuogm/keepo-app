@@ -9,6 +9,52 @@ import SwiftUI
 // Nothing here is `private`, for that reason alone.
 
 extension TransactionFormView {
+    /// The date, centred on the card, with a day either side of it.
+    ///
+    /// Most corrections to a date are one day: an evening's spending
+    /// entered the next morning, a receipt found in a pocket. Routing that
+    /// through the calendar costs a tap to open it, a month grid to read
+    /// and a tap to answer — for an answer that is always the cell next to
+    /// the one already selected. The chevrons do it in place; the pill is
+    /// still there for anywhere further away.
+    ///
+    /// They sit at the row's two ends rather than against the pill, so the
+    /// control that changes the date by a day and the control that opens a
+    /// calendar are nowhere near each other's thumb.
+    var dateStepper: some View {
+        HStack(spacing: AppTheme.Spacing.s) {
+            dayStep(-1, icon: "chevron.left", label: "Previous day")
+            Spacer(minLength: AppTheme.Spacing.s)
+            datePill
+            Spacer(minLength: AppTheme.Spacing.s)
+            dayStep(1, icon: "chevron.right", label: "Next day")
+        }
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: dateSteps)
+    }
+
+    /// Unbounded in both directions, exactly like the calendar behind the
+    /// pill: the ledger holds future rows — a bill entered early, a
+    /// recurring rule's next occurrence — and a stepper that stopped at
+    /// today would contradict the picker it sits beside.
+    ///
+    /// `hitTarget` and not a 44pt frame: the finger gets HIG's area
+    /// without the header growing to match it.
+    func dayStep(_ days: Int, icon: String, label: String) -> some View {
+        Button {
+            guard let stepped = Calendar.current.date(byAdding: .day, value: days, to: occurredAt) else { return }
+            occurredAt = stepped
+            dateSteps += 1
+        } label: {
+            Image(systemName: icon)
+                .font(AppTheme.Typography.captionEmphasis)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .padding(AppTheme.Spacing.xs)
+                .hitTarget()
+        }
+        .buttonStyle(.pressableCard)
+        .accessibilityLabel(label)
+    }
+
     /// Outlined rather than filled: it sits on the card's own surface, and a
     /// second filled capsule there competed with the amount for weight. The
     /// two most recent days get their names instead of their dates — "Today"
