@@ -64,6 +64,14 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     /// hiding them is most obviously worth knowing about. Same shape as
     /// `showsPrivacyToggle` above, for the same reason.
     var showsPrivacyLesson = false
+    /// The way back to the screen that sent the user here. `nil` — and so
+    /// no chevron at all — on a screen that is simply its own tab.
+    ///
+    /// A closure rather than a third `@ViewBuilder` slot: a header's leading
+    /// position holds a back control and nothing else, so the only thing a
+    /// caller decides is whether it is there — and the three screens that
+    /// never go back don't have to name a generic parameter they never use.
+    var onBack: (() -> Void)?
     let onOpenProfile: () -> Void
     /// Rendered immediately before the privacy toggle. Home puts "Done"
     /// here while the dashboard is being rearranged; Transactions puts the
@@ -149,6 +157,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
 
     private func card(_ scope: PublicSchema.AccountScope) -> some View {
         HStack(spacing: AppTheme.Spacing.m) {
+            backButton
             Button(action: onOpenProfile) {
                 ProfileAvatarView(
                     name: session.profile?.displayName, email: session.userEmail,
@@ -203,6 +212,38 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(title), \(scope.title) scope")
+        // Scoped to the chevron arriving or leaving. Everything else on the
+        // card — tilt, shrink, colour — is driven by the drag and has to
+        // stay out of an implicit animation.
+        .animation(AppTheme.Motion.standard, value: onBack != nil)
+    }
+
+    /// The leading slot, which is where iOS puts back and so where the eye
+    /// looks for it. *Beside* the avatar rather than replacing it: Profile
+    /// is reached from the header on every screen, and one that stopped
+    /// offering it because a filter was applied would be the exception.
+    ///
+    /// At the title's font, not `Size.glyph` like the two controls on the
+    /// other end — a chevron is a stroke, not a filled shape, so in the same
+    /// box as the eye and the funnel it reads as a hairline. Narrow in
+    /// layout but 44pt to the finger, so a glyph this thin doesn't push the
+    /// title a finger's width across.
+    @ViewBuilder
+    private var backButton: some View {
+        if let onBack {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(AppTheme.Typography.cardTitle)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
+                    .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.icon)
+                    .hitTarget()
+            }
+            // Dims rather than scales — the card emphasis is for things
+            // that look like surfaces, and this is a glyph.
+            .buttonStyle(.pressableRow)
+            .accessibilityLabel("Back")
+            .transition(.opacity.combined(with: .move(edge: .leading)))
+        }
     }
 
     /// The current scope's dot is a **pill**, not a bigger circle: length is
@@ -348,26 +389,5 @@ extension ScopeBannerView where Filters == EmptyView {
             title: title, session: session, showsPrivacyLesson: showsPrivacyLesson,
             onOpenProfile: onOpenProfile, accessory: accessory, filters: { EmptyView() }
         )
-    }
-}
-
-/// The "you are not looking at everything" flag beside a screen title.
-/// Never shown for Total — see `badgeTitle`.
-struct ScopeBadge: View {
-    let title: String
-    let icon: String
-
-    var body: some View {
-        HStack(spacing: AppTheme.Spacing.xs) {
-            ScopeGlyph(name: icon, size: AppTheme.Size.glyphNano)
-                .font(AppTheme.Typography.nanoEmphasis)
-            Text(title.uppercased())
-                .font(AppTheme.Typography.nanoEmphasis)
-                .tracking(0.4)
-        }
-        .foregroundStyle(AppTheme.Palette.textOnAccent)
-        .padding(.horizontal, AppTheme.Spacing.s)
-        .padding(.vertical, AppTheme.Spacing.xxs)
-        .background(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule())
     }
 }

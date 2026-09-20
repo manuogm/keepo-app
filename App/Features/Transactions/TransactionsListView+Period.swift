@@ -50,12 +50,57 @@ extension TransactionsListView {
         isAllTime = false
         customFrom = request.from
         customThrough = request.through
+        originRequest = request
         navigation.transactionsRequest = nil
         // The ask came from another screen, so the controls that produced
         // this state are not the ones on screen — open the panel so the
         // period and category the user is now looking at are visible rather
         // than hidden behind the funnel.
         isFiltersExpanded = true
+    }
+
+    /// Whether the ledger on screen is still the slice the dashboard asked
+    /// for — and so whether the header's back chevron would still be
+    /// telling the truth about where it goes.
+    ///
+    /// Compared against the request rather than tracked with a flag. The
+    /// user can undo the hand-over with any control in the filter panel,
+    /// and a flag would have to be cleared from every one of them — the
+    /// category menu, the kind menu, all five period segments, the stepper
+    /// and the range sheet — which is six places to forget. Comparing the
+    /// state to what was asked for cannot be forgotten anywhere.
+    ///
+    /// Only the fields the request actually sets are compared. Narrowing
+    /// further by account or by search is still the same drill-down seen
+    /// more closely, so the way back survives it.
+    var isShowingHandedOverSlice: Bool {
+        guard let originRequest else { return false }
+        return filter.categoryId == originRequest.categoryId
+            && filter.kind == originRequest.kind
+            && period == .custom
+            && !isAllTime
+            && customFrom == originRequest.from
+            && customThrough == originRequest.through
+    }
+
+    /// Back to the dashboard the category chevron came from, or `nil` when
+    /// there is nothing to go back to and the header draws no chevron.
+    ///
+    /// **A tab switch is all it takes, and that is not a shortcut.** The
+    /// hand-over was itself a tab switch (`AppNavigation.openTransactions`),
+    /// and `MainTabView` keeps all four tabs mounted — so Home's
+    /// `DashboardCanvasView` was never torn down. Its `expandedId`, its
+    /// expansion step, and the Cashflow widget's own direction and
+    /// highlighted bucket are all still exactly as they were left. There is
+    /// no state to restore, and anything that tried to restore it would be
+    /// a second source of truth for it.
+    ///
+    /// The filter is deliberately **not** cleared on the way out: coming
+    /// back to this tab later should find the ledger where it was left,
+    /// chevron included.
+    var backToDashboard: (() -> Void)? {
+        guard isShowingHandedOverSlice, let navigation else { return nil }
+        return { navigation.tab = .home }
     }
 
     /// Picking "Custom" opens the range sheet; *becoming* custom does not.

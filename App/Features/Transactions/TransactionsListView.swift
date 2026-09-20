@@ -46,6 +46,16 @@ struct TransactionsListView: View {
     /// by the banner: `applyPendingRequest` opens it when another screen
     /// hands this one a filter, so the state has to outlive the button.
     @State var isFiltersExpanded = false
+    /// The slice another screen handed this one, kept **after** it has been
+    /// applied so the header can offer the way back to where it came from.
+    ///
+    /// Deliberately not the same thing as `AppNavigation.transactionsRequest`,
+    /// which is cleared the moment it is consumed so it cannot re-apply
+    /// itself on a later visit. This is the memory of that hand-over, and
+    /// `isShowingHandedOverSlice` is what decides whether it is still true.
+    ///
+    /// Not `private` — read/written from TransactionsListView+Period.swift.
+    @State var originRequest: TransactionsRequest?
     /// Whether the Needs Review drawer has taken over the screen. Owned here
     /// because the ledger is what it takes over *from* — the drawer cannot
     /// hide a sibling it does not own.
@@ -186,6 +196,7 @@ struct TransactionsListView: View {
                     title: "Transactions",
                     session: session,
                     isFiltersExpanded: isFiltersExpanded,
+                    onBack: backToDashboard,
                     onOpenProfile: { navigation?.openProfileRoot() },
                     accessory: { filterToggle },
                     filters: { filterPanel }

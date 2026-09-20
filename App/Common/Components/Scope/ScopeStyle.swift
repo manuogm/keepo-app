@@ -117,6 +117,29 @@ struct ScopeGlyph: View {
     }
 }
 
+// MARK: - Scope badge
+
+/// The "you are not looking at everything" flag beside a screen title.
+/// Never shown for Total — see `badgeTitle`.
+struct ScopeBadge: View {
+    let title: String
+    let icon: String
+
+    var body: some View {
+        HStack(spacing: AppTheme.Spacing.xs) {
+            ScopeGlyph(name: icon, size: AppTheme.Size.glyphNano)
+                .font(AppTheme.Typography.nanoEmphasis)
+            Text(title.uppercased())
+                .font(AppTheme.Typography.nanoEmphasis)
+                .tracking(0.4)
+        }
+        .foregroundStyle(AppTheme.Palette.textOnAccent)
+        .padding(.horizontal, AppTheme.Spacing.s)
+        .padding(.vertical, AppTheme.Spacing.xxs)
+        .background(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule())
+    }
+}
+
 // MARK: - Top safe area
 
 /// The window's top safe-area inset, published by the app shell.
