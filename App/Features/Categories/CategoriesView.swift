@@ -165,7 +165,7 @@ struct CategoriesView: View {
         // form is opened for that kind rather than asking a second time. Two
         // entry points, one form — the kind is a parameter, not a control.
         .sheet(isPresented: $isAddingCategory) {
-            CategoryFormView(session: session, mode: .create(kind: selectedTab.categoryKind)) {
+            CategoryFormView(session: session, mode: .create(kind: selectedTab.categoryKind), existing: categories) {
                 session.refresh.bump()
             }
         }
@@ -174,7 +174,7 @@ struct CategoriesView: View {
         }
         .sheet(item: $editingCategoryId) { id in
             if let category = categories.first(where: { $0.id == id }) {
-                CategoryFormView(session: session, mode: .edit(category)) {
+                CategoryFormView(session: session, mode: .edit(category), existing: categories) {
                     session.refresh.bump()
                 }
             }

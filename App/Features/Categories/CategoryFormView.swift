@@ -20,6 +20,10 @@ import SwiftUI
 struct CategoryFormView: View {
     let session: SessionStore
     var mode: Mode = .create(kind: .expense)
+    /// The user's own categories, for the duplicate check — the caller has
+    /// them loaded already, and a form that had to fetch them would be a
+    /// second read of a list the screen behind it is currently drawing.
+    var existing: [PublicSchema.CategoriesSelect] = []
     var onSaved: () -> Void
 
     enum Mode {
@@ -197,21 +201,50 @@ struct CategoryFormView: View {
     private func save() async {
         isSaving = true
         errorMessage = nil
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        // Refused here rather than by `categories_one_name_per_kind` after
+        // the sheet has closed. This write goes through the outbox, so a
+        // server-side rejection would surface minutes later as a failed
+        // sync on a category the user believes they created — the same
+        // reasoning `TagsListView.commitRename` states for tags.
+        guard !isDuplicate(trimmed) else {
+            errorMessage = "You already have \(kind == .income ? "an income" : "an expense") category called "
+                + "\"\(trimmed)\"."
+            isSaving = false
+            return
+        }
         let resolvedColor = color.hexString ?? CategoryAppearance.randomColor()
         switch mode {
         case .create:
             guard let userId = session.profile?.id else { return }
             let payload = CreateCategoryPayload(
-                id: UUID(), ownerId: userId, kind: kind, name: name, icon: icon, color: resolvedColor
+                id: UUID(), ownerId: userId, kind: kind, name: trimmed, icon: icon, color: resolvedColor
             )
             await session.outbox.submitCreateCategory(payload)
         case .edit(let category):
-            let payload = UpdateCategoryPayload(id: category.id, name: name, icon: icon, color: resolvedColor)
+            let payload = UpdateCategoryPayload(id: category.id, name: trimmed, icon: icon, color: resolvedColor)
             await session.outbox.submitUpdateCategory(payload)
         }
         onSaved()
         dismiss()
         isSaving = false
+    }
+
+    /// Compares the way the index does — trimmed, case-insensitive, within
+    /// one kind, over live rows only. The two kinds are separate
+    /// namespaces on purpose: "Gift" as an expense and "Gift" as income is
+    /// two different categories, not one mistake.
+    private func isDuplicate(_ candidate: String) -> Bool {
+        let editingId: UUID? = {
+            if case .edit(let category) = mode { return category.id }
+            return nil
+        }()
+        return existing.contains { category in
+            category.id != editingId
+                && category.kind == kind
+                && category.deletedAt == nil
+                && category.name.trimmingCharacters(in: .whitespaces).lowercased() == candidate.lowercased()
+        }
     }
 
     /// Reads a live transaction count before showing the warning — offline,
