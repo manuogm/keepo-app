@@ -256,9 +256,16 @@ struct UpcomingBillsWidget: View {
 
     // MARK: - Helpers
 
-    /// Truncated to a UTC day, so it is stable across re-renders and lines up
-    /// with the date-only values the occurrences carry.
-    private var today: Date { utcCalendar.startOfDay(for: Date()) }
+    /// The **user's** calendar day, expressed in UTC so it lines up with the
+    /// date-only values the occurrences carry, and stable across re-renders.
+    ///
+    /// `utcCalendar.startOfDay(for: Date())` is the spelling this used to
+    /// have and is UTC's today, not the device's — so the ring marked "today"
+    /// was the wrong circle for anyone west of UTC from mid-afternoon on, and
+    /// the strip started a day late. See `PostgresDate.currentDateOnly`.
+    private var today: Date {
+        PostgresDate.currentDateOnly(in: utcCalendar) ?? utcCalendar.startOfDay(for: Date())
+    }
 
     private func accessibilityLabel(_ day: Date, items: [UpcomingTransactionLocal]) -> String {
         let date = PostgresDate.dateOnlyLabel(day, calendar: utcCalendar)

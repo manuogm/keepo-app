@@ -96,6 +96,36 @@ public enum ProfileRepository {
         let patch = ProfileBaseCurrencyPatch(baseCurrency: baseCurrency)
         try await client.from("profiles").update(patch).eq("id", value: userId).execute()
     }
+
+    /// Which calendar this user's dates mean, as an IANA zone name.
+    ///
+    /// **`materialize_recurring` is the only thing that reads it**, and it is
+    /// the reason the column exists: a rule due "on the 20th" has to become an
+    /// instant, and no fixed instant is the 20th everywhere (real offsets span
+    /// twenty-six hours). Stored per user so the occurrence lands at *their*
+    /// local midnight — see migration 20260928100000.
+    ///
+    /// The server refuses a name Postgres does not know, so this is not a free
+    /// text field; `TimeZone.current.identifier` is always one it knows.
+    public static func updateTimeZone(client: SupabaseClient, userId: UUID, timeZone: String) async throws {
+        let patch = ProfileTimeZonePatch(timeZone: timeZone)
+        try await client.from("profiles").update(patch).eq("id", value: userId).execute()
+    }
+
+    /// Moves this user's already-materialized recurring transactions from the
+    /// old UTC-midnight convention onto their own local midnight, and returns
+    /// how many moved.
+    ///
+    /// Only ever called straight after `updateTimeZone` has changed something:
+    /// before a zone is known the server cannot tell a correct row from an
+    /// incorrect one. It is idempotent and narrow by construction — it touches
+    /// only `source = 'recurring'` rows still sitting at exact UTC midnight
+    /// *and* rendering as the wrong local day — so calling it again, or for a
+    /// user east of UTC who was never affected, returns 0 and writes nothing.
+    @discardableResult
+    public static func realignRecurringOccurrences(client: SupabaseClient) async throws -> Int {
+        try await client.rpc("realign_recurring_occurrences").execute().value
+    }
 }
 
 private struct ProfileOnboardingPatch: Encodable {
@@ -122,6 +152,13 @@ private struct ProfileAvatarPathPatch: Encodable {
     let avatarPath: String?
     enum CodingKeys: String, CodingKey {
         case avatarPath = "avatar_path"
+    }
+}
+
+private struct ProfileTimeZonePatch: Encodable {
+    let timeZone: String
+    enum CodingKeys: String, CodingKey {
+        case timeZone = "time_zone"
     }
 }
 

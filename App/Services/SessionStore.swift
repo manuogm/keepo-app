@@ -350,6 +350,9 @@ public final class SessionStore {
         let profile = try await ProfileRepository.fetchOwn(client: client, userId: userId)
         self.profile = profile
         phase = profile.onboardedAt == nil ? .needsOnboarding : .ready
+        if let realigned = await reconcileTimeZone(profile, userId: userId) {
+            self.profile = realigned
+        }
     }
 
     /// Info.plist keys are set via INFOPLIST_KEY_SupabaseURL/SupabaseAnonKey

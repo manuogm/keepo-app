@@ -36,6 +36,7 @@
 		18BFB9F139515A49E698192E /* NeedsReviewRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760153CF7092D823E920BBFF /* NeedsReviewRow.swift */; };
 		197652F2F5196F4A4487FB4F /* DashboardGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C80AB872EF3B66A5C757E62D /* DashboardGeometryTests.swift */; };
 		1979678A5304703AB79F5093 /* ConfirmCaptureLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */; };
+		19D85A32B3220B2F24EB403E /* RecurringRuleLocalWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0E27136DC213191A148291 /* RecurringRuleLocalWrite.swift */; };
 		1A1C0635A50FD4CE595F9E6D /* CaptureTestSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19305D314ACB43EAC4C42E04 /* CaptureTestSession.swift */; };
 		1A627C469E88842C26A53B4E /* HouseholdReportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 055F0CA818A2CD7154B84071 /* HouseholdReportFlow.swift */; };
 		1B63ACEEE01F0CCB514750A2 /* CashflowBreakdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB7B5D9A55A42FEA71159568 /* CashflowBreakdownView.swift */; };
@@ -63,6 +64,7 @@
 		2F0B4AC72E20917F31A0D9F7 /* AccountFormView+Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = E82D12D8E224E6F3833EFD78 /* AccountFormView+Data.swift */; };
 		2F93B60FFC35E87E8539459C /* CurrencyFlagAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7440D8EAA40F17639CC1041 /* CurrencyFlagAssetTests.swift */; };
 		2FA5C7471F5140A0CC03B744 /* HouseholdKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 429EDEB71C3725F0838B5333 /* HouseholdKit.swift */; };
+		303EFE1709BE276368BD86D3 /* RecurringRuleFormView+Schedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35FCE63463A832562DF9C5DB /* RecurringRuleFormView+Schedule.swift */; };
 		3050B5B40C0C7419FDE71B98 /* DashboardDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D355FA2D4C581552DA98EC05 /* DashboardDataTests.swift */; };
 		3081F610263348FB89AFB5FE /* NetWorthWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907CF10603055CC52ED389C /* NetWorthWidget.swift */; };
 		30C5671CBE0B6D3E11AEBAA7 /* HouseholdReportOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC04D683E6EC69DDCECBFD9 /* HouseholdReportOverview.swift */; };
@@ -83,6 +85,7 @@
 		3E5A3C213A9C4C24DA0CDAD2 /* CaptureEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC330CD2BD135E7B857838F3 /* CaptureEnvironment.swift */; };
 		400C16FB82D8BDEFD68FDD71 /* HouseholdSetupCoordinator+Teardown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD9C054FF016E3872C4A1D9 /* HouseholdSetupCoordinator+Teardown.swift */; };
 		417D9CA1DF24EBD69F0A89F4 /* TransactionFormView+Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5623F587B3B8D61238E69B8D /* TransactionFormView+Data.swift */; };
+		41CD7915DAB1F0BA97869D52 /* RecurringRuleFormView+Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6155B7F51791BFA87C025151 /* RecurringRuleFormView+Data.swift */; };
 		41DF945183EDD59058A03D38 /* HouseholdQRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 145A30F06CC4CD6561EC2248 /* HouseholdQRView.swift */; };
 		41FDD9F61FE0C27BB4C5439B /* PressableRowButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7215DD41F6B092BD6986AD /* PressableRowButtonStyle.swift */; };
 		42CAEC37A85FED9A152E1AA4 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0A8C2BEF10788227677E2A /* SessionStore.swift */; };
@@ -121,7 +124,9 @@
 		5865DCBD730A1A6676CB888B /* FTUXCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED624A5EC4CE214399DB494E /* FTUXCoordinator.swift */; };
 		5896C902E1DF01D41623E7A6 /* AccountFormView+Dialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6527A3683E8F25003E736747 /* AccountFormView+Dialogs.swift */; };
 		58B4D277C06FF46BD703483B /* ReviewPromptModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FC0D1679BAABD4DCEB7A1B3 /* ReviewPromptModifier.swift */; };
+		58D76A9C5BA047D8DA730DE6 /* RecurringFrequency+Label.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26AAE68F45DAA74B640096CB /* RecurringFrequency+Label.swift */; };
 		59E0529AD0C2C827F4E01BB3 /* SimulateCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4483B90ADDC12EA6923C282A /* SimulateCaptureView.swift */; };
+		5A17DF8EC5391D9FB29B1E15 /* TransactionFormView+Recurring.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4201A86EDD51E43F6AF56621 /* TransactionFormView+Recurring.swift */; };
 		5AC76702BFC9E686203A47A6 /* AppNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797FA059761930E95F96636D /* AppNavigation.swift */; };
 		5AFDCEF416F195DDB747F1AE /* SetupAccountStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A638A85B40E4E4DA1C175FD /* SetupAccountStep.swift */; };
 		5C2EAAD51D82FD4DA43DAC07 /* ReviewCaptureLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983639BA2391235A898AD23F /* ReviewCaptureLocalWriteTests.swift */; };
@@ -201,6 +206,7 @@
 		9DB30A8E3FAF547AA25913CB /* DashboardCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666660B494D18FFDCFA6D9E9 /* DashboardCanvasView.swift */; };
 		9E048910960D5BEBA16D34D5 /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = 610996A30730C6CFFBBA65AC /* ConfettiBurst.swift */; };
 		9E3B038724CD348E84EC17AF /* TransactionFormView+Seed.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0BB3F19CDA0472C84CCAF8D /* TransactionFormView+Seed.swift */; };
+		9E7341A4E90764E7FDFE7EBA /* LocalRecurringRuleRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0409EB6DE009773078275B19 /* LocalRecurringRuleRow.swift */; };
 		9EC35B8464D0FEC959084980 /* TransactionDetailCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A11E1BCCB36DAF53FD193D7 /* TransactionDetailCard.swift */; };
 		9F206B449D6124FFBFD56069 /* CreditCardFace.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF89385A8B184D9222CDA06 /* CreditCardFace.swift */; };
 		A0A3C7CA5A7F03F096D79844 /* AccountsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B43265F15809313F001391C /* AccountsListView.swift */; };
@@ -265,6 +271,7 @@
 		CDEAFC8D83E97D3B04E20CFD /* LocalStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */; };
 		CF7632BB3A1B0551894DCCB0 /* FTUXLessonDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3AC53C0B5E14F58AC31BA0 /* FTUXLessonDetail.swift */; };
 		D15A1D633F72688611DDF354 /* ReviewPrompter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E53170A30B0E65B4F55C184 /* ReviewPrompter.swift */; };
+		D16ED7DBE1E601C052120BF7 /* RecurringRuleRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1C0F6BEC1D5D9D5B966833 /* RecurringRuleRow.swift */; };
 		D17D97C911F003E95B24DD2D /* TransferLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B92B44899D6DDB44851A8E /* TransferLocalWriteTests.swift */; };
 		D18BF57535C0B1A56DE160CC /* SetupCaptureIntroSubStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B5A82829163C74F5130CB7D /* SetupCaptureIntroSubStep.swift */; };
 		D1A22957D9168F2FB74BBEA7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C51BAEA2B58FB280672BF8C /* AppDelegate.swift */; };
@@ -320,6 +327,7 @@
 		F6828864D660E4D88F3E29CC /* SetupCaptureTestSubStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42DD908C92224E7C61E6275F /* SetupCaptureTestSubStep.swift */; };
 		F7133C4614BF0DCF5ED29E07 /* LocalStoreMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 330A1DB56C7CE8B1BC25180E /* LocalStoreMigrationTests.swift */; };
 		F7C13C6A8ECEEED7E99F1919 /* CapturePitchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81DCBC71F399EFB1C8930EEB /* CapturePitchView.swift */; };
+		F824BACFE8D7DA967111F9ED /* SessionStore+TimeZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0385315DE0205887262ED048 /* SessionStore+TimeZone.swift */; };
 		F94F12C09C7CFCF39E403C53 /* TransactionFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C989DB9E673F3B36CD29E0 /* TransactionFormView.swift */; };
 		F95C149D0E193F83FEE29433 /* DashboardCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6D9DF881AC96B89492D7C8 /* DashboardCatalogView.swift */; };
 		FA62554A9ABC64DD9EFD2DC6 /* CustomRangeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D14151CE072C63D0C999E30 /* CustomRangeSheet.swift */; };
@@ -353,9 +361,11 @@
 		02470A27D409D65059E47D19 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 		026F2BBB34E4C63B1C1CBB3F /* WidgetChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetChrome.swift; sourceTree = "<group>"; };
 		0300874CAE716E514E801E60 /* LocalMoneyQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMoneyQueries.swift; sourceTree = "<group>"; };
+		0385315DE0205887262ED048 /* SessionStore+TimeZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionStore+TimeZone.swift"; sourceTree = "<group>"; };
 		03941D7DA3A9DB1450A09F83 /* OfflineInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineInfoSheet.swift; sourceTree = "<group>"; };
 		03C66FB827DFBD10EF7AEC18 /* CurrencyExposureWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyExposureWidget.swift; sourceTree = "<group>"; };
 		03E47695783E639B37462948 /* AccountLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLocalWrite.swift; sourceTree = "<group>"; };
+		0409EB6DE009773078275B19 /* LocalRecurringRuleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalRecurringRuleRow.swift; sourceTree = "<group>"; };
 		04390E921137B01C4EBB45D2 /* CategoryLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryLocalWrite.swift; sourceTree = "<group>"; };
 		0543BB126633F2F0258233FC /* ShortcutInstallButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutInstallButton.swift; sourceTree = "<group>"; };
 		055F0CA818A2CD7154B84071 /* HouseholdReportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdReportFlow.swift; sourceTree = "<group>"; };
@@ -408,6 +418,7 @@
 		23B92B44899D6DDB44851A8E /* TransferLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferLocalWriteTests.swift; sourceTree = "<group>"; };
 		242AFF22D448A2969EE96D9C /* StubTransactionSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StubTransactionSender.swift; sourceTree = "<group>"; };
 		2466CDC8B59EB28490597507 /* PickerRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickerRows.swift; sourceTree = "<group>"; };
+		26AAE68F45DAA74B640096CB /* RecurringFrequency+Label.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecurringFrequency+Label.swift"; sourceTree = "<group>"; };
 		2764C668FBE41514EAF7AE12 /* HouseholdSetupModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdSetupModel.swift; sourceTree = "<group>"; };
 		29E27B8CE90F8B5B8DD7F514 /* TransactionsListView+Period.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionsListView+Period.swift"; sourceTree = "<group>"; };
 		2A1CF50053339F613C77014E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
@@ -428,6 +439,7 @@
 		341E14CE6FFBD77B40BAD3E6 /* CategoryMergeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryMergeSheet.swift; sourceTree = "<group>"; };
 		349CAF3BCEA4D911AA5E107F /* DashboardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardData.swift; sourceTree = "<group>"; };
 		35170FD359FD5CC824394DC0 /* FTUXCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTUXCoordinatorTests.swift; sourceTree = "<group>"; };
+		35FCE63463A832562DF9C5DB /* RecurringRuleFormView+Schedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecurringRuleFormView+Schedule.swift"; sourceTree = "<group>"; };
 		36C0E74B8A5085E376E747EF /* SetupNotificationsSubStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupNotificationsSubStep.swift; sourceTree = "<group>"; };
 		36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryLocalWriteTests.swift; sourceTree = "<group>"; };
 		3768CA435AE5F391055BEBA2 /* KindTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KindTabBar.swift; sourceTree = "<group>"; };
@@ -440,6 +452,7 @@
 		3C4399D180113EC51C5FA34A /* LocalStore+SchemaMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalStore+SchemaMigration.swift"; sourceTree = "<group>"; };
 		3F8FFECC5948E8F48BA0801E /* FXRateSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXRateSync.swift; sourceTree = "<group>"; };
 		3FB16A0FBB8E0356AFBB7D47 /* WalletAutomationGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAutomationGuideView.swift; sourceTree = "<group>"; };
+		4201A86EDD51E43F6AF56621 /* TransactionFormView+Recurring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionFormView+Recurring.swift"; sourceTree = "<group>"; };
 		429EDEB71C3725F0838B5333 /* HouseholdKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdKit.swift; sourceTree = "<group>"; };
 		42DD908C92224E7C61E6275F /* SetupCaptureTestSubStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupCaptureTestSubStep.swift; sourceTree = "<group>"; };
 		42EFC2392496054638F1B9CF /* WalkthroughClipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkthroughClipView.swift; sourceTree = "<group>"; };
@@ -496,6 +509,7 @@
 		60012E5603F2BBB56AC789E0 /* CustomRangeSheet+Grid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CustomRangeSheet+Grid.swift"; sourceTree = "<group>"; };
 		60703611BD5D37337868A10F /* SetupDashboardLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupDashboardLayoutTests.swift; sourceTree = "<group>"; };
 		610996A30730C6CFFBBA65AC /* ConfettiBurst.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiBurst.swift; sourceTree = "<group>"; };
+		6155B7F51791BFA87C025151 /* RecurringRuleFormView+Data.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecurringRuleFormView+Data.swift"; sourceTree = "<group>"; };
 		61E117F7A777571884BB0AA1 /* DashboardHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHaptics.swift; sourceTree = "<group>"; };
 		65131372E8A961D7B423253D /* HouseholdReportCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdReportCategories.swift; sourceTree = "<group>"; };
 		651B6E75A1EEE0DE610ECB03 /* DaySplitRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaySplitRing.swift; sourceTree = "<group>"; };
@@ -533,6 +547,7 @@
 		7E53170A30B0E65B4F55C184 /* ReviewPrompter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPrompter.swift; sourceTree = "<group>"; };
 		7EB85EAA8C8236A80CB106A6 /* Outbox+AccountsCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+AccountsCategories.swift"; sourceTree = "<group>"; };
 		7EC88E17D5F78D13BC67563C /* DashboardMetricSeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricSeries.swift; sourceTree = "<group>"; };
+		7F0E27136DC213191A148291 /* RecurringRuleLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRuleLocalWrite.swift; sourceTree = "<group>"; };
 		8039C17F3DF03A29FB0D1365 /* AccountFormView+Cards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountFormView+Cards.swift"; sourceTree = "<group>"; };
 		81DCBC71F399EFB1C8930EEB /* CapturePitchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePitchView.swift; sourceTree = "<group>"; };
 		822DA33296A0465F95710A8B /* CaptureTestSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureTestSessionTests.swift; sourceTree = "<group>"; };
@@ -595,6 +610,7 @@
 		BC080B33FA837D6D4D0F61A7 /* DashboardDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardDataLoader.swift; sourceTree = "<group>"; };
 		BC8E75A07394E414933509DB /* TransactionEntryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEntryTests.swift; sourceTree = "<group>"; };
 		BDA7D8129135E6F7A3654E79 /* OnboardingDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingDraftStore.swift; sourceTree = "<group>"; };
+		BE1C0F6BEC1D5D9D5B966833 /* RecurringRuleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRuleRow.swift; sourceTree = "<group>"; };
 		BFC2601A5B057E9F8CD882E7 /* ConflictDetailSheet+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConflictDetailSheet+Loading.swift"; sourceTree = "<group>"; };
 		C02190F3A60526A587EFCA91 /* CaptureQuickActionSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionSuggestions.swift; sourceTree = "<group>"; };
 		C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
@@ -751,6 +767,7 @@
 			isa = PBXGroup;
 			children = (
 				487EAE5A42131446A0EA564D /* ColorHex.swift */,
+				26AAE68F45DAA74B640096CB /* RecurringFrequency+Label.swift */,
 				67F70AFEF9431B8FA8A98F6E /* UUID+Identifiable.swift */,
 			);
 			path = Extensions;
@@ -823,6 +840,7 @@
 				5623F587B3B8D61238E69B8D /* TransactionFormView+Data.swift */,
 				674719F7E885BAA299442408 /* TransactionFormView+Date.swift */,
 				68FD22A4D8E74530E6ECFCEA /* TransactionFormView+Delete.swift */,
+				4201A86EDD51E43F6AF56621 /* TransactionFormView+Recurring.swift */,
 				D0BB3F19CDA0472C84CCAF8D /* TransactionFormView+Seed.swift */,
 				06C2F3F64823347A025EBB9D /* TransactionFormView+Transfer.swift */,
 				82CCCE4FCBDBDE32D9845EC2 /* TransactionRow.swift */,
@@ -895,6 +913,7 @@
 				F82A6B086F193EDA03980932 /* LocalMoneyConversion.swift */,
 				0300874CAE716E514E801E60 /* LocalMoneyQueries.swift */,
 				165D0C1A1BF53D4803DE5FBC /* LocalMoneyTypes.swift */,
+				0409EB6DE009773078275B19 /* LocalRecurringRuleRow.swift */,
 				AF71A7732689A19B52D34F44 /* LocalStore.swift */,
 				3C4399D180113EC51C5FA34A /* LocalStore+SchemaMigration.swift */,
 				C1FC58D96CA656DB078176BA /* LocalStore+TagTables.swift */,
@@ -902,6 +921,7 @@
 				0DBF6795112FAE14AF6A9964 /* LocalTransactionRow.swift */,
 				4CD0B50CAA1BC29C91EFA60B /* MappedCardQueries.swift */,
 				2C826F8EB1CECA41DDF5D02A /* OfflineStore.swift */,
+				7F0E27136DC213191A148291 /* RecurringRuleLocalWrite.swift */,
 				8242FCE5C65D5AC6A220824F /* TestCaptureQueries.swift */,
 			);
 			path = LocalStore;
@@ -953,6 +973,9 @@
 				2175B61B78B33F2633D36AE5 /* AutomationsView.swift */,
 				EF0D96E1ADBDF42EE075941B /* CaptureSetupFlowView.swift */,
 				E26113BDE0659689A35B7B28 /* RecurringRuleFormView.swift */,
+				6155B7F51791BFA87C025151 /* RecurringRuleFormView+Data.swift */,
+				35FCE63463A832562DF9C5DB /* RecurringRuleFormView+Schedule.swift */,
+				BE1C0F6BEC1D5D9D5B966833 /* RecurringRuleRow.swift */,
 				D24680F7D0E74D48EC916E28 /* RecurringRulesView.swift */,
 				3FB16A0FBB8E0356AFBB7D47 /* WalletAutomationGuideView.swift */,
 			);
@@ -1314,6 +1337,7 @@
 				5597232F1DF84A5AC9F1058F /* NotificationRouter.swift */,
 				7E53170A30B0E65B4F55C184 /* ReviewPrompter.swift */,
 				5B0A8C2BEF10788227677E2A /* SessionStore.swift */,
+				0385315DE0205887262ED048 /* SessionStore+TimeZone.swift */,
 				6F496BEBEB0AEB14CE874724 /* ShortcutsInstaller.swift */,
 				7B425488C710F598E9307947 /* Pairing */,
 			);
@@ -1716,6 +1740,7 @@
 				9A9522D7B248C0C29DC63A52 /* LocalMoneyConversion.swift in Sources */,
 				35A200834326AB5FFB236D5F /* LocalMoneyQueries.swift in Sources */,
 				F6149460C908D5CC42F1B2E1 /* LocalMoneyTypes.swift in Sources */,
+				9E7341A4E90764E7FDFE7EBA /* LocalRecurringRuleRow.swift in Sources */,
 				48A34F2B50E007DA6E563D97 /* LocalStore+SchemaMigration.swift in Sources */,
 				A0AD498290E62C4E7CE55F1A /* LocalStore+TagTables.swift in Sources */,
 				B18C1FD694FDD097B6344A64 /* LocalStore.swift in Sources */,
@@ -1771,7 +1796,12 @@
 				610B068DBE2C22A3C45B085E /* ProfileView+Sections.swift in Sources */,
 				EAE9BB0551B52CA258B1C65A /* ProfileView.swift in Sources */,
 				C83D5628BC4774EBD0CC495E /* QRScannerView.swift in Sources */,
+				58D76A9C5BA047D8DA730DE6 /* RecurringFrequency+Label.swift in Sources */,
+				41CD7915DAB1F0BA97869D52 /* RecurringRuleFormView+Data.swift in Sources */,
+				303EFE1709BE276368BD86D3 /* RecurringRuleFormView+Schedule.swift in Sources */,
 				6823B51CF7AC1FDD1404192D /* RecurringRuleFormView.swift in Sources */,
+				19D85A32B3220B2F24EB403E /* RecurringRuleLocalWrite.swift in Sources */,
+				D16ED7DBE1E601C052120BF7 /* RecurringRuleRow.swift in Sources */,
 				E81B9DD7867A79307B5389DF /* RecurringRulesView.swift in Sources */,
 				D6B7A4A8322A6A3BA1524FA4 /* RefreshCoordinator.swift in Sources */,
 				68C33B40830E28895706627A /* RemoveBadge.swift in Sources */,
@@ -1785,6 +1815,7 @@
 				63744FB4D48DDE55313798B5 /* ScopeStyle.swift in Sources */,
 				0D5315A665A76FCABF1A2724 /* SeriesWidgetChrome.swift in Sources */,
 				4D60CD7CFF2C75EA35FD537F /* SeriesWidgetState.swift in Sources */,
+				F824BACFE8D7DA967111F9ED /* SessionStore+TimeZone.swift in Sources */,
 				42CAEC37A85FED9A152E1AA4 /* SessionStore.swift in Sources */,
 				5AFDCEF416F195DDB747F1AE /* SetupAccountStep.swift in Sources */,
 				7423565633D4F1D0A1288CDF /* SetupAllSetView.swift in Sources */,
@@ -1822,6 +1853,7 @@
 				417D9CA1DF24EBD69F0A89F4 /* TransactionFormView+Data.swift in Sources */,
 				E28D269E5ACBCDE0B135659B /* TransactionFormView+Date.swift in Sources */,
 				D9C80C19804E752108250939 /* TransactionFormView+Delete.swift in Sources */,
+				5A17DF8EC5391D9FB29B1E15 /* TransactionFormView+Recurring.swift in Sources */,
 				9E3B038724CD348E84EC17AF /* TransactionFormView+Seed.swift in Sources */,
 				50FEDE6442856BA78C4547ED /* TransactionFormView+Transfer.swift in Sources */,
 				F94F12C09C7CFCF39E403C53 /* TransactionFormView.swift in Sources */,

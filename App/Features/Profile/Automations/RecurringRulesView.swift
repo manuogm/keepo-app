@@ -1,21 +1,36 @@
 import KeepoCore
 import SwiftUI
 
-/// One list, reached from Settings — not a top-level tab, matching the
-/// existing precedent (Household/Sync Ritual aren't tabs either). Shows
-/// each rule's own `next_due_at` directly; nothing here ever queries or
-/// creates a materialized row — that's `materialize_recurring`'s job alone,
-/// running on its own daily cron schedule (Phase 13/14).
+/// Every standing instruction the user has, as one list — reached from
+/// Settings, not a top-level tab, matching the existing precedent
+/// (Household/Sync Ritual aren't tabs either).
+///
+/// Nothing here ever queries or creates a materialized row: that is
+/// `materialize_recurring`'s job alone, on its own daily cron schedule. Each
+/// rule's `next_due_at` is shown directly, and a date in the past is shown
+/// as such rather than tidied up — it is exactly what materialization
+/// falling behind looks like.
+///
+/// **Rebuilt on the ledger's own row.** It used to be plain `List` rows of
+/// text: no leading icon, no privacy mode, no base-currency line, and an
+/// amount drawn with its minus sign while the identical transaction in the
+/// Transactions tab drops it. The rows are `TransactionRow`'s anatomy now —
+/// icon disc, title over a grey detail line, ledger-style amount with its
+/// conversion underneath — because a recurring rule IS a transaction, seen
+/// before it happens.
 struct RecurringRulesView: View {
     let session: SessionStore
 
-    @State private var rules: [PublicSchema.RecurringRulesSelect] = []
+    @State private var rules: [LocalRecurringRuleRow] = []
     @State private var isLoading = true
-    @State private var accounts: [LocalAccountRow] = []
-    @State private var categories: [PublicSchema.CategoriesSelect] = []
     @State private var isAddingRule = false
     @State private var editingRule: PublicSchema.RecurringRulesSelect?
-    @State private var actionErrorMessage: String?
+    @State private var actionError: ActionError?
+    /// Rules whose switch has been flipped but whose write has not come back
+    /// yet. The row reads its own state from here first, so the toggle moves
+    /// under the finger instead of waiting for a round trip and a reload —
+    /// and cannot be flipped twice while the first write is still going.
+    @State private var pendingActive: [UUID: Bool] = [:]
 
     var body: some View {
         ZStack {
@@ -24,31 +39,9 @@ struct RecurringRulesView: View {
             if isLoading {
                 ProgressView()
             } else if rules.isEmpty {
-                Text("No recurring transactions yet")
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                emptyState
             } else {
-                List {
-                    ForEach(rules, id: \.id) { rule in
-                        RecurringRuleRow(rule: rule, account: account(for: rule), category: category(for: rule))
-                            .contentShape(Rectangle())
-                            .onTapGesture { editingRule = rule }
-                    }
-                    .onDelete { offsets in
-                        Task { await pause(at: offsets) }
-                    }
-                }
-                .scrollContentBackground(.hidden)
-                .refreshable { await load() }
-            }
-
-            if let actionErrorMessage {
-                VStack {
-                    Spacer()
-                    Text(actionErrorMessage)
-                        .font(AppTheme.Typography.caption)
-                        .foregroundStyle(AppTheme.Palette.statusNegative)
-                        .padding()
-                }
+                ruleList
             }
         }
         .navigationTitle("Recurring")
@@ -60,6 +53,7 @@ struct RecurringRulesView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("New recurring transaction")
             }
         }
         .sheet(isPresented: $isAddingRule) {
@@ -72,104 +66,148 @@ struct RecurringRulesView: View {
                 session.refresh.bump()
             }
         }
+        .errorAlert($actionError)
         .task(id: session.refresh.token) { await load() }
     }
 
-    private func account(for rule: PublicSchema.RecurringRulesSelect) -> LocalAccountRow? {
-        accounts.first { $0.id == rule.accountId }
+    // MARK: - Content
+
+    /// **One card, no header.** The rules are already ordered by what matters
+    /// — active first, then soonest due — and a heading over a list whose
+    /// every row says for itself whether it is running would be labelling the
+    /// same fact twice.
+    ///
+    /// **A `ScrollView` of rows on one card, not a `List`**, because this
+    /// screen has no list affordance left to justify one. Swipe-to-delete is
+    /// gone — a rule cannot be deleted at all (see `setActive`) — and with
+    /// pause and resume both living on the switch there is no second action
+    /// to swipe for. What remains is a group of rows on a surface, which is
+    /// what `AutomationsView` and `ProfileView` already draw by hand.
+    ///
+    /// It also keeps a row with two independent controls out of `List`'s way.
+    /// A `Button` inside a `List` row can have UIKit treat the whole cell as
+    /// that button, which is why `ArchiveAccountsView` has to put
+    /// `.buttonStyle(.borderless)` on each of its two — at the cost of the
+    /// press state `.pressableRow` exists to draw. Not a bug this screen ever
+    /// hit, and worth not being exposed to.
+    private var ruleList: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(rules) { rule in
+                    RecurringRuleRow(
+                        rule: rule,
+                        isActive: pendingActive[rule.id] ?? rule.active,
+                        isBusy: pendingActive[rule.id] != nil,
+                        onToggle: { isOn in Task { await setActive(rule, to: isOn) } },
+                        onOpen: { Task { await open(rule) } }
+                    )
+                    .padding(.horizontal, AppTheme.Spacing.l)
+
+                    if rule.id != rules.last?.id {
+                        Divider()
+                            .padding(.leading, AppTheme.Size.dividerInset(icon: AppTheme.Size.icon))
+                    }
+                }
+            }
+            .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.surface))
+            .padding(AppTheme.Spacing.l)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .refreshable { await load() }
     }
 
-    private func category(for rule: PublicSchema.RecurringRulesSelect) -> PublicSchema.CategoriesSelect? {
-        categories.first { $0.id == rule.categoryId }
+    /// The illustrated shape `ScopeEmptyStateView` uses, rather than the one
+    /// grey sentence this screen used to show. An empty list that offers no
+    /// way to fill it is a dead end on a screen the user navigated three
+    /// levels down to reach.
+    private var emptyState: some View {
+        VStack(spacing: AppTheme.Spacing.m) {
+            KeepoIcon(name: "icon-recurrent", size: AppTheme.Size.icon)
+                .foregroundStyle(AppTheme.Palette.brandPrimary)
+                .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
+                .background(AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill), in: Circle())
+
+            VStack(spacing: AppTheme.Spacing.xs) {
+                Text("No recurring transactions yet")
+                    .font(AppTheme.Typography.rowTitle)
+                Text("Set up rent, a subscription or a monthly transfer once, and Keepo files it every time.")
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button("Add Recurring") { isAddingRule = true }
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .padding(.horizontal, AppTheme.Spacing.l)
+                .padding(.vertical, AppTheme.Spacing.m)
+                .background(AppTheme.Palette.brandPrimary, in: Capsule())
+                .buttonStyle(.plain)
+                .padding(.top, AppTheme.Spacing.xxs)
+        }
+        .padding(.horizontal, AppTheme.Spacing.xxl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    // MARK: - Actions
 
     private func load() async {
-        actionErrorMessage = nil
-        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else {
+        guard let baseCurrency = session.profile?.baseCurrency else {
             isLoading = false
             return
         }
         do {
-            let loaded: LoadedRecurringState = try await session.dbQueue.read { database in
-                LoadedRecurringState(
-                    rules: try LocalTableQueries.recurringRules(database),
-                    accounts: try LocalAccountRow.fetchAll(
-                        database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
-                    ),
-                    categories: try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
-                )
+            rules = try await session.dbQueue.read { database in
+                try LocalRecurringRuleRow.fetchAll(database, baseCurrency: baseCurrency)
             }
-            rules = loaded.rules
-            accounts = loaded.accounts
-            categories = loaded.categories
         } catch {
-            actionErrorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Load Recurring Transactions", error)
         }
         isLoading = false
     }
 
-    /// "Delete" pauses, never removes — a recurring rule has already
+    /// **The switch pauses; it never deletes.** A rule has already
     /// materialized real, historical transactions that must keep their
-    /// `recurring_rule_id` pointing at something. `active = false` simply
-    /// stops future materialization.
-    private func pause(at offsets: IndexSet) async {
-        actionErrorMessage = nil
-        for index in offsets {
-            let rule = rules[index]
-            do {
-                try await RecurringRuleRepository.setActive(client: session.client, id: rule.id, active: false)
-            } catch {
-                actionErrorMessage = UserFacingError.describe(error)
+    /// `recurring_rule_id` pointing at something, so `recurring_rules` has no
+    /// `deleted_at` at all — `active = false` simply stops the next one.
+    ///
+    /// That is also why the swipe-to-delete this list used to carry is gone.
+    /// It rendered the system's red "Delete", which was a plain lie about
+    /// what it did, and there was no gesture anywhere that could undo it: a
+    /// paused rule could only be resumed by opening its form and finding a
+    /// toggle at the bottom. One switch, on the row, does both directions.
+    private func open(_ row: LocalRecurringRuleRow) async {
+        do {
+            editingRule = try await session.dbQueue.read { database in
+                try LocalTableQueries.recurringRule(database, id: row.id.uuidString)
             }
+        } catch {
+            actionError = ActionError("Couldn't Open This Recurring Transaction", error)
         }
-        session.refresh.bump()
+    }
+
+    private func setActive(_ row: LocalRecurringRuleRow, to isActive: Bool) async {
+        guard pendingActive[row.id] == nil else { return }
+        pendingActive[row.id] = isActive
+        do {
+            try await RecurringRuleRepository.setActive(client: session.client, id: row.id, active: isActive)
+            // Mirrored locally before the bump, because the bump reloads off
+            // the mirror. Without this the switch springs back under the
+            // finger while the server holds the new value — see
+            // `RecurringRuleLocalWrite`.
+            try await session.dbQueue.write { database in
+                try RecurringRuleLocalWrite.setActive(id: row.id, active: isActive, in: database)
+            }
+            session.refresh.bump()
+        } catch {
+            actionError = ActionError(isActive ? "Couldn't Resume This Rule" : "Couldn't Pause This Rule", error)
+        }
+        // Cleared last, and in both outcomes: on success the reload that
+        // `refresh.bump()` triggers has already rewritten `rules`, so the row
+        // falls back to a server value that agrees; on failure it falls back
+        // to the value it had, which is the switch springing back.
+        pendingActive[row.id] = nil
     }
 }
 
 extension PublicSchema.RecurringRulesSelect: Identifiable {}
-
-private struct LoadedRecurringState {
-    let rules: [PublicSchema.RecurringRulesSelect]
-    let accounts: [LocalAccountRow]
-    let categories: [PublicSchema.CategoriesSelect]
-}
-
-private struct RecurringRuleRow: View {
-    let rule: PublicSchema.RecurringRulesSelect
-    let account: LocalAccountRow?
-    let category: PublicSchema.CategoriesSelect?
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
-                Text(category?.name ?? "—")
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                Text("\(account?.name ?? "—") · \(frequencyLabel) · next \(nextDueLabel)")
-                    .font(AppTheme.Typography.micro)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
-            Spacer()
-            let currencyInfo = CurrencyInfo(code: rule.currency, minorUnit: account?.currencyInfo.minorUnit ?? 2)
-            Text(MoneyFormatter.format(rule.amountE4, currency: currencyInfo))
-                .monospacedDigit()
-                .foregroundStyle(rule.active ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary)
-            if !rule.active {
-                Image(systemName: "pause.circle")
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
-        }
-    }
-
-    private var frequencyLabel: String {
-        switch rule.frequency {
-        case .weekly: return "Weekly"
-        case .monthly: return "Monthly"
-        case .yearly: return "Yearly"
-        }
-    }
-
-    private var nextDueLabel: String {
-        guard let date = PostgresDate.dateOnly(from: rule.nextDueAt) else { return "—" }
-        return date.formatted(date: .abbreviated, time: .omitted)
-    }
-}

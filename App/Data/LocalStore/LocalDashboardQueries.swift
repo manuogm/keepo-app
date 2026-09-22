@@ -28,9 +28,16 @@ enum LocalDashboardQueries {
     /// insert and update, and the sign is the value money rule 1 makes
     /// authoritative.
     ///
-    /// Transfers can never appear here: `recurring_rules.category_id` is
-    /// `not null`, and a transfer leg has no category. Nothing filters them
-    /// out because nothing can produce one.
+    /// **Transfer rules are excluded, and now explicitly.** They used to be
+    /// impossible — `recurring_rules.category_id` was `not null` — so the
+    /// inner join to `categories` did the excluding by accident. Migration
+    /// 20260927100000 made them possible, and the accident would have
+    /// produced a wrong headline rather than an extra row: this projects ONE
+    /// row per rule, the outflow, while a transfer's pair nets to zero. The
+    /// fortnight would have read as money leaving that never left the user's
+    /// world. A forecast that says "transfer £500 to savings on the 1st"
+    /// belongs on this tile eventually; it needs both legs, which is a
+    /// change to the shape this returns, not a filter.
     ///
     /// Archived and deleted accounts are excluded, matching `net_worth`'s own
     /// exclusion — a bill on an account you've archived is not a bill you're
@@ -49,6 +56,7 @@ enum LocalDashboardQueries {
             JOIN categories c ON c.id = r.category_id
             JOIN accounts a ON a.id = r.account_id
             WHERE r.active = 1
+              AND r.to_account_id IS NULL
               AND a.deleted_at IS NULL AND a.archived_at IS NULL AND c.deleted_at IS NULL
               AND (\(scopeClause))
             """

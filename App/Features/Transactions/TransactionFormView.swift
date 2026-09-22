@@ -132,7 +132,9 @@ struct TransactionFormView: View {
     /// on the tap rather than on everything else that sets `occurredAt` —
     /// the seed, an edit's prefill, the calendar (which has its own).
     @State var dateSteps = 0
-    @State private var isCreatingRecurringRule = false
+    // Not `private` — read/written from TransactionFormView+Recurring.swift,
+    // an extension in a different file (kept there purely for file-length).
+    @State var isCreatingRecurringRule = false
 
     var isEditing: Bool {
         if case .edit = mode { return true }
@@ -329,59 +331,5 @@ struct TransactionFormView: View {
         }
         .padding(.top, AppTheme.Spacing.xs)
         .sensoryFeedback(AppTheme.Feedback.success, trigger: savedCount)
-    }
-
-    /// One grey line that answers "where did this come from, and can it
-    /// happen again on its own?" — three states, never two at once:
-    /// captured rows say so and stop there (a capture cannot be turned into
-    /// a rule, it already happened); a row that is already an instance of a
-    /// rule says so; anything else offers to become one.
-    @ViewBuilder
-    private var recurringLine: some View {
-        if isCaptured {
-            recurringLabel("Automatically captured", icon: "icon-robot")
-        } else if editingRecurringRuleId != nil {
-            recurringLabel("Recurring", icon: "icon-recurrent")
-        } else if kind != .transfer {
-            // `recurring_rules` has a single account_id/category_id pair
-            // (app-architecture.md §3) — there is no shape in the schema for
-            // a recurring transfer, so offering the button would push to a
-            // form that cannot represent what was asked for.
-            Button {
-                isCreatingRecurringRule = true
-            } label: {
-                // Filled only in this branch. The other two states are
-                // statements of fact, not buttons — giving all three the same
-                // pill would promise a tap that two of them do not honour.
-                recurringLabel("Make recurring", icon: "icon-recurrent")
-                    .padding(.horizontal, AppTheme.Spacing.m)
-                    .padding(.vertical, AppTheme.Spacing.s)
-                    .background(AppTheme.Palette.bgSurfaceRaised, in: Capsule())
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.pressableCard)
-        }
-    }
-
-    private func recurringLabel(_ title: String, icon: String) -> some View {
-        HStack(spacing: AppTheme.Spacing.xs) {
-            KeepoIcon(name: icon, size: AppTheme.Size.glyphNano)
-            Text(title)
-        }
-        .font(AppTheme.Typography.micro)
-        .foregroundStyle(AppTheme.Palette.textSecondary)
-    }
-
-    /// Seeds the recurring-rule form from what is already on screen, so
-    /// "make this happen every month" does not mean retyping the amount,
-    /// account and category that are right there.
-    private var recurringSeedMode: RecurringRuleFormView.Mode {
-        .createSeeded(
-            accountId: selectedAccountId,
-            categoryId: selectedCategoryId,
-            amountText: amountText,
-            isIncome: kind == .income,
-            startingOn: occurredAt
-        )
     }
 }

@@ -34,6 +34,12 @@ struct TransactionDetailCard: View {
     /// read off it yet.
     let suggestedCategories: [PublicSchema.CategoriesSelect]
     let isTransfer: Bool
+    /// What the transfer's DESTINATION picker may offer, when that is
+    /// narrower than `accounts`. `nil` — the transaction form's case — means
+    /// the same list on both ends. The recurring form passes a filtered one,
+    /// because a rule's two accounts must share an owner and a currency
+    /// (migration 20260927100000).
+    var destinationAccounts: [LocalAccountRow]?
     /// Only ever set for expense/income. A transfer's legs are each already
     /// in their own account's currency, so there is no third one to name —
     /// `needsReceivedAmount` below is that case, and it predates this.
@@ -104,17 +110,62 @@ struct TransactionDetailCard: View {
 
     // MARK: - Transfer
 
-    /// The arrow rail runs down the left of both containers rather than
-    /// sitting between them: a glyph in the gap reads as a divider, while a
-    /// line that starts at one block and ends at the other reads as flow.
     private var transferBody: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
-            transferLegs
+            TransferLegsView(
+                fromAccountId: $fromAccountId,
+                toAccountId: $toAccountId,
+                amountText: $amountText,
+                receivedAmountText: $receivedAmountText,
+                accounts: accounts,
+                destinationAccounts: destinationAccounts,
+                needsReceivedAmount: needsReceivedAmount,
+                showsAmountCalculator: showsAmountCalculator
+            )
             tagRow
         }
     }
+}
 
-    private var transferLegs: some View {
+/// Two account+amount blocks with the direction of travel drawn down their
+/// left — what a transfer literally is, and the shape both forms that can
+/// create one are built from.
+///
+/// Extracted from `TransactionDetailCard` when recurring transfers landed:
+/// the rule form asks the same question (out of which account, into which,
+/// how much) and had no business answering it with its own layout. What the
+/// two forms do NOT share is the card around this — a transaction carries
+/// tags and a note, a rule carries a frequency — so the legs are the
+/// component and the card is not.
+///
+/// The arrow rail runs down the left of both containers rather than sitting
+/// between them: a glyph in the gap reads as a divider, while a line that
+/// starts at one block and ends at the other reads as flow.
+struct TransferLegsView: View {
+    @Binding var fromAccountId: UUID?
+    @Binding var toAccountId: UUID?
+    @Binding var amountText: String
+    @Binding var receivedAmountText: String
+
+    let accounts: [LocalAccountRow]
+    /// What the DESTINATION picker may offer, when that is narrower than
+    /// `accounts`. `nil` — the transaction form's case — means the same list
+    /// on both ends.
+    ///
+    /// A recurring transfer is the case this exists for: the server restricts
+    /// one to two accounts of the same owner in the same currency (migration
+    /// 20260927100000), so the rule form hands a filtered list rather than
+    /// offering a destination the save would then refuse.
+    var destinationAccounts: [LocalAccountRow]?
+    /// Only meaningful when the two accounts hold different currencies —
+    /// otherwise the received amount is the sent amount and asking for it
+    /// twice is asking the user to agree with themselves.
+    let needsReceivedAmount: Bool
+    /// Off for a recurring transfer, whose amount comes from the rule rather
+    /// than from a purchase that needs working out.
+    var showsAmountCalculator = true
+
+    var body: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.s) {
             FlowRail()
             VStack(spacing: AppTheme.Spacing.m) {
@@ -122,7 +173,8 @@ struct TransactionDetailCard: View {
                     accountId: $fromAccountId,
                     amountText: $amountText,
                     accounts: accounts,
-                    excluding: toAccountId
+                    excluding: toAccountId,
+                    showsAmountCalculator: showsAmountCalculator
                 )
                 TransactionDetailContainer(
                     accountId: $toAccountId,
@@ -130,9 +182,10 @@ struct TransactionDetailCard: View {
                     // than offering a second field that can only ever hold
                     // the same number.
                     amountText: needsReceivedAmount ? $receivedAmountText : $amountText,
-                    accounts: accounts,
+                    accounts: destinationAccounts ?? accounts,
                     excluding: fromAccountId,
-                    isAmountEditable: needsReceivedAmount
+                    isAmountEditable: needsReceivedAmount,
+                    showsAmountCalculator: showsAmountCalculator
                 )
             }
         }

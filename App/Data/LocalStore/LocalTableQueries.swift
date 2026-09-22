@@ -101,6 +101,16 @@ enum LocalTableQueries {
         )
     }
 
+    /// The tag ids currently on one recurring rule — the same query as
+    /// `tagIds` above, one step earlier in the chain.
+    static func recurringRuleTagIds(_ database: Database, ruleId: String) throws -> [String] {
+        try String.fetchAll(
+            database,
+            sql: "SELECT tag_id FROM recurring_rule_tags WHERE recurring_rule_id = ? AND deleted_at IS NULL",
+            arguments: [ruleId]
+        )
+    }
+
     static func currencies(_ database: Database) throws -> [PublicSchema.CurrenciesSelect] {
         try PublicSchema.CurrenciesSelect.fetchAll(database, sql: "SELECT * FROM currencies ORDER BY code")
     }

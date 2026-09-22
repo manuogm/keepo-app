@@ -86,6 +86,21 @@ insert into tags (id, owner_id, name) values ('e9000000-0000-0000-0000-00000000a
 insert into transaction_tags (transaction_id, tag_id, owner_id)
 values ('d9000000-0000-0000-0000-00000000a001', 'e9000000-0000-0000-0000-00000000a001', auth.uid());
 
+-- A recurring rule and one of its tag links. **The assertion below has always
+-- named `recurring_rules`, but nothing here ever created one** — so that line
+-- passed vacuously from the day it was written. It is a real check now, and
+-- `recurring_rule_tags` (added 20260930100000) joins it.
+insert into recurring_rules (
+  id, account_id, category_id, amount_e4, currency, frequency, next_due_at, notes, created_by
+) values (
+  'f9000000-0000-0000-0000-00000000a001', 'a9000000-0000-0000-0000-00000000a002',
+  'c9000000-0000-0000-0000-00000000a001', -99000, 'EUR', 'monthly', current_date + 3,
+  'Coffee subscription', auth.uid()
+);
+
+insert into recurring_rule_tags (recurring_rule_id, tag_id, owner_id)
+values ('f9000000-0000-0000-0000-00000000a001', 'e9000000-0000-0000-0000-00000000a001', auth.uid());
+
 select share_account('a9000000-0000-0000-0000-00000000a001');
 select log_export(array['a9000000-0000-0000-0000-00000000a001']::uuid[], 2);
 
@@ -125,6 +140,7 @@ select is(
       union all select count(*) from tags where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from transaction_tags where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from recurring_rules where owner_id = '11111111-1111-1111-1111-111111111111'
+      union all select count(*) from recurring_rule_tags where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from card_mappings where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from merchant_category_map where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from net_worth_daily where owner_id = '11111111-1111-1111-1111-111111111111'

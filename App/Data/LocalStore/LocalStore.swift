@@ -153,9 +153,16 @@ public enum LocalSchemaV1 {
             table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("created_by", .text).notNull().collate(.nocase)
             table.column("account_id", .text).notNull().collate(.nocase)
-            table.column("category_id", .text).notNull().collate(.nocase)
+            // Both nullable, and exactly one of them is set on any row: a
+            // category for an expense/income rule, a destination account for
+            // a transfer. The server states that as a CHECK
+            // (`recurring_rules_shape_check`); the mirror only has to be able
+            // to hold either shape.
+            table.column("category_id", .text).collate(.nocase)
+            table.column("to_account_id", .text).collate(.nocase)
             table.column("amount_e4", .integer).notNull()
             table.column("currency", .text).notNull()
+            table.column("notes", .text)
             table.column("frequency", .text).notNull()
             table.column("next_due_at", .text).notNull()
             table.column("last_materialized_at", .text)
@@ -164,6 +171,19 @@ public enum LocalSchemaV1 {
             table.column("created_at", .text).notNull()
             table.column("updated_at", .text).notNull()
             table.column("sync_seq", .integer).notNull()
+        }
+
+        // The same shape as `transaction_tags`, because it is the same
+        // relationship one step earlier — see migration 20260930100000.
+        try database.create(table: "recurring_rule_tags") { table in
+            table.column("recurring_rule_id", .text).notNull().collate(.nocase)
+            table.column("tag_id", .text).notNull().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
+            table.column("created_at", .text).notNull()
+            table.column("updated_at", .text).notNull()
+            table.column("deleted_at", .text)
+            table.column("sync_seq", .integer).notNull()
+            table.primaryKey(["recurring_rule_id", "tag_id"])
         }
     }
 
@@ -268,6 +288,15 @@ public enum LocalSchemaV1 {
             table.column("base_currency", .text)
             table.column("display_name", .text)
             table.column("avatar_path", .text)
+            // Mirrors the server 1:1, NOT NULL and defaulted, as this
+            // store's header requires. It was briefly nullable here "to be
+            // safe", which `ProfilesSelect.timeZone` — non-optional, because
+            // the server column is NOT NULL — refused to decode the moment a
+            // row carried a NULL. The default is what actually provides the
+            // tolerance: a row arriving without the column takes 'UTC', which
+            // is exactly the server's own default and the pre-migration
+            // behaviour.
+            table.column("time_zone", .text).notNull().defaults(to: "UTC")
             table.column("onboarded_at", .text)
             table.column("created_at", .text).notNull()
             table.column("updated_at", .text).notNull()

@@ -1042,6 +1042,7 @@ public enum PublicSchema {
     public let onboardedAt: String?
     public let syncEpoch: Int64
     public let syncSeq: Int64
+    public let timeZone: String
     public let updatedAt: String
     public enum CodingKeys: String, CodingKey {
       case avatarPath = "avatar_path"
@@ -1053,6 +1054,7 @@ public enum PublicSchema {
       case onboardedAt = "onboarded_at"
       case syncEpoch = "sync_epoch"
       case syncSeq = "sync_seq"
+      case timeZone = "time_zone"
       case updatedAt = "updated_at"
     }
   }
@@ -1066,6 +1068,7 @@ public enum PublicSchema {
     public let onboardedAt: String?
     public let syncEpoch: Int64?
     public let syncSeq: Int64?
+    public let timeZone: String?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case avatarPath = "avatar_path"
@@ -1077,6 +1080,7 @@ public enum PublicSchema {
       case onboardedAt = "onboarded_at"
       case syncEpoch = "sync_epoch"
       case syncSeq = "sync_seq"
+      case timeZone = "time_zone"
       case updatedAt = "updated_at"
     }
   }
@@ -1090,6 +1094,7 @@ public enum PublicSchema {
     public let onboardedAt: String?
     public let syncEpoch: Int64?
     public let syncSeq: Int64?
+    public let timeZone: String?
     public let updatedAt: String?
     public enum CodingKeys: String, CodingKey {
       case avatarPath = "avatar_path"
@@ -1101,6 +1106,61 @@ public enum PublicSchema {
       case onboardedAt = "onboarded_at"
       case syncEpoch = "sync_epoch"
       case syncSeq = "sync_seq"
+      case timeZone = "time_zone"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct RecurringRuleTagsSelect: Codable, Hashable, Sendable {
+    public let createdAt: String
+    public let deletedAt: String?
+    public let ownerId: UUID
+    public let recurringRuleId: UUID
+    public let syncSeq: Int64
+    public let tagId: UUID
+    public let updatedAt: String
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case ownerId = "owner_id"
+      case recurringRuleId = "recurring_rule_id"
+      case syncSeq = "sync_seq"
+      case tagId = "tag_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct RecurringRuleTagsInsert: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let deletedAt: String?
+    public let ownerId: UUID
+    public let recurringRuleId: UUID
+    public let syncSeq: Int64?
+    public let tagId: UUID
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case ownerId = "owner_id"
+      case recurringRuleId = "recurring_rule_id"
+      case syncSeq = "sync_seq"
+      case tagId = "tag_id"
+      case updatedAt = "updated_at"
+    }
+  }
+  public struct RecurringRuleTagsUpdate: Codable, Hashable, Sendable {
+    public let createdAt: String?
+    public let deletedAt: String?
+    public let ownerId: UUID?
+    public let recurringRuleId: UUID?
+    public let syncSeq: Int64?
+    public let tagId: UUID?
+    public let updatedAt: String?
+    public enum CodingKeys: String, CodingKey {
+      case createdAt = "created_at"
+      case deletedAt = "deleted_at"
+      case ownerId = "owner_id"
+      case recurringRuleId = "recurring_rule_id"
+      case syncSeq = "sync_seq"
+      case tagId = "tag_id"
       case updatedAt = "updated_at"
     }
   }
@@ -1108,7 +1168,7 @@ public enum PublicSchema {
     public let accountId: UUID
     public let active: Bool
     public let amountE4: Int64
-    public let categoryId: UUID
+    public let categoryId: UUID?
     public let createdAt: String
     public let createdBy: UUID
     public let currency: String
@@ -1116,8 +1176,10 @@ public enum PublicSchema {
     public let id: UUID
     public let lastMaterializedAt: String?
     public let nextDueAt: String
+    public let notes: String?
     public let ownerId: UUID
     public let syncSeq: Int64
+    public let toAccountId: UUID?
     public let updatedAt: String
     public let version: Int32
     public enum CodingKeys: String, CodingKey {
@@ -1132,8 +1194,10 @@ public enum PublicSchema {
       case id = "id"
       case lastMaterializedAt = "last_materialized_at"
       case nextDueAt = "next_due_at"
+      case notes = "notes"
       case ownerId = "owner_id"
       case syncSeq = "sync_seq"
+      case toAccountId = "to_account_id"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -1142,7 +1206,7 @@ public enum PublicSchema {
     public let accountId: UUID
     public let active: Bool?
     public let amountE4: Int64
-    public let categoryId: UUID
+    public let categoryId: UUID?
     public let createdAt: String?
     public let createdBy: UUID
     public let currency: String
@@ -1150,8 +1214,10 @@ public enum PublicSchema {
     public let id: UUID?
     public let lastMaterializedAt: String?
     public let nextDueAt: String
+    public let notes: String?
     public let ownerId: UUID
     public let syncSeq: Int64?
+    public let toAccountId: UUID?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -1166,8 +1232,10 @@ public enum PublicSchema {
       case id = "id"
       case lastMaterializedAt = "last_materialized_at"
       case nextDueAt = "next_due_at"
+      case notes = "notes"
       case ownerId = "owner_id"
       case syncSeq = "sync_seq"
+      case toAccountId = "to_account_id"
       case updatedAt = "updated_at"
       case version = "version"
     }
@@ -1184,8 +1252,10 @@ public enum PublicSchema {
     public let id: UUID?
     public let lastMaterializedAt: String?
     public let nextDueAt: String?
+    public let notes: String?
     public let ownerId: UUID?
     public let syncSeq: Int64?
+    public let toAccountId: UUID?
     public let updatedAt: String?
     public let version: Int32?
     public enum CodingKeys: String, CodingKey {
@@ -1200,8 +1270,10 @@ public enum PublicSchema {
       case id = "id"
       case lastMaterializedAt = "last_materialized_at"
       case nextDueAt = "next_due_at"
+      case notes = "notes"
       case ownerId = "owner_id"
       case syncSeq = "sync_seq"
+      case toAccountId = "to_account_id"
       case updatedAt = "updated_at"
       case version = "version"
     }

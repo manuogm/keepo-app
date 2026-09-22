@@ -47,6 +47,43 @@ public enum PostgresDate {
         FormatterCache.fixedFormat(dateOnlyFormat, calendar: calendar).date(from: string)
     }
 
+    /// Today — **the user's today** — expressed the way `dateOnly(from:)`
+    /// expresses a `date` column, so the two can be compared directly.
+    ///
+    /// This exists because the obvious spelling is wrong in a way that is
+    /// invisible from any one time zone. Date-only columns are decoded in UTC
+    /// (see `dateOnlyLabel`), so the instinct is to build today the same way:
+    ///
+    ///     utcCalendar.startOfDay(for: Date())     // ← not today
+    ///
+    /// That is *UTC's* today, not the device's. For a user in UTC-5 at 8pm it
+    /// is already tomorrow; for UTC+13 in the morning it is still yesterday.
+    /// So a rule due today reads as "tomorrow" all evening in the Americas,
+    /// and a "next 14 days" window silently drops a bill due today. Both
+    /// shipped, and neither is reachable from a machine set to UTC — which is
+    /// every CI runner.
+    ///
+    /// The fix is to take the calendar day from the **device** and re-express
+    /// it in the frame the column was decoded in: same year-month-day, read
+    /// where the user is, anchored where the data is.
+    ///
+    /// - Parameters:
+    ///   - calendar: the frame the date-only value was decoded in — pass the
+    ///     same one you passed to `dateOnly(from:calendar:)`.
+    ///   - device: the calendar the user actually lives in. Injectable only
+    ///     so this can be tested from a machine in any zone.
+    public static func currentDateOnly(
+        in calendar: Calendar, device: Calendar = .current, now: Date = Date()
+    ) -> Date? {
+        var components = device.dateComponents([.year, .month, .day], from: now)
+        // Cleared so `calendar` alone resolves them — a `DateComponents` that
+        // carries its source calendar or zone re-applies them and hands back
+        // the very instant this is correcting for.
+        components.calendar = nil
+        components.timeZone = nil
+        return calendar.date(from: components)
+    }
+
     /// Renders a `date`-only value for display **in the calendar it was
     /// decoded with**.
     ///

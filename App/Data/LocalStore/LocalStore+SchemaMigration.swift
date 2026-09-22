@@ -135,5 +135,29 @@ extension LocalStore {
         // holds less than the server is the failure mode this whole list
         // exists for.
         migrator.registerMigration("v16_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260927100000 adds
+        // recurring_rules.to_account_id server-side AND drops NOT NULL from
+        // recurring_rules.category_id. Both halves matter, and the second is
+        // the one that hard-fails: a stale device keeps `category_id NOT
+        // NULL`, so every pulled TRANSFER rule — which has none — hits a NOT
+        // NULL violation on insert and takes the whole pull down with it.
+        // The first half is the quieter failure this list is mostly about:
+        // the new column would be dropped from the whitelist intersection,
+        // leaving a transfer rule that points at no destination.
+        migrator.registerMigration("v17_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260928100000 adds
+        // profiles.time_zone server-side. Additive, so nothing hard-fails; a
+        // stale device would silently drop it from every pulled profile
+        // (`SyncApply` intersects its whitelist with the local schema), and
+        // the mirror would hold less than the server about which calendar the
+        // user's recurring rules are rendered against.
+        migrator.registerMigration("v18_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260930100000 adds
+        // recurring_rules.notes and the whole `recurring_rule_tags` table
+        // server-side. The table is the half that hard-fails without this:
+        // `SyncApply` skips a table the local schema does not have, so the
+        // rule's tags would be pulled and silently dropped, and the form
+        // would open showing none of them.
+        migrator.registerMigration("v19_rebuild_syncable_tables", migrate: rebuildSyncableTables)
     }
 }

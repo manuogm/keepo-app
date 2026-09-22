@@ -39,8 +39,12 @@ enum SyncApply {
             "created_as_twin", "version", "deleted_at", "created_at", "updated_at", "sync_seq"
         ],
         "recurring_rules": [
-            "id", "owner_id", "created_by", "account_id", "category_id", "amount_e4", "currency", "frequency",
-            "next_due_at", "last_materialized_at", "active", "version", "created_at", "updated_at", "sync_seq"
+            "id", "owner_id", "created_by", "account_id", "category_id", "to_account_id", "amount_e4",
+            "currency", "notes", "frequency", "next_due_at", "last_materialized_at", "active", "version",
+            "created_at", "updated_at", "sync_seq"
+        ],
+        "recurring_rule_tags": [
+            "recurring_rule_id", "tag_id", "owner_id", "created_at", "updated_at", "deleted_at", "sync_seq"
         ],
         "tags": [
             "id", "owner_id", "name", "version", "deleted_at", "created_at", "updated_at", "sync_seq"
@@ -65,7 +69,7 @@ enum SyncApply {
         "household_members": ["household_id", "user_id", "joined_at", "deleted_at", "sync_seq"],
         "household_accounts": ["household_id", "account_id", "shared_at", "deleted_at", "sync_seq"],
         "profiles": [
-            "id", "base_currency", "display_name", "avatar_path", "onboarded_at",
+            "id", "base_currency", "display_name", "avatar_path", "time_zone", "onboarded_at",
             "created_at", "updated_at", "deleted_at", "sync_epoch", "sync_seq"
         ]
     ]
@@ -73,6 +77,7 @@ enum SyncApply {
     private static let primaryKeys: [String: [String]] = [
         "accounts": ["id"], "transactions": ["id"], "categories": ["id"],
         "recurring_rules": ["id"], "tags": ["id"],
+        "recurring_rule_tags": ["recurring_rule_id", "tag_id"],
         "transaction_tags": ["transaction_id", "tag_id"], "currencies": ["code"],
         "fx_rates": ["currency", "rate_date"], "card_mappings": ["id"],
         "merchant_category_map": ["owner_id", "merchant_pattern"], "sync_conflicts": ["id"], "households": ["id"],

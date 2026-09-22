@@ -126,15 +126,22 @@ enum DashboardDataLoader {
         _ database: Database, _ moneyScope: LocalMoneyScope, now: Date
     ) throws -> UpcomingTransactionsMetrics {
         // The window opens *today*, not at this instant: a bill due today is
-        // still due today at 11pm. Both bounds are calendar days in UTC, the
-        // same zone every other date comparison in this app works in.
+        // still due today at 11pm. Both bounds are calendar days expressed in
+        // UTC, the frame every date-only comparison in this app works in.
+        //
+        // **`currentDateOnly`, not `utcCalendar.startOfDay(for: now)`** — the
+        // latter is UTC's today rather than the user's, which broke the very
+        // case the paragraph above promises: at 11pm in Chicago it is already
+        // tomorrow in UTC, so the window opened on the wrong day and a bill
+        // due *today* fell out of "next 14 days" entirely. Invisible from any
+        // machine set to UTC.
         //
         // `billsWindowDays - 1` because both bounds are inclusive: fourteen
         // days counting today is today plus thirteen. The old bound was one
         // day wider than the "next 14 days" the widget's title promises, and
         // the carousel — which draws exactly `windowDays` circles — would
         // have had an occurrence with no circle to land on.
-        let start = utcCalendar.startOfDay(for: now)
+        let start = PostgresDate.currentDateOnly(in: utcCalendar, now: now) ?? utcCalendar.startOfDay(for: now)
         let end = utcCalendar.date(byAdding: .day, value: billsWindowDays - 1, to: start) ?? start
         return UpcomingTransactionsMetrics(
             items: try LocalDashboardQueries.upcomingTransactions(
