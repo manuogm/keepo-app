@@ -1,6 +1,15 @@
 {
-  "originHash" : "6d8eaa1e94ec46e8171e709f920a899d2258c50d6bd885a79b5c4df73652e39b",
+  "originHash" : "5ed35db929aac0b9a8abf85eeb1ba1244bbe4b8f39ef503f30c0a23f4a2826fe",
   "pins" : [
+    {
+      "identity" : "grdb.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/groue/GRDB.swift",
+      "state" : {
+        "revision" : "b83108d10f42680d78f23fe4d4d80fc88dab3212",
+        "version" : "7.11.1"
+      }
+    },
     {
       "identity" : "supabase-swift",
       "kind" : "remoteSourceControl",
