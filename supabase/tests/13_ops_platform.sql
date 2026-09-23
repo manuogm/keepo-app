@@ -5,7 +5,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(19);
+select plan(20);
 
 -- ----------------------------------------------------------------------------
 -- 1-4. Cron jobs registered exactly once each, with the expected schedule.
@@ -37,11 +37,12 @@ select is(
 );
 
 -- ----------------------------------------------------------------------------
--- 5-7. Locked down: neither ops_health() nor the raw, any-subject
--- ops_check_rate_limit() is reachable by an ordinary signed-in user — only
--- ops_check_own_rate_limit(), which hardcodes the subject to auth.uid(),
--- is (S-03: a client granted the raw one could grief another user's budget
--- by passing their id as the subject).
+-- 5-8. Locked down: neither ops_health() nor the raw, any-subject
+-- ops_check_rate_limit() is reachable by an ordinary signed-in user (S-03: a
+-- client granted the raw one could grief another user's budget by passing
+-- their id as the subject). Of ops_check_own_rate_limit's two forms, only
+-- the one-argument one — subject hardcoded to auth.uid() AND budget looked
+-- up server-side — is reachable.
 -- ----------------------------------------------------------------------------
 
 set local role authenticated;
@@ -59,10 +60,20 @@ select throws_like(
   'an authenticated user cannot call the raw, any-subject ops_check_rate_limit()'
 );
 
+-- Migration 20261003100000 narrowed this. Self-scoping was never the whole
+-- property: naming your own budget let you name a zero-second window, which
+-- resets the counter instead of consuming it, and an audit demonstrated the
+-- full bypass that follows. The budget is the server's now.
+select throws_like(
+  $$ select ops_check_own_rate_limit('test-fn-13-own', 2, 3600) $$,
+  '%permission denied%',
+  'an authenticated user cannot name its own rate-limit budget'
+);
+
 select is(
-  ops_check_own_rate_limit('test-fn-13-own', 2, 3600),
+  ops_check_own_rate_limit('pull_changes'),
   true,
-  'an authenticated user CAN call ops_check_own_rate_limit(), self-scoped only'
+  'an authenticated user CAN call the budgeted form, self-scoped only'
 );
 
 reset role;
