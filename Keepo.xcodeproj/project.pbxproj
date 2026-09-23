@@ -20,6 +20,7 @@
 		07F9E00CFC52F9D2026A8DEE /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B77DBB46A1C80728EC956B4 /* SyncEngine.swift */; };
 		08BC136894905CD48CDB7EF5 /* HouseholdPairingMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989AE5C321395659FC0EEAF8 /* HouseholdPairingMessage.swift */; };
 		0BB13A70EDD3B3C0A8BA46C0 /* SetupDashboardLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60703611BD5D37337868A10F /* SetupDashboardLayoutTests.swift */; };
+		0BB9390B085C48CF4F9DA4E4 /* HouseholdPairingSession+Multipeer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA70868358755B94DA5E4D93 /* HouseholdPairingSession+Multipeer.swift */; };
 		0CFAB8B74442EB878B25B5D6 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487EAE5A42131446A0EA564D /* ColorHex.swift */; };
 		0D5315A665A76FCABF1A2724 /* SeriesWidgetChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D0D6AA2508CE2682EE3445 /* SeriesWidgetChrome.swift */; };
 		0EC6927922D113746FDC1FD4 /* ConflictResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81CEAFFB8092FE202B4DB40 /* ConflictResolution.swift */; };
@@ -269,6 +270,7 @@
 		CC59625186FAFA1CCCD6480C /* HouseholdSetupFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 791B69045C75E082FC09B489 /* HouseholdSetupFlow.swift */; };
 		CD8D3443804EBD1B5E4A6BE4 /* DashboardScopeFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3FEA59391FE97D8365A918F /* DashboardScopeFixture.swift */; };
 		CDEAFC8D83E97D3B04E20CFD /* LocalStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BD94CF1F85351099DDBE77 /* LocalStoreTests.swift */; };
+		CE0537608A5E9CD9D7C18441 /* HouseholdDiscoveryView+Code.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DD6F3DEAE76AA7A2FE54B24 /* HouseholdDiscoveryView+Code.swift */; };
 		CF7632BB3A1B0551894DCCB0 /* FTUXLessonDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3AC53C0B5E14F58AC31BA0 /* FTUXLessonDetail.swift */; };
 		D15A1D633F72688611DDF354 /* ReviewPrompter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E53170A30B0E65B4F55C184 /* ReviewPrompter.swift */; };
 		D16ED7DBE1E601C052120BF7 /* RecurringRuleRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1C0F6BEC1D5D9D5B966833 /* RecurringRuleRow.swift */; };
@@ -379,6 +381,7 @@
 		0CC3F3845C76B4D1137EBDA8 /* DashboardEditMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardEditMode.swift; sourceTree = "<group>"; };
 		0D43C1851E23D0D44B307710 /* SetupCommitPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupCommitPlanTests.swift; sourceTree = "<group>"; };
 		0DBF6795112FAE14AF6A9964 /* LocalTransactionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTransactionRow.swift; sourceTree = "<group>"; };
+		0DD6F3DEAE76AA7A2FE54B24 /* HouseholdDiscoveryView+Code.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HouseholdDiscoveryView+Code.swift"; sourceTree = "<group>"; };
 		0F1A025C92FE107062438BE2 /* UpcomingBillsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingBillsWidget.swift; sourceTree = "<group>"; };
 		0F41A2D2512482D64E77DDEB /* OutboxKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxKind.swift; sourceTree = "<group>"; };
 		10596AA5D71EE4DFBB5401C4 /* CategoryPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPicker.swift; sourceTree = "<group>"; };
@@ -662,6 +665,7 @@
 		E96E01C5182D992A8CAF309C /* HouseholdWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdWrite.swift; sourceTree = "<group>"; };
 		E9BF0478D2F7CAF455C4AE65 /* WidgetPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetPalette.swift; sourceTree = "<group>"; };
 		E9CCA2BF8D2E735851609DA9 /* TransferDivergenceAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferDivergenceAlert.swift; sourceTree = "<group>"; };
+		EA70868358755B94DA5E4D93 /* HouseholdPairingSession+Multipeer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HouseholdPairingSession+Multipeer.swift"; sourceTree = "<group>"; };
 		EB4473C45DBF70F6796DE4B7 /* CurrencyWheel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyWheel.swift; sourceTree = "<group>"; };
 		EB8EC979EC5F1FA0C58A177B /* SetupDashboardStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupDashboardStep.swift; sourceTree = "<group>"; };
 		EC330CD2BD135E7B857838F3 /* CaptureEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureEnvironment.swift; sourceTree = "<group>"; };
@@ -989,6 +993,7 @@
 				989AE5C321395659FC0EEAF8 /* HouseholdPairingMessage.swift */,
 				66868ACBE8602B4C6A23AA49 /* HouseholdPairingPermission.swift */,
 				3BD32E93474AC4DE074C67F9 /* HouseholdPairingSession.swift */,
+				EA70868358755B94DA5E4D93 /* HouseholdPairingSession+Multipeer.swift */,
 				21DDD5B9F4CCB6DEB4FD9822 /* HouseholdSetupCoordinator.swift */,
 				1BD9C054FF016E3872C4A1D9 /* HouseholdSetupCoordinator+Teardown.swift */,
 				79B22BD4DEC754DAEC181A07 /* UncheckedSendable.swift */,
@@ -1391,6 +1396,7 @@
 				1865CC6E75576ED201B2E3E0 /* CeremonyParticles.swift */,
 				AF3A3B1E628DB2EC5C721FAA /* HouseholdCeremonyView.swift */,
 				6777B149C1267AD0636DC635 /* HouseholdDiscoveryView.swift */,
+				0DD6F3DEAE76AA7A2FE54B24 /* HouseholdDiscoveryView+Code.swift */,
 				145A30F06CC4CD6561EC2248 /* HouseholdQRView.swift */,
 				791B69045C75E082FC09B489 /* HouseholdSetupFlow.swift */,
 				942E9C4DEEBB16CF77CC7243 /* HouseholdSetupIntro.swift */,
@@ -1703,11 +1709,13 @@
 				75A803CFF95BABAE9B35E27C /* HouseholdBlankState.swift in Sources */,
 				53DDDCB9693C26D604738006 /* HouseholdCeremonyView.swift in Sources */,
 				B1AD51250671EF9C18C0210F /* HouseholdData.swift in Sources */,
+				CE0537608A5E9CD9D7C18441 /* HouseholdDiscoveryView+Code.swift in Sources */,
 				BFA651B8387CAD32F21EC9AE /* HouseholdDiscoveryView.swift in Sources */,
 				2FA5C7471F5140A0CC03B744 /* HouseholdKit.swift in Sources */,
 				7C8FE756B3ACD3C96332648D /* HouseholdLinkError.swift in Sources */,
 				08BC136894905CD48CDB7EF5 /* HouseholdPairingMessage.swift in Sources */,
 				EB815779CF513F76B2473F8E /* HouseholdPairingPermission.swift in Sources */,
+				0BB9390B085C48CF4F9DA4E4 /* HouseholdPairingSession+Multipeer.swift in Sources */,
 				F1F9A451860CFE9C75DDB39C /* HouseholdPairingSession.swift in Sources */,
 				41DF945183EDD59058A03D38 /* HouseholdQRView.swift in Sources */,
 				5C62E6738B4BAB66464949BC /* HouseholdReportAccounts.swift in Sources */,

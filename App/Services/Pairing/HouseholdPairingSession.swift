@@ -1,4 +1,5 @@
 import Foundation
+import KeepoCore
 import MultipeerConnectivity
 import Observation
 import UIKit
@@ -44,8 +45,12 @@ final class HouseholdPairingSession: NSObject {
     enum State: Equatable {
         /// Radios up, nobody found yet.
         case searching
-        /// Connected, and both identities exchanged. The discovery screen
-        /// draws the other person's face from here.
+        /// Connected, and waiting on the code. The owner is waiting for the
+        /// guest to type theirs; the guest is being asked for it. **Neither
+        /// side has sent its identity yet** — that is what the code buys.
+        case verifying
+        /// Connected, code accepted, and both identities exchanged. The
+        /// discovery screen draws the other person's face from here.
         case paired(HouseholdPairingIdentity)
         /// The link dropped after being established. Distinct from
         /// `searching` because the screen has something to apologise for.
@@ -57,6 +62,17 @@ final class HouseholdPairingSession: NSObject {
     /// Set once the peer's identity lands, and kept across a `lost` so the
     /// ceremony can still name who it was building with.
     private(set) var peer: HouseholdPairingIdentity?
+
+    /// The owner's code and its attempt budget; nil on the guest's side.
+    /// Held on the session, not the connection — a budget the peer refills
+    /// by hanging up is no budget. See `HouseholdPairingChallenge`.
+    private var challenge: HouseholdPairingChallenge?
+
+    /// The digits to put on screen, owner-side.
+    var pairingCode: HouseholdPairingCode? { challenge?.code }
+    /// Guest-side: what to say under the field after a refused code. Nil
+    /// before the first attempt and after a correct one.
+    private(set) var codeRejection: String?
 
     /// Messages from the other phone, in arrival order.
     ///
@@ -130,6 +146,8 @@ final class HouseholdPairingSession: NSObject {
 
     init(identity: HouseholdPairingIdentity) {
         self.identity = identity
+        // Only the owner holds one. The guest is told it out loud.
+        self.challenge = identity.role == .owner ? HouseholdPairingChallenge() : nil
         // `MCPeerID`'s display name is capped at 63 bytes and the initialiser
         // traps above it. A name is user input, so it is measured in UTF-8
         // bytes and cut there rather than trusted to be short.
@@ -192,6 +210,89 @@ final class HouseholdPairingSession: NSObject {
         try? session.send(data, toPeers: [connectedPeer], with: .reliable)
     }
 
+    // MARK: - What the delegates are allowed to ask
+    /// The session to hand an arriving invitation, or nil to refuse it.
+    ///
+    /// **Accepted without asking the user**, as it always was — but what
+    /// accepting grants is now an open pipe and nothing else, until the code
+    /// is answered. A system "Accept?" alert over a screen that says
+    /// "Looking for nearby devices" would ask a question already answered by
+    /// starting the flow and standing next to the other phone.
+    func sessionForIncomingInvitation() -> MCSession? {
+        connectedPeer == nil ? session : nil
+    }
+
+    /// The session to invite a found owner into, or nil if already busy.
+    func sessionForOutgoingInvitation() -> MCSession? {
+        connectedPeer == nil ? session : nil
+    }
+
+    /// A radio that would not start. Same sentence either way, because the
+    /// user's fix is the same and the underlying `NSError` names a framework
+    /// they have never heard of.
+    func radioFailed() {
+        state = .failed(Self.radioFailureMessage)
+    }
+
+    static let radioFailureMessage =
+        "Keepo could not start looking for nearby devices. Check that Bluetooth and Wi-Fi are on, "
+        + "and that Keepo is allowed to find devices on your local network in Settings."
+
+    // MARK: - The code
+
+    /// Guest side. Sends what the user typed for the owner to judge; no
+    /// local format check, because the owner is the only side that can say
+    /// whether a code is right and a second copy would drift.
+    func submitCode(_ entered: String) {
+        guard identity.role == .guest else { return }
+        codeRejection = nil
+        send(.codeProof(code: entered))
+    }
+
+    /// Handles the three code messages and reports whether it consumed one;
+    /// they are the session's own and never reach the ceremony.
+    private func handleCodeMessage(_ message: HouseholdPairingMessage) -> Bool {
+        switch message {
+        case .codeProof(let code):
+            judge(code)
+        case .codeAccepted:
+            // Guest side only, and the role guard is load bearing: an owner
+            // that acted on this would answer a message any peer can send by
+            // handing over its identity — the very gate this closes.
+            guard identity.role == .guest else { return true }
+            codeRejection = nil
+            send(.identity(identity))
+        case .codeRejected(let remaining):
+            guard identity.role == .guest else { return true }
+            codeRejection = remaining == 1
+                ? "That code isn't right. One more try before you have to start again."
+                : "That code isn't right. \(remaining) tries left."
+        default:
+            return false
+        }
+        return true
+    }
+
+    /// Owner side. Spends a try; running out ends the session, because
+    /// retrying in place would refund the guesses just spent.
+    private func judge(_ entered: String) {
+        guard identity.role == .owner, challenge != nil else { return }
+
+        switch challenge?.judge(entered) {
+        case .accepted:
+            send(.codeAccepted)
+            send(.identity(identity))
+        case .rejected(let remaining):
+            send(.codeRejected(attemptsRemaining: remaining))
+        case .exhausted, .none:
+            send(.cancelled(reason: Self.tooManyAttemptsMessage))
+            state = .failed(Self.tooManyAttemptsMessage)
+            stop()
+        }
+    }
+    static let tooManyAttemptsMessage = "Too many wrong codes. Keepo stopped the pairing to keep "
+        + "your household safe — start again and Keepo will give you a new code."
+
     // MARK: - Identity
 
     /// The local user's identity payload, with their avatar attached when one
@@ -203,7 +304,6 @@ final class HouseholdPairingSession: NSObject {
         return HouseholdPairingIdentity(
             userId: userId,
             displayName: session.profile?.displayName,
-            email: session.userEmail,
             role: role,
             avatarJPEG: avatar.flatMap(thumbnailJPEG)
         )
@@ -236,10 +336,24 @@ final class HouseholdPairingSession: NSObject {
     /// hops here before touching a single property. `@Observable` state
     /// mutated off the main actor is a data race that SwiftUI will read
     /// mid-render.
-    fileprivate func handle(_ data: Data) {
+    func handle(_ data: Data) {
         guard let message = try? JSONDecoder().decode(HouseholdPairingMessage.self, from: data) else { return }
 
+        // The three code messages are the session's own business and are
+        // never delivered to the ceremony's inbox — same as `identity`
+        // below. `HouseholdSetupCoordinator` neither knows nor needs to know
+        // that a code happened. See HouseholdPairingSession+Code.swift.
+        if handleCodeMessage(message) { return }
+
         if case .identity(let remote) = message {
+            // Owner side: an identity that arrives before the code has been
+            // answered is either a peer skipping the gate or one that failed
+            // it. Either way it is not somebody this phone has agreed to
+            // know, and dropping it is what keeps the gate from being
+            // decorative. The guest has no code to check and accepts the
+            // owner's identity on arrival — it only ever sees one after its
+            // own `.codeAccepted`.
+            if identity.role == .owner && challenge?.isVerified != true { return }
             guard remote.protocolVersion == HouseholdPairingIdentity.protocolVersion else {
                 state = .failed("One of you is on an older version of Keepo. Update both phones and try again.")
                 stop()
@@ -263,133 +377,24 @@ final class HouseholdPairingSession: NSObject {
         deliver(message)
     }
 
-    fileprivate func connected(to peerID: MCPeerID) {
+    func connected(to peerID: MCPeerID) {
         // First peer wins. A second one is left in the session but never
         // spoken to, and drops out on its own timeout.
         guard connectedPeer == nil else { return }
         connectedPeer = peerID
-        // Both sides announce themselves the instant the pipe opens — there
-        // is no request/response here, just two phones each saying who they
-        // are, which means neither has to wait for the other to ask.
-        send(.identity(identity))
+        // A new link starts clean; `step` treats a stale `didPeerStop` as
+        // fatal and would abort a ceremony that has not begun.
+        didPeerStop = false
+        peerStopReason = nil
+        // **Nothing is announced here** (audit finding 6): both sides used to
+        // send their identity the instant the pipe opened, making a name and
+        // a face readable by anything in range. Who they are waits on the code.
+        state = .verifying
     }
 
-    fileprivate func disconnected(from peerID: MCPeerID) {
+    func disconnected(from peerID: MCPeerID) {
         guard connectedPeer == peerID else { return }
         connectedPeer = nil
         state = .lost
     }
-}
-
-// MARK: - MCSessionDelegate
-
-extension HouseholdPairingSession: MCSessionDelegate {
-    nonisolated func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
-        let peer = UncheckedSendable(peerID)
-        Task { @MainActor [weak self] in
-            switch state {
-            case .connected: self?.connected(to: peer.value)
-            case .notConnected: self?.disconnected(from: peer.value)
-            case .connecting: break
-            @unknown default: break
-            }
-        }
-    }
-
-    nonisolated func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        // `peerID` is deliberately not carried across: this session speaks to
-        // exactly one peer, and a message from anyone else could only have
-        // come from a connection we never accepted.
-        Task { @MainActor [weak self] in self?.handle(data) }
-    }
-
-    // The three stream/resource callbacks are required by the protocol and
-    // unused: this session sends small JSON messages and nothing else.
-    nonisolated func session(
-        _ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID
-    ) {}
-
-    nonisolated func session(
-        _ session: MCSession, didStartReceivingResourceWithName resourceName: String,
-        fromPeer peerID: MCPeerID, with progress: Progress
-    ) {}
-
-    nonisolated func session(
-        _ session: MCSession, didFinishReceivingResourceWithName resourceName: String,
-        fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?
-    ) {}
-}
-
-// MARK: - Advertising (the owner)
-
-extension HouseholdPairingSession: MCNearbyServiceAdvertiserDelegate {
-    nonisolated func advertiser(
-        _ advertiser: MCNearbyServiceAdvertiser,
-        didReceiveInvitationFromPeer peerID: MCPeerID,
-        withContext context: Data?,
-        invitationHandler: @escaping (Bool, MCSession?) -> Void
-    ) {
-        let respond = UncheckedSendable(invitationHandler)
-        Task { @MainActor [weak self] in
-            guard let self, let session = self.session, self.connectedPeer == nil else {
-                respond.value(false, nil)
-                return
-            }
-            // Accepted without asking. The user has already said yes twice —
-            // once by starting this flow, once by standing next to the other
-            // phone — and a system-styled "Accept?" alert on top of a screen
-            // that says "Looking for nearby devices" would be the app asking
-            // a question it already knows the answer to. Who was actually
-            // found is confirmed on the discovery card, with a face and a
-            // name, before anything is created.
-            respond.value(true, session)
-        }
-    }
-
-    nonisolated func advertiser(
-        _ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error
-    ) {
-        Task { @MainActor [weak self] in
-            self?.state = .failed(HouseholdPairingSession.radioFailureMessage)
-        }
-    }
-}
-
-// MARK: - Browsing (the guest)
-
-extension HouseholdPairingSession: MCNearbyServiceBrowserDelegate {
-    nonisolated func browser(
-        _ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?
-    ) {
-        let found = UncheckedSendable((browser: browser, peerID: peerID))
-        Task { @MainActor [weak self] in
-            guard let self, let session = self.session, self.connectedPeer == nil else { return }
-            // Only a phone that says it is offering a household. Every other
-            // Keepo user in Bonjour range is somebody else's business.
-            guard info?["role"] == HouseholdPairingIdentity.Role.owner.rawValue else { return }
-            found.value.browser.invitePeer(
-                found.value.peerID, to: session, withContext: nil, timeout: 30
-            )
-        }
-    }
-
-    nonisolated func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
-        let peer = UncheckedSendable(peerID)
-        Task { @MainActor [weak self] in self?.disconnected(from: peer.value) }
-    }
-
-    nonisolated func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
-        Task { @MainActor [weak self] in
-            self?.state = .failed(HouseholdPairingSession.radioFailureMessage)
-        }
-    }
-}
-
-private extension HouseholdPairingSession {
-    /// The same sentence for both radios failing to start, because the user's
-    /// fix is the same either way and the underlying `NSError` names a
-    /// framework they have never heard of.
-    static let radioFailureMessage =
-        "Keepo could not start looking for nearby devices. Check that Bluetooth and Wi-Fi are on, "
-        + "and that Keepo is allowed to find devices on your local network in Settings."
 }

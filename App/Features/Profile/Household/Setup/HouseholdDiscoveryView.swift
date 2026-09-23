@@ -31,11 +31,14 @@ struct HouseholdDiscoveryView: View {
     /// contest.
     private static let fallbackDelay: Duration = .seconds(12)
 
-    @State private var pairing: HouseholdPairingSession?
+    @State var pairing: HouseholdPairingSession?
     @State private var coordinator: HouseholdSetupCoordinator?
     @State private var isShowingFallback = false
     @State private var isShowingQR = false
     @State private var errorMessage: String?
+    /// Guest-side only: the digits as typed so far.
+    @State var enteredCode = ""
+    @FocusState var isCodeFieldFocused: Bool
 
     var body: some View {
         ZStack {
@@ -68,6 +71,35 @@ struct HouseholdDiscoveryView: View {
                 }
             )
         }
+        // A burned code is the one failure on this screen the user has to
+        // act on rather than just read — the session is over and there is a
+        // new code waiting behind the button. The other `.failed` messages
+        // stay inline, where they describe a search that is still running.
+        .alert("Pairing stopped", isPresented: isAttemptsExhausted) {
+            Button("Start Again") { Task { await restart() } }
+        } message: {
+            Text(HouseholdPairingSession.tooManyAttemptsMessage)
+        }
+    }
+
+    private var isAttemptsExhausted: Binding<Bool> {
+        Binding(
+            get: { pairing?.state == .failed(HouseholdPairingSession.tooManyAttemptsMessage) },
+            set: { _ in }
+        )
+    }
+
+    /// Tears the session down and builds a fresh one — which mints a new
+    /// code. Deliberately not a "try again" that reuses the old one: the
+    /// guesses already spent against it are spent, and handing them back is
+    /// the same hole as counting attempts per connection.
+    private func restart() async {
+        pairing?.stop()
+        pairing = nil
+        coordinator = nil
+        enteredCode = ""
+        errorMessage = nil
+        await start()
     }
 
     /// The ceremony takes over the moment a phase actually begins — which for
@@ -82,13 +114,20 @@ struct HouseholdDiscoveryView: View {
     @ViewBuilder
     private var content: some View {
         switch pairing?.state {
+        case .verifying:
+            verifyingView
         case .paired(let peer):
             foundView(peer)
         case .failed(let message):
             searchingView(note: message, isStalled: true)
         case .lost:
+            // The peer's own reason when it gave one. The owner burning the
+            // attempt budget tears the link down deliberately, and "keep the
+            // phones close" would send the guest chasing a radio problem
+            // that isn't there.
             searchingView(
-                note: "The connection dropped. Keep the phones close and Keepo open on both.",
+                note: pairing?.peerStopReason
+                    ?? "The connection dropped. Keep the phones close and Keepo open on both.",
                 isStalled: true
             )
         case .searching, .none:
@@ -122,6 +161,13 @@ struct HouseholdDiscoveryView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, AppTheme.Spacing.xs)
                 }
+            }
+
+            // The owner's code, up while the radios are still looking, so it
+            // can be said out loud before the other phone has arrived rather
+            // than after.
+            if role == .owner {
+                codeDisplay
             }
 
             Spacer()
@@ -191,7 +237,11 @@ struct HouseholdDiscoveryView: View {
         VStack(spacing: AppTheme.Spacing.m) {
             ProfileAvatarView(
                 name: peer.resolvedName,
-                email: peer.email,
+                // No address on the pairing card — it is not sent over the
+                // peer link any more (see `HouseholdPairingIdentity`), and
+                // this view only ever wanted one for an initial that
+                // `resolvedName` already supplies.
+                email: nil,
                 // The bytes that came over the peer link. Before a household
                 // exists the two users are strangers to the server, so this
                 // is the only way there is a real face here at all — see

@@ -273,7 +273,10 @@ final class HouseholdSetupCoordinator {
                     reason ?? "\(peer?.resolvedName ?? "The other phone") stopped before the household was built."
                 )
                 return
-            case .identity, .invite, .joined:
+            // Code messages never reach here: the session answers them and
+            // does not deliver them. Listed, not defaulted, so a new message
+            // keeps failing this switch until somebody decides about it.
+            case .identity, .invite, .joined, .codeProof, .codeAccepted, .codeRejected:
                 continue
             }
         }
@@ -345,14 +348,16 @@ final class HouseholdSetupCoordinator {
         while let message = await pairing.nextMessage() {
             switch message {
             case .invite(let token): return token
-            case .cancelled(let reason): throw HouseholdLinkError.stopped(reason)
+            // **Not fatal here, unlike every other `.cancelled` arm**: the
+            // owner burning the code sends this before offering a new one, so
+            // this loop must still be listening when the guest types it.
+            // Throwing killed the guest's only reader and hung the ceremony.
+            case .cancelled: continue
             // The owner announces the first phase *before* it mints the
-            // token, so this arrives first. Dropping it — which the obvious
-            // `default: continue` does — leaves the guest on the discovery
-            // screen until the token lands, and the two phones visibly start
-            // the ceremony at different moments.
+            // token, so this arrives first. Dropping it leaves the guest on
+            // discovery until the token lands, starting the two phones apart.
             case .phase(let announced): try await renderPhase(announced)
-            case .identity, .joined, .finished: continue
+            case .identity, .joined, .finished, .codeProof, .codeAccepted, .codeRejected: continue
             }
         }
         throw HouseholdLinkError.lost
