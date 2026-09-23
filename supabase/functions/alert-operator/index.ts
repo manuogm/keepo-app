@@ -13,6 +13,7 @@
 // an env var change, not a code change.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { secretMatches } from "../_shared/secret.ts";
 
 interface HealthCheck {
   check_name: string;
@@ -23,7 +24,7 @@ interface HealthCheck {
 Deno.serve(async (req) => {
   const expectedSecret = Deno.env.get("ALERT_OPERATOR_SECRET");
   const providedSecret = req.headers.get("x-alert-operator-secret");
-  if (!expectedSecret || providedSecret !== expectedSecret) {
+  if (!secretMatches(expectedSecret, providedSecret)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "content-type": "application/json" },

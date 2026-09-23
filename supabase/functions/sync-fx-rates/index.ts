@@ -32,9 +32,30 @@
 // overlap for free — this is what makes a repeated trigger idempotent).
 
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { secretMatches } from "../_shared/secret.ts";
 
 const FRANKFURTER_BASE = "https://api.frankfurter.dev/v1";
 const DEFAULT_WINDOW_DAYS = 5;
+
+// The largest window any caller may ask for. 400 is not a round number
+// picked for safety margin — it is exactly what the two real callers send:
+// `FXRateSync.days` (Profile's "Sync Exchange Rates" and the transaction
+// form's "Refresh FX rates") and `request_fx_backfill()`. A year of history
+// plus the weekends and holidays the ECB publishes no rate on.
+//
+// Before this cap, `days` was read straight off the request body and checked
+// only for being finite and positive, while `authorize()` accepts any signed-
+// in user's JWT — so any account could ask for an arbitrary span, and every
+// day × currency in it became its own `upsert_fx_rate` call. Found by the
+// security audit of 2026-09-21.
+const MAX_WINDOW_DAYS = 400;
+
+// Even a legal window is a lot of writes — 400 days against the full
+// supported currency set is some thousands of RPCs — and the previous code
+// pushed every one of them into a single `Promise.all`, which opens as many
+// concurrent PostgREST requests as the array is long. Chunking bounds the
+// concurrency without meaningfully slowing the job down.
+const UPSERT_CONCURRENCY = 25;
 
 interface FrankfurterResponse {
   amount: number;
@@ -61,7 +82,7 @@ interface FrankfurterResponse {
 async function authorize(req: Request): Promise<{ subject: string } | null> {
   const expectedSecret = Deno.env.get("FX_SYNC_SECRET");
   const providedSecret = req.headers.get("x-fx-sync-secret");
-  if (expectedSecret && providedSecret === expectedSecret) return { subject: "cron" };
+  if (secretMatches(expectedSecret, providedSecret)) return { subject: "cron" };
 
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
@@ -131,15 +152,23 @@ Deno.serve(async (req) => {
   const body: FrankfurterResponse = await res.json();
 
   const fetchedAt = new Date().toISOString();
-  const upserts: Promise<void>[] = [];
-  let ratesWritten = 0;
+  const pending: { currency: string; rateDate: string; rate: number }[] = [];
 
   for (const [rateDate, ratesForDate] of Object.entries(body.rates)) {
     for (const currency of currencies) {
       const rate = ratesForDate[currency];
       if (rate === undefined) continue; // Frankfurter doesn't publish every currency every date.
-      ratesWritten++;
-      upserts.push(
+      pending.push({ currency, rateDate, rate });
+    }
+  }
+  const ratesWritten = pending.length;
+
+  // `UPSERT_CONCURRENCY` at a time, not all of them at once. The first
+  // failure still aborts the whole job, exactly as `Promise.all` over the
+  // full array did.
+  for (let i = 0; i < pending.length; i += UPSERT_CONCURRENCY) {
+    await Promise.all(
+      pending.slice(i, i + UPSERT_CONCURRENCY).map(({ currency, rateDate, rate }) =>
         supabase.rpc("upsert_fx_rate", {
           p_currency: currency,
           p_rate_date: rateDate,
@@ -148,12 +177,10 @@ Deno.serve(async (req) => {
           p_fetched_at: fetchedAt,
         }).then(({ error }) => {
           if (error) throw error;
-        }),
-      );
-    }
+        })
+      ),
+    );
   }
-
-  await Promise.all(upserts);
 
   return new Response(
     JSON.stringify({ ratesWritten, currencies, startDate, endDate }),
@@ -195,7 +222,11 @@ async function windowDays(req: Request): Promise<number> {
   try {
     const body = await req.clone().json();
     const days = Number(body?.days);
-    return Number.isFinite(days) && days > 0 ? days : DEFAULT_WINDOW_DAYS;
+    if (!Number.isFinite(days) || days < 1) return DEFAULT_WINDOW_DAYS;
+    // Clamped rather than rejected: the callers that matter never exceed
+    // this, so a 400 is a worse answer than quietly doing the most work
+    // anyone is entitled to ask for.
+    return Math.min(Math.floor(days), MAX_WINDOW_DAYS);
   } catch {
     return DEFAULT_WINDOW_DAYS;
   }
