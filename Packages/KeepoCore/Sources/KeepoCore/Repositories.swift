@@ -129,7 +129,8 @@ public enum TransactionRepository {
         currency: String,
         occurredAt: Date = Date(),
         notes: String? = nil,
-        original: ForeignOriginal? = nil
+        original: ForeignOriginal? = nil,
+        title: String? = nil
     ) async throws -> UUID {
         let row = NewTransactionRow(
             id: id,
@@ -142,7 +143,8 @@ public enum TransactionRepository {
             occurredAt: PostgresDate.timestampString(occurredAt),
             notes: notes,
             originalAmountE4: original?.amountE4,
-            originalCurrency: original?.currency
+            originalCurrency: original?.currency,
+            title: title
         )
         try await client.from("transactions").insert(row).execute()
         return id
@@ -170,7 +172,8 @@ public enum TransactionRepository {
         occurredAt: Date = Date(),
         merchantRaw: String?,
         notes: String? = nil,
-        original: ForeignOriginal? = nil
+        original: ForeignOriginal? = nil,
+        title: String? = nil
     ) async throws -> WriteResult {
         let params = UpdateTransactionParams(
             id: id,
@@ -183,7 +186,8 @@ public enum TransactionRepository {
             merchantRaw: merchantRaw,
             notes: notes,
             originalAmountE4: original?.amountE4,
-            originalCurrency: original?.currency
+            originalCurrency: original?.currency,
+            title: title
         )
         let rows: [ConflictRow] = try await client.rpc("update_transaction", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict
@@ -201,7 +205,8 @@ public enum TransactionRepository {
         fromAmountE4: Int64,
         toAmountE4: Int64,
         occurredAt: Date = Date(),
-        notes: String? = nil
+        notes: String? = nil,
+        title: String? = nil
     ) async throws -> WriteResult {
         let params = UpdateTransferParams(
             transferGroupId: transferGroupId,
@@ -210,7 +215,8 @@ public enum TransactionRepository {
             fromAmountE4: fromAmountE4,
             toAmountE4: toAmountE4,
             occurredAt: PostgresDate.timestampString(occurredAt),
-            notes: notes
+            notes: notes,
+            title: title
         )
         let rows: [ConflictRow] = try await client.rpc("update_transfer", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict
@@ -253,8 +259,9 @@ private struct NewTransactionRow: Encodable {
     /// passes them around in; this is the shape the table wants.
     let originalAmountE4: Int64?
     let originalCurrency: String?
+    let title: String?
     enum CodingKeys: String, CodingKey {
-        case id, currency, notes
+        case id, currency, notes, title
         case amountE4 = "amount_e4"
         case ownerId = "owner_id"
         case createdBy = "created_by"

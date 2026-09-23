@@ -1,63 +1,17 @@
 import Foundation
 import Supabase
 
-/// Phase 18: export. No new read RPC — the client already has everything
-/// it needs via `TransactionRepository.fetchAll`/`transactions_with_details`;
-/// this only builds the CSV text from rows already fetched and writes the
-/// audit trail immediately afterward. The step-up re-auth the spec requires
-/// "immediately before generation" is the caller's job (`SessionStore.
-/// stepUp(reason:)`, Phase 17) — this type has no opinion on when it runs,
-/// only that `logExport` is called once the CSV actually exists.
+/// The export's one server call: the audit row.
+///
+/// The export itself is built on the device, from the same local mirror the
+/// Transactions list reads (`ExportBuilder` in the app), so the file contains
+/// exactly what the user filtered — including a write still waiting in the
+/// outbox. What cannot happen locally is the record that it happened: the
+/// spec calls an export "the highest-value target in the app", and the audit
+/// row is how one is always detectable afterwards. The caller's step-up
+/// re-auth (`SessionStore.stepUp(reason:)`) runs before the file is built;
+/// this runs once it exists.
 public enum ExportRepository {
-    /// Every transaction on one or more of the caller's own/shared
-    /// accounts — scoped server-side via `.in` and, when given, an
-    /// `occurred_at` range — never fetched in full and filtered
-    /// client-side. `from`/`through` both `nil` means all time.
-    public static func fetchTransactions(
-        client: SupabaseClient, accountIds: [UUID], from: Date? = nil, through: Date? = nil
-    ) async throws -> [PublicSchema.TransactionsWithDetailsSelect] {
-        var query = client.from("transactions_with_details")
-            .select()
-            .in("account_id", values: accountIds)
-        if let from {
-            query = query.gte("occurred_at", value: PostgresDate.timestampString(from))
-        }
-        if let through {
-            query = query.lte("occurred_at", value: PostgresDate.timestampString(through))
-        }
-        return try await query
-            .order("occurred_at", ascending: false)
-            .execute()
-            .value
-    }
-
-    /// One field per column, comma-joined, quoting any field that itself
-    /// contains a comma or quote — an RFC 4180 subset. It had a reader
-    /// (`CSVImportParser`) until CSV import was removed; this is now the
-    /// only direction data crosses this format, which is the point of
-    /// keeping export while import went.
-    public static func csv(from rows: [PublicSchema.TransactionsWithDetailsSelect]) -> String {
-        var lines = ["Date,Account,Category,Merchant,Amount,Currency"]
-        for row in rows {
-            let amountText: String = row.amountE4.map { amountE4 in "\(Decimal(amountE4) / Decimal(10_000))" } ?? ""
-            let fields: [String] = [
-                row.occurredAt ?? "",
-                row.accountName ?? "",
-                row.categoryName ?? "",
-                row.merchantRaw ?? "",
-                amountText,
-                row.currency ?? ""
-            ]
-            lines.append(fields.map(quoteIfNeeded).joined(separator: ","))
-        }
-        return lines.joined(separator: "\n")
-    }
-
-    private static func quoteIfNeeded(_ field: String) -> String {
-        guard field.contains(",") || field.contains("\"") || field.contains("\n") else { return field }
-        return "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""
-    }
-
     @discardableResult
     public static func logExport(
         client: SupabaseClient, accountIds: [UUID], rowCount: Int

@@ -29,7 +29,7 @@ enum SyncApply {
         "transactions": [
             "id", "owner_id", "created_by", "account_id", "category_id", "category_kind",
             "amount_e4", "currency", "original_amount_e4", "original_currency",
-            "occurred_at", "merchant_raw", "merchant_normalized", "notes",
+            "occurred_at", "merchant_raw", "merchant_normalized", "notes", "title",
             "card_identifier", "transfer_group_id", "source", "status", "external_id", "recurring_rule_id",
             "version", "deleted_at", "created_at", "updated_at", "sync_seq"
         ],
@@ -40,7 +40,7 @@ enum SyncApply {
         ],
         "recurring_rules": [
             "id", "owner_id", "created_by", "account_id", "category_id", "to_account_id", "amount_e4",
-            "currency", "notes", "frequency", "next_due_at", "last_materialized_at", "active", "version",
+            "currency", "notes", "title", "frequency", "next_due_at", "last_materialized_at", "active", "version",
             "created_at", "updated_at", "sync_seq"
         ],
         "recurring_rule_tags": [

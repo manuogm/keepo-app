@@ -76,7 +76,8 @@ extension TransactionFormView {
             categoryId: kind == .transfer ? nil : selectedCategoryId,
             amountText: amountText,
             kind: recurringKind,
-            startingOn: occurredAt
+            startingOn: occurredAt,
+            title: title
         )
     }
 

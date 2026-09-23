@@ -1179,6 +1179,7 @@ public enum PublicSchema {
     public let notes: String?
     public let ownerId: UUID
     public let syncSeq: Int64
+    public let title: String?
     public let toAccountId: UUID?
     public let updatedAt: String
     public let version: Int32
@@ -1197,6 +1198,7 @@ public enum PublicSchema {
       case notes = "notes"
       case ownerId = "owner_id"
       case syncSeq = "sync_seq"
+      case title = "title"
       case toAccountId = "to_account_id"
       case updatedAt = "updated_at"
       case version = "version"
@@ -1217,6 +1219,7 @@ public enum PublicSchema {
     public let notes: String?
     public let ownerId: UUID
     public let syncSeq: Int64?
+    public let title: String?
     public let toAccountId: UUID?
     public let updatedAt: String?
     public let version: Int32?
@@ -1235,6 +1238,7 @@ public enum PublicSchema {
       case notes = "notes"
       case ownerId = "owner_id"
       case syncSeq = "sync_seq"
+      case title = "title"
       case toAccountId = "to_account_id"
       case updatedAt = "updated_at"
       case version = "version"
@@ -1255,6 +1259,7 @@ public enum PublicSchema {
     public let notes: String?
     public let ownerId: UUID?
     public let syncSeq: Int64?
+    public let title: String?
     public let toAccountId: UUID?
     public let updatedAt: String?
     public let version: Int32?
@@ -1273,6 +1278,7 @@ public enum PublicSchema {
       case notes = "notes"
       case ownerId = "owner_id"
       case syncSeq = "sync_seq"
+      case title = "title"
       case toAccountId = "to_account_id"
       case updatedAt = "updated_at"
       case version = "version"
@@ -1511,6 +1517,7 @@ public enum PublicSchema {
     public let source: TransactionSource
     public let status: TransactionStatus
     public let syncSeq: Int64
+    public let title: String?
     public let transferGroupId: UUID?
     public let updatedAt: String
     public let version: Int32
@@ -1537,6 +1544,7 @@ public enum PublicSchema {
       case source = "source"
       case status = "status"
       case syncSeq = "sync_seq"
+      case title = "title"
       case transferGroupId = "transfer_group_id"
       case updatedAt = "updated_at"
       case version = "version"
@@ -1565,6 +1573,7 @@ public enum PublicSchema {
     public let source: TransactionSource?
     public let status: TransactionStatus?
     public let syncSeq: Int64?
+    public let title: String?
     public let transferGroupId: UUID?
     public let updatedAt: String?
     public let version: Int32?
@@ -1591,6 +1600,7 @@ public enum PublicSchema {
       case source = "source"
       case status = "status"
       case syncSeq = "sync_seq"
+      case title = "title"
       case transferGroupId = "transfer_group_id"
       case updatedAt = "updated_at"
       case version = "version"
@@ -1619,6 +1629,7 @@ public enum PublicSchema {
     public let source: TransactionSource?
     public let status: TransactionStatus?
     public let syncSeq: Int64?
+    public let title: String?
     public let transferGroupId: UUID?
     public let updatedAt: String?
     public let version: Int32?
@@ -1645,6 +1656,7 @@ public enum PublicSchema {
       case source = "source"
       case status = "status"
       case syncSeq = "sync_seq"
+      case title = "title"
       case transferGroupId = "transfer_group_id"
       case updatedAt = "updated_at"
       case version = "version"
@@ -1761,6 +1773,7 @@ public enum PublicSchema {
     public let recurringRuleId: UUID?
     public let source: TransactionSource?
     public let status: TransactionStatus?
+    public let title: String?
     public let transactionId: UUID?
     public let transferGroupId: UUID?
     public let version: Int32?
@@ -1789,6 +1802,7 @@ public enum PublicSchema {
       case recurringRuleId = "recurring_rule_id"
       case source = "source"
       case status = "status"
+      case title = "title"
       case transactionId = "transaction_id"
       case transferGroupId = "transfer_group_id"
       case version = "version"

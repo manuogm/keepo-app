@@ -107,14 +107,24 @@ public enum CaptureLocalWrite {
         /// .hasPossibleDuplicate`. Overrides the notification's copy and
         /// button set with a duplicate warning + Delete action.
         public let isPossibleDuplicate: Bool
+        /// The merchant taught Keepo nothing, and the category came from a
+        /// title the user once typed that matches it exactly
+        /// (`LocalTitleMemory`). This is what the outbox forwards to the
+        /// server as `p_category_hint`, so the server row lands on the same
+        /// category rather than the default and does not flip the row on the
+        /// next pull. Defaulted so the showcase and tests that build a
+        /// resolution by hand need not name it.
+        public var categoryFromTitle = false
     }
 
     static func resolveAndWrite(
         _ payload: CaptureTransactionPayload, ownerId: String, in database: Database
     ) throws -> Resolution? {
-        guard let category = try resolveCategory(
+        guard let resolvedCategory = try resolveCategory(
             database, ownerId: ownerId, merchantNormalized: payload.merchantNormalized
         ) else { return nil }
+        let category = resolvedCategory.row
+        let categoryFromTitle = resolvedCategory.fromTitle
         let categoryId: String = category["id"]
         let categoryName: String = category["name"]
         let categoryIsDefault: Bool = category["is_default"]
@@ -156,7 +166,8 @@ public enum CaptureLocalWrite {
             accountCurrency: resolved.accountCurrency, accountMinorUnit: accountMinorUnit,
             categoryId: categoryId, accountId: accountId,
             suggestedCategories: quickActions.categories, suggestedAccounts: quickActions.accounts,
-            isPossibleDuplicate: quickActions.isPossibleDuplicate
+            isPossibleDuplicate: quickActions.isPossibleDuplicate,
+            categoryFromTitle: categoryFromTitle
         )
     }
 
@@ -352,9 +363,14 @@ public enum CaptureLocalWrite {
         )
     }
 
+    /// Learned merchant, then a title the user typed that matches the
+    /// merchant exactly, then the owner's default — `resolve_category_for
+    /// _merchant`'s order, with this device's title match standing where the
+    /// server takes the hint. `fromTitle` is what tells the outbox to send
+    /// that hint.
     private static func resolveCategory(
         _ database: Database, ownerId: String, merchantNormalized: String
-    ) throws -> Row? {
+    ) throws -> (row: Row, fromTitle: Bool)? {
         if let learned = try Row.fetchOne(
             database,
             sql: """
@@ -364,7 +380,12 @@ public enum CaptureLocalWrite {
             """,
             arguments: [ownerId, merchantNormalized]
         ) {
-            return learned
+            return (learned, false)
+        }
+        if let titled = try LocalTitleMemory.category(
+            forUnlearnedMerchant: merchantNormalized, ownerId: ownerId, in: database
+        ) {
+            return (titled, true)
         }
         return try Row.fetchOne(
             database,
@@ -374,6 +395,6 @@ public enum CaptureLocalWrite {
             LIMIT 1
             """,
             arguments: [ownerId]
-        )
+        ).map { ($0, false) }
     }
 }

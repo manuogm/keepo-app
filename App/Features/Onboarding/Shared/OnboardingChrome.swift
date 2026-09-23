@@ -20,7 +20,10 @@ struct OnboardingChrome: View {
 
     var body: some View {
         ZStack {
-            ProgressDots(step: step)
+            ProgressDots(
+                current: SetupStep.progressSteps.firstIndex(of: step) ?? SetupStep.progressSteps.count,
+                count: SetupStep.progressSteps.count
+            )
 
             HStack {
                 if let onBack {
@@ -42,46 +45,6 @@ struct OnboardingChrome: View {
         }
         .padding(.horizontal, AppTheme.Spacing.l)
         .frame(height: AppTheme.Size.touchTarget)
-    }
-}
-
-/// Where you are, as dots — the current one a pill, per the brief.
-///
-/// The pill is the *same* view as the dots with a different width, animated
-/// with `Motion.quick`, so the shape travels along the row instead of one
-/// dot vanishing and another appearing somewhere else. `matchedGeometryEffect`
-/// would do the same thing with more machinery; a width change on a capsule
-/// is the whole effect.
-private struct ProgressDots: View {
-    let step: SetupStep
-
-    private static let pillWidth: CGFloat = 20
-
-    var body: some View {
-        HStack(spacing: AppTheme.Spacing.xs) {
-            ForEach(SetupStep.progressSteps, id: \.self) { dot in
-                Capsule()
-                    .fill(fill(for: dot))
-                    .frame(width: dot == step ? Self.pillWidth : AppTheme.Size.dot, height: AppTheme.Size.dot)
-            }
-        }
-        .animation(AppTheme.Motion.quick, value: step)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label)
-    }
-
-    /// Steps already behind you keep the accent at reduced strength: the
-    /// row reads as progress rather than as one lit dot among seven dead
-    /// ones, which is the difference between "four to go" and "you are on
-    /// number four".
-    private func fill(for dot: SetupStep) -> Color {
-        if dot == step { return AppTheme.Palette.brandPrimary }
-        return dot < step ? AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.dim) : AppTheme.Palette.fillStrong
-    }
-
-    private var label: String {
-        guard let index = SetupStep.progressSteps.firstIndex(of: step) else { return "Setting up" }
-        return "Step \(index + 1) of \(SetupStep.progressSteps.count)"
     }
 }
 

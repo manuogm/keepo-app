@@ -77,7 +77,7 @@ struct TransactionRow: View {
 
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                 HStack(spacing: AppTheme.Spacing.xs) {
-                    Text(isTransfer ? "Transfer" : (transaction.categoryName ?? "—"))
+                    Text(headline)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                         .lineLimit(1)
                     if isPendingReview {
@@ -147,11 +147,30 @@ struct TransactionRow: View {
         return "\(legs.from.accountName ?? "—") → \(legs.to.accountName ?? "—")"
     }
 
+    /// What the row is called: the user's own title when they gave it one,
+    /// otherwise the category — or "Transfer", which is a transfer's
+    /// category in all but name.
+    private var headline: String {
+        if let title = transaction.title { return title }
+        return isTransfer ? "Transfer" : (transaction.categoryName ?? "—")
+    }
+
     /// The second line as drawn: the account alone on the ledger, the
     /// merchant and then the account in the inbox. See `merchant`.
+    ///
+    /// **A title pushes the category down here** rather than off the row. The
+    /// icon still says it, but an icon is a colour and a glyph, and "which
+    /// category did I file this under" is a question the ledger has always
+    /// answered in words. A transfer has none to move — its arrow is already
+    /// in the account line.
     private var detailLine: String {
-        guard let merchant, !merchant.isEmpty else { return accountLine }
-        return "\(merchant) · \(accountLine)"
+        var parts: [String] = []
+        if let merchant, !merchant.isEmpty { parts.append(merchant) }
+        if transaction.title != nil, !isTransfer, let category = transaction.categoryName {
+            parts.append(category)
+        }
+        parts.append(accountLine)
+        return parts.joined(separator: " · ")
     }
 
     private var formattedAmount: String {

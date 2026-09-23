@@ -79,14 +79,33 @@ enum LocalTransactionRow {
         _ database: Database, filter: TransactionFilter, scope: PublicSchema.AccountScope,
         baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
-        var sql = """
+        let source = filteredSource(filter: filter, scope: scope, ownerId: ownerId)
+        let sql = """
         SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-               t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+               t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                t.recurring_rule_id, t.original_amount_e4, t.original_currency,
                ocur.minor_unit AS original_minor_unit,
                CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                     WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
+        \(source.sql)
+        ORDER BY t.occurred_at DESC, t.id DESC
+        """
+
+        let rows = try Row.fetchAll(database, sql: sql, arguments: StatementArguments(source.arguments))
+        let base = try BaseCurrency(database, code: baseCurrency)
+        return try rows.map { try build($0, database: database, base: base) }
+    }
+
+    /// `FROM … WHERE …` for a filtered read, with its arguments in order —
+    /// the one definition of "the rows this filter selects". The ledger reads
+    /// rows through it and the export counts and totals through it
+    /// (`LocalExportQueries`), so a file can never contain a different set of
+    /// transactions from the list it was launched from.
+    static func filteredSource(
+        filter: TransactionFilter, scope: PublicSchema.AccountScope, ownerId: String
+    ) -> (sql: String, arguments: [DatabaseValueConvertible]) {
+        var sql = """
         FROM transactions t
         LEFT JOIN accounts a ON a.id = t.account_id
             AND a.deleted_at IS NULL AND a.archived_at IS NULL AND \(visibleAccountClause)
@@ -99,11 +118,7 @@ enum LocalTransactionRow {
         sql += " AND (\(LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "t.account_id")))"
         var arguments: [DatabaseValueConvertible] = [ownerId, ownerId, ownerId]
         append(filter, to: &sql, arguments: &arguments)
-        sql += " ORDER BY t.occurred_at DESC, t.id DESC"
-
-        let rows = try Row.fetchAll(database, sql: sql, arguments: StatementArguments(arguments))
-        let base = try BaseCurrency(database, code: baseCurrency)
-        return try rows.map { try build($0, database: database, base: base) }
+        return (sql, arguments)
     }
 
     /// The user's own filter terms, appended to `sql` with their arguments
@@ -115,6 +130,16 @@ enum LocalTransactionRow {
         if let accountId = filter.accountId {
             sql += " AND t.account_id = ?"
             arguments.append(accountId.uuidString)
+        }
+        if let accountIds = filter.accountIds {
+            // An empty set is "no accounts", not "any account" — `IN ()` is
+            // not valid SQLite, so it is spelled as a clause that is false.
+            if accountIds.isEmpty {
+                sql += " AND 0"
+            } else {
+                sql += " AND t.account_id IN (\(databaseQuestionMarks(count: accountIds.count)))"
+                arguments.append(contentsOf: accountIds.map(\.uuidString))
+            }
         }
         if let categoryId = filter.categoryId {
             sql += " AND t.category_id = ?"
@@ -137,10 +162,11 @@ enum LocalTransactionRow {
         }
         if let search = filter.search, !search.isEmpty {
             sql += """
-             AND (t.merchant_raw LIKE ? OR t.merchant_normalized LIKE ? OR c.name LIKE ? OR a.name LIKE ?)
+             AND (t.title LIKE ? OR t.merchant_raw LIKE ? OR t.merchant_normalized LIKE ?
+                  OR c.name LIKE ? OR a.name LIKE ?)
             """
             let pattern = "%\(search)%"
-            arguments.append(contentsOf: [pattern, pattern, pattern, pattern])
+            arguments.append(contentsOf: [pattern, pattern, pattern, pattern, pattern])
         }
     }
 
@@ -155,7 +181,7 @@ enum LocalTransactionRow {
             sql: """
             SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-                   t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+                   t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                    t.recurring_rule_id, t.original_amount_e4, t.original_currency,
                    ocur.minor_unit AS original_minor_unit,
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
@@ -210,7 +236,7 @@ enum LocalTransactionRow {
             sql: """
             SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-                   t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+                   t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                    t.recurring_rule_id, t.original_amount_e4, t.original_currency,
                    ocur.minor_unit AS original_minor_unit,
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'

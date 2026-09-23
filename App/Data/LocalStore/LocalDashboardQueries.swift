@@ -49,7 +49,7 @@ enum LocalDashboardQueries {
         let rows = try Row.fetchAll(
             database,
             sql: """
-            SELECT r.id, r.amount_e4, r.currency, r.frequency, r.next_due_at,
+            SELECT r.id, r.title, r.amount_e4, r.currency, r.frequency, r.next_due_at,
                    c.name AS category_name, c.icon AS category_icon, c.color AS category_color,
                    a.name AS account_name
             FROM recurring_rules r
@@ -93,7 +93,7 @@ enum LocalDashboardQueries {
                 ruleId: row["id"], dueOn: dueOn, categoryName: row["category_name"],
                 categoryIcon: row["category_icon"], categoryColor: row["category_color"],
                 accountName: row["account_name"], amountBaseE4: converted, nativeAmountE4: amountE4,
-                nativeCurrency: currency
+                nativeCurrency: currency, title: row["title"]
             )
         }
     }
@@ -296,6 +296,10 @@ struct UpcomingTransactionLocal: Equatable, Identifiable {
     let amountBaseE4: Int64?
     let nativeAmountE4: Int64
     let nativeCurrency: String
+    /// The rule's own title, when it has one — what the bill is actually
+    /// called. Defaulted so samples and fixtures that predate titles still
+    /// build.
+    var title: String?
 
     /// Which way the money goes, from the sign of the rule's own amount —
     /// which the server's `validate_recurring_rule_sign` keeps in agreement

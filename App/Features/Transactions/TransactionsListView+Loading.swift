@@ -103,3 +103,14 @@ private struct LoadedTransactionsState {
     let categories: [PublicSchema.CategoriesSelect]
     let accounts: [LocalAccountRow]
 }
+
+/// What `load()` re-runs on — the list's `.task(id:)` key. Beside `load()`
+/// rather than in TransactionsListView.swift, which is at its file-length limit.
+struct TransactionsLoadKey: Equatable {
+    let token: Int
+    let scope: PublicSchema.AccountScope
+    let filter: TransactionFilter
+    /// Optional for the same reason `range` is — All Time re-keys the load
+    /// exactly like any other change of period.
+    let range: DateInterval?
+}

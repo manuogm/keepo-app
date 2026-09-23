@@ -1,15 +1,16 @@
 import SwiftUI
 
-// The month grid `CustomRangeSheet` scrolls: the weekday rule, one month's
+// The month grid `RangeCalendar` scrolls: the weekday rule, one month's
 // worth of day cells, and how a day draws itself given where it falls in
-// the selection. Split out of CustomRangeSheet.swift for the project's
+// the selection. Split out of RangeCalendar.swift for the project's
 // file-length and type-body-length lints, same precedent as
-// TransactionFormView+Date.swift.
+// TransactionFormView+Date.swift. Moved here with the calendar from
+// CustomRangeSheet+Grid.swift when Export's period page embedded it.
 //
-// Nothing here decides anything — `select(_:)` and `commit()` stay with the
-// state they mutate. This file only draws.
+// Nothing here decides anything — `DayRange.select(_:)` owns the rules.
+// This file only draws.
 
-extension CustomRangeSheet {
+extension RangeCalendar {
     // MARK: - Calendar
 
     /// Outside the scroll view on purpose — a day column you have to
@@ -29,16 +30,21 @@ extension CustomRangeSheet {
 
     func calendarScroll(_ proxy: ScrollViewProxy) -> some View {
         ScrollView {
-            LazyVStack(spacing: AppTheme.Spacing.l) {
+            // The gap between months is each month's own top padding rather
+            // than stack spacing, and at least as tall as the top fade: a
+            // month scrolled to `.top` then lands with its name just below
+            // the fade instead of dissolved in it.
+            LazyVStack(spacing: 0) {
                 ForEach(months, id: \.self) { month in
                     monthSection(month)
+                        .padding(.top, AppTheme.Spacing.xl)
                         .id(month)
                 }
             }
             .padding(.horizontal, AppTheme.Spacing.l)
-            .padding(.vertical, AppTheme.Spacing.s)
+            .padding(.bottom, AppTheme.Spacing.s)
         }
-        // The sheet opens on the month being looked at rather than at one
+        // The calendar opens on the month being looked at rather than at one
         // end of a seven-year list.
         //
         // A `ScrollViewReader` and not `scrollPosition(id:)`: that
@@ -50,49 +56,25 @@ extension CustomRangeSheet {
         // or there is nothing to jump to.
         .task {
             await Task.yield()
-            proxy.scrollTo(scrolledMonth, anchor: .top)
+            proxy.scrollTo(DayRange.monthStart(of: range.start ?? Date(), calendar: calendar), anchor: .top)
         }
-    }
-
-    /// Any month in the window, in two taps — because "March 2021" is four
-    /// years of flicking away, and a calendar you can only walk through is
-    /// one you cannot use for last year's tax return.
-    ///
-    /// A nested `Menu` rather than a wheel or a second sheet: it is the
-    /// smallest control that answers "which month" without taking a
-    /// permanent strip of the screen away from the calendar itself.
-    /// Unanimated on purpose — a five-year scroll rendered at speed is a
-    /// blur that tells the eye nothing and takes a second to finish.
-    func jumpToMenu(_ proxy: ScrollViewProxy) -> some View {
-        Menu {
-            ForEach(monthsByYear, id: \.year) { group in
-                Menu(String(group.year)) {
-                    ForEach(group.months, id: \.self) { month in
-                        Button(month.formatted(.dateTime.month(.wide))) {
-                            scrolledMonth = month
-                            proxy.scrollTo(month, anchor: .top)
-                        }
-                    }
-                }
+        // The Jump To menu and Export's period pills ask for a month by
+        // setting `focus`; it is cleared once honoured, so asking for the
+        // same month again after scrolling away still works.
+        //
+        // Twice, a turn apart: the stack is lazy, so a first jump over
+        // months it has never built lands on estimated heights and stops
+        // short or long; the second lands on the real ones.
+        .onChange(of: focus) { _, month in
+            guard let month else { return }
+            let target = DayRange.monthStart(of: month, calendar: calendar)
+            proxy.scrollTo(target, anchor: .top)
+            focus = nil
+            Task {
+                await Task.yield()
+                proxy.scrollTo(target, anchor: .top)
             }
-        } label: {
-            HStack(spacing: AppTheme.Spacing.xs) {
-                Image(systemName: "calendar")
-                    .font(AppTheme.Typography.captionEmphasis)
-                Text("Jump to")
-                    .font(AppTheme.Typography.label)
-                Image(systemName: "chevron.down")
-                    .font(AppTheme.Typography.nanoEmphasis)
-            }
-            .foregroundStyle(AppTheme.Palette.textSecondary)
-            .padding(.horizontal, AppTheme.Spacing.m)
-            .padding(.vertical, AppTheme.Spacing.s)
-            .background(AppTheme.Palette.fillSubtle, in: Capsule())
-            .contentShape(Capsule())
         }
-        .menuStyle(.button)
-        .buttonStyle(.pressableCard)
-        .transaction { $0.animation = nil }
     }
 
     private func monthSection(_ month: Date) -> some View {
@@ -123,7 +105,7 @@ extension CustomRangeSheet {
     /// out. The endpoints are `textPrimary` discs, so the shape reads as
     /// grey-between-two-marks.
     private func dayCell(_ day: Date) -> some View {
-        let state = state(of: day)
+        let state = range.state(of: day)
         return Text(day.formatted(.dateTime.day()))
             .font(state.isEndpoint ? AppTheme.Typography.labelEmphasis : AppTheme.Typography.label)
             .monospacedDigit()
@@ -147,34 +129,22 @@ extension CustomRangeSheet {
                 }
             }
             .contentShape(Rectangle())
-            .onTapGesture { select(day) }
+            .onTapGesture {
+                withAnimation(AppTheme.Motion.quick) { range.select(day) }
+            }
             .accessibilityLabel(day.formatted(date: .complete, time: .omitted))
             .accessibilityAddTraits(state == .none ? [] : .isSelected)
     }
 
-    private func band(for state: DayState) -> some View {
+    private func band(for state: DayRange.DayState) -> some View {
         SelectionBand(state: state).fill(AppTheme.Palette.fillSubtle)
-    }
-
-    enum DayState: Equatable {
-        case none, start, end, between, single
-
-        var isEndpoint: Bool { self == .start || self == .end || self == .single }
-    }
-
-    func state(of day: Date) -> DayState {
-        guard !isEverything else { return .none }
-        guard let end else { return day == start ? .single : .none }
-        if day == start { return start == end ? .single : .start }
-        if day == end { return .end }
-        return day > start && day < end ? .between : .none
     }
 }
 
 // The month grid's own arithmetic. In an extension rather than in the
 // struct for the type-body-length lint, and it reads better here anyway:
 // none of it knows what a selection is.
-extension CustomRangeSheet {
+extension RangeCalendar {
 
     private var weekdaySymbols: [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
@@ -189,43 +159,6 @@ extension CustomRangeSheet {
     private func days(of month: Date) -> [Date] {
         guard let count = calendar.range(of: .day, in: .month, for: month)?.count else { return [] }
         return (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: month) }
-    }
-
-    /// The window grouped for the "Jump to" menu — one submenu per year,
-    /// holding only the months the window actually contains, so the menu
-    /// can never offer a month the list would have nothing to scroll to.
-    var monthsByYear: [(year: Int, months: [Date])] {
-        let grouped = Dictionary(grouping: months) { calendar.component(.year, from: $0) }
-        return grouped.keys.sorted(by: >).map { year in
-            (year: year, months: (grouped[year] ?? []).sorted())
-        }
-    }
-
-    static func monthStart(of day: Date, calendar: Calendar) -> Date {
-        calendar.date(from: calendar.dateComponents([.year, .month], from: day)) ?? day
-    }
-
-    /// Six years back and one forward, widened to whatever the current
-    /// selection needs. Forward at all because a ledger can hold a future
-    /// date — a recurring rule's next occurrence, a bill entered early —
-    /// and a picker that cannot reach it would make that row unfilterable.
-    static func monthWindow(covering selection: ClosedRange<Date>, calendar: Calendar) -> [Date] {
-        let today = Date()
-        let back = calendar.date(byAdding: .year, value: -6, to: today) ?? today
-        let forward = calendar.date(byAdding: .year, value: 1, to: today) ?? today
-        var cursor = min(
-            monthStart(of: back, calendar: calendar), monthStart(of: selection.lowerBound, calendar: calendar)
-        )
-        let last = max(
-            monthStart(of: forward, calendar: calendar), monthStart(of: selection.upperBound, calendar: calendar)
-        )
-        var months: [Date] = []
-        while cursor <= last {
-            months.append(cursor)
-            guard let next = calendar.date(byAdding: .month, value: 1, to: cursor) else { break }
-            cursor = next
-        }
-        return months
     }
 }
 
@@ -242,7 +175,7 @@ extension CustomRangeSheet {
 /// single path has no overlap to composite — the union is filled in one
 /// pass, at one opacity.
 private struct SelectionBand: Shape {
-    let state: CustomRangeSheet.DayState
+    let state: DayRange.DayState
 
     func path(in rect: CGRect) -> Path {
         var path = Path()

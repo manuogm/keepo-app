@@ -17,6 +17,9 @@ import SwiftUI
 /// It edits a **draft** and commits once, on Done. The ledger underneath
 /// reloads whenever the period changes, and half a selection — "from the
 /// 12th to nowhere" — is not a period anyone asked to see.
+///
+/// The calendar itself is `RangeCalendar`, shared with Export's period page;
+/// this sheet is the draft, the All Time row, and Done.
 struct CustomRangeSheet: View {
     let onDone: (Selection) -> Void
 
@@ -29,23 +32,14 @@ struct CustomRangeSheet: View {
     }
 
     @Environment(\.dismiss) private var dismiss
-    // Not `private` from here down — read from CustomRangeSheet+Grid.swift,
-    // an extension in a different file (kept there purely for file-length).
-    @Environment(\.colorScheme) var colorScheme
 
-    /// The first day of the selection. Never optional: the sheet always
-    /// opens on the period already being looked at.
-    @State var start: Date
-    /// The last day, or `nil` while a selection is half made — which is
-    /// also the one state Done refuses to commit.
-    @State var end: Date?
-    @State var isEverything: Bool
-    @State var scrolledMonth: Date?
+    /// Never without a start here: the sheet always opens on the period
+    /// already being looked at. The end goes `nil` while a new selection is
+    /// half made — which is also the one state Done refuses to commit.
+    @State private var range: DayRange
+    @State private var focus: Date?
 
-    let calendar = Calendar.current
-    /// Computed once, in `init`. The window only has to cover what the user
-    /// can reach, and they can only tap days this list draws.
-    let months: [Date]
+    private let calendar = Calendar.current
 
     init(from: Date, through: Date, isAllTime: Bool, onDone: @escaping (Selection) -> Void) {
         self.onDone = onDone
@@ -55,11 +49,7 @@ struct CustomRangeSheet: View {
         // arrive from stale state either.
         let first = min(calendar.startOfDay(for: from), calendar.startOfDay(for: through))
         let last = max(calendar.startOfDay(for: from), calendar.startOfDay(for: through))
-        _start = State(initialValue: first)
-        _end = State(initialValue: last)
-        _isEverything = State(initialValue: isAllTime)
-        _scrolledMonth = State(initialValue: Self.monthStart(of: first, calendar: calendar))
-        months = Self.monthWindow(covering: first...last, calendar: calendar)
+        _range = State(initialValue: DayRange(start: first, end: last, isAllTime: isAllTime))
     }
 
     var body: some View {
@@ -67,25 +57,15 @@ struct CustomRangeSheet: View {
             ZStack {
                 AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
-                // The reader wraps the header too, not just the scroll
-                // view: "Jump to" lives up there and drives this same
-                // proxy. A second reader inside would be a second
-                // coordinate space that cannot reach these rows.
-                ScrollViewReader { proxy in
-                    VStack(spacing: 0) {
-                        HStack(spacing: AppTheme.Spacing.m) {
-                            allTimeRow
-                            jumpToMenu(proxy)
-                        }
-                        .padding(.horizontal, AppTheme.Spacing.l)
-                        .padding(.bottom, AppTheme.Spacing.m)
-                        weekdayHeader
-                        calendarScroll(proxy)
-                            .fadingEdges()
-                            .opacity(isEverything ? AppTheme.Opacity.dim : 1)
-                            .disabled(isEverything)
-                        summaryBar
+                VStack(spacing: 0) {
+                    HStack(spacing: AppTheme.Spacing.m) {
+                        CheckboxRow(title: "All Time", isOn: range.isAllTime) { range.isAllTime.toggle() }
+                        MonthJumpMenu(range: range, focus: $focus)
                     }
+                    .padding(.horizontal, AppTheme.Spacing.l)
+                    .padding(.bottom, AppTheme.Spacing.m)
+                    RangeCalendar(range: $range, focus: $focus)
+                    summaryBar
                 }
                 .padding(.top, AppTheme.Spacing.m)
             }
@@ -97,84 +77,14 @@ struct CustomRangeSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button { commit() } label: { Image(systemName: "checkmark") }
-                        .disabled(end == nil && !isEverything)
+                        .disabled(range.days == nil && !range.isAllTime)
                 }
             }
         }
     }
 
-    // MARK: - All Time
-
-    /// A checkbox rather than a switch: a switch says "a setting that stays
-    /// on", and this is one of the three answers to "which period" — it
-    /// turns itself off the moment a date is tapped.
-    ///
-    /// Bare on the canvas, with no card behind it and no explanatory line
-    /// under it. "All Time" needs neither: the calendar dimming beneath it
-    /// says what it does more plainly than a sentence could.
-    private var allTimeRow: some View {
-        Button {
-            isEverything.toggle()
-        } label: {
-            HStack(spacing: AppTheme.Spacing.m) {
-                RoundedRectangle(cornerRadius: AppTheme.Radius.control / 2)
-                    .strokeBorder(
-                        isEverything ? AppTheme.Palette.brandPrimary : AppTheme.Palette.fillStrong, lineWidth: 1.5
-                    )
-                    .background(
-                        isEverything ? AppTheme.Palette.brandPrimary : .clear,
-                        in: RoundedRectangle(cornerRadius: AppTheme.Radius.control / 2)
-                    )
-                    .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.glyph)
-                    .overlay {
-                        if isEverything {
-                            Image(systemName: "checkmark")
-                                .font(AppTheme.Typography.captionEmphasis)
-                                .foregroundStyle(AppTheme.Palette.textOnAccent)
-                        }
-                    }
-
-                Text("All Time")
-                    .font(AppTheme.Typography.labelEmphasis)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, AppTheme.Spacing.s)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.pressableCard)
-        .sensoryFeedback(AppTheme.Feedback.toggle, trigger: isEverything)
-    }
-
-    // MARK: - Selection
-
-    /// Three rules, in this order, and the second is the one that closes
-    /// the crash: **a tap before the start is a new start**, never an end
-    /// that would sort before it.
-    /// Not `private` — called from the grid in CustomRangeSheet+Grid.swift.
-    /// Worth saying out loud here: while it was, the compiler did not
-    /// complain about a missing method, it silently resolved `select(day)`
-    /// to **Darwin's `select(2)`** and failed on its argument count. A
-    /// cross-file `private` in this codebase can produce an error about a
-    /// completely unrelated C function.
-    func select(_ day: Date) {
-        withAnimation(AppTheme.Motion.quick) {
-            if end != nil || day < start {
-                start = day
-                end = nil
-            } else {
-                end = day
-            }
-        }
-    }
-
     private func commit() {
-        onDone(
-            isEverything
-                ? Selection(range: nil, isAllTime: true)
-                : Selection(range: start...(end ?? start), isAllTime: false)
-        )
+        onDone(Selection(range: range.isAllTime ? nil : range.days, isAllTime: range.isAllTime))
         dismiss()
     }
 
@@ -191,8 +101,8 @@ struct CustomRangeSheet: View {
     }
 
     private var summary: String {
-        if isEverything { return "All Time" }
-        guard let end else { return "Now pick the last day" }
+        if range.isAllTime { return "All Time" }
+        guard let start = range.start, let end = range.end else { return "Now pick the last day" }
         let days = (calendar.dateComponents([.day], from: start, to: end).day ?? 0) + 1
         let label = start == end
             ? start.formatted(date: .abbreviated, time: .omitted)

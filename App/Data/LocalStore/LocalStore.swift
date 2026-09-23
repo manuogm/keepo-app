@@ -92,6 +92,9 @@ public enum LocalSchemaV1 {
             table.column("merchant_raw", .text)
             table.column("merchant_normalized", .text)
             table.column("notes", .text)
+            // The user's own name for the row — never set by capture, and
+            // null rather than blank when there is none (the server's CHECK).
+            table.column("title", .text)
             // Only ever set for source='capture' rows — remembers which
             // card produced this row so resolving its account later (via
             // OutboxLocalWrite.updateTransaction) can auto-link the card.
@@ -163,6 +166,7 @@ public enum LocalSchemaV1 {
             table.column("amount_e4", .integer).notNull()
             table.column("currency", .text).notNull()
             table.column("notes", .text)
+            table.column("title", .text)
             table.column("frequency", .text).notNull()
             table.column("next_due_at", .text).notNull()
             table.column("last_materialized_at", .text)

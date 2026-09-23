@@ -57,6 +57,17 @@ struct TransactionFormView: View {
     @State var occurredAt = Date()
     @State var merchantRaw: String?
     @State var notes = ""
+    /// The user's own name for the entry; stored through
+    /// `TransactionTitle.stored`, so an empty field saves as no title.
+    @State var title = ""
+    /// Set by the field's binding, never by a prefill — see `titleBinding`.
+    @State var titleEdited = false
+    /// The category the typed title points at, if anything does — shown as
+    /// the first chip, and pre-selected while the category is still a guess.
+    @State var titleCategoryId: UUID?
+    /// Set the moment the user taps a category, after which a title only
+    /// ever suggests. See `userCategoryBinding`.
+    @State var categoryPickedByUser = false
 
     @State var selectedToAccountId: UUID?
     @State var receivedAmountText = ""
@@ -253,10 +264,12 @@ struct TransactionFormView: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
             dateStepper
 
+            titleField
+
             TransactionDetailCard(
                 fromAccountId: $selectedAccountId,
                 toAccountId: $selectedToAccountId,
-                categoryId: $selectedCategoryId,
+                categoryId: userCategoryBinding,
                 amountText: $amountText,
                 receivedAmountText: $receivedAmountText,
                 selectedTagIds: $selectedTagIds,
@@ -264,7 +277,7 @@ struct TransactionFormView: View {
                 onEditTags: { isPickingTags = true },
                 accounts: accounts,
                 categories: categoriesForKind,
-                suggestedCategories: suggestedCategories,
+                suggestedCategories: displayedCategorySuggestions,
                 isTransfer: kind == .transfer,
                 foreign: foreignAmount,
                 // A capture's paid figure came out of the Wallet

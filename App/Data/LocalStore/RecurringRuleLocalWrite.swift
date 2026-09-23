@@ -60,18 +60,19 @@ enum RecurringRuleLocalWrite {
         nextDueAt: Date,
         active: Bool,
         notes: String?,
+        title: String?,
         in database: Database
     ) throws {
         try database.execute(
             sql: """
             UPDATE recurring_rules
             SET account_id = ?, category_id = ?, to_account_id = ?, amount_e4 = ?, currency = ?,
-                notes = ?, frequency = ?, next_due_at = ?, active = ?, updated_at = ?
+                notes = ?, title = ?, frequency = ?, next_due_at = ?, active = ?, updated_at = ?
             WHERE id = ?
             """,
             arguments: [
                 accountId.uuidString, target.categoryId?.uuidString, target.toAccountId?.uuidString,
-                amountE4, currency, notes, frequency.rawValue, PostgresDate.dateOnlyString(nextDueAt),
+                amountE4, currency, notes, title, frequency.rawValue, PostgresDate.dateOnlyString(nextDueAt),
                 active, PostgresDate.sqliteTimestampBoundaryString(Date()), id.uuidString
             ]
         )
@@ -100,6 +101,7 @@ enum RecurringRuleLocalWrite {
         frequency: PublicSchema.RecurringFrequency,
         nextDueAt: Date,
         notes: String?,
+        title: String?,
         in database: Database
     ) throws {
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
@@ -107,14 +109,14 @@ enum RecurringRuleLocalWrite {
             sql: """
             INSERT OR REPLACE INTO recurring_rules (
                 id, owner_id, created_by, account_id, category_id, to_account_id, amount_e4, currency,
-                notes, frequency, next_due_at, last_materialized_at, active, version,
+                notes, title, frequency, next_due_at, last_materialized_at, active, version,
                 created_at, updated_at, sync_seq
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, 0)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, 0)
             """,
             arguments: [
                 id.uuidString, ownerId.uuidString, ownerId.uuidString, accountId.uuidString,
                 target.categoryId?.uuidString, target.toAccountId?.uuidString, amountE4, currency,
-                notes, frequency.rawValue, PostgresDate.dateOnlyString(nextDueAt), now, now
+                notes, title, frequency.rawValue, PostgresDate.dateOnlyString(nextDueAt), now, now
             ]
         )
     }

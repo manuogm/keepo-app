@@ -125,6 +125,7 @@ extension TransactionFormView {
         selectedCategoryId = transaction.categoryId
         merchantRaw = transaction.merchantRaw
         notes = transaction.notes ?? ""
+        title = transaction.title ?? ""
         isConfirmingCapture = transaction.status == .pending && transaction.source == .capture
         applyForeignAmounts(transaction)
     }
@@ -143,6 +144,12 @@ extension TransactionFormView {
         editingToVersion = destination.version.map(Int.init)
         selectedAccountId = from.accountId
         selectedToAccountId = destination.accountId
+        // Both legs carry the same note and title, so either is the
+        // transfer's. The note was never prefilled here, which meant saving
+        // any edit to a transfer silently wiped what the user had written —
+        // `update_transfer` stores exactly what it is sent.
+        notes = from.notes ?? ""
+        title = from.title ?? ""
         if let amount = from.amountE4 {
             amountText = AmountFormatter.editableString(amount, minorUnit: Int(from.minorUnit ?? 2))
         }
@@ -300,7 +307,7 @@ extension TransactionFormView {
         let payload = CreateTransactionPayload(
             id: UUID(), ownerId: userId, accountId: accountId, categoryId: categoryId,
             amountE4: amounts.signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            notes: notes.isEmpty ? nil : notes, original: amounts.original
+            notes: notes.isEmpty ? nil : notes, original: amounts.original, title: TransactionTitle.stored(title)
         )
         pendingDelivery = await session.outbox.submitCreateTransaction(payload)
         return payload.id
@@ -319,7 +326,8 @@ extension TransactionFormView {
         let payload = UpdateTransactionPayload(
             id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
             amountE4: amounts.signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes, original: amounts.original
+            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes, original: amounts.original,
+            title: TransactionTitle.stored(title)
         )
         await session.outbox.submitUpdateTransaction(payload)
     }
@@ -344,7 +352,8 @@ extension TransactionFormView {
         let payload = ReviewCaptureTransactionPayload(
             id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
             amountE4: amounts.signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes, original: amounts.original
+            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes, original: amounts.original,
+            title: TransactionTitle.stored(title)
         )
         await session.outbox.submitReviewCaptureTransaction(payload)
     }

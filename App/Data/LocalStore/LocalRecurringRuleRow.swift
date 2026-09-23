@@ -56,6 +56,12 @@ struct LocalRecurringRuleRow: Identifiable, Equatable {
 
     let id: UUID
     let subject: Subject
+    /// The user's own name for the rule, which every occurrence also carries.
+    let title: String?
+    /// What the row is called: the title when there is one, which is the
+    /// whole reason a rule can have one — "Gym" says more than "Health".
+    var displayName: String { title ?? subject.name }
+
     let accountName: String
     /// **Signed**, straight off the column — negative for an expense and for
     /// a transfer's outflow, positive for income. Money rule 1: nothing here
@@ -86,7 +92,7 @@ struct LocalRecurringRuleRow: Identifiable, Equatable {
         let rows = try Row.fetchAll(
             database,
             sql: """
-            SELECT r.id, r.amount_e4, r.currency, r.frequency, r.next_due_at, r.active,
+            SELECT r.id, r.title, r.amount_e4, r.currency, r.frequency, r.next_due_at, r.active,
                    a.name AS account_name,
                    c.name AS category_name, c.icon AS category_icon, c.color AS category_color,
                    d.name AS to_account_name, d.icon AS to_account_icon, d.color AS to_account_color
@@ -152,6 +158,7 @@ struct LocalRecurringRuleRow: Identifiable, Equatable {
         return LocalRecurringRuleRow(
             id: id,
             subject: subject,
+            title: row["title"],
             accountName: row["account_name"],
             amountE4: amountE4,
             currencyInfo: CurrencyInfo(code: currency, minorUnit: currencies[currency] ?? 2),

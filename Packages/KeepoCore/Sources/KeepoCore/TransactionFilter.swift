@@ -10,6 +10,11 @@ public struct TransactionFilter: Equatable, Sendable {
     public var from: Date?
     public var through: Date?
     public var search: String?
+    /// Several accounts at once — the export's multi-account selection. The
+    /// ledger's own menu picks one (`accountId`); both may be set and are
+    /// AND'd like everything else. An empty set matches nothing, which is
+    /// what "no accounts chosen" means.
+    public var accountIds: Set<UUID>?
 
     public init(
         accountId: UUID? = nil,
@@ -17,7 +22,8 @@ public struct TransactionFilter: Equatable, Sendable {
         kind: String? = nil,
         from: Date? = nil,
         through: Date? = nil,
-        search: String? = nil
+        search: String? = nil,
+        accountIds: Set<UUID>? = nil
     ) {
         self.accountId = accountId
         self.categoryId = categoryId
@@ -25,17 +31,18 @@ public struct TransactionFilter: Equatable, Sendable {
         self.from = from
         self.through = through
         self.search = search
+        self.accountIds = accountIds
     }
 
     public var isEmpty: Bool {
         accountId == nil && categoryId == nil && kind == nil && from == nil && through == nil
-            && (search?.isEmpty ?? true)
+            && (search?.isEmpty ?? true) && accountIds == nil
     }
 }
 
 public extension TransactionRepository {
     /// Every filter is optional and additive (AND'd together); `search`
-    /// matches merchant/category/account name. Ordered the same way as
+    /// matches title, merchant, category or account name. Ordered the same way as
     /// `fetchAll`, riding the existing `(owner_id, occurred_at desc, id
     /// desc)` keyset index — filtering never changes the sort, only which
     /// rows qualify.
@@ -43,6 +50,7 @@ public extension TransactionRepository {
         -> [PublicSchema.TransactionsWithDetailsSelect] {
         var query = client.from("transactions_with_details").select()
         if let accountId = filter.accountId { query = query.eq("account_id", value: accountId) }
+        if let accountIds = filter.accountIds { query = query.in("account_id", values: Array(accountIds)) }
         if let categoryId = filter.categoryId { query = query.eq("category_id", value: categoryId) }
         if let kind = filter.kind { query = query.eq("kind", value: kind) }
         if let from = filter.from { query = query.gte("occurred_at", value: PostgresDate.timestampString(from)) }
@@ -52,7 +60,7 @@ public extension TransactionRepository {
         if let search = filter.search, !search.isEmpty {
             let pattern = "%\(search)%"
             query = query.or(
-                "merchant_raw.ilike.\(pattern),merchant_normalized.ilike.\(pattern),"
+                "title.ilike.\(pattern),merchant_raw.ilike.\(pattern),merchant_normalized.ilike.\(pattern),"
                     + "category_name.ilike.\(pattern),account_name.ilike.\(pattern)"
             )
         }

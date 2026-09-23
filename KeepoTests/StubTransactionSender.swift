@@ -51,8 +51,14 @@ final class StubTransactionSender: OutboxSending, @unchecked Sendable {
     /// as before (governed purely by `confirmCaptureTransactionResult`).
     var requireCaptureBeforeConfirm = false
 
+    /// What the last capture actually sent — the category hint is decided
+    /// after the payload is built, so the payload a test constructs is not
+    /// the one that reaches the network.
+    private(set) var lastCapturePayload: CaptureTransactionPayload?
+
     func captureTransaction(_ payload: CaptureTransactionPayload) async throws {
         captureTransactionCallCount += 1
+        lastCapturePayload = payload
         try captureTransactionResult.get()
     }
 

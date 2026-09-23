@@ -106,7 +106,9 @@ extension RecurringRuleFormView {
         case .edit(let rule):
             apply(rule)
             await loadAppliedTags(ruleId: rule.id)
-        case .createSeeded(let accountId, let toAccountId, let categoryId, let seededAmount, let seededKind, let start):
+        case .createSeeded(
+            let accountId, let toAccountId, let categoryId, let seededAmount, let seededKind, let start, let seededTitle
+        ):
             kind = seededKind
             selectedAccountId = accountId
             selectedToAccountId = toAccountId
@@ -116,6 +118,9 @@ extension RecurringRuleFormView {
             // parsed and re-formatted.
             amountText = seededAmount
             nextDueAt = start
+            // Carried across so "Make recurring" on "Gym" makes a rule called
+            // "Gym" — which is also what every occurrence will be called.
+            title = seededTitle
         case .create:
             // The account the user reaches for most is a guess; the account
             // they have is not. One account means no question to ask.
@@ -227,6 +232,7 @@ extension RecurringRuleFormView {
         // Read AFTER the account is set: `minorUnit` resolves through it.
         amountText = AmountFormatter.editableString(abs(rule.amountE4), minorUnit: minorUnit)
         notes = rule.notes ?? ""
+        title = rule.title ?? ""
         frequency = rule.frequency
         nextDueAt = PostgresDate.dateOnly(from: rule.nextDueAt) ?? Date()
         active = rule.active
@@ -281,13 +287,13 @@ extension RecurringRuleFormView {
                 let id = try await RecurringRuleRepository.create(
                     client: session.client, ownerId: ownerId, accountId: accountId, target: target,
                     amountE4: signedAmountE4, currency: currency, frequency: frequency,
-                    nextDueAt: nextDueAt, notes: trimmedNotes
+                    nextDueAt: nextDueAt, notes: trimmedNotes, title: storedTitle
                 )
                 try await session.dbQueue.write { database in
                     try RecurringRuleLocalWrite.insert(
                         id: id, ownerId: ownerId, accountId: accountId, target: target,
                         amountE4: signedAmountE4, currency: currency, frequency: frequency,
-                        nextDueAt: nextDueAt, notes: trimmedNotes, in: database
+                        nextDueAt: nextDueAt, notes: trimmedNotes, title: storedTitle, in: database
                     )
                 }
                 try await applyTagChanges(ruleId: id, ownerId: ownerId)
@@ -296,13 +302,13 @@ extension RecurringRuleFormView {
                 try await RecurringRuleRepository.update(
                     client: session.client, id: id, accountId: accountId, target: target,
                     amountE4: signedAmountE4, currency: currency, frequency: frequency,
-                    nextDueAt: nextDueAt, active: active, notes: trimmedNotes
+                    nextDueAt: nextDueAt, active: active, notes: trimmedNotes, title: storedTitle
                 )
                 try await session.dbQueue.write { database in
                     try RecurringRuleLocalWrite.update(
                         id: id, accountId: accountId, target: target, amountE4: signedAmountE4,
                         currency: currency, frequency: frequency, nextDueAt: nextDueAt,
-                        active: active, notes: trimmedNotes, in: database
+                        active: active, notes: trimmedNotes, title: storedTitle, in: database
                     )
                 }
                 guard let ownerId = session.profile?.id else { return }
@@ -322,6 +328,12 @@ extension RecurringRuleFormView {
     var trimmedNotes: String? {
         let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// The same rule the transaction form stores its title by, because every
+    /// occurrence this rule mints carries it into that column.
+    var storedTitle: String? {
+        TransactionTitle.stored(title)
     }
 
     /// Writes only the difference, server first then the mirror — the same

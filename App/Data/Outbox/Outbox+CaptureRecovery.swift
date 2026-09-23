@@ -105,7 +105,8 @@ extension Outbox {
             try Row.fetchOne(
                 database,
                 sql: """
-                SELECT card_identifier, merchant_raw, merchant_normalized, amount_e4, occurred_at, external_id, notes
+                SELECT card_identifier, merchant_raw, merchant_normalized, amount_e4, occurred_at, external_id, notes,
+                       category_id
                 FROM transactions WHERE id = ? AND source = 'capture' AND card_identifier IS NOT NULL
                 """,
                 arguments: [id]
@@ -124,7 +125,12 @@ extension Outbox {
         let payload = CaptureTransactionPayload(
             id: uuid, cardIdentifier: cardIdentifier, merchantRaw: merchantRaw,
             merchantNormalized: merchantNormalized, amountE4: abs(amountE4), occurredAt: occurredAt,
-            externalId: externalId, notes: row["notes"] as String?
+            externalId: externalId, notes: row["notes"] as String?,
+            // Whatever the device already filed it under. The server takes a
+            // hint only where its own merchant map is silent, so this can
+            // only ever make the two agree — which is the whole job of a
+            // repair.
+            categoryHint: (row["category_id"] as String?).flatMap(UUID.init(uuidString:))
         )
         return (try? await sender.captureTransaction(payload)) != nil ? .recovered : .failed
     }

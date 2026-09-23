@@ -37,7 +37,8 @@ struct RecurringRuleFormView: View {
             categoryId: UUID?,
             amountText: String,
             kind: Kind,
-            startingOn: Date
+            startingOn: Date,
+            title: String
         )
         case edit(PublicSchema.RecurringRulesSelect)
     }
@@ -86,6 +87,10 @@ struct RecurringRuleFormView: View {
     /// a case for this screen.
     @State var mirroredAmountText = ""
     @State var notes = ""
+    /// What every occurrence will be called in the ledger. Same field, same
+    /// place and same rule as the transaction form's — see
+    /// `TransactionFormView.titleField`.
+    @State var title = ""
     /// The tags on this rule. Applied on Save, not as they are tapped — a tag
     /// toggled on a rule the user then cancels out of must not have been
     /// written. Same contract as the transaction form's.
@@ -128,6 +133,12 @@ struct RecurringRuleFormView: View {
     var categoriesForKind: [PublicSchema.CategoriesSelect] {
         let categoryKind: PublicSchema.CategoryKind = kind == .income ? .income : .expense
         return categories.filter { $0.kind == categoryKind }
+    }
+
+    /// Caps at the server's limit as the user types, like the transaction
+    /// form's, rather than letting a save fail on a constraint nobody can see.
+    var titleBinding: Binding<String> {
+        Binding(get: { title }, set: { title = String($0.prefix(TransactionTitle.maxLength)) })
     }
 
     // MARK: - Body
@@ -201,6 +212,12 @@ struct RecurringRuleFormView: View {
     private var detailCard: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
             scheduleBlock
+
+            TextField("Title", text: titleBinding)
+                .font(AppTheme.Typography.cardTitle)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+                .textInputAutocapitalization(.sentences)
+                .submitLabel(.done)
 
             detailBody
 

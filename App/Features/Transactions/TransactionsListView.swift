@@ -73,6 +73,8 @@ struct TransactionsListView: View {
     /// range either, which is the point: see `range`.
     @State var isAllTime = false
     @State var isCustomRangePresented = false
+    /// The pre-filled Export sheet — see TransactionsListView+Export.swift.
+    @State var exportRequest: ExportRequest?
 
     /// The filter pills' fixed width — the fix for the distortion
     /// `pillLabel` documents, and the reason it is a *width* rather than a
@@ -169,6 +171,7 @@ struct TransactionsListView: View {
             .sheet(isPresented: $isCustomRangePresented) {
                 customRangeSheet
             }
+            .modifier(ExportSheetModifier(request: $exportRequest, session: session))
             .task(id: TransactionsLoadKey(
                 token: session.refresh.token, scope: session.scope, filter: filter, range: range
             )) { await load() }
@@ -198,7 +201,7 @@ struct TransactionsListView: View {
                     isFiltersExpanded: isFiltersExpanded,
                     onBack: backToDashboard,
                     onOpenProfile: { navigation?.openProfileRoot() },
-                    accessory: { filterToggle },
+                    accessory: { headerActions },
                     filters: { filterPanel }
                 )
                 .zIndex(1)
@@ -387,13 +390,4 @@ extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
     /// a freshly-minted fallback identity does to a `List` row and to
     /// `.sheet(item:)`.
     public var id: UUID? { transactionId }
-}
-
-private struct TransactionsLoadKey: Equatable {
-    let token: Int
-    let scope: PublicSchema.AccountScope
-    let filter: TransactionFilter
-    /// Optional for the same reason `range` is — All Time re-keys the load
-    /// exactly like any other change of period.
-    let range: DateInterval?
 }

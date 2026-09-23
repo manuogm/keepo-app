@@ -18,13 +18,14 @@ public enum CaptureRepository {
         occurredAt: Date,
         externalId: String,
         notes: String? = nil,
-        detectedCurrency: String? = nil
+        detectedCurrency: String? = nil,
+        categoryHint: UUID? = nil
     ) async throws {
         let params = CaptureTransactionParams(
             id: id, cardIdentifier: cardIdentifier, merchantRaw: merchantRaw,
             merchantNormalized: merchantNormalized, amountE4: amountE4,
             occurredAt: PostgresDate.timestampString(occurredAt), externalId: externalId, notes: notes,
-            detectedCurrency: detectedCurrency
+            detectedCurrency: detectedCurrency, categoryHint: categoryHint
         )
         // Void RPC (X-05) — it used to return `(mapped, account_id)`, but
         // since migration 20260822100000 the transaction insert is
@@ -65,13 +66,14 @@ public enum CaptureRepository {
         occurredAt: Date = Date(),
         merchantRaw: String?,
         notes: String? = nil,
-        original: ForeignOriginal? = nil
+        original: ForeignOriginal? = nil,
+        title: String? = nil
     ) async throws -> WriteResult {
         let params = ReviewCaptureParams(
             id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
             amountE4: amountE4, currency: currency, occurredAt: PostgresDate.timestampString(occurredAt),
             merchantRaw: merchantRaw, notes: notes,
-            originalAmountE4: original?.amountE4, originalCurrency: original?.currency
+            originalAmountE4: original?.amountE4, originalCurrency: original?.currency, title: title
         )
         let rows: [ConflictRow] = try await client.rpc("review_capture_transaction", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict
@@ -104,6 +106,10 @@ private struct CaptureTransactionParams: Encodable {
     let externalId: String
     let notes: String?
     let detectedCurrency: String?
+    /// The device's own category resolution when it matched the merchant
+    /// against one of the user's titles. Advice the server takes only when
+    /// its merchant map has nothing — see `resolve_category_for_merchant`.
+    let categoryHint: UUID?
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case cardIdentifier = "p_card_identifier"
@@ -114,6 +120,7 @@ private struct CaptureTransactionParams: Encodable {
         case externalId = "p_external_id"
         case notes = "p_notes"
         case detectedCurrency = "p_detected_currency"
+        case categoryHint = "p_category_hint"
     }
 }
 
@@ -147,6 +154,7 @@ private struct ReviewCaptureParams: Encodable {
     let notes: String?
     let originalAmountE4: Int64?
     let originalCurrency: String?
+    let title: String?
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case expectedVersion = "p_expected_version"
@@ -159,6 +167,7 @@ private struct ReviewCaptureParams: Encodable {
         case notes = "p_notes"
         case originalAmountE4 = "p_original_amount_e4"
         case originalCurrency = "p_original_currency"
+        case title = "p_title"
     }
 }
 

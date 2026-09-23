@@ -53,7 +53,7 @@ struct RecurringRuleRow: View {
                     // still sits under the amount.
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                         HStack(spacing: AppTheme.Spacing.s) {
-                            Text(rule.subject.name)
+                            Text(rule.displayName)
                                 .foregroundStyle(AppTheme.Palette.textPrimary)
                                 .lineLimit(1)
                             Spacer(minLength: AppTheme.Spacing.xs)
@@ -99,7 +99,7 @@ struct RecurringRuleRow: View {
                 .labelsHidden()
                 .tint(AppTheme.Palette.statusPositive)
                 .disabled(isBusy)
-                .accessibilityLabel(isActive ? "Pause \(rule.subject.name)" : "Resume \(rule.subject.name)")
+                .accessibilityLabel(isActive ? "Pause \(rule.displayName)" : "Resume \(rule.displayName)")
         }
         // `.m`, not the ledger row's `.xs`: `TransactionRow` sits inside a
         // `List`, which adds its own generous cell insets on top. These rows
@@ -120,10 +120,20 @@ struct RecurringRuleRow: View {
     @ViewBuilder
     private func detailRow(includingConversion: Bool) -> some View {
         HStack(spacing: AppTheme.Spacing.s) {
-            Text(detailLine)
-                .font(AppTheme.Typography.micro)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .lineLimit(1)
+            // Two texts, so that when the line is too long it is the lead —
+            // which account, and for a titled rule which category — that
+            // gives way, and never the schedule, the one fact this screen
+            // knows that the ledger does not.
+            HStack(spacing: 0) {
+                Text(detailLead)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(" · \(schedule)")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .font(AppTheme.Typography.micro)
+            .foregroundStyle(AppTheme.Palette.textSecondary)
             Spacer(minLength: AppTheme.Spacing.xs)
             if includingConversion, !isPrivacyMode {
                 CurrencyConversionLabel(
@@ -157,10 +167,27 @@ struct RecurringRuleRow: View {
     /// the title: "Savings / from Current · Monthly · 2 Oct". The title
     /// names where the money lands, and without the preposition the row
     /// would be silent about which of the two accounts is which.
-    private var detailLine: String {
-        let schedule = "\(rule.frequency.shortLabel) · \(nextDueLabel)"
-        guard rule.subject.isTransfer else { return "\(rule.accountName) · \(schedule)" }
-        return "from \(rule.accountName) · \(schedule)"
+    ///
+    /// **A titled rule moves its subject down here**, the same move
+    /// `TransactionRow` makes: the title took the first line, and the
+    /// category — or, for a transfer, the destination — is still a fact the
+    /// row owes the reader. A titled transfer names both ends with an arrow,
+    /// because the title no longer says where the money lands.
+    private var detailLead: String {
+        switch (rule.title != nil, rule.subject) {
+        case (false, .transfer):
+            return "from \(rule.accountName)"
+        case (false, .category):
+            return rule.accountName
+        case (true, .transfer(let destination, _, _)):
+            return "\(rule.accountName) → \(destination)"
+        case (true, .category(let category, _, _)):
+            return "\(category) · \(rule.accountName)"
+        }
+    }
+
+    private var schedule: String {
+        "\(rule.frequency.shortLabel) · \(nextDueLabel)"
     }
 
     /// Formatted in `utcCalendar` — the same calendar the due date was

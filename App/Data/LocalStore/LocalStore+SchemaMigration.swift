@@ -159,5 +159,13 @@ extension LocalStore {
         // rule's tags would be pulled and silently dropped, and the form
         // would open showing none of them.
         migrator.registerMigration("v19_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20261005100000 adds
+        // transactions.title and recurring_rules.title server-side. Additive,
+        // so nothing hard-fails; a stale device would silently drop both from
+        // every pulled row (`SyncApply` intersects its whitelist with the
+        // local schema), and a title typed on one phone would simply never
+        // appear on the other — the mirror holding less than the server,
+        // which is what every entry in this list exists to prevent.
+        migrator.registerMigration("v20_rebuild_syncable_tables", migrate: rebuildSyncableTables)
     }
 }

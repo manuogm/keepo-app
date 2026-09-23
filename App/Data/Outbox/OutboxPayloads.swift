@@ -17,10 +17,14 @@ public struct CreateTransactionPayload: Codable, Sendable {
     /// this existed still decodes — `decodeIfPresent` is what Swift
     /// synthesizes for an `Optional` property.
     public let original: ForeignOriginal?
+    /// The user's own name for the row, trimmed, or `nil` for none. Optional
+    /// in the stored payload too, so an item queued before titles existed
+    /// still decodes.
+    public let title: String?
 
     public init(
         id: UUID, ownerId: UUID, accountId: UUID, categoryId: UUID, amountE4: Int64, currency: String,
-        occurredAt: Date, notes: String? = nil, original: ForeignOriginal? = nil
+        occurredAt: Date, notes: String? = nil, original: ForeignOriginal? = nil, title: String? = nil
     ) {
         self.id = id
         self.ownerId = ownerId
@@ -31,6 +35,7 @@ public struct CreateTransactionPayload: Codable, Sendable {
         self.occurredAt = occurredAt
         self.notes = notes
         self.original = original
+        self.title = title
     }
 }
 
@@ -47,10 +52,12 @@ public struct CreateTransferPayload: Codable, Sendable {
     /// Optional so an already-queued payload from before migration
     /// 20260904100000 still decodes.
     public let notes: String?
+    /// Both legs, like `notes`, and for the same reason.
+    public let title: String?
 
     public init(
         fromId: UUID, toId: UUID, fromAccountId: UUID, toAccountId: UUID,
-        fromAmountE4: Int64, toAmountE4: Int64?, occurredAt: Date, notes: String? = nil
+        fromAmountE4: Int64, toAmountE4: Int64?, occurredAt: Date, notes: String? = nil, title: String? = nil
     ) {
         self.fromId = fromId
         self.toId = toId
@@ -60,6 +67,7 @@ public struct CreateTransferPayload: Codable, Sendable {
         self.toAmountE4 = toAmountE4
         self.occurredAt = occurredAt
         self.notes = notes
+        self.title = title
     }
 }
 
@@ -77,11 +85,14 @@ public struct UpdateTransactionPayload: Codable, Sendable {
     /// **clears** a stored original, which is how a row wrongly marked
     /// foreign is corrected.
     public let original: ForeignOriginal?
+    /// `nil` **clears** a title, the same way `original` and `notes` clear —
+    /// an edit states the whole row.
+    public let title: String?
 
     public init(
         id: UUID, expectedVersion: Int, accountId: UUID, categoryId: UUID,
         amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?, notes: String? = nil,
-        original: ForeignOriginal? = nil
+        original: ForeignOriginal? = nil, title: String? = nil
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
@@ -93,6 +104,7 @@ public struct UpdateTransactionPayload: Codable, Sendable {
         self.merchantRaw = merchantRaw
         self.notes = notes
         self.original = original
+        self.title = title
     }
 }
 
@@ -105,10 +117,11 @@ public struct UpdateTransferPayload: Codable, Sendable {
     public let occurredAt: Date
     /// See `CreateTransferPayload.notes` — same both-legs rule.
     public let notes: String?
+    public let title: String?
 
     public init(
         transferGroupId: UUID, fromExpectedVersion: Int, toExpectedVersion: Int,
-        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date, notes: String? = nil
+        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date, notes: String? = nil, title: String? = nil
     ) {
         self.transferGroupId = transferGroupId
         self.fromExpectedVersion = fromExpectedVersion
@@ -117,6 +130,7 @@ public struct UpdateTransferPayload: Codable, Sendable {
         self.toAmountE4 = toAmountE4
         self.occurredAt = occurredAt
         self.notes = notes
+        self.title = title
     }
 }
 
@@ -127,43 +141,6 @@ public struct DeleteTransactionPayload: Codable, Sendable {
     public init(id: UUID, expectedVersion: Int) {
         self.id = id
         self.expectedVersion = expectedVersion
-    }
-}
-
-/// The App Intent's write, generalized into the outbox as its 7th
-/// operation (anticipated in Phase 11's log). No `expectedVersion` — a
-/// capture has nothing to conflict against, it's an insert-or-noop keyed by
-/// `externalId`, not an edit of an existing row.
-public struct CaptureTransactionPayload: Codable, Sendable {
-    public let id: UUID
-    public let cardIdentifier: String
-    public let merchantRaw: String
-    public let merchantNormalized: String
-    public let amountE4: Int64
-    public let occurredAt: Date
-    public let externalId: String
-    public let notes: String?
-    /// What `CurrencyDetector` read out of Wallet's formatted amount, or
-    /// `nil` when it could not be certain. **Not a decision** — the server
-    /// and `CaptureLocalWrite` both compare it against the mapped account's
-    /// currency and both re-check it against the supported set, because
-    /// only they know the account.
-    public let detectedCurrency: String?
-
-    public init(
-        id: UUID, cardIdentifier: String, merchantRaw: String, merchantNormalized: String,
-        amountE4: Int64, occurredAt: Date, externalId: String, notes: String? = nil,
-        detectedCurrency: String? = nil
-    ) {
-        self.id = id
-        self.cardIdentifier = cardIdentifier
-        self.merchantRaw = merchantRaw
-        self.merchantNormalized = merchantNormalized
-        self.amountE4 = amountE4
-        self.occurredAt = occurredAt
-        self.externalId = externalId
-        self.notes = notes
-        self.detectedCurrency = detectedCurrency
     }
 }
 

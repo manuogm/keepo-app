@@ -35,7 +35,7 @@ extension TransactionFormView {
         let payload = CreateTransferPayload(
             fromId: UUID(), toId: UUID(), fromAccountId: accountId, toAccountId: toAccountId,
             fromAmountE4: magnitude, toAmountE4: receivedAmount, occurredAt: occurredAt,
-            notes: notes.isEmpty ? nil : notes
+            notes: notes.isEmpty ? nil : notes, title: TransactionTitle.stored(title)
         )
         pendingDelivery = await session.outbox.submitCreateTransfer(payload)
         return payload.fromId
@@ -58,7 +58,7 @@ extension TransactionFormView {
         let payload = UpdateTransferPayload(
             transferGroupId: transferGroupId, fromExpectedVersion: fromExpectedVersion,
             toExpectedVersion: toExpectedVersion, fromAmountE4: magnitude, toAmountE4: toAmount,
-            occurredAt: occurredAt, notes: notes.isEmpty ? nil : notes
+            occurredAt: occurredAt, notes: notes.isEmpty ? nil : notes, title: TransactionTitle.stored(title)
         )
         await session.outbox.submitUpdateTransfer(payload)
     }

@@ -148,6 +148,17 @@ public enum MoneyFormatter {
         locale.decimalSeparator ?? "."
     }
 
+    /// The figure a machine reads: signed, `.` as the decimal point, no
+    /// grouping and no symbol — `-1234.50` — rounded to the currency's minor
+    /// unit by the same rule the screen uses, so an export and the ledger can
+    /// never disagree by a cent. For file formats (CSV, a spreadsheet cell),
+    /// never for anything a person reads on screen.
+    public static func plain(_ amountE4: Int64, currency: CurrencyInfo) -> String {
+        let value = displayValue(amountE4, currency: currency)
+        let formatter = FormatterCache.editable(minorUnit: currency.minorUnit, locale: .posix)
+        return formatter.string(from: value as NSDecimalNumber) ?? "\(value)"
+    }
+
     private static func drawnAmount(_ amountE4: Int64, signStyle: MoneySignStyle) -> Int64 {
         switch signStyle {
         case .standard: return amountE4

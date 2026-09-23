@@ -121,7 +121,7 @@ extension TransactionFormView {
     /// What "Save and Add Another" leaves behind.
     ///
     /// The context of the run stays — account, category, date, kind — and
-    /// only what belonged to the one purchase clears. A note or a tag
+    /// only what belonged to the one purchase clears. A title, a note or a tag
     /// silently carried onto the next transaction is a wrong record the
     /// user has to notice before they can undo it, and the amount is the
     /// one field that is different every time.
@@ -135,6 +135,9 @@ extension TransactionFormView {
         amountText = ""
         receivedAmountText = ""
         notes = ""
+        title = ""
+        titleEdited = false
+        titleCategoryId = nil
         selectedTagIds = []
         originalTagIds = []
         merchantRaw = nil

@@ -45,6 +45,7 @@ extension OutboxLocalWrite {
                 "occurred_at": .string(PostgresDate.sqliteTimestampBoundaryString(payload.occurredAt)),
                 "merchant_raw": payload.merchantRaw.map(AnyJSON.string) ?? .null,
                 "notes": payload.notes.map(AnyJSON.string) ?? .null, "status": .string("confirmed"),
+                "title": payload.title.map(AnyJSON.string) ?? .null,
                 "version": .integer(payload.expectedVersion + 1), "updated_at": .string(now)
             ],
             table: "transactions", in: database

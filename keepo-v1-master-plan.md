@@ -436,6 +436,21 @@ was deleted with it — see the log's decision 1 for why that coupling was wrong
 - **`AppStoreListing.appID` is `nil`** until Keepo exists in App Store Connect,
   which keeps the Profile "Rate Keepo" row hidden.
 
+## Notification replica, transaction titles, export redesign (workstream, agreed 2026-09-23) ✅ built and migration `20261005100000` pushed 2026-09-23
+
+Log: `version-logs/titles-export-notifications-2026-09-23-log.md`.
+
+Three items the user asked for together and approved item by item (A1–A2, B1–B5, C1–C5), in this order:
+
+**A — onboarding notification cards look like the real banner.** Measured from a device screenshot: 32pt app icon (the real artwork, continuous squircle), `labelEmphasis` title, `label` body, relative timestamp top-right, translucent material platter at `Radius.surface`. The platter sits on a soft mango backdrop so the material reads as glass rather than grey. The long-press actions stay, drawn the way iOS draws them: a separate glass list under the banner. Copy still comes from `CaptureNotificationCopy.showcase` — a card cannot promise a shape production does not send. Client only.
+
+**B — a transaction title.** `transactions.title` and `recurring_rules.title`, nullable, CHECK trimmed-non-empty and ≤ 80 chars, so "no title" is always null. Carried by every write path (manual insert, `update_transaction`, `review_capture_transaction`, both transfer RPCs — both legs, like notes — `materialize_recurring`, "Make recurring", `fork_one_account`); **never** set by capture. The row shows the title in place of the category name (or "Transfer") and moves the category name to the second line. The form's title field is bare, placeholder "Title", above the account+amount block, in both forms. Search matches it; export carries it.
+- **Learning:** titles never train `merchant_category_map`. The "memory" is derived from the user's own titled transactions — no new table, so re-filing a transaction updates it for free. Titles are keyed through `MerchantNormalizer`, so the key space is the merchants'.
+- Form: typed title → exact past title, else a learned merchant equal to the title or to its leading words → pre-selects the category unless the user picked one.
+- Capture: unknown merchant → **exact** normalized title match only (nobody is watching an unattended capture, so no prefix matching), before the default. Matching lives in Swift only; `capture_transaction` takes an optional **validated category hint** it uses only when its own merchant map has nothing, so server and mirror cannot disagree and flip the category on the next pull.
+
+**C — export redesign.** Formats: **CSV, Excel (.xlsx), PDF** (OFX/QIF and JSON deliberately not offered). Three questions, **one per page** — accounts (bare "All accounts" checkbox over the list), period (the range calendar itself, inline — `RangeCalendar`, shared with the ledger's `CustomRangeSheet` — with an All time checkbox and This month / Last month / This year / Last 12 months pills over it), format (the Notifications screen's cards, `ChoiceCard`) — with progress dots, no subtitles, one concentric bottom button ("Continue" → "Export", with "Face ID required" over it), a live count under the calendar, and a recap of the earlier answers on the last page (each row jumps back). *Revised twice the same day on user feedback:* first an accordion of three cards (overwhelming), then one-per-page with preset rows and a separate calendar sheet, then this. Reads the **local mirror** with the Transactions list's own query, so the count is what the user filtered. Step-up and `log_export` unchanged. A quick-access export button beside the Transactions funnel — shown only while the filter panel is open (user call, 2026-09-23) — opens the screen pre-filled with the list's account/period/category/type/search; the last three show as removable chips. Spreadsheet formats write one row per transfer leg (so per-account sums hold); the PDF folds them like the ledger.
+
 ## Known gaps this plan does not close
 
 - iOS 18.0 remains the declared minimum but is never executed (user's call). Surfaces at TestFlight if it bites.

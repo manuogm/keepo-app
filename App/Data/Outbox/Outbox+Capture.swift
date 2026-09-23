@@ -30,7 +30,7 @@ extension LiveOutboxSender {
             client: client, id: payload.id, expectedVersion: payload.expectedVersion, accountId: payload.accountId,
             categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
             occurredAt: payload.occurredAt, merchantRaw: payload.merchantRaw, notes: payload.notes,
-            original: payload.original
+            original: payload.original, title: payload.title
         )
         switch result {
         case .saved: return true
@@ -129,9 +129,16 @@ extension Outbox {
         _ payload: CaptureTransactionPayload, ownerId: UUID? = nil
     ) async -> OutboxCaptureResult {
         if let ownerId, let resolution = await resolveAndApplyCaptureLocally(payload, ownerId: ownerId) {
+            // Only a title match travels as a hint. A learned merchant is
+            // the server's own answer already, and the default is the answer
+            // it falls back to without being told — sending either would
+            // only be a second source for a fact the server already has.
+            let sent = resolution.categoryFromTitle
+                ? payload.hinting(UUID(uuidString: resolution.categoryId))
+                : payload
             Task {
-                await self.attempt(id: payload.id, kind: .captureTransaction, payload: payload) {
-                    try await self.sender.captureTransaction(payload)
+                await self.attempt(id: sent.id, kind: .captureTransaction, payload: sent) {
+                    try await self.sender.captureTransaction(sent)
                     return true
                 }
             }

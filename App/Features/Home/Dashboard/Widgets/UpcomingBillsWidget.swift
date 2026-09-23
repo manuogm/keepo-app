@@ -232,11 +232,18 @@ struct UpcomingBillsWidget: View {
             HStack(spacing: AppTheme.Spacing.m) {
                 CategoryIconView(icon: item.categoryIcon, color: Color(hex: item.categoryColor))
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(item.categoryName)
+                    // Titled like the ledger row: the rule's own name first,
+                    // and the category pushed down beside the account rather
+                    // than dropped.
+                    Text(item.title ?? item.categoryName)
                         .font(AppTheme.Typography.label)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                         .lineLimit(1)
-                    Text("\(dueLabel(item.dueOn)) · \(item.accountName)")
+                    Text(
+                        [dueLabel(item.dueOn), item.title.map { _ in item.categoryName }, item.accountName]
+                            .compactMap { $0 }
+                            .joined(separator: " · ")
+                    )
                         .font(AppTheme.Typography.nano)
                         .foregroundStyle(AppTheme.Palette.textSecondary)
                         .lineLimit(1)

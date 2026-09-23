@@ -72,14 +72,15 @@ public enum RecurringRuleRepository {
         currency: String,
         frequency: PublicSchema.RecurringFrequency,
         nextDueAt: Date,
-        notes: String?
+        notes: String?,
+        title: String? = nil
     ) async throws -> UUID {
         let id = UUID()
         let row = PublicSchema.RecurringRulesInsert(
             accountId: accountId, active: true, amountE4: amountE4, categoryId: target.categoryId, createdAt: nil,
             createdBy: ownerId, currency: currency, frequency: frequency, id: id, lastMaterializedAt: nil,
             nextDueAt: PostgresDate.dateOnlyString(nextDueAt), notes: notes, ownerId: ownerId, syncSeq: nil,
-            toAccountId: target.toAccountId, updatedAt: nil, version: nil
+            title: title, toAccountId: target.toAccountId, updatedAt: nil, version: nil
         )
         try await client.from("recurring_rules").insert(row).execute()
         return id
@@ -113,7 +114,8 @@ public enum RecurringRuleRepository {
         frequency: PublicSchema.RecurringFrequency,
         nextDueAt: Date,
         active: Bool,
-        notes: String?
+        notes: String?,
+        title: String? = nil
     ) async throws {
         let patch = RecurringRuleShapePatch(
             accountId: accountId,
@@ -124,7 +126,8 @@ public enum RecurringRuleRepository {
             frequency: frequency,
             nextDueAt: PostgresDate.dateOnlyString(nextDueAt),
             active: active,
-            notes: notes
+            notes: notes,
+            title: title
         )
         try await client.from("recurring_rules").update(patch).eq("id", value: id).execute()
     }
@@ -175,7 +178,7 @@ public enum RecurringRuleRepository {
         let patch = PublicSchema.RecurringRulesUpdate(
             accountId: nil, active: active, amountE4: nil, categoryId: nil, createdAt: nil, createdBy: nil,
             currency: nil, frequency: nil, id: nil, lastMaterializedAt: nil, nextDueAt: nil, notes: nil,
-            ownerId: nil, syncSeq: nil, toAccountId: nil, updatedAt: nil, version: nil
+            ownerId: nil, syncSeq: nil, title: nil, toAccountId: nil, updatedAt: nil, version: nil
         )
         try await client.from("recurring_rules").update(patch).eq("id", value: id).execute()
     }
@@ -200,6 +203,8 @@ private struct RecurringRuleShapePatch: Encodable {
     /// Nullable and always sent, for the same reason the two shape columns
     /// are: clearing a note has to reach the server as a real null.
     let notes: String?
+    /// Sent the same way, for the same reason as `notes`.
+    let title: String?
 
     enum CodingKeys: String, CodingKey {
         case accountId = "account_id"
@@ -211,6 +216,7 @@ private struct RecurringRuleShapePatch: Encodable {
         case nextDueAt = "next_due_at"
         case active = "active"
         case notes = "notes"
+        case title = "title"
     }
 
     /// Written out rather than synthesized: `encode` (not `encodeIfPresent`)
@@ -226,6 +232,7 @@ private struct RecurringRuleShapePatch: Encodable {
         try container.encode(nextDueAt, forKey: .nextDueAt)
         try container.encode(active, forKey: .active)
         try container.encode(notes, forKey: .notes)
+        try container.encode(title, forKey: .title)
     }
 }
 
