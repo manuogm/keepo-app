@@ -23,8 +23,7 @@ import SwiftUI
 struct HouseholdQRView: View {
     let session: SessionStore
     let role: HouseholdPairingIdentity.Role
-    let accountIds: [UUID]
-    let categoryIds: [UUID]
+    let choices: HouseholdShareChoices
     var onJoined: () -> Void
 
     /// The scheme in front of the token, so a Keepo camera pointed at a
@@ -201,7 +200,8 @@ struct HouseholdQRView: View {
         do {
             try await ensureHousehold()
             token = try await HouseholdRepository.createInvite(
-                client: session.client, accountIds: accountIds, categoryIds: categoryIds
+                client: session.client, accountIds: choices.accountIds, categoryIds: choices.categoryIds,
+                fullHistoryAccountIds: choices.fullHistoryAccountIds
             )
             await waitForMember()
         } catch {
@@ -273,7 +273,7 @@ struct HouseholdQRView: View {
             // real by this line, and a failed automatic pass leaves the
             // report's manual Merge exactly where it was. Refusing to open
             // the report over it would strand a household nobody can review.
-            _ = try? await HouseholdAutoMerge.run(session: session, selectedCategoryIds: categoryIds)
+            _ = try? await HouseholdAutoMerge.run(session: session, selectedCategoryIds: choices.categoryIds)
             await session.syncNow()
             session.refresh.bump()
             isShowingReport = true
@@ -287,7 +287,8 @@ struct HouseholdQRView: View {
         do {
             try await HouseholdRepository.acceptInvite(
                 client: session.client, token: token,
-                accountIds: accountIds, categoryIds: categoryIds
+                accountIds: choices.accountIds, categoryIds: choices.categoryIds,
+                fullHistoryAccountIds: choices.fullHistoryAccountIds
             )
             memberArrived = true
             await session.syncNow()

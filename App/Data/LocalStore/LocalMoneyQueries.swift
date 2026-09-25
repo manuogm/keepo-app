@@ -62,9 +62,9 @@ enum LocalMoneyQueries {
     /// One native `(accountId, currency, balanceE4)` row per account
     /// matching `filter`, at `asOf` — the local counterpart to
     /// `account_balances` (which is always "as of today" server-side; L4
-    /// generalizes it to any date since `net_worth_series` needs exactly
-    /// that, and recomputing per day is the plan's explicit choice over
-    /// caching a `net_worth_daily` equivalent on-device).
+    /// generalizes it to any date since the dashboard's net worth series
+    /// needs exactly that, and recomputing per day is the plan's explicit
+    /// choice over caching daily figures on-device).
     ///
     /// **One statement for every account, not three per account.** This
     /// used to be a loop: each caller fetched a list of account ids, then

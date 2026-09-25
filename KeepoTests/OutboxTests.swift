@@ -1,6 +1,7 @@
 import Foundation
 import GRDB
 import KeepoCore
+import Supabase
 import Testing
 @testable import Keepo
 
@@ -222,6 +223,82 @@ struct OutboxTests {
         sender.confirmCaptureTransactionResult = .success(true)
         await outbox.drainAll()
         #expect(outbox.pendingCount == 0)
+    }
+
+    /// The same overwrite, for a transfer: its create is queued under the
+    /// sending leg's id and its edit under the group id, which is that same
+    /// id (migration 20261006100000). Collapsing the two sent only the edit,
+    /// against a transfer the server had never been told about.
+    @Test("an edit to a not-yet-created transfer queues behind the create, never replacing it")
+    func editDuringPendingTransferDoesNotDiscardTheCreate() async throws {
+        let sender = StubTransactionSender()
+        sender.createTransferResult = .failure(StubSenderError.network)
+        sender.updateTransferResult = .failure(StubSenderError.network)
+        let outbox = try makeOutbox(sender: sender)
+        let fromId = UUID()
+
+        _ = await outbox.submitCreateTransfer(
+            CreateTransferPayload(
+                fromId: fromId, toId: UUID(), fromAccountId: UUID(), toAccountId: UUID(),
+                fromAmountE4: 10000, toAmountE4: nil, occurredAt: Date()
+            )
+        ).value
+        _ = await outbox.submitUpdateTransfer(
+            UpdateTransferPayload(
+                transferGroupId: fromId, fromExpectedVersion: 1, toExpectedVersion: 1,
+                fromAmountE4: 20000, toAmountE4: 20000, occurredAt: Date()
+            )
+        ).value
+        #expect(outbox.pendingCount == 2)
+
+        sender.createTransferResult = .success(())
+        sender.updateTransferResult = .success(true)
+        await outbox.drainAll()
+        #expect(outbox.pendingCount == 0)
+        #expect(sender.deliveredTransferWrites == ["create", "update"])
+    }
+
+    /// A refusal cannot succeed on a retry, and retrying it forever is what
+    /// kept every such failure silent: the optimistic copy stayed on screen
+    /// and only a banner that never cleared hinted at it.
+    @Test("a write the server refuses outright is not queued, is reported, and asks for a full re-sync")
+    func refusedWriteIsFinal() async throws {
+        let sender = StubTransactionSender()
+        sender.deleteTransactionResult = .failure(
+            PostgrestError(code: "P0001", message: "transaction 1 is a transfer leg — use delete_transfer")
+        )
+        let outbox = try makeOutbox(sender: sender)
+
+        let result = await outbox.submitDeleteTransaction(
+            DeleteTransactionPayload(id: UUID(), expectedVersion: 1)
+        ).value
+
+        #expect(result == .refused)
+        #expect(outbox.pendingCount == 0)
+        #expect(outbox.refusal != nil)
+        #expect(outbox.needsFullResync)
+    }
+
+    @Test("a queued write that turns out to be refused is dropped from the queue, not retried")
+    func refusedDuringDrainIsDropped() async throws {
+        let sender = StubTransactionSender()
+        sender.updateTransactionResult = .failure(StubSenderError.network)
+        let outbox = try makeOutbox(sender: sender)
+        _ = await outbox.submitUpdateTransaction(
+            UpdateTransactionPayload(
+                id: UUID(), expectedVersion: 1, accountId: UUID(), categoryId: UUID(),
+                amountE4: -200000, currency: "EUR", occurredAt: Date(), merchantRaw: nil
+            )
+        ).value
+        #expect(outbox.pendingCount == 1)
+
+        sender.updateTransactionResult = .failure(
+            PostgrestError(code: "23514", message: "transfer must have exactly 2 legs")
+        )
+        await outbox.drainAll()
+
+        #expect(outbox.pendingCount == 0)
+        #expect(outbox.refusal != nil)
     }
 
     @Test("hasStalePending is threshold-relative, not a bare pending count")

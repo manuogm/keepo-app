@@ -1,6 +1,8 @@
--- account_balance_on / account_balances (H11 refactor) / net_worth_daily /
--- refresh_net_worth_daily / net_worth_series / fx_convert's same-currency
--- short-circuit (H15). Migration 20260806140000_home_net_worth.sql.
+-- account_balance_on / account_balances (H11 refactor) / net_worth /
+-- fx_convert's same-currency short-circuit (H15). Migration
+-- 20260806140000_home_net_worth.sql. `net_worth_daily` and its two functions
+-- were removed in 20261012100000; their scope and money-rule-5 assertions now
+-- run against `net_worth` and `fx_convert`.
 -- Fixture A = 11111111-... (base EUR).
 --
 -- Money is bigint at fixed scale 4 (L1) — 1000.00 is written as 10000000.
@@ -8,7 +10,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(17);
+select plan(15);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -80,48 +82,29 @@ select is(
 );
 
 -- ----------------------------------------------------------------------------
--- net_worth_daily / refresh_net_worth_daily
--- ----------------------------------------------------------------------------
-
-select refresh_net_worth_daily(auth.uid(), (current_date - 5), current_date);
-
-select is(
-  (select balance_e4 from net_worth_daily
-    where account_id = 'e8000000-0000-0000-0000-00000000e001' and as_of = current_date),
-  8500000::bigint,
-  'refresh_net_worth_daily materializes today''s balance correctly'
-);
-
-select is(
-  (select count(*) from net_worth_daily where account_id = 'e8000000-0000-0000-0000-00000000e001'),
-  6::bigint,
-  'refresh_net_worth_daily populates exactly one row per day in the requested range'
-);
-
--- ----------------------------------------------------------------------------
--- net_worth_series: scopes. Sharing the only account moves it out of 'me'
--- and into 'household' — 'total' always includes it either way.
+-- net_worth: scopes. Sharing the only account moves it out of 'me' and into
+-- 'household' — 'total' always includes it either way.
 -- ----------------------------------------------------------------------------
 
 select create_household();
 select share_account('e8000000-0000-0000-0000-00000000e001');
 
 select is(
-  (select count(*) from net_worth_series('me', current_date, current_date)),
+  net_worth('me'),
   0::bigint,
-  'net_worth_series(''me'') has no rows once the only account is shared'
+  'net_worth(''me'') is a computable zero once the only account is shared'
 );
 
 select is(
-  (select total_e4 from net_worth_series('household', current_date, current_date)),
+  net_worth('household'),
   8500000::bigint,
-  'net_worth_series(''household'') totals the shared account correctly'
+  'net_worth(''household'') totals the shared account correctly'
 );
 
 select is(
-  (select total_e4 from net_worth_series('total', current_date, current_date)),
+  net_worth('total'),
   8500000::bigint,
-  'net_worth_series(''total'') includes the account regardless of scope partition'
+  'net_worth(''total'') includes the account regardless of scope partition'
 );
 
 -- ----------------------------------------------------------------------------
@@ -150,38 +133,35 @@ select is(
   'fx_convert short-circuits same-currency conversion with zero fx_rates rows'
 );
 
--- A private USD account with no resolvable rate renders the day as NULL in
--- net_worth_series('me'), never a silently-partial sum (money rule 5).
+-- A private USD account with no resolvable rate makes net_worth('me') NULL,
+-- never a silently-partial sum (money rule 5).
 insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
 values ('e8000000-0000-0000-0000-00000000e002', auth.uid(), auth.uid(), 'regular', 'USD Ledger', 'USD', 5000000);
 
-select refresh_net_worth_daily(auth.uid(), current_date, current_date);
-
 select is(
-  (select total_e4 from net_worth_series('me', current_date, current_date)),
+  net_worth('me'),
   null::bigint,
-  'a day with an unconvertible account renders NULL in net_worth_series(''me''), not a partial sum'
+  'an unconvertible account renders net_worth(''me'') NULL, not a partial sum'
 );
 
--- A rate gap carries forward across the whole series — seeding one USD
--- rate 10 days back must resolve every day in an 8-day range that follows.
+-- A rate gap carries forward — seeding one USD rate 10 days back must resolve
+-- every day that follows.
 reset role;
 select upsert_fx_rate('USD', (current_date - 10), 0.9, 'ecb', now());
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
-select refresh_net_worth_daily(auth.uid(), (current_date - 8), (current_date - 1));
-
 select is(
-  (select count(*) from net_worth_series('me', (current_date - 8), (current_date - 1))),
-  8::bigint,
-  'net_worth_series returns every day in range once the account has data'
+  (select count(*) from generate_series(current_date - 8, current_date - 1, interval '1 day') d
+   where fx_convert(5000000, 'USD', 'EUR', d::date) is null),
+  0::bigint,
+  'a fx_rates gap carries forward — no later day is unconvertible'
 );
 
-select is(
-  (select count(*) from net_worth_series('me', (current_date - 8), (current_date - 1)) where total_e4 is null),
-  0::bigint,
-  'a fx_rates gap carries forward across the whole series — no day renders NULL'
+select isnt(
+  net_worth('me'),
+  null::bigint,
+  'and net_worth(''me'') is computable again'
 );
 
 select * from finish();

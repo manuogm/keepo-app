@@ -87,12 +87,18 @@ extension RecurringRuleFormView {
     // MARK: - Loading
 
     func load() async {
+        var heldCategory: PublicSchema.CategoriesSelect?
         if let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency {
+            let editedCategoryId: UUID? = {
+                guard case .edit(let rule) = mode else { return nil }
+                return rule.categoryId
+            }()
             let loaded = try? await session.dbQueue.read { database in
                 (
                     try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency),
                     try LocalTableQueries.categories(database, ownerId: ownerId.uuidString),
-                    try LocalTableQueries.tags(database)
+                    try LocalTableQueries.tags(database),
+                    try editedCategoryId.flatMap { try LocalTableQueries.category(database, id: $0.uuidString) }
                 )
             }
             accounts = loaded?.0 ?? []
@@ -100,14 +106,23 @@ extension RecurringRuleFormView {
             tagsById = Dictionary(
                 (loaded?.2 ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }
             )
+            heldCategory = loaded?.3 ?? nil
         }
 
         switch mode {
         case .edit(let rule):
             apply(rule)
+            // Synchronous and straight after `apply`, for the reason
+            // `TransactionFormView.adoptEditedCategory` gives.
+            if let heldCategory, heldCategory.id == selectedCategoryId {
+                let resolved = AccountCategories.editing(held: heldCategory, among: categories)
+                categories = resolved.categories
+                selectedCategoryId = resolved.selection
+            }
             await loadAppliedTags(ruleId: rule.id)
         case .createSeeded(
-            let accountId, let toAccountId, let categoryId, let seededAmount, let seededKind, let start, let seededTitle
+            let accountId, let toAccountId, let categoryId, let seededAmount, let seededKind, let start,
+            let seededTitle, let seededNotes, let seededTagIds
         ):
             kind = seededKind
             selectedAccountId = accountId
@@ -121,6 +136,12 @@ extension RecurringRuleFormView {
             // Carried across so "Make recurring" on "Gym" makes a rule called
             // "Gym" — which is also what every occurrence will be called.
             title = seededTitle
+            // The note and tags too, since a rule carries both onto every
+            // occurrence (20260930100000). The tags land as a *selection*
+            // over an empty baseline, so Save writes them as links of the
+            // new rule exactly as if they had been picked here.
+            notes = seededNotes
+            selectedTagIds = seededTagIds
         case .create:
             // The account the user reaches for most is a guess; the account
             // they have is not. One account means no question to ask.
@@ -291,7 +312,7 @@ extension RecurringRuleFormView {
                 )
                 try await session.dbQueue.write { database in
                     try RecurringRuleLocalWrite.insert(
-                        id: id, ownerId: ownerId, accountId: accountId, target: target,
+                        id: id, createdBy: ownerId, accountId: accountId, target: target,
                         amountE4: signedAmountE4, currency: currency, frequency: frequency,
                         nextDueAt: nextDueAt, notes: trimmedNotes, title: storedTitle, in: database
                     )

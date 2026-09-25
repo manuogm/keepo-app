@@ -131,3 +131,35 @@ struct UserFacingErrorEdgeFunctionTests {
         #expect(!described.lowercased().contains("no changes"))
     }
 }
+
+/// The outbox stops retrying exactly the failures that cannot succeed.
+@Suite("Final refusals")
+struct UserFacingErrorFinalRefusalTests {
+    @Test("A sentence the database raised on purpose is final")
+    func raisedSentenceIsFinal() {
+        #expect(UserFacingError.isFinalRefusal(
+            PostgrestError(code: "P0001", message: "transaction 1 is a transfer leg — use delete_transfer")
+        ))
+    }
+
+    @Test("A rate limit is raised as a sentence too, and is not final")
+    func rateLimitIsTransient() {
+        #expect(!UserFacingError.isFinalRefusal(PostgrestError(code: "P0001", message: "rate limit exceeded")))
+    }
+
+    @Test("Integrity, data and permission errors are final")
+    func constraintAndPermissionErrorsAreFinal() {
+        for code in ["23514", "23503", "22P02", "42501"] {
+            #expect(UserFacingError.isFinalRefusal(PostgrestError(code: code, message: "refused")))
+        }
+    }
+
+    /// An app ahead of an un-pushed migration sees "could not find the
+    /// function" — which resolves itself the moment the migration lands.
+    @Test("PostgREST's own errors and network failures are transient")
+    func postgrestAndNetworkErrorsAreTransient() {
+        #expect(!UserFacingError.isFinalRefusal(PostgrestError(code: "PGRST202", message: "not found")))
+        #expect(!UserFacingError.isFinalRefusal(PostgrestError(code: nil, message: "unknown")))
+        #expect(!UserFacingError.isFinalRefusal(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)))
+    }
+}

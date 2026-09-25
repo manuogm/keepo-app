@@ -105,10 +105,10 @@ select is(
 );
 
 -- ----------------------------------------------------------------------------
--- The forkable-table registry guard: register a fake account_id-bearing
--- table without adding it to fork_handled_tables, confirm fork refuses to
--- run, then clean it up (savepoint-scoped so it never leaks into another
--- test file's information_schema view).
+-- The fork's registry guard: register a fake account_id-bearing table
+-- without adding it to fork_handled_columns, confirm fork refuses to run,
+-- then clean it up (savepoint-scoped so it never leaks into another test
+-- file's information_schema view).
 -- ----------------------------------------------------------------------------
 
 reset role;
@@ -120,7 +120,7 @@ select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222
 -- 8. leave_household refuses to run while an unregistered account_id table exists.
 select throws_like(
   $$ select leave_household() $$,
-  '%unregistered account_id-bearing table%',
+  '%unregistered account reference(s): zzz_unregistered_fork_test.account_id%',
   'leave_household refuses to fork while a table has an unregistered account_id column'
 );
 
@@ -165,8 +165,8 @@ select is(
 -- household)", which was the behaviour until 20260915100000. Two real phones
 -- showed why it was wrong: the member who stayed was told nothing and their
 -- Household screen went on showing a partner who had gone. A household is two
--- people, so one leaving ends it — and the fork above has already given each
--- side an independent private copy, so nothing is lost either way.
+-- people, so one leaving ends it — and the fork above has already handed the
+-- member who lost access a copy of what they could see, so nothing is lost.
 select is(
   (select count(*) from household_members where user_id = auth.uid()),
   0::bigint,
@@ -184,27 +184,27 @@ select is(
   'A''s membership is retired too — leaving dissolves the household for both'
 );
 
--- 13/14. A also has her own untouched original transaction/recurring rule
--- still attached to the now-archived original account, plus her own forked
--- copy exactly like B's.
+-- 13/14. A owns the account, so she keeps it exactly as it was — not
+-- archived, not copied (20261012100000; the old fork archived it and handed
+-- her a copy too, so her Cashflow counted the history twice).
 select is(
-  (select archived_at is not null from accounts where id = 'a4000000-0000-0000-0000-00000000a001'),
+  (select archived_at is null from accounts where id = 'a4000000-0000-0000-0000-00000000a001'),
   true,
-  'the original shared account is archived, not deleted'
+  'the owner keeps her account, unarchived'
 );
 
 select is(
   (
     select count(*) from transactions t
     join accounts a on a.id = t.account_id
-    where a.owner_id = '11111111-1111-1111-1111-111111111111' and a.name = 'Shared Checking' and a.archived_at is null
+    where a.owner_id = '11111111-1111-1111-1111-111111111111' and a.name = 'Shared Checking'
       and t.amount_e4 = -500000
   ),
   1::bigint,
-  'A also got her own fresh forked copy of the shared transaction'
+  'and gets no copy of it: the transaction exists once on her side'
 );
 
--- 15. household_accounts no longer shares the (now-archived) account — the
+-- 15. household_accounts no longer shares the account — the
 -- row is soft-deleted (a tombstone the other member's pull still needs to
 -- see), not hard-deleted, so this filters deleted_at explicitly.
 select is(
@@ -257,7 +257,7 @@ select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222
 select accept_invite((select token from erase_token));
 select erase_own_account();
 
--- 17. B's own forked copy has merchant_raw scrubbed.
+-- 17. B's copy of A's account has merchant_raw scrubbed.
 select is(
   (
     select count(*) from transactions t
@@ -273,8 +273,8 @@ select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
--- 18. A's own forked copy is untouched — the erasure never corrupts the
--- other member's history.
+-- 18. A's own account is untouched — the erasure never corrupts the other
+-- member's history.
 select is(
   (
     select count(*) from transactions t
@@ -283,7 +283,7 @@ select is(
       and t.merchant_raw = 'Some Merchant'
   ),
   1::bigint,
-  'erase_own_account leaves the other member''s own copy of the shared history untouched'
+  'erase_own_account leaves the other member''s own account untouched'
 );
 
 select is(
@@ -292,24 +292,18 @@ select is(
   'a member_erased event was recorded'
 );
 
--- 19. fork_handled_tables genuinely covers every account_id-bearing table
+-- 19. fork_handled_columns genuinely covers every reference to an account
 -- right now (a live guard, not just a static list — this assertion fails
 -- the moment a future migration adds one without registering it here).
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
 select is(
-  (
-    select count(*)
-    from information_schema.columns c
-    join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name
-    where c.table_schema = 'public' and c.column_name = 'account_id' and t.table_type = 'BASE TABLE'
-      and not exists (select 1 from fork_handled_tables f where f.table_name = c.table_name)
-  ),
-  0::bigint,
-  'every current account_id-bearing base table is registered in fork_handled_tables'
+  unregistered_account_references(),
+  null,
+  'every current reference to an account is registered in fork_handled_columns'
 );
 
 -- 20. household_events RLS: a non-member sees nothing.
-reset role;
-select set_config('request.jwt.claim.sub', '', true);
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 

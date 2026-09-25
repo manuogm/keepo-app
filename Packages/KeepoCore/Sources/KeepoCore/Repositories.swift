@@ -115,6 +115,11 @@ public enum TransactionRepository {
     /// this exact call reuses the same id and hits `transactions`' primary
     /// key instead of inserting a duplicate row.
     ///
+    /// `ownerId` is the account's owner; `createdBy` is who entered it, when
+    /// that is someone else — a partner on the owner's shared account. RLS
+    /// requires `created_by` to be the caller, and the foreign keys require
+    /// `owner_id` to be the account's owner.
+    ///
     /// Otherwise six named, self-explanatory parameters describing one
     /// transaction — same reasoning as AccountRepository.create above.
     @discardableResult
@@ -123,6 +128,7 @@ public enum TransactionRepository {
         client: SupabaseClient,
         id: UUID = UUID(),
         ownerId: UUID,
+        createdBy: UUID? = nil,
         accountId: UUID,
         categoryId: UUID,
         amountE4: Int64,
@@ -135,7 +141,7 @@ public enum TransactionRepository {
         let row = NewTransactionRow(
             id: id,
             ownerId: ownerId,
-            createdBy: ownerId,
+            createdBy: createdBy ?? ownerId,
             accountId: accountId,
             categoryId: categoryId,
             amountE4: amountE4,
@@ -193,8 +199,10 @@ public enum TransactionRepository {
         return rows.first.map(WriteResult.init) ?? .conflict
     }
 
-    /// Both legs' amount/date, updated atomically with each leg's own
-    /// expected version — see `update_transfer` in migration 003.
+    /// Both legs' accounts, amounts and date, updated atomically with each
+    /// leg's own expected version — see `update_transfer` (last restated in
+    /// 20261006100000, which added the accounts: a leg may move to another
+    /// account with the same owner).
     @discardableResult
     // swiftlint:disable:next function_parameter_count
     public static func updateTransfer(
@@ -206,7 +214,9 @@ public enum TransactionRepository {
         toAmountE4: Int64,
         occurredAt: Date = Date(),
         notes: String? = nil,
-        title: String? = nil
+        title: String? = nil,
+        fromAccountId: UUID? = nil,
+        toAccountId: UUID? = nil
     ) async throws -> WriteResult {
         let params = UpdateTransferParams(
             transferGroupId: transferGroupId,
@@ -216,7 +226,9 @@ public enum TransactionRepository {
             toAmountE4: toAmountE4,
             occurredAt: PostgresDate.timestampString(occurredAt),
             notes: notes,
-            title: title
+            title: title,
+            fromAccountId: fromAccountId,
+            toAccountId: toAccountId
         )
         let rows: [ConflictRow] = try await client.rpc("update_transfer", params: params).execute().value
         return rows.first.map(WriteResult.init) ?? .conflict

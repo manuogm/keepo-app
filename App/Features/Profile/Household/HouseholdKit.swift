@@ -267,13 +267,18 @@ struct SharedByThemIcon: View {
 /// The count in the header is not decoration: these lists collapse, and a
 /// closed section with no count is a section the user has to open to find out
 /// whether it was worth opening.
+///
+/// `hasRows` is for a list that holds more than it counts: the summary counts
+/// what is shared and also lists what could be, and gating "Nothing here." on
+/// the count drew it over the very rows the user came to switch on.
 struct HouseholdDisclosure<Content: View>: View {
     let title: String
     let count: Int
+    var hasRows: Bool?
     @Binding var isExpanded: Bool
     @ViewBuilder var content: Content
 
-    private var isEmpty: Bool { count < 1 }
+    private var isEmpty: Bool { hasRows.map { !$0 } ?? (count < 1) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

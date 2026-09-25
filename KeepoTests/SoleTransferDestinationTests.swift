@@ -88,4 +88,64 @@ struct SoleTransferDestinationTests {
 
         #expect(TransactionFormView.soleDestination(among: rows, excluding: source) == nil)
     }
+
+    /// A private account and the partner's shared account are both on
+    /// screen, but `check_transfer_integrity` refuses that pair at commit —
+    /// so from the private source the only answer is the user's own other
+    /// account, and from a shared source the partner's is a real second
+    /// choice, so nothing is guessed.
+    @Test("An account the source cannot pair with is neither offered nor prefilled")
+    func unpairableAccountsAreNotCandidates() throws {
+        let partner = UUID().uuidString
+        let household = UUID().uuidString
+        let privateSource = UUID()
+        let myShared = UUID()
+        let partnersShared = UUID()
+        let stamp = "2026-01-01T00:00:00.000000+00:00"
+        let dbQueue = try DatabaseQueue()
+        var migrator = DatabaseMigrator()
+        migrator.registerMigration("v1") { database in try LocalSchemaV1.migrate(database) }
+        try migrator.migrate(dbQueue)
+        try dbQueue.write { database in
+            for (id, owner) in [(privateSource.uuidString, ownerId), (myShared.uuidString, ownerId),
+                                (partnersShared.uuidString, partner)] {
+                try database.execute(
+                    sql: """
+                    INSERT INTO accounts (id, owner_id, created_by, kind, name, currency,
+                        opening_balance_e4, opening_balance_at, include_in_total, icon, color, version,
+                        created_at, updated_at, sync_seq)
+                    VALUES (?, ?, ?, 'regular', 'Account', 'USD', 0, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
+                        ?, ?, 1)
+                    """,
+                    arguments: [id, owner, owner, stamp, stamp]
+                )
+            }
+            for user in [ownerId, partner] {
+                try database.execute(
+                    sql: """
+                    INSERT INTO household_members (household_id, user_id, joined_at, sync_seq)
+                    VALUES (?, ?, ?, 1)
+                    """,
+                    arguments: [household, user, stamp]
+                )
+            }
+            for account in [myShared.uuidString, partnersShared.uuidString] {
+                try database.execute(
+                    sql: """
+                    INSERT INTO household_accounts (household_id, account_id, shared_at, sync_seq)
+                    VALUES (?, ?, ?, 1)
+                    """,
+                    arguments: [household, account, stamp]
+                )
+            }
+        }
+        let rows = try dbQueue.read { database in
+            try LocalAccountRow.fetchAll(database, ownerId: ownerId, baseCurrency: "USD")
+        }
+
+        let fromPrivate = TransactionFormView.pairable(with: privateSource, among: rows).map(\.id)
+        #expect(!fromPrivate.contains(partnersShared))
+        #expect(TransactionFormView.soleDestination(among: rows, excluding: privateSource) == myShared)
+        #expect(TransactionFormView.soleDestination(among: rows, excluding: myShared) == nil)
+    }
 }

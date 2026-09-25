@@ -24,8 +24,9 @@ public struct LiveOutboxSender: OutboxSending {
     public func createTransaction(_ payload: CreateTransactionPayload) async throws {
         do {
             try await TransactionRepository.create(
-                client: client, id: payload.id, ownerId: payload.ownerId, accountId: payload.accountId,
-                categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
+                client: client, id: payload.id, ownerId: payload.ownerId, createdBy: payload.createdBy,
+                accountId: payload.accountId, categoryId: payload.categoryId, amountE4: payload.amountE4,
+                currency: payload.currency,
                 occurredAt: payload.occurredAt, notes: payload.notes, original: payload.original,
                 title: payload.title
             )
@@ -66,7 +67,8 @@ public struct LiveOutboxSender: OutboxSending {
             client: client, transferGroupId: payload.transferGroupId,
             fromExpectedVersion: payload.fromExpectedVersion, toExpectedVersion: payload.toExpectedVersion,
             fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4,
-            occurredAt: payload.occurredAt, notes: payload.notes, title: payload.title
+            occurredAt: payload.occurredAt, notes: payload.notes, title: payload.title,
+            fromAccountId: payload.fromAccountId, toAccountId: payload.toAccountId
         )
         switch result {
         case .saved: return true

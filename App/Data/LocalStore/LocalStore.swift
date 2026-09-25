@@ -40,6 +40,7 @@ public enum LocalSchemaV1 {
         try createTagTables(database)
         try createPlanningTables(database)
         try createReferenceTables(database)
+        try createConflictTable(database)
         try createHouseholdTables(database)
     }
 
@@ -246,7 +247,11 @@ public enum LocalSchemaV1 {
             table.column("sync_seq", .integer).notNull()
             table.primaryKey(["owner_id", "merchant_pattern"])
         }
+    }
 
+    /// Its own function only for the function-length lint — it was the table
+    /// that tipped `createReferenceTables` over when it gained a column.
+    private static func createConflictTable(_ database: Database) throws {
         try database.create(table: "sync_conflicts") { table in
             table.column("id", .text).primaryKey().collate(.nocase)
             table.column("table_name", .text).notNull()
@@ -254,6 +259,9 @@ public enum LocalSchemaV1 {
             table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("client_version", .integer).notNull()
             table.column("server_version", .integer).notNull()
+            // The rejected write, as JSON text — `{"rpc": …, …arguments}`
+            // (migration 20261008100000). What "Keep mine" replays.
+            table.column("attempted_payload", .text)
             table.column("created_at", .text).notNull()
             table.column("resolved_at", .text)
             table.column("deleted_at", .text)
@@ -284,6 +292,9 @@ public enum LocalSchemaV1 {
             table.column("shared_at", .text).notNull()
             table.column("deleted_at", .text)
             table.column("sync_seq", .integer).notNull()
+            // Null for a share with full history; otherwise where a
+            // partner's view of the account begins (20261009100000).
+            table.column("history_from", .text)
             table.primaryKey(["household_id", "account_id"])
         }
 

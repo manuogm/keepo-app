@@ -88,8 +88,7 @@ final class HouseholdSetupCoordinator {
     /// `HouseholdSetupCoordinator+Teardown.swift` — `pairing` and `role`
     /// beside it already are.
     let session: SessionStore
-    private let selectedAccountIds: [UUID]
-    private let selectedCategoryIds: [UUID]
+    private let choices: HouseholdShareChoices
     /// Kept so the report can tell an original category from a twin that
     /// `accept_invite` auto-created — see `autoMergeCategories()`.
     private(set) var mergedGroupIds: Set<UUID> = []
@@ -112,14 +111,12 @@ final class HouseholdSetupCoordinator {
         session: SessionStore,
         pairing: HouseholdPairingSession,
         role: HouseholdPairingIdentity.Role,
-        accountIds: [UUID],
-        categoryIds: [UUID]
+        choices: HouseholdShareChoices
     ) {
         self.session = session
         self.pairing = pairing
         self.role = role
-        self.selectedAccountIds = accountIds
-        self.selectedCategoryIds = categoryIds
+        self.choices = choices
     }
 
     // MARK: - Running
@@ -174,8 +171,9 @@ final class HouseholdSetupCoordinator {
             try await self.ensureHousehold()
             let token = try await HouseholdRepository.createInvite(
                 client: self.session.client,
-                accountIds: self.selectedAccountIds,
-                categoryIds: self.selectedCategoryIds
+                accountIds: self.choices.accountIds,
+                categoryIds: self.choices.categoryIds,
+                fullHistoryAccountIds: self.choices.fullHistoryAccountIds
             )
             self.pairing.send(.invite(token: token))
         }
@@ -245,8 +243,9 @@ final class HouseholdSetupCoordinator {
         try await HouseholdRepository.acceptInvite(
             client: session.client,
             token: token,
-            accountIds: selectedAccountIds,
-            categoryIds: selectedCategoryIds
+            accountIds: choices.accountIds,
+            categoryIds: choices.categoryIds,
+            fullHistoryAccountIds: choices.fullHistoryAccountIds
         )
         hasJoined = true
         await session.syncNow()
@@ -394,7 +393,7 @@ final class HouseholdSetupCoordinator {
     /// fallback has to run exactly the same one without a coordinator.
     private func autoMergeCategories() async throws {
         mergedGroupIds = try await HouseholdAutoMerge.run(
-            session: session, selectedCategoryIds: selectedCategoryIds
+            session: session, selectedCategoryIds: choices.categoryIds
         )
     }
 }

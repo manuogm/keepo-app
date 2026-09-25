@@ -250,6 +250,13 @@ select delete_account(
   (select version from accounts where id = 'a4300000-0000-0000-0000-000000000002'),
   true
 );
+-- Forced, because this account holds halves of the pairs the rule minted,
+-- and the delete used to leave their partners as lone legs — which
+-- check_transfer_integrity refuses at COMMIT. Without this line that failure
+-- was invisible here: a deferred trigger never fires in a file that rolls
+-- back. 20261007100000 keeps those halves as anchors; this is what proves it.
+set constraints all immediate;
+set constraints all deferred;
 
 reset role;
 select set_config('request.jwt.claim.sub', '', true);

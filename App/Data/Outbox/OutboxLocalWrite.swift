@@ -45,7 +45,8 @@ enum OutboxLocalWrite {
         try SyncApply.upsertRow(
             [
                 "id": .string(payload.id.uuidString), "owner_id": .string(payload.ownerId.uuidString),
-                "created_by": .string(payload.ownerId.uuidString), "account_id": .string(payload.accountId.uuidString),
+                "created_by": .string((payload.createdBy ?? payload.ownerId).uuidString),
+                "account_id": .string(payload.accountId.uuidString),
                 "category_id": .string(payload.categoryId.uuidString),
                 "category_kind": categoryKind.map(AnyJSON.string) ?? .null,
                 "amount_e4": .integer(Int(payload.amountE4)), "currency": .string(payload.currency),
@@ -147,12 +148,15 @@ enum OutboxLocalWrite {
         )
     }
 
+    /// No `opening_balance_e4`: `update_account` stopped writing it
+    /// (20261009100000), and on a partner's phone the stored figure is the
+    /// balance carried into the share's start date, which a rename echoing
+    /// the value it loaded could only ever make stale.
     static func updateAccount(_ payload: UpdateAccountPayload, in database: Database) throws {
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         try SyncApply.upsertRow(
             [
                 "id": .string(payload.id.uuidString), "name": .string(payload.name),
-                "opening_balance_e4": .integer(Int(payload.openingBalanceE4)),
                 "include_in_total": .bool(payload.includeInTotal),
                 "icon": .string(payload.icon), "color": .string(payload.color),
                 "version": .integer(payload.expectedVersion + 1), "updated_at": .string(now)

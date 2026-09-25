@@ -451,6 +451,186 @@ Three items the user asked for together and approved item by item (A1–A2, B1�
 
 **C — export redesign.** Formats: **CSV, Excel (.xlsx), PDF** (OFX/QIF and JSON deliberately not offered). Three questions, **one per page** — accounts (bare "All accounts" checkbox over the list), period (the range calendar itself, inline — `RangeCalendar`, shared with the ledger's `CustomRangeSheet` — with an All time checkbox and This month / Last month / This year / Last 12 months pills over it), format (the Notifications screen's cards, `ChoiceCard`) — with progress dots, no subtitles, one concentric bottom button ("Continue" → "Export", with "Face ID required" over it), a live count under the calendar, and a recap of the earlier answers on the last page (each row jumps back). *Revised twice the same day on user feedback:* first an accordion of three cards (overwhelming), then one-per-page with preset rows and a separate calendar sheet, then this. Reads the **local mirror** with the Transactions list's own query, so the count is what the user filtered. Step-up and `log_export` unchanged. A quick-access export button beside the Transactions funnel — shown only while the filter panel is open (user call, 2026-09-23) — opens the screen pre-filled with the list's account/period/category/type/search; the last three show as removable chips. Spreadsheet formats write one row per transfer leg (so per-account sums hold); the PDF folds them like the ledger.
 
+## Transfers & household sharing — history choice + fork rewrite (workstream, agreed 2026-09-23) — done, deployed 2026-09-24
+
+**Origin.** A transfer-focused review on 2026-09-23, with no code written. Six scenarios were reproduced against the local stack inside rolled-back transactions, firing the deferred trigger with `set constraints all immediate`. It produced sixteen findings plus one cross-cutting outbox issue, listed below. The user asked for every finding and phase to be actioned in the suggested order (2026-09-23), with the review stops below.
+
+**Progress.** Findings #2–#6, #10–#13, #15 and the cross-cutting outbox fix are done (migrations 20261006100000–20261008100000, plus client). Phases 1 and 2 are done (migrations 20261009100000 and 20261010100000, pgTAP 51 and 52). First review stop passed 2026-09-24: the user chose to refuse moves out of a partner's view (20261011100000, pgTAP 53). Phase 3 is done (20261012100000, pgTAP 54); second review stop passed 2026-09-24. Phase 4 is done (20261013100000, pgTAP 55). Re-sharing replaces the partner's old copy (user's decision 2026-09-24; 20261014100000, pgTAP 56). Phase 5 is done; the third review stop (two Simulators on the local stack) passed 2026-09-24 with three fixes and a pre-existing partner bug fixed (20261015100000, pgTAP 57). An empty household now closes (20261016100000, pgTAP 58). Phase 6 (docs) is done. **Committed on `dev` and deployed 2026-09-24**: migrations 20261006100000–20261016100000 were pushed to hosted with the user's approval, and `supabase db diff --linked --schema public` afterwards shows only Supabase's own platform objects.
+
+### Review findings (numbered as in the review)
+
+1. **Critical.** `delete_own_account` rolls back if the leaver ever had a transfer with the other member's account: their half is hard-deleted, the partner's survives alone, and the deferred integrity trigger raises. *Fix:* one shared `detach_transfer_leg` SQL function (group id → null, the owner's default category by sign, source `adjustment`, note/title/tags kept — what `fork_one_account` already does inline), called on every such survivor before the hard delete.
+2. **Critical.** `create_transfer` mints the group id server-side, while the device uses `fromId` as a placeholder until the next pull. An edit or delete of a fresh transfer targets a group the server never had, and fails forever. Offline, create-then-edit overwrites the queued create, because `Outbox.enqueue` only protects captures (plain transactions have the same bug). *Fix:* a client-supplied `p_group_id` (defaulted for old builds); `enqueue` never overwrites an undelivered create.
+3. **Critical.** The transfer edit form lets both accounts change, but `update_transfer` has no account parameters. Changing the currency pairing stores a wrong received amount (cross-currency → same-currency) or trips the trigger (the reverse). *Fix:* account parameters on `update_transfer`, same owner per half (`transactions_prevent_owner_id_change` forbids anything else), pickers limited to that owner.
+4. **High.** `delete_account(p_cascade)` tombstones one half of a transfer, and the trigger raises at commit. Test 43 #18 passes only because it never fires the deferred trigger. *Fix:* halves on the deleted account stay as hidden anchors when the other account is live; pairs whose accounts are both deleted are tombstoned together; the integrity trigger raises a non-P0001 SQLSTATE so its text never reaches the user.
+5. **High.** `OutboxLocalWrite.updateTransfer` writes the sent magnitude positive, then its `amount_e4 > 0` update matches both halves: locally, both become inflows. *Fix:* resolve halves by sign, update by id with the server's signs; test amounts and balances.
+6. **High.** The form finds a transfer's other half only among rows on screen (`TransactionsListView.sibling(of:)`). A lone half (scoped or filtered view, or its partner on an archived account) opens an empty form. Swipe-to-delete sends `delete_transaction`, which the server refuses forever while the local row is already tombstoned. *Fix:* the form loads both halves by group id itself; read-only when the other half isn't on the device; a half never goes through `delete_transaction`.
+7. **High.** The fork archives and copies the *owner's own* shared accounts. Transfers degrade to "Other" adjustments; notes, tags and `original_*` are dropped; the owner's Cashflow counts forked history twice (archived original + copy). *Fix:* this workstream.
+8. **High.** A recurring transfer *into* a forked account goes dormant and vanishes from the Recurring list. The fork guard scans only columns named `account_id`, so `to_account_id` escapes it. *Fix:* the fork rewrite, plus a guard that finds account references by foreign key.
+9. **High.** Rows visible only through a derived rule are never re-stamped. When an account is shared into an existing household, its tags and categories never reach the partner's phone, and neither does a partner's own tag applied later. *Fix:* Phase 2 below.
+10. **High.** The transaction form offers private → partner's-shared-account transfers, which the trigger always rejects. *Fix:* one KeepoCore pairing rule (same owner, or both shared in the household) filtering the pickers.
+11. **Medium.** `applyTransfer` never sets `editingId`, so an existing transfer's tags aren't shown and tags added while editing are dropped. *Fix:* set it to the outflow half.
+12. **Medium.** "Keep mine" needs `categoryId`, so for a transfer it does nothing and still marks the conflict resolved. *Fix:* `sync_conflicts.attempted_payload` (the open Phase 11 follow-up), replayed through the same RPC for any kind; one conflict row per transfer.
+13. **Low.** Editing a cross-currency transfer skips the rate-divergence guard. *Fix:* one check for both save paths.
+14. **Closed — no change.** Tags stay on the outflow half only (user's decision, 2026-09-23).
+15. **Low.** "Make recurring" drops the note and tags. *Fix:* carry both in `createSeeded`.
+16. **Low.** `create_transfer` and the `transactions_insert` policy accept deleted accounts. *Fix:* one "writable and not deleted" predicate.
+
+**Cross-cutting.** The outbox retries a deterministic refusal forever, while the optimistic local write stays on screen — why #2, #3, #6, #10 and #16 are silent. *Fix:* treat P0001/23xxx (other than duplicate-on-create, already treated as success) as final: dequeue, restore the touched rows from the server, and show an alert.
+
+### Agreed design (user decisions, 2026-09-23)
+
+**An account has one owner; sharing never changes it.** When a household ends, or an account is unshared, **the owner keeps the original untouched**: same id, full history, card mappings, rules and transfer pairs. **Only the member losing access gets a copy**, containing exactly what they could see. This replaces today's fork, which copies every shared account for both members and archives the original.
+
+**The owner chooses how much history to share, per account.**
+- `household_accounts.history_from` (null = full history, what every existing share has).
+- On the setup pickers (both phones), a switched-on account shows "Include past transactions", **off by default**. Sharing later from the account screen asks the same question.
+- The start date is **the start of the share day in the owner's time zone**. For invite shares that is the day the invite is accepted.
+- The owner may **widen to full history later; narrowing is not offered**.
+- Recurring rules stay visible, since they describe the future. **No "balance brought forward" line** in the partner's ledger.
+
+**Mechanism.**
+- **One visibility predicate** `transaction_visible_to(user, account, occurred_at)`. It is used by transaction and tag-link RLS, `can_read_tag`/`can_read_category`, every transaction write path (a partner cannot create, edit, delete or re-date anything before the start date), and the fork. The boundary is on `occurred_at` — a `created_at` boundary would count a backdated entry twice.
+- **The partner's balance** stays opening + SUM over the same formula. `pull_changes` hands a non-owner an *adjusted opening*: dated at the start date, holding the balance carried into it, computed in SQL on read and never stored.
+  - A trigger re-stamps the account row whenever a transaction before the start date changes, so the partner re-pulls the figure.
+  - After every pull, the device deletes its local rows dated before the start date.
+  - `account_balance_on` becomes definer-gated, so the server returns the true balance to anyone who can read the account.
+- **Hazards the mechanism exists to avoid:**
+  - `update_account` echoes the opening balance from the local mirror, so it must stop writing it — a partner's rename would otherwise overwrite the owner's real opening.
+  - `net_worth_daily` is readable through the API and unused by the app, so remove it.
+  - A cross-member transfer must be dated on or after both accounts' start dates.
+- **Accepted leak:** the account row's original opening balance stays readable through the API.
+- **Transfers in a copy** are re-paired when both halves land with the same member. When a household ends, a transfer between the two members' accounts splits into one same-owner pair per member. Anything else is detached with #1's function.
+- **Compatibility:** every new parameter defaults to full history, so the build already on a phone behaves as today.
+
+**Recurring rules on a member's copy start paused** (`active = false`; user's decision, 2026-09-23). Nothing is lost, and the copy — a snapshot of shared history — doesn't keep receiving the owner's rent every month. Today's fork copies them active.
+
+**Unsharing an account that has a transfer to the partner's still-shared account** (user's decision, 2026-09-23): the partner's half is re-paired with their copy of the unshared account, and the owner's half is detached with #1's function, as a payment into someone else's account. No pair ever spans a private account and the other member's account.
+
+### Phases (each waits for the user's go-ahead; migrations 1–4 ship before client phase 5)
+
+| Phase | Content | Closes |
+|---|---|---|
+| 1. Visibility predicate (server) — **done** | `history_from`, the predicate, RLS, derived predicates, write guards, definer-gated `account_balance_on`, `update_account` stops writing the opening. No user-visible change. | #16 |
+| 2. Sync — **done** | Adjusted opening in `pull_changes`, re-stamp trigger, re-stamping of derived rows (share, tag link, category first used on a shared account), pull-completeness pgTAP | #9 |
+| 3. Fork — **done** | `detach_transfer_leg`, fork rewrite on the predicate, re-pairing, tags by name via `fork_tag_id`, rule copies paused, guard by foreign key, `net_worth_daily` removed (with KeepoCore's dead `refreshNetWorthDaily`/`netWorthSeries`) | #1, #7, #8 |
+| 4. Sharing API — **done** | `create_invite`/`accept_invite`/`share_account` history parameters, widen RPC, start-date calculation, cross-member transfer date rule, a partner's recurring rule cannot start before the start date, `preview_invite` shows each choice; the re-share upsert (`on conflict … set deleted_at = null`) must set `history_from` too, or a re-shared account keeps its old start date | — |
+| 5. Client — **done** | Local schema + `SyncApply` for `history_from`, post-pull purge, setup pickers, account screen (choice, labels, widen), partner date limit, the form refuses a move out of the household's view before saving (a pop-up with the server's sentence), referee fixture for a limited partner | — |
+| 6. Docs — **done** | `app-architecture.md`, a sentence under CLAUDE.md money rule 1 on the adjusted opening, version log + lessons | — |
+
+Human review stops after phases 2, 3 and 5 (phase 5 on two devices).
+
+**Phase 1 as built (20261009100000).** The boundary test lives once, in `transaction_shared_into(account, at)` — the household a live share reaches at that moment. `transaction_visible_to(user, account, at)` is the owner or a live member of that household. Both are internal, because they take any user. Policies and RPCs use self-scoped wrappers: `can_read_transaction(account, owner, at)` for existing rows (an unassigned capture stays its owner's), `can_place_transaction(account, at)` for creates and moves (live account, visible date — #16), and `assert_transaction_placeable`/`assert_transaction_date_visible` where an RPC needs a message. A transfer leg that stays put only needs its new date checked, so the anchor a deleted account keeps can still be edited from the live side. `can_read_tag` and `household_sharing_tag` go through the household, not ownership. That keeps a partner's tag out of the owner's list after an unshare, as before.
+- **Moved out of Phase 1:** `net_worth_daily` removal goes to Phase 3, because `fork_one_account` and `delete_own_account` both reference the table and are rewritten there anyway.
+- **Added to Phase 4:** the widen RPC calls `restamp_account_for_sync`, which since Phase 2 also re-sends tag links, tags, categories and rule tag links.
+- **Added to Phase 4:** the date limit on a partner's recurring rule. `next_due_at` is a date in the rule owner's zone, and the start date is set in the account owner's zone, so the comparison belongs with the start-date calculation. Until then, `materialize_recurring` would create a partner's backdated occurrences as the owner's rows, which the partner cannot see. That is harmless, and unreachable before Phase 4 lets a start date be set.
+
+**Phase 2 as built (20261010100000).** `account_balance_through(account, moment)` is the one statement of the balance formula. `account_balance_on` and the carried opening are both calls to it. `account_opening_as_seen` overlays the partner's opening and opening date onto the account row in `pull_changes`. Three things now re-send rows:
+- the transaction trigger `transactions_restamp_what_it_reveals` (the account, when a row before a start date moves; the category, when it first labels a household transaction);
+- the tag-link trigger (the tag);
+- `restamp_account_for_sync` (now also tag links, tags, categories and rule tag links).
+
+`begin_restamp`/`end_restamp` restore the `keepo.restamp_only` flag instead of resetting it.
+
+**Phase 3 as built (20261012100000, pgTAP 54).** `fork_accounts(account_ids)` is the one fork; `unshare_account` calls it with one account, and `fork_household_accounts(household)` (leave, erase, and so delete) with every live share. It never touches the owner's rows except to rebuild pairs and swap tags. Its steps:
+- A recipient (`fork_recipients`: the live member who is not the owner, for each live account) gets the account at `opening_seen_from` (the carried opening for a dated share; `account_opening_as_seen` now reads it too).
+- They also get its rules, paused, with a transfer rule copied only when both ends go to them.
+- They get the transactions `fork_copied_transactions` lists: visible to them, confirmed, live. A pending capture is left out, since it is the owner's purchase awaiting the owner's review.
+- Copies carry notes, titles, `original_*` and tags (`fork_tag_id`, by name, created if missing). Every copy id is `fork_copy_id(salt, original)`, so no lookup table is needed.
+- `fork_transfer_plan` is computed once, before anything moves: each person's halves of a touched pair (their originals plus the copies they get) form a pair when there are two, and a lone half is detached by `detach_transfer_leg`. A pair keeps its group when its sending half is an original, and otherwise takes the sending copy's id.
+- The registry is `fork_handled_columns`, checked by `unregistered_account_references` (foreign keys to `accounts(id)`, plus any `*account_id` column).
+
+Found while building, and fixed in the same migration:
+- **A partner's tag on the owner's row blocked the partner's account deletion** (reproduced): the owner's link held the tag's foreign key. `swap_in_own_tags` swaps such links for the owner's own tag of the same name, both at every fork and as `delete_own_account`'s backstop, alongside detaching older cross-owner transfer halves (#1). The link is soft-deleted, so the owner's phone hears about it; delete also hard-deletes tombstones that point at the leaver's tags. Categories cannot have the problem: `(category_id, owner_id)` is a foreign key, so a row on the owner's account always carries the owner's category (since 20261015100000 the server swaps a partner's shared category for the owner's counterpart).
+- **`erase_own_account` now bumps the remaining member's epoch.** They lose access to the eraser's accounts, as an unshare's partner does, and their phone kept showing them.
+- **`net_worth` and `accounts_with_balances.is_shared` counted ended shares.** The old fork's archive hid this; they now check `deleted_at is null`, as the phone's queries already did. KeepoCore's `fetchSharedAccountIds` (unused) still reads ended rows too.
+- **Test footguns** (for Phase 6's lessons):
+  - `set constraints all immediate` inside pgTAP's `lives_ok` stays in force after a later `rollback to savepoint`, so fire it at top level and follow with `pass()`.
+  - Never `create extension pgtap` in the local database by hand: it lands in `public`, which fails `01_grants_rls` and puts pgTAP's views into `supabase gen types`.
+- **Open observation for the user:** after an unshare, the partner keeps their copy. If the owner re-shares the same account later, the partner sees the original again alongside their copy, and their Total counts both. *Closed by 20261014100000 (below).*
+
+**Phase 4 as built (20261013100000, pgTAP 55).**
+- **Start date.** `share_start(owner)` is the start of today in the owner's zone, taken when the share is made, so an invite's accounts start on the day it is accepted.
+- **One way into a household.** `share_into_household(household, account, full_history)` is the only upsert: `share_account` and both sides of `accept_invite` call it, and it restamps.
+  - A share that had ended starts afresh with the requested date.
+  - A live share never narrows (the wider of old and new wins).
+- **Signatures.** The old ones are dropped and recreated with defaults, so the build already on a phone binds unchanged.
+  - `share_account(account, p_full_history default true)`.
+  - `create_invite(…, p_full_history_account_ids default null)`: null means every shared account gets full history. The choice is stored in the new `household_invites.full_history_account_ids`, and pending invites were backfilled to full history.
+  - `accept_invite(…, p_full_history_account_ids default null)`.
+  - `preview_invite` returns a `full_history` column (null on category rows).
+- **Widening.** `share_full_history(account)`, owner only, requires a live share, and restamps.
+- **Cross-member transfers.** `assert_transfer_seen_by_both`, called by `create_transfer` and `update_transfer`, refuses a pair across two owners unless both halves are `transaction_shared_into` at that date.
+- **A partner's recurring rule.** The trigger `recurring_rules_stay_in_view` sends a partner's write through `assert_transaction_date_visible` at the moment `materialize_recurring` would date the first occurrence. It checks only inserts, and updates that move the start, change an account or resume the rule. The owner, the scheduler (no user) and a fork (whose caller cannot read the copy's account) are exempt.
+- **Phase 5 needs from this:** `SyncApply`/the local schema carry `household_accounts.history_from`, and KeepoCore's invite-preview line decodes `full_history`.
+
+**Decided after Phase 4 — sharing an account again replaces the old copy (user's decision 2026-09-24; built as 20261014100000, pgTAP 56).** The partner is not asked anything. Keepo finds the copy they were handed when the account last left them and replaces it, so they only see the latest version.
+- `accounts.copied_from`, set by `fork_accounts`, is provenance only, with no foreign key. Copies made before 20261014100000 have none and are left alone.
+- `share_into_household` retires every live copy of the account owned by a member of the household it joins, the way `delete_account(p_cascade)` would. That cascade is now `retire_account_contents`, shared with `delete_account`.
+- The copy's transactions go, including anything the partner added after the unshare. A transfer half on the copy stays as an anchor while its other half is live, and its rules are paused.
+
+**Phase 5 as built (client; KeepoCore 372, app 268, lint clean).**
+- **Rules on the phone.** `SharedHistory` (KeepoCore) holds the server's three start-date rules and their exact sentences: a partner's date limit, the cross-member transfer rule, and the owner's move out of view. `AccountSharing` (owner, shared, start) is what it and `TransferPairing` read; `TransferPairing.Side` is now an alias.
+- **Local store.**
+  - `household_accounts.history_from` is added, with a v22 rebuild.
+  - `LocalAccountRow` carries `sharedFrom` and `openingBalanceAt`.
+  - `SyncApply.purgeHistoryBeforeShares` runs after every pull and deletes someone else's rows dated before a live share's start, with their tag links. It compares with `julianday`, because timestamps differ in offset and precision.
+  - The referee `LimitedPartnerRefereeTests` pins a partner's balance to pgTAP 52's 700,000.
+- **Setup.**
+  - An account that is switched on shows "Include past transactions", off by default.
+  - `HouseholdShareChoices` carries accounts, full-history accounts and categories through discovery, QR and the coordinator to `create_invite`/`accept_invite`.
+  - The intro's "Nothing is permanent" line describes the new fork.
+- **Sharing later.**
+  - Turning sharing on, on the account screen or the Household summary, asks "Share From Today" / "Include Past Transactions".
+  - The account screen shows where the household's view begins. The owner's day comes from their own zone; the partner's from their copy's `opening_balance_at`, because they cannot read the owner's zone.
+  - The owner can widen with "Include Past Transactions", and the confirmation says it cannot be undone.
+  - The unshare dialog is reworded for the new fork.
+  - Sharing failures show as pop-ups.
+- **Forms.**
+  - The transaction form's calendar and day arrows stop at the viewer's earliest date. For a cross-member transfer that is the later of both starts.
+  - Before saving, the form checks `SharedHistory.refusal` and shows the server's sentence as a pop-up, which covers capture review too.
+  - The recurring-rule calendar starts no earlier than the partner's opening day. It saves online, so any server refusal already arrives as a pop-up.
+- **Housekeeping.** `OutboxLocalWrite.updateAccount` no longer writes `opening_balance_e4`.
+- **Checked in the Simulator:** the intro and the picker's switches, with nothing created. Synthetic taps need a short press (`duration` 0.2) to flip a SwiftUI `Toggle`. The account-screen dialogs and the partner limits need a two-member household, which is the review.
+
+**Phase 5 review (2026-09-24, two Simulators on the local stack, dev users A and B).** All seven steps passed:
+- setup with the switch;
+- the partner's limited view and balance;
+- the owner's two refusals;
+- the cross-member transfer refusal;
+- widening;
+- unshare then re-share replacing the copy;
+- leaving.
+
+Fixed after the review, at the user's request:
+- **The partner could flip "Share with Household" on the owner's account.** They saw the owner's wording, then the raw server message. The switch is now the owner's only; the partner sees "Shared with Household" and where their view starts.
+- **Five texts still described the old fork** ("splits into two private copies…"): the leave confirmation, the member sheet's remove note, two info-sheet points and the "partner left" screen. All now say each keeps their own accounts plus a copy of what they could see.
+- **The back-a-day arrow did not look disabled at the start date.** It now uses `textTertiary` there.
+- **A partner could not add a transaction to the owner's shared account at all (pre-existing, also in HEAD d6aca76).** The app sent the partner as `owner_id`, but `(account_id, owner_id)` requires the account's owner, and `(category_id, owner_id)` the owner's category.
+  - The user chose: on someone else's account, offer only the categories shared with the household, plus Other (not auto-sharing a private category).
+  - Built as `owners_category` + `use_owners_category` (20261015100000, pgTAP 57). BEFORE triggers on `transactions` (`category_id`) and `recurring_rules` swap the viewer's category for the owner's counterpart: the owner's row in the same `shared_group_id`, or the owner's default of the same kind. They refuse a private one in plain words.
+  - Client: `AccountCategories` (KeepoCore) filters both forms' pickers per account and resolves a held owner's category when editing. `CreateTransactionPayload` gains `createdBy`, and the form sends the account's owner as `ownerId`. `RecurringRuleLocalWrite.insert` takes the owner from the account, as `set_recurring_rule_owner` does.
+
+Noted, not fixed:
+- The Household summary showed different counts on the two phones (A 4/2/0, B 4/1/2, true 2/1/0). First skipped, then **fixed at the user's request** (client only):
+  - The accounts and categories badges counted every listed row, including the viewer's own unshared ones with their switches off. That dated from the redesign fix that stopped "Nothing here." drawing over those rows, which gated the empty state on the same number. `HouseholdDisclosure` now takes `hasRows` for the empty state, and the badges count `sharedAccounts` and `sharedCategoryCount` (merged + extra groups).
+  - Tags counted every tag on the phone, so each phone counted its owner's private ones. The card now counts and lists "Shared tags": `LocalTableQueries.householdTags`, the second half of `can_read_tag` (a live link on a live transaction that `transaction_shared_into` places in the viewer's household, compared with `julianday`). The same set on both phones.
+  - The report's tags screen: the "Household tags" headline counts shared tags; its prune list still holds every tag the phone can see.
+- The transaction form's account menu can list two accounts with the same name.
+- `leave_household` ended both memberships but never soft-deleted the household. **Fixed at the user's request (20261016100000, pgTAP 58).**
+  - The trigger `household_members_close_an_empty_household` runs `close_household_when_empty` whenever a membership ends, by soft-delete or hard delete. It covers leave, discard, erase and delete.
+  - Once no live member is left, it soft-deletes the household and revokes its pending invites. Without that, `accept_invite` (which checks the invite, not the household) would still let someone join an empty household through an old invite.
+  - `delete_own_account` lost its inline copy of the step.
+  - The migration closes households that were already empty and revokes their pending invites.
+- Four pgTAP files (29, 30, 33, 37) counted rows across the whole table and failed once the local database held a household of its own. Each now counts only its fixture users' rows.
+
+Final counts: pgTAP 799 in 54 files, KeepoCore 377, app 275, lint clean.
+
+**Decided after Phase 2 — rows that leave a partner's view (user chose refusal, 2026-09-24; built as 20261011100000, pgTAP 53).** RLS hides a row the moment it leaves the partner's view, so the partner's device never hears about it again and keeps the stale copy. Two edits did it: moving a shared transaction to a private account (possible before this workstream too), and re-dating one to before the start date (worse: the re-sent carried opening already includes it, so it counts twice). The post-pull purge cannot catch either, because the stale copy keeps its old account and date.
+- **Built:** the `transactions_keep_shared_in_view` trigger refuses an update that takes a live row out of the household's view, on every write path, with a sentence telling the owner to delete it and add it again — a deletion stays in view, so the tombstone reaches the partner. Rows never in view move freely; so do rows moving within the same household's view.
+- **Consequence:** a capture that landed on a shared account can't be filed under a private one during review; the owner deletes it and adds it again. Phase 5 makes the form say so before saving.
+- *Rejected:* a `transaction_departures` table delivered through `pull_changes`.
+
 ## Known gaps this plan does not close
 
 - iOS 18.0 remains the declared minimum but is never executed (user's call). Surfaces at TestFlight if it bites.
@@ -458,6 +638,17 @@ Three items the user asked for together and approved item by item (A1–A2, B1�
 - Everything in Phase 20's device checklist (APNs, SIWA, TestFlight, `.biometryCurrentSet` invalidation, real file-protection ciphertext, MetricKit) is unverifiable until the paid membership exists — assumed to be after Phase 19 for planning purposes.
 
 ## Change log
+
+- **2026-09-24 (household sharing workstream — done, deployed)** — Findings #1–#16 and the cross-cutting outbox fix, plus Phases 1–6, as recorded in the "Transfers & household sharing" section. Migrations 20261006100000–20261016100000 and pgTAP 51–58. The user decided five things during the build:
+  - refuse moves out of a partner's view (option B);
+  - re-sharing replaces the old copy without asking;
+  - a partner on the owner's account is offered shared categories and Other only;
+  - the three post-review fixes;
+  - fixing the summary counts (first skipped): badges count only what is shared, and tags are shared by use.
+
+  Two-device review on two Simulators. Committed on `dev`; the migrations were pushed to hosted with the user's approval, and hosted matches them. Log: `version-logs/household-sharing-2026-09-24-log.md`.
+
+- **2026-09-23 (transfer review → household sharing workstream, planned)** — Review only, no code. Sixteen transfer findings plus a cross-cutting outbox issue, recorded in the new "Transfers & household sharing" workstream section, where they await the user's selection. The user decided: tags stay on the outflow half (#14); the fork is rewritten so the owner keeps originals and only the member losing access gets a copy; and a new per-account "Include past transactions" choice (off by default, start of the share day in the owner's zone, widen-only, rules visible, no brought-forward line), built on one visibility predicate shared with the fork.
 
 - **2026-09-20 (transaction form — the date moved to the middle, the pending badge became a band)** — Client only, no migration, two user-requested changes to `TransactionFormView`'s card. **(1) The date is now a stepper.** The pill sits centred at the top of the card with a chevron at each end of the row, so ±1 day — which is what almost every date correction is — costs one tap instead of opening a month grid to tap the cell beside the one already selected. Both directions are unbounded, matching the picker behind the pill, because the ledger holds future rows. The chevrons take `hitTarget()` rather than a 44pt frame so the header keeps its height, and they carry their own haptic counter (`dateSteps`) rather than observing `occurredAt`, which the seed and the edit prefill also set — observing the value would buzz on every open. **(2) `PendingBadge` is gone from the form**, replaced by `PendingEdgeStrip`: a full-bleed band across the top edge of the card, the badge's own wash (`brandPrimary` at `Opacity.fill`) with "Pending" centred in it. The badge stays in the ledger, where a row has neighbours and has to distinguish itself from them; on the form the fact belongs to the whole entry, and the badge was standing where the stepper now is. **The defect worth keeping:** the first version was an overlay — the card's own `RoundedRectangle` with only its *drawing* masked to the top few points, so the band would taper into the corners. A mask does not narrow hit testing, so that overlay silently ate **every tap on the card** of a pending transaction: chevrons, category tiles, amount, all of it, with nothing on screen to suggest why. Found by tapping, not by reading — the build was clean and the screenshot was correct. The band is now composed in the card's stack and the card clips it, which removes the hazard rather than patching it. 302 `swift test`, 239 `KeepoTests`, build and strict lint clean; both forms (pending and new) walked in the Simulator.
 

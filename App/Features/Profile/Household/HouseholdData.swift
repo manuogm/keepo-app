@@ -39,7 +39,12 @@ struct HouseholdSnapshot {
     /// Your own unshared categories, for the summary's toggles.
     var privateCategories: [PublicSchema.CategoriesSelect] = []
 
+    /// Every tag this phone can see: yours, shared or not, and theirs on
+    /// what the household sees. What the report's prune list works from.
     var tags: [PublicSchema.TagsSelect] = []
+    /// The tags the household sees, the same set on both phones
+    /// (`LocalTableQueries.householdTags`). What "shared tags" counts.
+    var householdTags: [PublicSchema.TagsSelect] = []
 
     var hasHousehold: Bool { household != nil }
 
@@ -51,6 +56,9 @@ struct HouseholdSnapshot {
 
     var everydayCount: Int { sharedAccounts.filter { $0.kind == .regular }.count }
     var investmentCount: Int { sharedAccounts.filter { $0.kind == .investment }.count }
+
+    /// One per shared group, merged or not, both kinds.
+    var sharedCategoryCount: Int { mergedCategories.count + extraCategories.count }
 
     func merged(_ kind: PublicSchema.CategoryKind) -> [HouseholdMergedCategory] {
         mergedCategories.filter { $0.kind == kind }
@@ -175,6 +183,7 @@ enum HouseholdDataLoader {
         (snapshot.mergedCategories, snapshot.extraCategories) = split(categories, viewer: viewer)
 
         snapshot.tags = try LocalTableQueries.tags(database)
+        snapshot.householdTags = try LocalTableQueries.householdTags(database, viewerId: viewer.uuidString)
         return snapshot
     }
 

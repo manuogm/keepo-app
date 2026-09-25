@@ -21,8 +21,7 @@ struct HouseholdDiscoveryView: View {
     let session: SessionStore
     let avatars: AvatarStore
     let role: HouseholdPairingIdentity.Role
-    let accountIds: [UUID]
-    let categoryIds: [UUID]
+    let choices: HouseholdShareChoices
     var onBuilt: () -> Void
 
     /// Long enough that a working pairing almost always lands first — a
@@ -63,8 +62,7 @@ struct HouseholdDiscoveryView: View {
             HouseholdQRView(
                 session: session,
                 role: role,
-                accountIds: accountIds,
-                categoryIds: categoryIds,
+                choices: choices,
                 onJoined: {
                     isShowingQR = false
                     onBuilt()
@@ -309,8 +307,7 @@ struct HouseholdDiscoveryView: View {
 
         let pairing = HouseholdPairingSession(identity: identity)
         let coordinator = HouseholdSetupCoordinator(
-            session: session, pairing: pairing, role: role,
-            accountIds: accountIds, categoryIds: categoryIds
+            session: session, pairing: pairing, role: role, choices: choices
         )
         self.pairing = pairing
         self.coordinator = coordinator

@@ -31,6 +31,8 @@ struct TransactionsListView: View {
     // Not `private` — read/written from TransactionsListView+Loading.swift,
     // an extension in a different file (kept there purely for file-length).
     @State var transactions: [PublicSchema.TransactionsWithDetailsSelect] = []
+    /// Transfers this device holds both halves of — see `canDelete(_:)`.
+    @State var completeTransferGroups: Set<UUID> = []
     @State var isLoading = true
     @State var loadErrorMessage: String?
     @State var filterCategories: [PublicSchema.CategoriesSelect] = []
@@ -150,7 +152,7 @@ struct TransactionsListView: View {
                 }
             }
             .sheet(item: $editingTransaction) { transaction in
-                TransactionFormView(session: session, mode: .edit(transaction, sibling: sibling(of: transaction))) {
+                TransactionFormView(session: session, mode: .edit(transaction)) {
                     session.refresh.bump()
                 }
             }
@@ -302,6 +304,10 @@ struct TransactionsListView: View {
                                 .tint(AppTheme.Palette.textPrimary)
                             }
                         }
+                        // Half of a transfer whose other half is on an account
+                        // this viewer cannot see: `delete_transfer` would
+                        // refuse it, so the swipe is not offered at all.
+                        .deleteDisabled(!canDelete(entry))
                     }
                     .onDelete { offsets in
                         Task { await delete(at: offsets, in: group.items.map(\.transaction)) }
@@ -355,13 +361,6 @@ struct TransactionsListView: View {
     }
 
     // MARK: - Transaction helpers
-
-    func sibling(
-        of transaction: PublicSchema.TransactionsWithDetailsSelect
-    ) -> PublicSchema.TransactionsWithDetailsSelect? {
-        guard let groupId = transaction.transferGroupId else { return nil }
-        return transactions.first { $0.transferGroupId == groupId && $0.transactionId != transaction.transactionId }
-    }
 
     private func handleTap(on transaction: PublicSchema.TransactionsWithDetailsSelect) {
         if transaction.recurringRuleId != nil {

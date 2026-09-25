@@ -70,13 +70,13 @@ enum LocalMoneyConversion {
         return LocalFxConvert.convert(amountE4, from: from, to: toCurrency, rates: rates)
     }
 
-    // MARK: - net_worth(scope) / net_worth_series
+    // MARK: - net_worth(scope), at any date
 
     /// Port of `net_worth(p_scope)` at an arbitrary date — server-side this
     /// is always "today". L4 generalized it because the dashboard needs the
-    /// same computation at each bucket's end and there is no on-device
-    /// `net_worth_daily` to read instead (the plan's explicit call: a local
-    /// store can afford to recompute).
+    /// same computation at each bucket's end, and recomputing is the plan's
+    /// explicit call over caching daily figures (the server's
+    /// `net_worth_daily` cache went unused and was removed in 20261012100000).
     static func netWorth(
         _ database: Database, _ moneyScope: LocalMoneyScope, asOf: String, now: Date,
         cache: LocalFxCache? = nil

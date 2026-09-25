@@ -73,6 +73,13 @@ extension ConflictDetailSheet {
             couldNotReachServer = true
             return
         }
+        // What the rejected write actually said, when the conflict kept it —
+        // not this device's copy, which a pull may already have overwritten
+        // and which never held a delete at all.
+        if let attempted = detail?.attemptedWrite {
+            fields = attemptedFields(attempted, server: server)
+            return
+        }
         guard let mine = myTransaction else { return }
         var built: [ConflictField] = []
         let mineAmount = formattedAmount(mine)
@@ -127,6 +134,20 @@ extension ConflictDetailSheet {
                     id: myAccount.id, expectedVersion: freshVersion, archived: myAccount.archivedAt != nil
                 )
             ).value
+        } else if let attempted = detail.attemptedWrite, let rowId = UUID(uuidString: detail.rowId) {
+            // Replayed through the same call it was, whatever kind it was —
+            // including a transfer, which the rebuild below could never
+            // express (it needs a category) and so used to skip before
+            // marking the conflict resolved.
+            let replayed = await attempted.replay(
+                rowId: rowId, rowVersion: await localRowVersion(detail),
+                legVersions: await legVersions(attempted.transferGroupId), outbox: session.outbox
+            )
+            guard replayed else {
+                errorMessage = "Your version can't be applied any more — this transaction has since been deleted."
+                isWorking = false
+                return
+            }
         } else if let myTransaction, let id = myTransaction.transactionId, let categoryId = myTransaction.categoryId {
             _ = await session.outbox.submitUpdateTransaction(
                 UpdateTransactionPayload(
@@ -146,13 +167,64 @@ extension ConflictDetailSheet {
     /// After the pull above, the local row's own `version` IS the server's
     /// current one — no separate network round trip needed to learn it.
     func currentServerVersion(_ detail: SyncConflictDetail) async -> Int {
-        let fresh: Int? = try? await session.dbQueue.read { database in
+        await localRowVersion(detail) ?? detail.serverVersion
+    }
+
+    /// `nil` when the row is no longer on this device.
+    func localRowVersion(_ detail: SyncConflictDetail) async -> Int? {
+        try? await session.dbQueue.read { database in
             if detail.tableName == "accounts" {
                 return try LocalTableQueries.account(database, id: detail.rowId).map { Int($0.version) }
             }
             return try LocalTableQueries.transaction(database, id: detail.rowId).map { Int($0.version) }
         }
-        return fresh ?? detail.serverVersion
+    }
+
+    /// Both halves' versions as they are now, for replaying a transfer
+    /// write. `nil` unless the device holds both.
+    func legVersions(_ transferGroupId: UUID?) async -> (from: Int, to: Int)? {
+        guard let transferGroupId, let ownerId = session.profile?.id,
+              let baseCurrency = session.profile?.baseCurrency else { return nil }
+        let legs = (try? await session.dbQueue.read { database in
+            try LocalTransactionRow.fetchByTransferGroup(
+                database, transferGroupId: transferGroupId.uuidString, baseCurrency: baseCurrency,
+                ownerId: ownerId.uuidString
+            )
+        }) ?? []
+        guard
+            let from = legs.first(where: { ($0.amountE4 ?? 0) < 0 })?.version,
+            let destination = legs.first(where: { ($0.amountE4 ?? 0) > 0 })?.version
+        else { return nil }
+        return (Int(from), Int(destination))
+    }
+
+    /// The diff for a conflict that kept its attempted write: amount and date
+    /// against the server's row, and — for a delete, which changes neither —
+    /// a line saying that the change was a delete.
+    func attemptedFields(
+        _ attempted: AttemptedTransactionWrite, server: PublicSchema.TransactionsWithDetailsSelect
+    ) -> [ConflictField] {
+        if attempted.rpc == "delete_transaction" || attempted.rpc == "delete_transfer" {
+            return [ConflictField(label: "Change", mine: "Delete", server: "Keep")]
+        }
+        var built: [ConflictField] = []
+        let serverAmount = formattedAmount(server)
+        if let amount = attempted.attemptedAmountE4, let currency = attempted.currency ?? server.currency {
+            let mineAmount = MoneyFormatter.format(
+                amount, currency: CurrencyInfo(code: currency, minorUnit: Int(server.minorUnit ?? 2))
+            )
+            if mineAmount != serverAmount {
+                built.append(ConflictField(label: "Amount", mine: mineAmount, server: serverAmount))
+            }
+        }
+        if let date = attempted.occurredAtDate {
+            let mineDate = date.formatted(date: .abbreviated, time: .shortened)
+            let serverDate = formattedDate(server.occurredAt)
+            if mineDate != serverDate {
+                built.append(ConflictField(label: "Date", mine: mineDate, server: serverDate))
+            }
+        }
+        return built
     }
 
     func resolve(_ detail: SyncConflictDetail) async {

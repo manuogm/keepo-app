@@ -11,12 +11,18 @@ public enum HouseholdRepository {
     /// is created: until somebody accepts there is nobody to share with, and
     /// an invite that quietly changed the inviter's data before anyone used
     /// it would be a surprise the day it expired unused.
+    ///
+    /// `fullHistoryAccountIds` are the shared accounts that come with every
+    /// past transaction; the rest are shared from the day the invite is
+    /// accepted.
     public static func createInvite(
-        client: SupabaseClient, accountIds: [UUID] = [], categoryIds: [UUID] = []
+        client: SupabaseClient, accountIds: [UUID] = [], categoryIds: [UUID] = [], fullHistoryAccountIds: [UUID] = []
     ) async throws -> String {
         try await client.rpc(
             "create_invite",
-            params: InviteSelectionParams(accountIds: accountIds, categoryIds: categoryIds)
+            params: InviteSelectionParams(
+                accountIds: accountIds, categoryIds: categoryIds, fullHistoryAccountIds: fullHistoryAccountIds
+            )
         ).execute().value
     }
 
@@ -32,11 +38,15 @@ public enum HouseholdRepository {
     /// the invitee's from these arguments.
     @discardableResult
     public static func acceptInvite(
-        client: SupabaseClient, token: String, accountIds: [UUID] = [], categoryIds: [UUID] = []
+        client: SupabaseClient, token: String, accountIds: [UUID] = [], categoryIds: [UUID] = [],
+        fullHistoryAccountIds: [UUID] = []
     ) async throws -> UUID {
         try await client.rpc(
             "accept_invite",
-            params: AcceptInviteParams(token: token, accountIds: accountIds, categoryIds: categoryIds)
+            params: AcceptInviteParams(
+                token: token, accountIds: accountIds, categoryIds: categoryIds,
+                fullHistoryAccountIds: fullHistoryAccountIds
+            )
         ).execute().value
     }
 
@@ -50,10 +60,9 @@ public enum HouseholdRepository {
         try await client.rpc("unshare_category", params: CategoryIdParam(categoryId: categoryId)).execute()
     }
 
-    /// Forks every account shared in the caller's household into two fresh,
-    /// private copies (one per member) and removes only the caller's own
-    /// membership — see the migration's own header for why this is a split,
-    /// not a transfer of ownership.
+    /// Ends the household. Each member keeps their own accounts as they are,
+    /// and is handed a copy of what they could see of the other's
+    /// (20261012100000).
     public static func leave(client: SupabaseClient) async throws {
         try await client.rpc("leave_household").execute()
     }
@@ -128,8 +137,18 @@ public enum HouseholdRepository {
         try await client.rpc("create_household").execute().value
     }
 
-    public static func share(client: SupabaseClient, accountId: UUID) async throws {
-        try await client.rpc("share_account", params: AccountIdParam(accountId: accountId)).execute()
+    /// `fullHistory` false shares the account from the start of today; true
+    /// shares every past transaction too.
+    public static func share(client: SupabaseClient, accountId: UUID, fullHistory: Bool) async throws {
+        try await client.rpc(
+            "share_account", params: ShareAccountParams(accountId: accountId, fullHistory: fullHistory)
+        ).execute()
+    }
+
+    /// Turns a share that began on a date into one with full history. There
+    /// is no way back: narrowing a share is not offered.
+    public static func shareFullHistory(client: SupabaseClient, accountId: UUID) async throws {
+        try await client.rpc("share_full_history", params: AccountIdParam(accountId: accountId)).execute()
     }
 
     public static func unshare(client: SupabaseClient, accountId: UUID) async throws {
@@ -142,47 +161,6 @@ public enum HouseholdRepository {
     /// itself is what tells the two apart, not this call site.
     public static func netWorth(client: SupabaseClient, scope: PublicSchema.AccountScope) async throws -> Int64? {
         try await client.rpc("net_worth", params: ScopeParam(scope: scope)).execute().value
-    }
-
-    /// No `pg_cron` exists yet (Phase 13) — the client refreshes its own
-    /// window before reading the trajectory. `p_user` must be the caller's
-    /// own id; the RPC itself enforces that.
-    public static func refreshNetWorthDaily(
-        client: SupabaseClient, userId: UUID, from: Date, through: Date
-    ) async throws {
-        let params = RefreshNetWorthDailyParams(
-            userId: userId,
-            from: PostgresDate.dateOnlyString(from),
-            through: PostgresDate.dateOnlyString(through)
-        )
-        try await client.rpc("refresh_net_worth_daily", params: params).execute()
-    }
-
-    /// One point per day that has data — a day with no accounts in scope
-    /// simply isn't in the result (see the RPC's own doc comment); `total`
-    /// is `nil` for a day with an unconvertible account in scope, never a
-    /// silently-partial sum (money rule 5).
-    public static func netWorthSeries(
-        client: SupabaseClient,
-        scope: PublicSchema.AccountScope,
-        from: Date,
-        through: Date
-    ) async throws -> [NetWorthPoint] {
-        let params = NetWorthSeriesParams(
-            scope: scope,
-            from: PostgresDate.dateOnlyString(from),
-            through: PostgresDate.dateOnlyString(through)
-        )
-        return try await client.rpc("net_worth_series", params: params).execute().value
-    }
-}
-
-public struct NetWorthPoint: Decodable, Sendable {
-    public let asOf: String
-    public let totalE4: Int64?
-    enum CodingKeys: String, CodingKey {
-        case asOf = "as_of"
-        case totalE4 = "total_e4"
     }
 }
 
@@ -223,28 +201,6 @@ private struct ScopeParam: Encodable {
     }
 }
 
-private struct RefreshNetWorthDailyParams: Encodable {
-    let userId: UUID
-    let from: String
-    let through: String
-    enum CodingKeys: String, CodingKey {
-        case userId = "p_user"
-        case from = "p_from"
-        case through = "p_to"
-    }
-}
-
-private struct NetWorthSeriesParams: Encodable {
-    let scope: PublicSchema.AccountScope
-    let from: String
-    let through: String
-    enum CodingKeys: String, CodingKey {
-        case scope = "p_scope"
-        case from = "p_from"
-        case through = "p_to"
-    }
-}
-
 /// One line of `preview_invite`: an account name, or a category name and its
 /// kind. Exactly one of the two is non-nil per row — the RPC unions two
 /// selects, because "what am I being given" is one list to the person reading
@@ -253,20 +209,25 @@ public struct InvitePreviewRow: Decodable, Hashable, Sendable {
     public let accountName: String?
     public let categoryName: String?
     public let categoryKind: PublicSchema.CategoryKind?
+    /// On an account line: whether it comes with its past transactions.
+    public let fullHistory: Bool?
 
     enum CodingKeys: String, CodingKey {
         case accountName = "account_name"
         case categoryName = "category_name"
         case categoryKind = "category_kind"
+        case fullHistory = "full_history"
     }
 }
 
 private struct InviteSelectionParams: Encodable {
     let accountIds: [UUID]
     let categoryIds: [UUID]
+    let fullHistoryAccountIds: [UUID]
     enum CodingKeys: String, CodingKey {
         case accountIds = "p_share_account_ids"
         case categoryIds = "p_share_category_ids"
+        case fullHistoryAccountIds = "p_full_history_account_ids"
     }
 }
 
@@ -274,10 +235,21 @@ private struct AcceptInviteParams: Encodable {
     let token: String
     let accountIds: [UUID]
     let categoryIds: [UUID]
+    let fullHistoryAccountIds: [UUID]
     enum CodingKeys: String, CodingKey {
         case token = "p_token"
         case accountIds = "p_share_account_ids"
         case categoryIds = "p_share_category_ids"
+        case fullHistoryAccountIds = "p_full_history_account_ids"
+    }
+}
+
+private struct ShareAccountParams: Encodable {
+    let accountId: UUID
+    let fullHistory: Bool
+    enum CodingKeys: String, CodingKey {
+        case accountId = "p_account_id"
+        case fullHistory = "p_full_history"
     }
 }
 

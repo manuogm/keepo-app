@@ -42,18 +42,55 @@ extension View {
     }
 
     /// Turning sharing off is not the inverse of turning it on: server-side,
-    /// `unshare_account` forks the account into an independent copy for the
-    /// other household member (migration 20260816100000). They keep
-    /// everything; what ends is the two of you seeing the same account. That
-    /// is a surprising enough outcome to spell out.
+    /// `unshare_account` hands the other household member a copy of what they
+    /// could see (20261012100000), and sharing again later replaces that copy
+    /// (20261014100000). That is a surprising enough outcome to spell out.
     func unshareConfirmation(isPresented: Binding<Bool>, onConfirm: @escaping () -> Void) -> some View {
         confirmationDialog("Stop sharing this account?", isPresented: isPresented, titleVisibility: .visible) {
             Button("Stop Sharing", role: .destructive, action: onConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(
-                "Your household member keeps their own independent copy of this account and its "
-                    + "transactions. Nothing is lost, but the two copies stop staying in step."
+                "Your account stays exactly as it is. Your household member keeps a copy of what they could "
+                    + "see, which is replaced if you share this account again."
+            )
+        }
+    }
+
+    /// Sharing an account asks how much of it: from today, or its past too —
+    /// the same question the household setup asks with a switch under each
+    /// account (user's decision, 2026-09-23). "From today" comes first because
+    /// it is the default everywhere else.
+    ///
+    /// Two buttons rather than a switch and a Share button: there is no third
+    /// state, and the choice *is* the action.
+    func shareAccountDialog(
+        accountName: String, isPresented: Binding<Bool>, onShare: @escaping (_ fullHistory: Bool) -> Void
+    ) -> some View {
+        confirmationDialog(
+            "Share \"\(accountName)\" with your household?", isPresented: isPresented, titleVisibility: .visible
+        ) {
+            Button("Share From Today") { onShare(false) }
+            Button("Include Past Transactions") { onShare(true) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "From today, your household sees this account's new transactions and its past stays private. "
+                    + "You can include the past later, but not hide it again."
+            )
+        }
+    }
+
+    /// Widening a share that began on a date. It has no way back — narrowing
+    /// a share is not offered — so it says so.
+    func includePastConfirmation(isPresented: Binding<Bool>, onConfirm: @escaping () -> Void) -> some View {
+        confirmationDialog("Include past transactions?", isPresented: isPresented, titleVisibility: .visible) {
+            Button("Include Past Transactions", action: onConfirm)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Your household will see every transaction on this account, not only those since you shared it. "
+                    + "This can't be undone."
             )
         }
     }

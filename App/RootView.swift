@@ -90,6 +90,22 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(appearanceMode.colorScheme)
+        // A write the server refused outright. The outbox no longer retries
+        // one forever (it cannot succeed), so this alert is the only place
+        // the user learns their change did not stick — and that what they
+        // see now is what the server has.
+        .errorAlert(Binding(
+            get: {
+                session.outbox.refusal.map {
+                    ActionError(
+                        title: "Couldn't Save a Change",
+                        message: $0.message + "\n\nThe change wasn't saved, and Keepo is showing what the "
+                            + "server has instead."
+                    )
+                }
+            },
+            set: { if $0 == nil { session.outbox.dismissRefusal() } }
+        ))
         .task { await session.start() }
         .onOpenURL { url in
             // Capture setup's `x-callback-url` answer comes back on the

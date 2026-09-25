@@ -80,7 +80,8 @@ struct HouseholdSetupFlow: View {
         HouseholdAccountPicker(
             accounts: model.accounts,
             isLoaded: model.isLoaded,
-            selection: Bindable(model).selectedAccountIds
+            selection: Bindable(model).selectedAccountIds,
+            fullHistory: Bindable(model).fullHistoryAccountIds
         ) {
             HouseholdFlowBar(nextTitle: "Next") { path.append(.categories) }
         }
@@ -107,8 +108,7 @@ struct HouseholdSetupFlow: View {
             session: session,
             avatars: avatars,
             role: role,
-            accountIds: Array(model.selectedAccountIds),
-            categoryIds: Array(model.selectedCategoryIds),
+            choices: model.choices,
             onBuilt: {
                 onBuilt()
                 dismiss()

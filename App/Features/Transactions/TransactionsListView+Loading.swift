@@ -25,18 +25,23 @@ extension TransactionsListView {
         }()
         do {
             let loaded: LoadedTransactionsState = try await dbQueue.read { database in
-                LoadedTransactionsState(
-                    transactions: try LocalTransactionRow.fetchFiltered(
-                        database, filter: effectiveFilter, scope: scope, baseCurrency: baseCurrency,
-                        ownerId: ownerId.uuidString
-                    ),
+                let transactions = try LocalTransactionRow.fetchFiltered(
+                    database, filter: effectiveFilter, scope: scope, baseCurrency: baseCurrency,
+                    ownerId: ownerId.uuidString
+                )
+                return LoadedTransactionsState(
+                    transactions: transactions,
                     categories: try LocalTableQueries.categories(database, ownerId: ownerId.uuidString),
                     accounts: try LocalAccountRow.fetchAll(
                         database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency
+                    ),
+                    completeTransferGroups: try LocalTransactionRow.completeTransferGroups(
+                        database, among: Array(Set(transactions.compactMap { $0.transferGroupId?.uuidString }))
                     )
                 )
             }
             transactions = loaded.transactions
+            completeTransferGroups = Set(loaded.completeTransferGroups.compactMap(UUID.init(uuidString:)))
             filterCategories = loaded.categories
             filterAccounts = loaded.accounts
             // Day grouping and the category lookup are derived here, once,
@@ -68,12 +73,13 @@ extension TransactionsListView {
         for index in offsets {
             let transaction = list[index]
             guard let id = transaction.transactionId, let version = transaction.version else { continue }
-            if let groupId = transaction.transferGroupId, let siblingVersion = sibling(of: transaction)?.version {
-                let payload = DeleteTransferPayload(
-                    transferGroupId: groupId,
-                    fromExpectedVersion: (transaction.amountE4 ?? 0) < 0 ? Int(version) : Int(siblingVersion),
-                    toExpectedVersion: (transaction.amountE4 ?? 0) < 0 ? Int(siblingVersion) : Int(version)
-                )
+            if let groupId = transaction.transferGroupId {
+                // Both halves, read from the database — never from the rows
+                // on screen, which hold only one half whenever a filter or a
+                // scope hides the other. A half with no findable partner is
+                // not deleted at all (`canDelete` also withholds the swipe):
+                // `delete_transaction` refuses a transfer leg.
+                guard let payload = await transferDeletion(groupId: groupId) else { continue }
                 await session.outbox.submitDeleteTransfer(payload)
             } else {
                 let payload = DeleteTransactionPayload(id: id, expectedVersion: Int(version))
@@ -81,6 +87,31 @@ extension TransactionsListView {
             }
         }
         session.refresh.bump()
+    }
+
+    /// Whether a ledger entry can be swiped away. Everything can except half
+    /// of a transfer this device does not hold the other half of — that
+    /// half is on a household member's private account, and only they can
+    /// delete the transfer.
+    func canDelete(_ entry: TransactionEntry) -> Bool {
+        guard let groupId = entry.transaction.transferGroupId, entry.counterpart == nil else { return true }
+        return completeTransferGroups.contains(groupId)
+    }
+
+    private func transferDeletion(groupId: UUID) async -> DeleteTransferPayload? {
+        guard let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency else { return nil }
+        let legs = (try? await session.dbQueue.read { database in
+            try LocalTransactionRow.fetchByTransferGroup(
+                database, transferGroupId: groupId.uuidString, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
+            )
+        }) ?? []
+        guard
+            let fromVersion = legs.first(where: { ($0.amountE4 ?? 0) < 0 })?.version,
+            let toVersion = legs.first(where: { ($0.amountE4 ?? 0) > 0 })?.version
+        else { return nil }
+        return DeleteTransferPayload(
+            transferGroupId: groupId, fromExpectedVersion: Int(fromVersion), toExpectedVersion: Int(toVersion)
+        )
     }
 
     /// The Transactions screen's own quick "Confirm" swipe action — an
@@ -102,6 +133,7 @@ private struct LoadedTransactionsState {
     let transactions: [PublicSchema.TransactionsWithDetailsSelect]
     let categories: [PublicSchema.CategoriesSelect]
     let accounts: [LocalAccountRow]
+    let completeTransferGroups: Set<String>
 }
 
 /// What `load()` re-runs on — the list's `.task(id:)` key. Beside `load()`

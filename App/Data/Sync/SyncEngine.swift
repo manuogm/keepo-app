@@ -56,6 +56,19 @@ public final class SyncEngine {
     /// overlap — while making the await mean what every call site reads it
     /// as meaning.
     public func pull() async {
+        await chained { try await $0.pullOnce() }
+    }
+
+    /// Throws the mirror away and pulls everything again — the answer to the
+    /// one thing an incremental pull cannot repair: an optimistic local write
+    /// the server refused. The server's rows never changed, so nothing about
+    /// them is past any cursor and no ordinary pull would ever resend them.
+    /// Chained with `pull()`, so the two never overlap.
+    public func resync() async {
+        await chained { try await $0.pullFromScratch() }
+    }
+
+    private func chained(_ work: @escaping @MainActor (SyncEngine) async throws -> Void) async {
         let previous = chain
         let task = Task { @MainActor [weak self] in
             await previous?.value
@@ -63,7 +76,7 @@ public final class SyncEngine {
             self.isSyncing = true
             defer { self.isSyncing = false }
             do {
-                try await self.pullOnce()
+                try await work(self)
                 self.lastErrorMessage = nil
             } catch {
                 self.lastErrorMessage = UserFacingError.describe(error)
@@ -95,7 +108,10 @@ public final class SyncEngine {
             try await applyAndSave(result)
             return
         }
+        try await pullFromScratch()
+    }
 
+    private func pullFromScratch() async throws {
         try await dbQueue.write { database in try SyncApply.wipeServerDerivedTables(database) }
         SyncCursorStore.reset(for: userId)
         let freshResult = try await puller.pullChanges(cursor: 0, globalCursor: 0)
@@ -103,7 +119,11 @@ public final class SyncEngine {
     }
 
     private func applyAndSave(_ result: PullChangesResult) async throws {
-        try await dbQueue.write { database in try SyncApply.apply(result.payload, in: database) }
+        let userId = userId
+        try await dbQueue.write { database in
+            try SyncApply.apply(result.payload, in: database)
+            try SyncApply.purgeHistoryBeforeShares(viewerId: userId, in: database)
+        }
         SyncCursorStore.save(
             cursor: result.nextCursor, globalCursor: result.nextGlobalCursor, epoch: result.syncEpoch, for: userId
         )

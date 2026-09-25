@@ -77,7 +77,9 @@ extension TransactionFormView {
             amountText: amountText,
             kind: recurringKind,
             startingOn: occurredAt,
-            title: title
+            title: title,
+            notes: notes,
+            tagIds: selectedTagIds
         )
     }
 

@@ -67,7 +67,7 @@ extension AccountFormView {
         loadedBalanceText = balanceText
     }
 
-    private func loadSharedState(accountId: UUID) async {
+    func loadSharedState(accountId: UUID) async {
         guard let ownerId = session.profile?.id.uuidString else { return }
         let row = (try? await session.dbQueue.read { database -> PublicSchema.HouseholdAccountsSelect? in
             guard let household = try LocalTableQueries.myHousehold(database, userId: ownerId) else { return nil }
@@ -77,6 +77,24 @@ extension AccountFormView {
         }) ?? nil
         isShared = row != nil
         sharedAt = row?.sharedAt
+        sharedFrom = row?.historyFrom.flatMap(PostgresDate.date(fromTimestamp:))
+    }
+
+    var isOwner: Bool { editingOwnerId == nil || editingOwnerId == session.profile?.id }
+
+    /// The day the household's view begins, as the owner's calendar has it.
+    /// The owner reads it off the start in their own time zone; a partner,
+    /// who cannot read the owner's time zone, off the opening date the
+    /// server gave their copy of the account (`account_opening_as_seen`) —
+    /// formatting the start in the partner's own zone could land a day early.
+    var sharedFromLabel: String? {
+        guard isShared, let sharedFrom else { return nil }
+        if isOwner { return sharedFrom.formatted(date: .abbreviated, time: .omitted) }
+        guard let opening = loadedOpeningBalanceAt,
+              let day = PostgresDate.dateOnly(from: String(opening.prefix(10)), calendar: utcCalendar) else {
+            return sharedFrom.formatted(date: .abbreviated, time: .omitted)
+        }
+        return PostgresDate.dateOnlyLabel(day, calendar: utcCalendar, template: "dMMMy")
     }
 
     /// Shared by the initial edit-mode prefill and by a post-conflict reload.
@@ -95,6 +113,8 @@ extension AccountFormView {
         icon = account.icon
         color = Color(hex: account.color)
         loadedOpeningBalanceE4 = account.openingBalanceE4
+        loadedOpeningBalanceAt = account.openingBalanceAt
+        editingOwnerId = account.ownerId
     }
 }
 
@@ -209,22 +229,42 @@ extension AccountFormView {
 
     /// Online-only, and deliberately not routed through the outbox: both
     /// RPCs re-derive household membership server-side at the moment they
-    /// run, and `unshare_account` forks the account for the other member —
-    /// neither is something a queued write should replay days later against
-    /// a household that may have changed underneath it.
-    func setShared(_ shared: Bool) async {
+    /// run, and `unshare_account` hands the other member a copy of the
+    /// account — neither is something a queued write should replay days
+    /// later against a household that may have changed underneath it.
+    ///
+    /// Pulls before re-reading, so the start date the server just chose is
+    /// on screen when the dialog closes rather than on the next visit.
+    func setShared(_ shared: Bool, fullHistory: Bool = false) async {
+        guard let id = editingId else { return }
         isSaving = true
-        errorMessage = nil
         do {
             if shared {
-                try await HouseholdRepository.share(client: session.client, accountId: editingId ?? UUID())
+                try await HouseholdRepository.share(client: session.client, accountId: id, fullHistory: fullHistory)
             } else {
-                try await HouseholdRepository.unshare(client: session.client, accountId: editingId ?? UUID())
+                try await HouseholdRepository.unshare(client: session.client, accountId: id)
             }
             isShared = shared
+            await session.syncNow()
+            await loadSharedState(accountId: id)
             session.refresh.bump()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError(shared ? "Couldn't Share Account" : "Couldn't Stop Sharing", error)
+        }
+        isSaving = false
+    }
+
+    /// Widens a share that began on a date to the account's whole history.
+    func includePastTransactions() async {
+        guard let id = editingId else { return }
+        isSaving = true
+        do {
+            try await HouseholdRepository.shareFullHistory(client: session.client, accountId: id)
+            await session.syncNow()
+            await loadSharedState(accountId: id)
+            session.refresh.bump()
+        } catch {
+            actionError = ActionError("Couldn't Include Past Transactions", error)
         }
         isSaving = false
     }

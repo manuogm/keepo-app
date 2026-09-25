@@ -143,7 +143,6 @@ select is(
       union all select count(*) from recurring_rule_tags where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from card_mappings where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from merchant_category_map where owner_id = '11111111-1111-1111-1111-111111111111'
-      union all select count(*) from net_worth_daily where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from sync_conflicts where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from export_audit_log where owner_id = '11111111-1111-1111-1111-111111111111'
       union all select count(*) from household_members where user_id = '11111111-1111-1111-1111-111111111111'
@@ -180,7 +179,9 @@ select is(
 
 -- 7. The household keeps its record that this happened...
 select is(
-  (select count(*) from household_events where kind = 'member_erased'),
+  -- Only this file's event (`now()` is frozen for the file): the local
+  -- database the suite runs against can hold events of its own.
+  (select count(*) from household_events where kind = 'member_erased' and created_at = now()),
   1::bigint,
   'the member_erased event survives for the remaining member'
 );
@@ -263,8 +264,11 @@ select is(
 
 -- 14. And the empty household is closed rather than left as a shell nobody
 -- can reach — soft-deleted, so a still-syncing device sees a tombstone.
+-- Only this file's household: `now()` is frozen for the whole test
+-- transaction, so it is the one created at `now()`. The local database the
+-- suite runs against can hold households of its own.
 select is(
-  (select count(*) from households where deleted_at is null),
+  (select count(*) from households where deleted_at is null and created_at = now()),
   0::bigint,
   'a household with no members left is soft-deleted'
 );

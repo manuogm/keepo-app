@@ -39,17 +39,40 @@ struct LocalAccountRow: Identifiable {
     let sortOrder: Int
     let version: Int
     let isShared: Bool
+    /// Where the household's view of a shared account begins; nil for a share
+    /// with full history, and for an account that is not shared.
+    let sharedFrom: Date?
+    /// `opening_balance_at` as this viewer holds it — for a partner on a
+    /// share that began on a date, the owner's calendar day it began
+    /// (`account_opening_as_seen`). See `SharedHistory.earliestRuleDay`.
+    let openingBalanceAt: String
     let hasMappedCard: Bool
     let balanceE4: Int64?
     let balanceBaseE4: Int64?
     let baseCurrencyInfo: CurrencyInfo?
 
-    static func fetchAll(_ database: Database, ownerId: String, baseCurrency: String) throws -> [LocalAccountRow] {
+    /// What `TransferPairing` and `SharedHistory` decide by.
+    var sharing: AccountSharing {
+        AccountSharing(ownerId: ownerId, isShared: isShared, sharedFrom: sharedFrom)
+    }
+
+    /// `alsoIncluding` names deleted accounts to return anyway — only the
+    /// transfer form asks, for the account a surviving transfer half was left
+    /// on (`delete_account` keeps such halves, migration 20261007100000), so
+    /// it can say where the money came from or went. A deleted account is
+    /// always archived first, so no picker offers it (`AccountPickerRow`
+    /// drops archived rows from its options); it can only be *shown*.
+    static func fetchAll(
+        _ database: Database, ownerId: String, baseCurrency: String, alsoIncluding deletedIds: [String] = []
+    ) throws -> [LocalAccountRow] {
+        let deletedClause = deletedIds.isEmpty
+            ? "" : " OR id IN (\(databaseQuestionMarks(count: deletedIds.count)))"
         let accounts = try Row.fetchAll(
             database,
             sql: """
-            SELECT id, owner_id, name, currency, kind, icon, color, sort_order, archived_at, version FROM accounts
-            WHERE deleted_at IS NULL AND (
+            SELECT id, owner_id, name, currency, kind, icon, color, sort_order, archived_at, version,
+                   opening_balance_at FROM accounts
+            WHERE (deleted_at IS NULL\(deletedClause)) AND (
                 owner_id = ? OR id IN (
                     SELECT ha.account_id FROM household_accounts ha
                     JOIN household_members hm ON hm.household_id = ha.household_id
@@ -58,9 +81,9 @@ struct LocalAccountRow: Identifiable {
             )
             ORDER BY CASE kind WHEN 'regular' THEN 0 ELSE 1 END, sort_order, name
             """,
-            arguments: [ownerId, ownerId]
+            arguments: StatementArguments(deletedIds + [ownerId, ownerId])
         )
-        let sharedIds = try sharedAccountIds(database, ownerId: ownerId)
+        let shares = try liveShares(database, ownerId: ownerId)
         let cardMappedIds = try cardMappedAccountIds(database, ownerId: ownerId)
         let currencies = Dictionary(
             uniqueKeysWithValues: try LocalTableQueries.currencies(database).map { ($0.code, Int($0.minorUnit)) }
@@ -86,7 +109,8 @@ struct LocalAccountRow: Identifiable {
                 kind: PublicSchema.AccountKind(rawValue: kindRaw) ?? .regular,
                 icon: row["icon"], color: row["color"], archivedAt: row["archived_at"],
                 sortOrder: row["sort_order"], version: row["version"],
-                isShared: sharedIds.contains(accountId), hasMappedCard: cardMappedIds.contains(accountId),
+                isShared: shares[accountId] != nil, sharedFrom: shares[accountId] ?? nil,
+                openingBalanceAt: row["opening_balance_at"], hasMappedCard: cardMappedIds.contains(accountId),
                 balanceE4: balance, balanceBaseE4: balanceBase,
                 baseCurrencyInfo: baseMinorUnit.map { CurrencyInfo(code: baseCurrency, minorUnit: $0) }
             )
@@ -127,17 +151,25 @@ struct LocalAccountRow: Identifiable {
         ).reduce(into: [String: Int64]()) { $0[$1.accountId] = $1.balanceE4 }
     }
 
-    private static func sharedAccountIds(_ database: Database, ownerId: String) throws -> Set<String> {
+    /// Every live share in the viewer's household, keyed by account, with
+    /// where it begins (`history_from`, nil for full history).
+    private static func liveShares(_ database: Database, ownerId: String) throws -> [String: Date?] {
         let rows = try Row.fetchAll(
             database,
             sql: """
-            SELECT ha.account_id FROM household_accounts ha
+            SELECT ha.account_id, ha.history_from FROM household_accounts ha
             JOIN household_members hm ON hm.household_id = ha.household_id
             WHERE hm.user_id = ? AND hm.deleted_at IS NULL AND ha.deleted_at IS NULL
             """,
             arguments: [ownerId]
         )
-        return Set(rows.map { $0["account_id"] as String })
+        return Dictionary(
+            rows.map { row in
+                let historyFrom = (row["history_from"] as String?).flatMap(PostgresDate.date(fromTimestamp:))
+                return (row["account_id"] as String, historyFrom)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     /// Scoped to `ownerId`, not the account's full visibility set — matching

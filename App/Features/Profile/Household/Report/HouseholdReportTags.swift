@@ -4,10 +4,14 @@ import SwiftUI
 /// Report screen four: the household's tags, and the chance to prune the
 /// duplicates two people inevitably arrive with.
 ///
-/// Tags are the one thing here nobody chose to share. Sharing an account
-/// shares every tag on it automatically (`can_read_tag` derives visibility
-/// from `can_read_account`), so the first time either member sees the pooled
-/// list is now — and it is usually where "Holiday" meets "Holidays".
+/// Tags are the one thing here nobody chose to share. A tag is shared by
+/// sitting on a transaction the household sees (`can_read_tag`), so the first
+/// time either member sees the other's is now — and it is usually where
+/// "Holiday" meets "Holidays".
+///
+/// **The headline counts only those**, the same number on both phones. The
+/// list below is every tag this phone holds, your private ones included,
+/// because a duplicate of your own is as much worth pruning.
 ///
 /// **Deleting one asks where its transactions go.** A tag is not decoration;
 /// it is the only record that a transaction belonged to something the user was
@@ -52,11 +56,11 @@ struct HouseholdReportTags: View {
     private var countCard: some View {
         HouseholdCard(
             title: "Household tags",
-            subtitle: "From both of you. Deleting one asks where its transactions go."
+            subtitle: "Shared once used on a shared account. Deleting one asks where its transactions go."
         ) {
             HouseholdMetric(
-                value: snapshot.tags.count,
-                label: snapshot.tags.count == 1 ? "Tag" : "Tags",
+                value: snapshot.householdTags.count,
+                label: snapshot.householdTags.count == 1 ? "Shared tag" : "Shared tags",
                 tint: AppTheme.Palette.tagTint
             )
         }

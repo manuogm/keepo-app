@@ -170,9 +170,23 @@ enum LocalTransactionRow {
         }
     }
 
-    /// Both legs of a transfer, by group id — `TransactionFormView`'s
-    /// post-conflict reload needs both sides re-fetched together, the same
-    /// way it originally opened via `sibling(of:)`.
+    /// Every leg of a transfer this device holds, by group id — **the** way
+    /// to find a transfer's other half. Two means the whole transfer; one
+    /// means the other half is on an account this viewer cannot see (a
+    /// household member's private account).
+    ///
+    /// Independent of whatever a screen happens to have loaded. The edit
+    /// form and the ledger's swipe-to-delete used to find the other half
+    /// among the rows currently on screen, so any view that showed one half
+    /// alone — an account filter, a search, Private or Household scope, a
+    /// partner on an archived account — opened an empty form and deleted
+    /// through `delete_transaction`, which the server refuses for a transfer
+    /// leg.
+    ///
+    /// Not filtered on the account being live: a leg left on a deleted
+    /// account (`delete_account`'s cascade keeps those, migration
+    /// 20261007100000) is still half of a real transfer, and the survivor's
+    /// form has to be able to name it.
     static func fetchByTransferGroup(
         _ database: Database, transferGroupId: String, baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
@@ -187,7 +201,7 @@ enum LocalTransactionRow {
                    CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
                         WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
             FROM transactions t
-            JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
+            JOIN accounts a ON a.id = t.account_id AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
             JOIN currencies cur ON cur.code = t.currency
             LEFT JOIN currencies ocur ON ocur.code = t.original_currency
@@ -197,6 +211,26 @@ enum LocalTransactionRow {
         )
         let base = try BaseCurrency(database, code: baseCurrency)
         return try rows.map { try build($0, database: database, base: base) }
+    }
+
+    /// Which of `groupIds` this device holds both legs of — the transfers a
+    /// swipe can delete. One the ledger shows alone for a *view* reason (a
+    /// filter, a scope) is complete here; one whose other half is on an
+    /// account this viewer cannot see is not, and `delete_transfer` would
+    /// refuse it.
+    static func completeTransferGroups(_ database: Database, among groupIds: [String]) throws -> Set<String> {
+        guard !groupIds.isEmpty else { return [] }
+        return Set(
+            try String.fetchAll(
+                database,
+                sql: """
+                SELECT transfer_group_id FROM transactions
+                WHERE deleted_at IS NULL AND transfer_group_id IN (\(databaseQuestionMarks(count: groupIds.count)))
+                GROUP BY transfer_group_id HAVING COUNT(*) = 2
+                """,
+                arguments: StatementArguments(groupIds)
+            )
+        )
     }
 
     /// One row by id — `RootView`'s notification deep-link and

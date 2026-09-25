@@ -167,5 +167,17 @@ extension LocalStore {
         // appear on the other — the mirror holding less than the server,
         // which is what every entry in this list exists to prevent.
         migrator.registerMigration("v20_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20261008100000 adds
+        // sync_conflicts.attempted_payload. Without it a stale device drops
+        // the column (`SyncApply` intersects its whitelist with the local
+        // schema), and "Keep mine" has nothing to replay for any conflict
+        // it pulls.
+        migrator.registerMigration("v21_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20261009100000 adds
+        // household_accounts.history_from. A stale device would drop it
+        // (`SyncApply` intersects its whitelist with the local schema), so a
+        // partner's phone would never learn where their view of an account
+        // begins: no purge of older rows, no date limit on the forms.
+        migrator.registerMigration("v22_rebuild_syncable_tables", migrate: rebuildSyncableTables)
     }
 }

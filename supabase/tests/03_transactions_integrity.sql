@@ -91,34 +91,24 @@ values ('c0000000-0000-0000-0000-000000000099', auth.uid(), 'expense', 'B''s cat
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 
--- The composite FK is DEFERRABLE INITIALLY DEFERRED (same as accounts'
--- equivalent), so the violation doesn't fire at INSERT — only once
--- something forces the check, here `SET CONSTRAINTS ALL IMMEDIATE`. An
--- explicit SAVEPOINT wraps both statements and is always rolled back
--- afterward: throws_ok's own internal savepoint only undoes the immediate-
--- check statement itself (reverting the constraint mode back to deferred),
--- NOT the earlier INSERT — without this outer savepoint, the bad row and
--- its still-deferred violation would leak into every later assertion in
--- this file (confirmed empirically: it corrupted the transfer-leg test
--- below before this fix, which had nothing to do with categories).
-savepoint h12_check;
-
--- Run as postgres (bypasses RLS on categories/accounts so the FK itself,
--- not a visibility gap, is what's being exercised) — the FK must reject
--- this regardless of who's asking.
-insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
-values (
-  '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
-  'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000099', -10, 'EUR', now()
-);
-
+-- Refused at the insert since 20261015100000: a category that is not the
+-- owner's is swapped for the owner's counterpart when there is one (a
+-- shared category, or the default), and refused in plain words when there
+-- is not — before the composite FK, which stays behind it, ever sees it.
+-- B's category here is private, so it has no counterpart on A's side.
+--
+-- Run as postgres (bypasses RLS on categories/accounts so the rule itself,
+-- not a visibility gap, is what's being exercised) — it must refuse this
+-- regardless of who's asking.
 select throws_ok(
-  $$ set constraints all immediate $$,
-  '23503', null,
-  'a transaction cannot reference another owner''s category (H12 composite FK)'
+  $$ insert into transactions (owner_id, created_by, account_id, category_id, amount_e4, currency, occurred_at)
+     values (
+       '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
+       'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000099', -10, 'EUR', now()
+     ) $$,
+  'P0001', null,
+  'a transaction cannot reference another owner''s private category (H12, 20261015100000)'
 );
-
-rollback to savepoint h12_check;
 
 -- check_transfer_integrity: exactly 0 or 2 legs, never 1. The trigger is
 -- DEFERRABLE INITIALLY DEFERRED, so it only fires at COMMIT — never inside
@@ -133,12 +123,14 @@ values (
   '99999999-9999-9999-9999-999999999999'
 );
 
--- P0001 ("raise_exception"), not 23514 — check_transfer_integrity is a
--- plpgsql RAISE EXCEPTION, not a declarative CHECK constraint, so it gets
--- Postgres's generic user-raised-exception code rather than check_violation.
+-- 23514 (check_violation), deliberately, since 20261007100000. It was
+-- P0001, the default for a plpgsql RAISE — but P0001 is how every RPC here
+-- raises a sentence *meant for a person*, and `UserFacingError` shows those
+-- verbatim, so an invariant violation reached the screen as raw text with a
+-- UUID in it. An integrity failure is a bug, never the user's to read.
 select throws_ok(
   $$ set constraints all immediate $$,
-  'P0001', null,
+  '23514', null,
   'a lone transfer leg (1 of 2) is rejected once the deferred constraint fires'
 );
 

@@ -8,8 +8,9 @@ import SwiftUI
 //
 // The `@State` these read stays in the main declaration; only the derived
 // values live here, plus `applyForeignAmounts` (prefill from an existing
-// row) and `refreshConversion` (derive the charge) — both here rather than
-// in +Data.swift because what they are about is this, not loading.
+// row), `refreshConversion` (derive the charge) and `resolveLedgerAmounts`
+// (what the two fields store) — here rather than in +Data.swift because
+// what they are about is this, not loading or saving.
 
 extension TransactionFormView {
     /// The wheel needs a concrete code; the form stores `nil` for "the
@@ -169,5 +170,31 @@ extension TransactionFormView {
         }
         chargedAmountText = AmountFormatter.editableString(amount, minorUnit: account.currencyInfo.minorUnit)
         conversionRateDate = occurredAt
+    }
+}
+
+extension TransactionFormView {
+    /// Splits the two fields into what the row stores, applying the sign
+    /// once, from the kind the user picked — the same single point every
+    /// write here has always signed at.
+    ///
+    /// Returns `nil` having set `errorMessage` when the entry is foreign
+    /// and the charge is missing, which happens when no rate resolved and
+    /// the user has not typed one: there is no number that belongs in the
+    /// account's currency, and inventing one is the thing this whole
+    /// workstream exists to stop.
+    func resolveLedgerAmounts(magnitude: Int64) -> LedgerAmounts? {
+        let signedPaid = kind == .expense ? -magnitude : magnitude
+        guard isForeign, let code = paidCurrencyCode else {
+            return LedgerAmounts(signedAmountE4: signedPaid, original: nil)
+        }
+        guard let charged = AmountParser.parse(chargedAmountText), charged > 0 else {
+            errorMessage = "Enter the amount charged to \(fromAccount?.name ?? "this account")."
+            return nil
+        }
+        return LedgerAmounts(
+            signedAmountE4: kind == .expense ? -charged : charged,
+            original: ForeignOriginal(amountE4: signedPaid, currency: code)
+        )
     }
 }

@@ -10,4 +10,17 @@ enum OutboxKind: String {
     case confirmCaptureTransaction
     case reviewCapture
     case createTag, updateTag, deleteTag, setTransactionTag
+
+    /// A write that brings its row into existence on the server. Anything
+    /// queued for the same row after one of these depends on it having
+    /// landed first, which is why `Outbox.enqueue` never lets a later write
+    /// overwrite one — see that function.
+    var createsRow: Bool {
+        switch self {
+        case .createTransaction, .createTransfer, .captureTransaction, .createAccount, .createCategory, .createTag:
+            return true
+        default:
+            return false
+        }
+    }
 }

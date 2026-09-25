@@ -153,3 +153,31 @@ public enum UserFacingError {
         return "The server couldn't finish that request. Please try again in a moment."
     }
 }
+
+extension UserFacingError {
+    /// Whether the server refused a write for a reason that will not change
+    /// by sending it again — so retrying it is pointless, and the local
+    /// mirror's optimistic copy of it is now a claim the server has rejected.
+    ///
+    /// The outbox retried every failed write forever, backing off to five
+    /// minutes, whatever the failure. For a network blip that is right. For
+    /// a refusal it is not: the write never lands, the local write-through
+    /// that preceded it stays on screen as if it had, and the only sign
+    /// anything is wrong is a pending-sync banner that never clears. Several
+    /// transfer bugs were silent for exactly this reason.
+    ///
+    /// Final: a sentence the database raised on purpose (`P0001`), an
+    /// integrity or data error (classes `23` and `22` — a duplicate key on a
+    /// *create* never gets here, the senders already treat that as "already
+    /// applied"), and an RLS or grant refusal (`42501`). Everything else is
+    /// assumed transient, including every PostgREST-level `PGRST…` code —
+    /// "function not found" is what an app ahead of an un-pushed migration
+    /// sees, and that one does fix itself once the migration lands. So does a
+    /// rate limit, which the schema raises as `P0001` and is the one such
+    /// sentence that is not final.
+    public static func isFinalRefusal(_ error: Error) -> Bool {
+        guard let postgrestError = error as? PostgrestError, let code = postgrestError.code else { return false }
+        if code == "P0001" { return !postgrestError.message.localizedCaseInsensitiveContains("rate limit") }
+        return code.hasPrefix("23") || code.hasPrefix("22") || code == "42501"
+    }
+}

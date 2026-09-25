@@ -98,23 +98,48 @@ extension TransactionFormView {
     /// to agree with the app. Only ever fills a destination that is empty
     /// or has just become the source — a choice already made is never
     /// overwritten.
+    ///
+    /// A destination the new source cannot pair with is not a choice worth
+    /// keeping either: switching the source to a private account strands the
+    /// partner's shared one, which the destination picker no longer offers
+    /// (see `transferDestinations`), so it is dropped like one that has just
+    /// become the source.
     func fillSoleTransferDestination() {
         guard kind == .transfer else { return }
-        if let destination = selectedToAccountId, destination != selectedAccountId { return }
+        if let destination = selectedToAccountId, destination != selectedAccountId,
+           transferDestinations.contains(where: { $0.id == destination }) {
+            return
+        }
         selectedToAccountId = Self.soleDestination(among: accounts, excluding: selectedAccountId)
     }
 
-    /// Exactly one live account that is not the source, or nothing.
-    /// Static and pure so the rule can be pinned by a test rather than
-    /// only by opening the form on a two-account ledger — which is what it
-    /// took to notice it could not be checked at all on a ledger with
-    /// thirteen.
+    /// Where money leaving the chosen source account may go: every account
+    /// `TransferPairing` allows, which the server will accept at commit.
+    /// `nil` source (nothing chosen yet) offers everything. On an existing
+    /// transfer, additionally only accounts of the receiving leg's own owner
+    /// — see `transferSourceAccounts` for why.
+    var transferDestinations: [LocalAccountRow] {
+        let pairable = Self.pairable(with: selectedAccountId, among: accounts)
+        guard let owner = ownerOfAccount(editingTransferBaseline?.toAccountId) else { return pairable }
+        return pairable.filter { $0.ownerId == owner }
+    }
+
+    static func pairable(with source: UUID?, among accounts: [LocalAccountRow]) -> [LocalAccountRow] {
+        guard let sourceRow = accounts.first(where: { $0.id == source }) else { return accounts }
+        return accounts.filter { TransferPairing.allows(sourceRow.sharing, $0.sharing) }
+    }
+
+    /// Exactly one live account that is not the source and that the source
+    /// can pair with, or nothing. Static and pure so the rule can be pinned
+    /// by a test rather than only by opening the form on a two-account
+    /// ledger — which is what it took to notice it could not be checked at
+    /// all on a ledger with thirteen.
     ///
     /// Archived accounts are excluded because the picker excludes them:
     /// prefilling one would put a destination in the field that its own
-    /// menu does not offer.
+    /// menu does not offer. Unpairable ones for the same reason.
     static func soleDestination(among accounts: [LocalAccountRow], excluding source: UUID?) -> UUID? {
-        let candidates = accounts.filter { $0.archivedAt == nil && $0.id != source }
+        let candidates = pairable(with: source, among: accounts).filter { $0.archivedAt == nil && $0.id != source }
         return candidates.count == 1 ? candidates.first?.id : nil
     }
 

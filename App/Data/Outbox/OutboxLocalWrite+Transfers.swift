@@ -46,11 +46,11 @@ extension OutboxLocalWrite {
 
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         let occurredAt = PostgresDate.sqliteTimestampBoundaryString(payload.occurredAt)
-        // A placeholder: the real group id is `gen_random_uuid()` inside the
-        // function body, unknowable offline. Both legs share this one so
-        // they pair up locally, and the next pull upserts each leg BY ITS
-        // OWN id — those are client-supplied and stable — replacing the
-        // placeholder in place rather than duplicating anything.
+        // The group id `create_transfer` itself uses: the sending leg's id
+        // (migration 20261006100000). It used to mint a random one, so this
+        // was a placeholder — and an edit or delete made before the next
+        // pull addressed a group the server had never heard of, failing
+        // forever. Now both sides derive the same value from the same id.
         let groupId = payload.fromId.uuidString
 
         try SyncApply.upsertRow(
@@ -72,33 +72,65 @@ extension OutboxLocalWrite {
         )
     }
 
-    /// Legs aren't identified by id here (the payload never carried one) —
-    /// matched by their CURRENT sign instead, the same "negative outflow,
-    /// positive inflow" convention money rule 1 fixes everywhere else in
-    /// this codebase. A transfer edit never flips which side is the send
-    /// side, so the sign a leg had before this edit is still the right key
-    /// to find it by.
+    /// Does what `update_transfer` does, in the order it does it: find each
+    /// leg by its CURRENT sign, then write each one **by id**, with the
+    /// server's signs — the payload carries two positive magnitudes and the
+    /// sending leg is stored as `-fromAmountE4`.
+    ///
+    /// Both halves of that are load-bearing, and the version before this
+    /// got both wrong. It wrote the sending leg as the positive magnitude,
+    /// and it matched legs by sign statement by statement — so the second
+    /// statement's `amount_e4 > 0` matched the leg the first had just turned
+    /// positive, and wrote the received amount onto **both** halves. Until a
+    /// pull corrected it, an edited transfer read as two inflows: the
+    /// account the money left rose instead of falling, and reopening the
+    /// transfer found no outflow leg to prefill from.
+    ///
+    /// `version` goes up by one per leg, exactly as `bump_version` does
+    /// server-side — the same thing `updateTransaction` does — so a second
+    /// edit made before the next pull sends the version the server now has
+    /// instead of conflicting with its own previous save.
+    ///
+    /// A leg moved to another account (`fromAccountId`/`toAccountId`) takes
+    /// that account's currency, as `update_transfer` makes it — a row's
+    /// currency is always its account's.
     static func updateTransfer(_ payload: UpdateTransferPayload, in database: Database) throws {
+        let legs = try Row.fetchAll(
+            database,
+            sql: """
+            SELECT id, amount_e4, account_id, currency FROM transactions
+            WHERE transfer_group_id = ? AND deleted_at IS NULL
+            """,
+            arguments: [payload.transferGroupId.uuidString]
+        )
+        guard
+            let outflow = legs.first(where: { ($0["amount_e4"] as Int64) < 0 }),
+            let inflow = legs.first(where: { ($0["amount_e4"] as Int64) > 0 })
+        else { return }
+
         let now = PostgresDate.sqliteTimestampBoundaryString(Date())
         let occurredAt = PostgresDate.sqliteTimestampBoundaryString(payload.occurredAt)
-        try database.execute(
-            sql: """
-            UPDATE transactions SET amount_e4 = ?, occurred_at = ?, notes = ?, title = ?, updated_at = ?
-            WHERE transfer_group_id = ? AND amount_e4 < 0
-            """,
-            arguments: [
-                payload.fromAmountE4, occurredAt, payload.notes, payload.title, now, payload.transferGroupId.uuidString
-            ]
-        )
-        try database.execute(
-            sql: """
-            UPDATE transactions SET amount_e4 = ?, occurred_at = ?, notes = ?, title = ?, updated_at = ?
-            WHERE transfer_group_id = ? AND amount_e4 > 0
-            """,
-            arguments: [
-                payload.toAmountE4, occurredAt, payload.notes, payload.title, now, payload.transferGroupId.uuidString
-            ]
-        )
+        for (leg, movedTo, amountE4, version) in [
+            (outflow, payload.fromAccountId, -payload.fromAmountE4, payload.fromExpectedVersion + 1),
+            (inflow, payload.toAccountId, payload.toAmountE4, payload.toExpectedVersion + 1)
+        ] {
+            let legId: String = leg["id"]
+            let currentAccountId: String? = leg["account_id"]
+            let currentCurrency: String? = leg["currency"]
+            let accountId = movedTo?.uuidString ?? currentAccountId
+            let currency = try accountId.flatMap { try accountCurrency(database, accountId: $0) } ?? currentCurrency
+            try database.execute(
+                sql: """
+                UPDATE transactions
+                SET account_id = ?, currency = ?, amount_e4 = ?, occurred_at = ?, notes = ?, title = ?,
+                    version = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                arguments: [
+                    accountId, currency, amountE4, occurredAt, payload.notes, payload.title, version, now, legId
+                ]
+            )
+        }
     }
 
     static func deleteTransfer(_ payload: DeleteTransferPayload, in database: Database) throws {

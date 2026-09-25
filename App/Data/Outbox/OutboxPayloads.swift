@@ -5,7 +5,13 @@ import KeepoCore
 
 public struct CreateTransactionPayload: Codable, Sendable {
     public let id: UUID
+    /// The account's owner, who owns every row on it — not necessarily the
+    /// person entering it (`(account_id, owner_id)` is a foreign key).
     public let ownerId: UUID
+    /// Who entered it, when that is not the owner: a partner logging on the
+    /// owner's shared account. Nil means the owner, which is also what an
+    /// item queued before this existed decodes to.
+    public let createdBy: UUID?
     public let accountId: UUID
     public let categoryId: UUID
     public let amountE4: Int64
@@ -23,11 +29,13 @@ public struct CreateTransactionPayload: Codable, Sendable {
     public let title: String?
 
     public init(
-        id: UUID, ownerId: UUID, accountId: UUID, categoryId: UUID, amountE4: Int64, currency: String,
-        occurredAt: Date, notes: String? = nil, original: ForeignOriginal? = nil, title: String? = nil
+        id: UUID, ownerId: UUID, createdBy: UUID? = nil, accountId: UUID, categoryId: UUID, amountE4: Int64,
+        currency: String, occurredAt: Date, notes: String? = nil, original: ForeignOriginal? = nil,
+        title: String? = nil
     ) {
         self.id = id
         self.ownerId = ownerId
+        self.createdBy = createdBy
         self.accountId = accountId
         self.categoryId = categoryId
         self.amountE4 = amountE4
@@ -118,10 +126,17 @@ public struct UpdateTransferPayload: Codable, Sendable {
     /// See `CreateTransferPayload.notes` — same both-legs rule.
     public let notes: String?
     public let title: String?
+    /// Where each leg should now be. Optional so a payload queued by a build
+    /// that predates moving a transfer still decodes (synthesized `Codable`
+    /// reads a missing optional key as `nil`), and `nil` is exactly what the
+    /// RPC reads as "unchanged".
+    public let fromAccountId: UUID?
+    public let toAccountId: UUID?
 
     public init(
         transferGroupId: UUID, fromExpectedVersion: Int, toExpectedVersion: Int,
-        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date, notes: String? = nil, title: String? = nil
+        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date, notes: String? = nil, title: String? = nil,
+        fromAccountId: UUID? = nil, toAccountId: UUID? = nil
     ) {
         self.transferGroupId = transferGroupId
         self.fromExpectedVersion = fromExpectedVersion
@@ -131,6 +146,8 @@ public struct UpdateTransferPayload: Codable, Sendable {
         self.occurredAt = occurredAt
         self.notes = notes
         self.title = title
+        self.fromAccountId = fromAccountId
+        self.toAccountId = toAccountId
     }
 }
 

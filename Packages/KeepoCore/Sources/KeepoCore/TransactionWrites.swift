@@ -165,6 +165,9 @@ struct UpdateTransferParams: Encodable {
     let occurredAt: String
     let notes: String?
     let title: String?
+    /// `nil` leaves that leg where it is — `update_transfer` defaults both.
+    let fromAccountId: UUID?
+    let toAccountId: UUID?
     enum CodingKeys: String, CodingKey {
         case transferGroupId = "p_transfer_group_id"
         case fromExpectedVersion = "p_from_expected_version"
@@ -174,6 +177,8 @@ struct UpdateTransferParams: Encodable {
         case occurredAt = "p_occurred_at"
         case notes = "p_notes"
         case title = "p_title"
+        case fromAccountId = "p_from_account_id"
+        case toAccountId = "p_to_account_id"
     }
 }
 

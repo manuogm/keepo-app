@@ -72,6 +72,13 @@ struct AccountFormView: View {
     @State var hasHousehold = false
     @State var createdAt: String?
     @State var sharedAt: String?
+    /// Where the household's view of this account begins, when it was
+    /// shared from a date; nil for full history.
+    @State var sharedFrom: Date?
+    /// The account's `opening_balance_at` as this viewer holds it — for a
+    /// partner on a dated share, the owner's calendar day it began.
+    @State var loadedOpeningBalanceAt: String?
+    @State var editingOwnerId: UUID?
 
     @State var editingId: UUID?
     @State var editingVersion: Int?
@@ -87,6 +94,11 @@ struct AccountFormView: View {
     @State var showDeleteOptions = false
     @State var isShowingCardHelp = false
     @State var showUnshareConfirm = false
+    @State var showShareChoice = false
+    @State var showIncludePast = false
+    /// A sharing action the server refused — a pop-up, like every failed
+    /// action (`ActionError`). `errorMessage` stays for validation.
+    @State var actionError: ActionError?
 
     @State var cardMappings: [PublicSchema.CardMappingsSelect] = []
     @State var editingCard: MappedCardEditor?
@@ -184,6 +196,13 @@ struct AccountFormView: View {
         .unshareConfirmation(isPresented: $showUnshareConfirm) {
             Task { await setShared(false) }
         }
+        .shareAccountDialog(accountName: name, isPresented: $showShareChoice) { fullHistory in
+            Task { await setShared(true, fullHistory: fullHistory) }
+        }
+        .includePastConfirmation(isPresented: $showIncludePast) {
+            Task { await includePastTransactions() }
+        }
+        .errorAlert($actionError)
         .task { await load() }
     }
 
@@ -276,27 +295,6 @@ struct AccountFormView: View {
         }
     }
 
-    /// Sharing is the one control here that is not offline-capable and not
-    /// symmetrical: `share_account` is a plain link, but `unshare_account`
-    /// FORKS the account into an independent copy for the other member
-    /// (migration 20260816100000). Turning the toggle off is therefore not
-    /// an undo, and it says so before it happens.
-    @ViewBuilder
-    private var shareToggleRow: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            Toggle("Share with Household", isOn: shareBinding)
-                .tint(AppTheme.Palette.statusPositive)
-                .disabled(!hasHousehold || isSaving)
-            if !hasHousehold {
-                Text("Create a household in Profile first.")
-                    .font(AppTheme.Typography.micro)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
-        }
-        .padding(.horizontal, AppTheme.Spacing.l)
-        .padding(.vertical, AppTheme.Spacing.m)
-    }
-
     /// Provenance, not a control — grey and out of the way, right above the
     /// destructive action rather than competing with the identity card for
     /// attention.
@@ -313,19 +311,6 @@ struct AccountFormView: View {
         .font(AppTheme.Typography.micro)
         .foregroundStyle(AppTheme.Palette.textSecondary)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var shareBinding: Binding<Bool> {
-        Binding(
-            get: { isShared },
-            set: { newValue in
-                if newValue {
-                    Task { await setShared(true) }
-                } else {
-                    showUnshareConfirm = true
-                }
-            }
-        )
     }
 
     var isSaveDisabled: Bool {

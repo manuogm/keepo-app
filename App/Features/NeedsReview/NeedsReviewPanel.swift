@@ -141,7 +141,7 @@ struct NeedsReviewPanel: View {
         }
         .errorAlert($actionError)
         .sheet(item: $editingTransaction) { transaction in
-            TransactionFormView(session: session, mode: .edit(transaction, sibling: nil)) {
+            TransactionFormView(session: session, mode: .edit(transaction)) {
                 session.refresh.bump()
             }
         }

@@ -32,26 +32,32 @@ extension TransactionFormView {
         .sensoryFeedback(AppTheme.Feedback.selection, trigger: dateSteps)
     }
 
-    /// Unbounded in both directions, exactly like the calendar behind the
-    /// pill: the ledger holds future rows — a bill entered early, a
-    /// recurring rule's next occurrence — and a stepper that stopped at
-    /// today would contradict the picker it sits beside.
+    /// Unbounded forward, exactly like the calendar behind the pill: the
+    /// ledger holds future rows — a bill entered early, a recurring rule's
+    /// next occurrence — and a stepper that stopped at today would contradict
+    /// the picker it sits beside. Backward it stops where the calendar does,
+    /// at `earliestAllowedDate`.
     ///
     /// `hitTarget` and not a 44pt frame: the finger gets HIG's area
     /// without the header growing to match it.
     func dayStep(_ days: Int, icon: String, label: String) -> some View {
-        Button {
-            guard let stepped = Calendar.current.date(byAdding: .day, value: days, to: occurredAt) else { return }
+        let stepped = Calendar.current.date(byAdding: .day, value: days, to: occurredAt)
+        let isBeforeEarliest = stepped.map { date in earliestAllowedDate.map { date < $0 } ?? false } ?? true
+        return Button {
+            guard let stepped, !isBeforeEarliest else { return }
             occurredAt = stepped
             dateSteps += 1
         } label: {
+            // Dimmed by hand: the explicit colour overrides the one
+            // `.disabled` would otherwise fade to.
             Image(systemName: icon)
                 .font(AppTheme.Typography.captionEmphasis)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .foregroundStyle(isBeforeEarliest ? AppTheme.Palette.textTertiary : AppTheme.Palette.textSecondary)
                 .padding(AppTheme.Spacing.xs)
                 .hitTarget()
         }
         .buttonStyle(.pressableCard)
+        .disabled(isBeforeEarliest)
         .accessibilityLabel(label)
     }
 
@@ -102,7 +108,12 @@ extension TransactionFormView {
     /// selected changes nothing, so nothing would dismiss.
     var datePickerSheet: some View {
         NavigationStack {
-            DatePicker("Date", selection: $occurredAt, displayedComponents: [.date])
+            // A partner cannot date an entry before the account was shared
+            // with them; the calendar greys those days out.
+            DatePicker(
+                "Date", selection: $occurredAt, in: (earliestAllowedDate ?? .distantPast)...,
+                displayedComponents: [.date]
+            )
                 .datePickerStyle(.graphical)
                 .padding()
                 .navigationTitle("Date")

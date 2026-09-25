@@ -14,9 +14,12 @@ import SwiftUI
 struct TransactionFormView: View {
     let session: SessionStore
     /// `.create` for a new transaction; `.edit` pre-fills every field from
-    /// an existing row (plus its sibling leg, for a transfer) and locks the
-    /// kind — changing kind is delete-and-recreate, never an in-place edit
-    /// (app-architecture.md §2).
+    /// an existing row and locks the kind — changing kind is
+    /// delete-and-recreate, never an in-place edit (app-architecture.md §2).
+    /// A transfer's other leg is found by the form itself, by group id (see
+    /// `load()`), never handed in: a caller only knows the rows it happens to
+    /// have loaded, and that was the whole reason a transfer shown alone
+    /// could not be edited or deleted.
     var mode: Mode = .create
     /// What a **new** transaction opens on, from whoever presented the
     /// sheet. The Transactions screen hands over its own filters, so
@@ -29,7 +32,7 @@ struct TransactionFormView: View {
 
     enum Mode {
         case create
-        case edit(PublicSchema.TransactionsWithDetailsSelect, sibling: PublicSchema.TransactionsWithDetailsSelect?)
+        case edit(PublicSchema.TransactionsWithDetailsSelect)
     }
 
     enum Kind: String, CaseIterable, Identifiable {
@@ -96,7 +99,20 @@ struct TransactionFormView: View {
     @State var editingFromVersion: Int?
     @State var editingToVersion: Int?
     @State var editingTransferGroupId: UUID?
+    @State var editingTransferBaseline: TransferBaseline?
+    /// Set when only one half of the transfer being opened is on this
+    /// device — the other is on a household member's private account. The
+    /// form then shows the half it has and changes nothing: the server
+    /// refuses a transfer edit or delete from anyone who cannot write both
+    /// accounts.
+    @State var hiddenTransferSide: TransferSide?
     @State var editingRecurringRuleId: UUID?
+    /// Where an existing entry was when the sheet opened — its account (the
+    /// ledger kind; a transfer's are in `editingTransferBaseline`) and its
+    /// date — so Save can tell a move out of the household's view from any
+    /// other edit. See `sharedHistoryRefusal`.
+    @State var originalAccountId: UUID?
+    @State var originalOccurredAt: Date?
     // created_by (who entered it) differs from the viewer on a shared account.
     @State var addedByHouseholdMember = false
 
@@ -163,11 +179,6 @@ struct TransactionFormView: View {
     var needsReceivedAmount: Bool {
         guard kind == .transfer, let source = fromAccount, let destination = toAccount else { return false }
         return source.currency != destination.currency
-    }
-
-    var categoriesForKind: [PublicSchema.CategoriesSelect] {
-        let categoryKind: PublicSchema.CategoryKind = kind == .income ? .income : .expense
-        return categories.filter { $0.kind == categoryKind }
     }
 
     var body: some View {
@@ -262,6 +273,49 @@ struct TransactionFormView: View {
 
     private var cardBody: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
+            editableFields
+
+            recurringLine
+
+            if addedByHouseholdMember {
+                Text("Added by your household member")
+                    .font(AppTheme.Typography.micro)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+            }
+
+            if hiddenTransferSide != nil {
+                Text("The other side of this transfer is an account only its owner can see, "
+                     + "so only they can change or delete it.")
+                    .font(AppTheme.Typography.micro)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+            }
+
+            if let errorMessage {
+                FormErrorText(message: errorMessage)
+            }
+
+            // Standard practice whenever a swipe-action exists elsewhere
+            // for the same object (the list's swipe-to-delete) — not
+            // every user discovers the gesture. Absent for a transfer whose
+            // other half is out of this viewer's reach: the server would
+            // refuse it, and a button that can only fail is not an option.
+            if !isEditing {
+                addAnotherAction
+            } else if hiddenTransferSide == nil {
+                DestructiveActionButton(title: "Delete Transaction", isEnabled: !isSaving) {
+                    Task { await deleteTransaction() }
+                }
+                .padding(.top, AppTheme.Spacing.xs)
+            }
+        }
+    }
+
+    /// Everything on the card the user can change, locked together when
+    /// the transfer's other half is on an account this viewer cannot see —
+    /// `Group` so the lock reaches each control without changing the
+    /// stack's spacing.
+    private var editableFields: some View {
+        Group {
             dateStepper
 
             titleField
@@ -275,16 +329,18 @@ struct TransactionFormView: View {
                 selectedTagIds: $selectedTagIds,
                 tagsById: tagsById,
                 onEditTags: { isPickingTags = true },
-                accounts: accounts,
+                accounts: kind == .transfer ? transferSourceAccounts : accounts,
                 categories: categoriesForKind,
                 suggestedCategories: displayedCategorySuggestions,
                 isTransfer: kind == .transfer,
+                destinationAccounts: transferDestinations,
                 foreign: foreignAmount,
                 // A capture's paid figure came out of the Wallet
                 // automation's `Amount` string, so there is nothing to work
                 // out; a hand-entered one still gets the calculator.
                 showsAmountCalculator: !isCaptured,
-                needsReceivedAmount: needsReceivedAmount
+                needsReceivedAmount: needsReceivedAmount,
+                hiddenTransferSide: hiddenTransferSide
             )
 
             // Every kind, including transfers, since migration
@@ -293,31 +349,8 @@ struct TransactionFormView: View {
             TextField("Add a note…", text: $notes, axis: .vertical)
                 .font(AppTheme.Typography.label)
                 .lineLimit(1...4)
-
-            recurringLine
-
-            if addedByHouseholdMember {
-                Text("Added by your household member")
-                    .font(AppTheme.Typography.micro)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
-
-            if let errorMessage {
-                FormErrorText(message: errorMessage)
-            }
-
-            // Standard practice whenever a swipe-action exists elsewhere
-            // for the same object (the list's swipe-to-delete) — not
-            // every user discovers the gesture.
-            if isEditing {
-                DestructiveActionButton(title: "Delete Transaction", isEnabled: !isSaving) {
-                    Task { await deleteTransaction() }
-                }
-                .padding(.top, AppTheme.Spacing.xs)
-            } else {
-                addAnotherAction
-            }
         }
+        .disabled(hiddenTransferSide != nil)
     }
 
     /// A second save that keeps the sheet open, for the run of entries

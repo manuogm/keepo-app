@@ -80,11 +80,15 @@ enum RecurringRuleLocalWrite {
 
     /// A newly created rule.
     ///
-    /// `owner_id` and `created_by` are both the signed-in user here, which is
-    /// what the server's `set_recurring_rule_owner` trigger will have derived
-    /// from the account anyway — the account is one the caller can write to,
-    /// and for a transfer both ends share an owner by composite foreign key
+    /// `owner_id` is the account's owner, read the way the server's
+    /// `set_recurring_rule_owner` trigger reads it: a partner's rule on the
+    /// owner's shared account is the owner's. `created_by` is whoever made
+    /// it. For a transfer both ends share an owner by composite foreign key
     /// (migration 20260927100000).
+    ///
+    /// The category is kept as sent. On someone else's account the server
+    /// swaps it for the owner's counterpart (`owners_category`), which the
+    /// next pull brings back — the same name either way.
     ///
     /// `version` starts at 1 and `sync_seq` at 0 to match the server's own
     /// defaults for a fresh row. `sync_seq` being 0 is the load-bearing half:
@@ -93,7 +97,7 @@ enum RecurringRuleLocalWrite {
     /// older news.
     static func insert(
         id: UUID,
-        ownerId: UUID,
+        createdBy: UUID,
         accountId: UUID,
         target: RecurringRuleRepository.Target,
         amountE4: Int64,
@@ -111,10 +115,13 @@ enum RecurringRuleLocalWrite {
                 id, owner_id, created_by, account_id, category_id, to_account_id, amount_e4, currency,
                 notes, title, frequency, next_due_at, last_materialized_at, active, version,
                 created_at, updated_at, sync_seq
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, 1, ?, ?, 0)
+            ) VALUES (
+                ?, COALESCE((SELECT owner_id FROM accounts WHERE id = ?), ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                NULL, 1, 1, ?, ?, 0
+            )
             """,
             arguments: [
-                id.uuidString, ownerId.uuidString, ownerId.uuidString, accountId.uuidString,
+                id.uuidString, accountId.uuidString, createdBy.uuidString, createdBy.uuidString, accountId.uuidString,
                 target.categoryId?.uuidString, target.toAccountId?.uuidString, amountE4, currency,
                 notes, title, frequency.rawValue, PostgresDate.dateOnlyString(nextDueAt), now, now
             ]

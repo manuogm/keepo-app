@@ -154,7 +154,10 @@ extension RecurringRuleFormView {
     /// already selected.
     var datePickerSheet: some View {
         NavigationStack {
-            DatePicker("Next due", selection: $nextDueAt, displayedComponents: [.date])
+            DatePicker(
+                "Next due", selection: $nextDueAt, in: (earliestNextDue ?? .distantPast)...,
+                displayedComponents: [.date]
+            )
                 .datePickerStyle(.graphical)
                 .padding()
                 .navigationTitle("Next Due")
@@ -168,5 +171,21 @@ extension RecurringRuleFormView {
                 .sensoryFeedback(AppTheme.Feedback.selection, trigger: nextDueAt)
         }
         .presentationDetents([.medium])
+    }
+}
+
+extension RecurringRuleFormView {
+    /// The first day a partner may start a rule on an account shared with
+    /// them from a date — the day it opens for them — or nil when nothing
+    /// limits this viewer. A rule starting earlier would have the scheduler
+    /// create entries they could never see, which the server refuses
+    /// (`recurring_rules_stay_in_view`, 20261013100000).
+    var earliestNextDue: Date? {
+        guard let viewer = session.profile?.id else { return nil }
+        let sides = [selectedAccountId, selectedToAccountId].compactMap { id in accounts.first { $0.id == id } }
+        return sides
+            .compactMap { SharedHistory.earliestRuleDay(on: $0.sharing, openingDay: $0.openingBalanceAt, for: viewer) }
+            .compactMap { PostgresDate.dateOnly(from: $0) }
+            .max()
     }
 }

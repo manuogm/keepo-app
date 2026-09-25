@@ -38,7 +38,9 @@ struct RecurringRuleFormView: View {
             amountText: String,
             kind: Kind,
             startingOn: Date,
-            title: String
+            title: String,
+            notes: String,
+            tagIds: Set<UUID>
         )
         case edit(PublicSchema.RecurringRulesSelect)
     }
@@ -130,9 +132,15 @@ struct RecurringRuleFormView: View {
         accounts.first { $0.id == selectedAccountId }
     }
 
+    /// On someone else's account, only the categories that have a
+    /// counterpart there — see `AccountCategories`.
     var categoriesForKind: [PublicSchema.CategoriesSelect] {
         let categoryKind: PublicSchema.CategoryKind = kind == .income ? .income : .expense
-        return categories.filter { $0.kind == categoryKind }
+        var offered = categories
+        if let account = selectedAccount, let viewer = session.profile?.id {
+            offered = AccountCategories.offered(categories, onAccountOwnedBy: account.ownerId, viewer: viewer)
+        }
+        return offered.filter { $0.kind == categoryKind }
     }
 
     /// Caps at the server's limit as the user types, like the transaction

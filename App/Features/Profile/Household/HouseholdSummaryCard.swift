@@ -24,7 +24,10 @@ struct HouseholdSummaryCard: View {
     @State private var isCategoriesExpanded = false
     @State private var isTagsExpanded = false
     @State private var busyIds: Set<UUID> = []
-    @State private var errorMessage: String?
+    /// The account whose switch was just turned on, waiting for the answer
+    /// to "from today, or with its past?".
+    @State private var pendingShare: LocalAccountRow?
+    @State private var actionError: ActionError?
 
     private var viewer: UUID? { session.profile?.id }
 
@@ -49,8 +52,20 @@ struct HouseholdSummaryCard: View {
                 }
             }
 
-            if let errorMessage { FormErrorText(message: errorMessage) }
         }
+        .shareAccountDialog(accountName: pendingShare?.name ?? "", isPresented: isChoosingHistory) { fullHistory in
+            guard let id = pendingShare?.id else { return }
+            busyIds.insert(id)
+            Task {
+                await setAccountShared(id, shared: true, fullHistory: fullHistory)
+                busyIds.remove(id)
+            }
+        }
+        .errorAlert($actionError)
+    }
+
+    private var isChoosingHistory: Binding<Bool> {
+        Binding(get: { pendingShare != nil }, set: { if !$0 { pendingShare = nil } })
     }
 
     // MARK: - Accounts
@@ -64,12 +79,13 @@ struct HouseholdSummaryCard: View {
     }
 
     private var accountsSection: some View {
-        // Counted on what is actually listed, not on what is shared. Passing
-        // the shared count made an untouched household render "Nothing here."
-        // over a list of the very accounts the user came to switch on.
+        // The badge counts what is shared, both members', so the two phones
+        // agree; the list also holds your own accounts you could share, so
+        // "Nothing here." waits for the list itself to be empty.
         HouseholdDisclosure(
             title: "Shared accounts",
-            count: accountRows.count,
+            count: snapshot.sharedAccounts.count,
+            hasRows: !accountRows.isEmpty,
             isExpanded: $isAccountsExpanded
         ) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
@@ -88,7 +104,14 @@ struct HouseholdSummaryCard: View {
                                     shareToggle(
                                         id: account.id,
                                         isOn: account.isShared,
-                                        set: { await setAccountShared(account.id, shared: $0) }
+                                        set: { isOn in
+                                            // Switching on asks first; see `pendingShare`.
+                                            if isOn {
+                                                pendingShare = account
+                                            } else {
+                                                await setAccountShared(account.id, shared: false)
+                                            }
+                                        }
                                     )
                                 } else {
                                     SharedByThemIcon()
@@ -105,9 +128,12 @@ struct HouseholdSummaryCard: View {
     // MARK: - Categories
 
     private var categoriesSection: some View {
+        // As with accounts: counted on what is shared, listed with what
+        // could be.
         HouseholdDisclosure(
             title: "Shared categories",
-            count: categoryRows(.expense).count + categoryRows(.income).count,
+            count: snapshot.sharedCategoryCount,
+            hasRows: !(categoryRows(.expense) + categoryRows(.income)).isEmpty,
             isExpanded: $isCategoriesExpanded
         ) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
@@ -167,12 +193,15 @@ struct HouseholdSummaryCard: View {
 
     // MARK: - Tags
 
+    /// Only the tags the household sees. A tag has no switch — it is shared
+    /// by being used on a shared account — so a private one has nothing to
+    /// do in this card, and listing it made each phone count its own.
     private var tagsSection: some View {
         HouseholdDisclosure(
-            title: "All tags", count: snapshot.tags.count, isExpanded: $isTagsExpanded
+            title: "Shared tags", count: snapshot.householdTags.count, isExpanded: $isTagsExpanded
         ) {
             TagFlowLayout(spacing: AppTheme.Spacing.s) {
-                ForEach(snapshot.tags, id: \.id) { tag in
+                ForEach(snapshot.householdTags, id: \.id) { tag in
                     TagChip(name: tag.name)
                 }
             }
@@ -219,11 +248,10 @@ struct HouseholdSummaryCard: View {
 
     // MARK: - Writes
 
-    private func setAccountShared(_ id: UUID, shared: Bool) async {
-        errorMessage = nil
+    private func setAccountShared(_ id: UUID, shared: Bool, fullHistory: Bool = false) async {
         do {
             if shared {
-                try await HouseholdRepository.share(client: session.client, accountId: id)
+                try await HouseholdRepository.share(client: session.client, accountId: id, fullHistory: fullHistory)
             } else {
                 try await HouseholdRepository.unshare(client: session.client, accountId: id)
             }
@@ -231,12 +259,11 @@ struct HouseholdSummaryCard: View {
             session.refresh.bump()
             onChange()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError(shared ? "Couldn't Share Account" : "Couldn't Stop Sharing", error)
         }
     }
 
     private func setCategoryShared(_ id: UUID, shared: Bool) async {
-        errorMessage = nil
         do {
             if shared {
                 try await HouseholdRepository.shareCategory(client: session.client, categoryId: id)
@@ -250,7 +277,7 @@ struct HouseholdSummaryCard: View {
             session.refresh.bump()
             onChange()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError(shared ? "Couldn't Share Category" : "Couldn't Stop Sharing", error)
         }
     }
 }

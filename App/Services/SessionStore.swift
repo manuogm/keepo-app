@@ -116,6 +116,22 @@ public final class SessionStore {
         }
         self.outbox = Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
         self.outbox.startRetryLoop()
+        self.outbox.onRefusal = { [weak self] in
+            Task { await self?.resyncAfterRefusal() }
+        }
+    }
+
+    /// A refused write left an optimistic copy in the mirror that no
+    /// incremental pull can correct, so the mirror is rebuilt from the server
+    /// — but only once nothing else is queued: a rebuild drops every
+    /// optimistic row, including those of writes still waiting to be sent,
+    /// and those must not vanish from the screen before they land. If the
+    /// queue is not empty yet, the next `syncNow` gets there instead.
+    private func resyncAfterRefusal() async {
+        guard outbox.needsFullResync, outbox.pendingCount == 0, let syncEngine else { return }
+        await syncEngine.resync()
+        outbox.markResynced()
+        refresh.bump()
     }
 
     /// Rebuilds `syncEngine` for the now-known `userId` — called from every
@@ -145,7 +161,14 @@ public final class SessionStore {
     /// `.task(id: refresh.token)` re-fires. Every other caller just omits it.
     public func syncNow(afterPull: (() async -> Void)? = nil) async {
         await outbox.drainAll()
-        await syncEngine?.pull()
+        // A refusal during the drain — or one still waiting on an empty
+        // queue — asks for the mirror to be rebuilt, not merely advanced.
+        if outbox.needsFullResync, outbox.pendingCount == 0, let syncEngine {
+            await syncEngine.resync()
+            outbox.markResynced()
+        } else {
+            await syncEngine?.pull()
+        }
         await afterPull?()
         refresh.bump()
     }

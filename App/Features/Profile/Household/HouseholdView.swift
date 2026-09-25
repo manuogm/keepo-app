@@ -129,8 +129,8 @@ struct HouseholdView: View {
             Button("Cancel", role: .cancel) { isRemoving = false }
         } message: {
             Text(
-                "Every shared account splits into two private copies — one each. Nothing is lost, "
-                    + "and neither of you keeps access to the other's."
+                "You each keep your own accounts and get a copy of what you could see of the other's. "
+                    + "Nothing is lost."
             )
         }
     }
