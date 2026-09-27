@@ -133,6 +133,7 @@
 		5896C902E1DF01D41623E7A6 /* AccountFormView+Dialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6527A3683E8F25003E736747 /* AccountFormView+Dialogs.swift */; };
 		58B4D277C06FF46BD703483B /* ReviewPromptModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FC0D1679BAABD4DCEB7A1B3 /* ReviewPromptModifier.swift */; };
 		58D76A9C5BA047D8DA730DE6 /* RecurringFrequency+Label.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26AAE68F45DAA74B640096CB /* RecurringFrequency+Label.swift */; };
+		596277E8AFC6AF3899E45256 /* TransactionFormView+Household.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C34455B2FCB5CB9A146E2CB /* TransactionFormView+Household.swift */; };
 		59E0529AD0C2C827F4E01BB3 /* SimulateCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4483B90ADDC12EA6923C282A /* SimulateCaptureView.swift */; };
 		5A17DF8EC5391D9FB29B1E15 /* TransactionFormView+Recurring.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4201A86EDD51E43F6AF56621 /* TransactionFormView+Recurring.swift */; };
 		5AC76702BFC9E686203A47A6 /* AppNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797FA059761930E95F96636D /* AppNavigation.swift */; };
@@ -216,6 +217,7 @@
 		990454158221F345747B1CBF /* TransactionFormView+Title.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB1F930C7BB7378F46977A7 /* TransactionFormView+Title.swift */; };
 		9912029F3BA033365E943695 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 6CF67C6B40F5CAB317C7F6FC /* GRDB */; };
 		9A9522D7B248C0C29DC63A52 /* LocalMoneyConversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82A6B086F193EDA03980932 /* LocalMoneyConversion.swift */; };
+		9BE8774DF3B10DFC9E1BF807 /* HouseholdMemberNameCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3BFB2DBBD39AA2579E684ED /* HouseholdMemberNameCache.swift */; };
 		9C171D8DEF40254DF32EF44E /* OutboxLocalWrite+Transfers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EF250E1431E84C16157028C /* OutboxLocalWrite+Transfers.swift */; };
 		9C7DD97B77F64B45C887BF9D /* DashboardBlankState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF714EAD5AE98EB0246165E /* DashboardBlankState.swift */; };
 		9DB30A8E3FAF547AA25913CB /* DashboardCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666660B494D18FFDCFA6D9E9 /* DashboardCanvasView.swift */; };
@@ -583,6 +585,7 @@
 		79EC6068435CF1AB8689CD97 /* HouseholdView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdView.swift; sourceTree = "<group>"; };
 		7BA14030637CFFD08A547224 /* KeepoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoUITests.swift; sourceTree = "<group>"; };
 		7C29C6DAE9AD83B91CA49389 /* TestPurchaseDecisionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestPurchaseDecisionSheet.swift; sourceTree = "<group>"; };
+		7C34455B2FCB5CB9A146E2CB /* TransactionFormView+Household.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionFormView+Household.swift"; sourceTree = "<group>"; };
 		7E53170A30B0E65B4F55C184 /* ReviewPrompter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPrompter.swift; sourceTree = "<group>"; };
 		7EB85EAA8C8236A80CB106A6 /* Outbox+AccountsCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+AccountsCategories.swift"; sourceTree = "<group>"; };
 		7EC88E17D5F78D13BC67563C /* DashboardMetricSeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricSeries.swift; sourceTree = "<group>"; };
@@ -732,6 +735,7 @@
 		EFECEE9766B8475EB58B93D5 /* OutboxMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxMigration.swift; sourceTree = "<group>"; };
 		F0722C7D32EF6A7D41AC4C27 /* TagsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagsListView.swift; sourceTree = "<group>"; };
 		F149A624F5F2249B3FA98BA9 /* MetricHeadline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricHeadline.swift; sourceTree = "<group>"; };
+		F3BFB2DBBD39AA2579E684ED /* HouseholdMemberNameCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdMemberNameCache.swift; sourceTree = "<group>"; };
 		F3C8BE6B253E7496D8A8F487 /* SeriesWidgetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesWidgetState.swift; sourceTree = "<group>"; };
 		F3D1996C00A3B200872FFDA8 /* LocalTableQueriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTableQueriesTests.swift; sourceTree = "<group>"; };
 		F4D1ACC858F833C5F71AF85B /* HouseholdReportTags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdReportTags.swift; sourceTree = "<group>"; };
@@ -896,6 +900,7 @@
 				5623F587B3B8D61238E69B8D /* TransactionFormView+Data.swift */,
 				674719F7E885BAA299442408 /* TransactionFormView+Date.swift */,
 				68FD22A4D8E74530E6ECFCEA /* TransactionFormView+Delete.swift */,
+				7C34455B2FCB5CB9A146E2CB /* TransactionFormView+Household.swift */,
 				4201A86EDD51E43F6AF56621 /* TransactionFormView+Recurring.swift */,
 				D0BB3F19CDA0472C84CCAF8D /* TransactionFormView+Seed.swift */,
 				2A0B4894FE28691370A36F0E /* TransactionFormView+SharedHistory.swift */,
@@ -1286,6 +1291,7 @@
 				EE5BD64028F3B4CEAF95201D /* HouseholdBlankState.swift */,
 				E7D04C4098B946BDD9BEA9AB /* HouseholdData.swift */,
 				429EDEB71C3725F0838B5333 /* HouseholdKit.swift */,
+				F3BFB2DBBD39AA2579E684ED /* HouseholdMemberNameCache.swift */,
 				C898961FFBC213487D1CDC41 /* HouseholdSummaryCard.swift */,
 				79EC6068435CF1AB8689CD97 /* HouseholdView.swift */,
 				9F47DC93FFF5B30B798529B2 /* Report */,
@@ -1800,6 +1806,7 @@
 				BFA651B8387CAD32F21EC9AE /* HouseholdDiscoveryView.swift in Sources */,
 				2FA5C7471F5140A0CC03B744 /* HouseholdKit.swift in Sources */,
 				7C8FE756B3ACD3C96332648D /* HouseholdLinkError.swift in Sources */,
+				9BE8774DF3B10DFC9E1BF807 /* HouseholdMemberNameCache.swift in Sources */,
 				08BC136894905CD48CDB7EF5 /* HouseholdPairingMessage.swift in Sources */,
 				EB815779CF513F76B2473F8E /* HouseholdPairingPermission.swift in Sources */,
 				0BB9390B085C48CF4F9DA4E4 /* HouseholdPairingSession+Multipeer.swift in Sources */,
@@ -1957,6 +1964,7 @@
 				417D9CA1DF24EBD69F0A89F4 /* TransactionFormView+Data.swift in Sources */,
 				E28D269E5ACBCDE0B135659B /* TransactionFormView+Date.swift in Sources */,
 				D9C80C19804E752108250939 /* TransactionFormView+Delete.swift in Sources */,
+				596277E8AFC6AF3899E45256 /* TransactionFormView+Household.swift in Sources */,
 				5A17DF8EC5391D9FB29B1E15 /* TransactionFormView+Recurring.swift in Sources */,
 				9E3B038724CD348E84EC17AF /* TransactionFormView+Seed.swift in Sources */,
 				D80A863838C15E7F708C6637 /* TransactionFormView+SharedHistory.swift in Sources */,

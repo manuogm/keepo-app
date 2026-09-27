@@ -144,6 +144,14 @@ enum HouseholdDataLoader {
         // which is the same thing it draws for a member with no photo.
         if snapshot.hasHousehold {
             snapshot.peer = try? await HouseholdRepository.memberProfile(client: session.client)
+            // Write-through: this screen is the one place a renamed partner
+            // is ever seen fresh, so every visit is also what keeps
+            // `HouseholdMemberNameCache` (the transaction form's "Added by"
+            // pill) from drifting.
+            if let householdId = snapshot.household?.id,
+               let name = snapshot.peer?.displayName ?? snapshot.peer?.email {
+                HouseholdMemberNameCache.save(name, for: householdId)
+            }
         }
         return snapshot
     }

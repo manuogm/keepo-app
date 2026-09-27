@@ -115,6 +115,11 @@ struct TransactionFormView: View {
     @State var originalOccurredAt: Date?
     // created_by (who entered it) differs from the viewer on a shared account.
     @State var addedByHouseholdMember = false
+    /// The peer's name for the "Added by" line — read-through against
+    /// `HouseholdMemberNameCache` once `addedByHouseholdMember` is known;
+    /// `nil` (offline, or no display name/email set) falls back to the
+    /// generic phrasing. See `loadHouseholdMemberName`.
+    @State var householdMemberName: String?
 
     // Set from the row being reviewed — a pending, captured transaction —
     // so Save both applies any edit and confirms it in one tap, per the
@@ -278,9 +283,12 @@ struct TransactionFormView: View {
             recurringLine
 
             if addedByHouseholdMember {
-                Text("Added by your household member")
-                    .font(AppTheme.Typography.micro)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    KeepoIcon(name: "icon-home-filled", size: AppTheme.Size.glyphNano)
+                    Text("Added by \(householdMemberName ?? "your household member")")
+                        .font(AppTheme.Typography.micro)
+                }
+                .foregroundStyle(AppTheme.Palette.scopeHousehold)
             }
 
             if hiddenTransferSide != nil {

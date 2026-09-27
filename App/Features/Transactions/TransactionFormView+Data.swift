@@ -50,6 +50,9 @@ extension TransactionFormView {
             apply(transaction: transaction, legs: legs)
             adoptEditedCategory(heldCategory)
             await loadAppliedTags()
+            if addedByHouseholdMember {
+                await loadHouseholdMemberName()
+            }
         } else {
             seedCreateDefaults()
             // Explicitly, rather than leaving it to the `.task(id:)`

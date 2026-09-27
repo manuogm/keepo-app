@@ -314,10 +314,12 @@ public final class SessionStore {
     public func signOut() async throws {
         try await client.auth.signOut()
         try? await dbQueue.write { database in try SyncApply.wipeAllLocalData(database) }
-        // Same reasoning as the store wipe above, for the one piece of the
-        // user's data that does not live in it: a cached photo of their face,
-        // on disk, for whoever signs in on this device next.
+        // Same reasoning as the store wipe above, for the two pieces of the
+        // user's data that do not live in it: a cached photo of their face,
+        // and their household partner's cached name, on disk, for whoever
+        // signs in on this device next.
         AvatarStore.clearAllCached()
+        HouseholdMemberNameCache.clear()
         SyncCursorStore.resetAll()
         SyncCursorStore.clearLocalOwner()
         userId = nil
