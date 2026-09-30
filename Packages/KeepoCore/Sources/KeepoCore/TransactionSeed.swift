@@ -38,6 +38,13 @@ public struct TransactionSeed: Equatable, Sendable {
     /// It is **optional** because All Time is not a wide range, it is the
     /// absence of one — nothing is off screen, so there is nothing to clamp
     /// into and the entry is simply dated now.
+    ///
+    /// Category and type are copied **only when the filter names exactly
+    /// one** (`soleCategoryId`/`soleKind`). A ledger narrowed to Groceries
+    /// and Transport has not answered "which category", and prefilling
+    /// either of them would be the form inventing an answer the screen never
+    /// gave — the seed's whole contract is that it repeats what the user
+    /// already said.
     public init(
         filter: TransactionFilter,
         visible: DateInterval?,
@@ -46,8 +53,8 @@ public struct TransactionSeed: Equatable, Sendable {
     ) {
         self.init(
             accountId: filter.accountId,
-            categoryId: filter.categoryId,
-            kind: filter.kind,
+            categoryId: filter.soleCategoryId,
+            kind: filter.soleKind,
             occurredAt: visible.map { Self.date(in: $0, now: now, calendar: calendar) } ?? now
         )
     }

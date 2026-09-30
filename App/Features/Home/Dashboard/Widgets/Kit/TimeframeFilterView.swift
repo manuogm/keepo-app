@@ -69,12 +69,17 @@ struct TimeframeFilterView: View {
 /// both to be the same capsule at the same height — which they cannot be if
 /// each carries its own copy of these four numbers.
 ///
+/// Internal rather than `private` since the Transactions ledger's period
+/// track became the third: same shape, same question ("which period is
+/// this?"), and a fourth copy of the four numbers is how two controls that
+/// are meant to read as one control stop doing so.
+///
 /// Kept faint. The track is a surface for its contents to sit on, not an
 /// object in its own right — at a heavier grey the unselected letters lost
 /// their contrast against it and the whole control read as disabled. The
 /// border stays as a hairline on top, so it still has a defined edge on a
 /// card whose fill is close to the track's.
-private struct WidgetHeaderTrack: ViewModifier {
+struct WidgetHeaderTrack: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(.horizontal, AppTheme.Spacing.xs)
@@ -84,7 +89,7 @@ private struct WidgetHeaderTrack: ViewModifier {
     }
 }
 
-private extension View {
+extension View {
     func widgetHeaderTrack() -> some View { modifier(WidgetHeaderTrack()) }
 }
 

@@ -276,9 +276,13 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
                 // Breathing room under the card's edge — without it the
                 // first row of controls sits flush against the header and
                 // the panel reads as a continuation of it rather than as a
-                // drawer it opened.
+                // drawer it opened. Tight underneath, because everything
+                // below this panel is the screen's actual content: the
+                // drawer costs the ledger its height for as long as it is
+                // open, so it is one row of controls and the smallest
+                // surround that still reads as a surface.
                 .padding(.top, AppTheme.Spacing.s)
-                .padding(.bottom, AppTheme.Spacing.m)
+                .padding(.bottom, AppTheme.Spacing.s)
         }
         .frame(maxWidth: .infinity)
         .background(

@@ -1,4 +1,6 @@
 import Foundation
+import KeepoCore
+import Supabase
 
 /// The household partner's display name, cached device-locally so reading it
 /// — the transaction form's "Added by" pill, chiefly — almost never costs the
@@ -35,6 +37,24 @@ enum HouseholdMemberNameCache {
         let defaults = UserDefaults.standard
         defaults.set(householdId.uuidString, forKey: householdIdKey)
         defaults.set(name, forKey: nameKey)
+    }
+
+    /// The partner's name for a household, cache first and the network only
+    /// when the cache cannot answer — **the** read-through, called by the
+    /// transaction form's "Added by" pill and by the ledger's "Added by"
+    /// filter. Two copies of this would be two devices' worth of round trips
+    /// and one more place to forget the `save`.
+    ///
+    /// `nil` is "not known on this device right now" (offline, or the RPC
+    /// refused), never "no partner" — callers fall back to their own generic
+    /// wording rather than asserting anything about the household.
+    static func resolvedName(for householdId: UUID, client: SupabaseClient) async -> String? {
+        if let cached = name(for: householdId) { return cached }
+        guard let peer = try? await HouseholdRepository.memberProfile(client: client),
+              let name = peer.displayName ?? peer.email
+        else { return nil }
+        save(name, for: householdId)
+        return name
     }
 
     /// Called alongside `AvatarStore.clearAllCached()` and

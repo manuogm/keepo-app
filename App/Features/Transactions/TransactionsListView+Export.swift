@@ -5,32 +5,34 @@ import SwiftUI
 // TransactionsListView+Filters.swift for the project's file-length lint.
 
 extension TransactionsListView {
-    /// The header's controls: the funnel always, and — only while the filter
-    /// panel is open — export what the filters are showing (the user's call:
-    /// export belongs with the filters it carries, not in the header at
-    /// rest). It fades on `colorSafe` rather than riding the panel's spring,
-    /// because a spring on an opacity change is a rendering bug here.
+    /// The header's controls: export, then the funnel.
+    ///
+    /// **Both always**, on the user's call — reversing the earlier rule that
+    /// showed export only while the filter panel was open. That rule was
+    /// written when every filter lived in the panel, so "what you are
+    /// exporting" was only legible with the panel down. The account and the
+    /// period are pinned to the canvas now and the export starts from those
+    /// as much as from the funnel's filters, so there is no longer a state in
+    /// which the button is offering something the screen cannot show you.
     var headerActions: some View {
         HStack(spacing: AppTheme.Spacing.s) {
-            if isFiltersExpanded {
-                exportButton
-                    .transition(.opacity.animation(AppTheme.Motion.colorSafe))
-            }
+            exportButton
             filterToggle
         }
     }
 
     /// Export, starting from exactly what is on screen: the account filter
     /// (or, with none, every account the current scope card shows), the
-    /// period, and the category, type and search filters — so the Export
-    /// screen opens with only the format left to choose.
+    /// period, and the category, type, author and search filters — so the
+    /// Export screen opens with only the format left to choose.
     ///
-    /// Beside the funnel, in the banner, but shown only with the panel open.
+    /// Beside the funnel, in the banner.
     var exportButton: some View {
         Button {
             exportRequest = ExportRequest(
                 accountIds: exportAccountIds, period: ExportPeriod.matching(range, calendar: calendar),
-                categoryId: filter.categoryId, kind: filter.kind, search: filter.search
+                categoryIds: filter.categoryIds, kinds: filter.kinds,
+                createdByIds: filter.createdByIds, sources: filter.sources, search: filter.search
             )
         } label: {
             Image(systemName: "square.and.arrow.up")

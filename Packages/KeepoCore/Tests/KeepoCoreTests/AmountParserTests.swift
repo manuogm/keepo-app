@@ -175,3 +175,35 @@ struct AmountFormatterSignedTests {
         #expect(AmountParser.parse(text, locale: usLocale) == 8_400_000)
     }
 }
+
+/// The overflow boundary. `NSDecimalNumber.int64Value` **wraps** rather than
+/// trapping or saturating, so before this was guarded a long enough string of
+/// digits came back as a plausible amount that was not the one given — via
+/// `parse` from a typed field, and via `parseFormattedCurrency` from a Wallet
+/// capture, where nothing human reads the figure before it is written.
+@Suite("Amount parser overflow")
+struct AmountParserOverflowTests {
+    @Test("A number too large to hold is nil, never a wrapped one")
+    func tooLargeIsNil() {
+        #expect(AmountParser.parse(String(repeating: "9", count: 40)) == nil)
+        #expect(AmountParser.parse("-" + String(repeating: "9", count: 40)) == nil)
+        #expect(AmountParser.parseFormattedCurrency("$" + String(repeating: "9", count: 40)) == nil)
+    }
+
+    /// The largest value that still scales, and the first one that does not.
+    @Test("The boundary itself holds")
+    func boundary() {
+        #expect(AmountParser.parse("922337203685477") == 9_223_372_036_854_770_000)
+        #expect(AmountParser.parse("922337203685478") == nil)
+    }
+
+    /// The guard must not have narrowed anything real: every figure a person
+    /// or a payment terminal produces still parses exactly as before.
+    @Test("Ordinary amounts are untouched")
+    func ordinaryAmountsUnaffected() {
+        #expect(AmountParser.parse("12.34") == 123_400)
+        #expect(AmountParser.parse("-1250.75") == -12_507_500)
+        #expect(AmountParser.parse("0") == 0)
+        #expect(AmountParser.parseFormattedCurrency("$1.06") == 10_600)
+    }
+}

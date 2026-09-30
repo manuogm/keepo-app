@@ -29,7 +29,7 @@ struct TransactionSeedTests {
     func filtersTravel() {
         let account = UUID()
         let category = UUID()
-        let filter = TransactionFilter(accountId: account, categoryId: category, kind: "income")
+        let filter = TransactionFilter(accountId: account, categoryIds: [category], kinds: ["income"])
         let seed = TransactionSeed(
             filter: filter, visible: month(2026, 9), now: date(2026, 9, 18, 14, 32), calendar: calendar
         )
@@ -37,6 +37,39 @@ struct TransactionSeedTests {
         #expect(seed.accountId == account)
         #expect(seed.categoryId == category)
         #expect(seed.kind == "income")
+    }
+
+    /// The ledger's category and type axes are multi-select, and a form can
+    /// only open on one of each. Two is not an answer, so it seeds neither —
+    /// see `TransactionSeed.init(filter:visible:)`.
+    @Test("Several categories or types seed nothing on that axis")
+    func severalValuesSeedNothing() {
+        let account = UUID()
+        let filter = TransactionFilter(
+            accountId: account, categoryIds: [UUID(), UUID()], kinds: ["expense", "income"]
+        )
+        let seed = TransactionSeed(
+            filter: filter, visible: month(2026, 9), now: date(2026, 9, 18, 14, 32), calendar: calendar
+        )
+
+        // The account is single-select on this screen, so it still travels.
+        #expect(seed.accountId == account)
+        #expect(seed.categoryId == nil)
+        #expect(seed.kind == nil)
+    }
+
+    /// An axis narrowed to nothing at all is not an axis narrowed to one
+    /// thing — the empty set matches no rows, and a prefill must not read it
+    /// as an answer.
+    @Test("An empty axis seeds nothing on that axis")
+    func emptyAxisSeedsNothing() {
+        let filter = TransactionFilter(categoryIds: [], kinds: [])
+        let seed = TransactionSeed(
+            filter: filter, visible: month(2026, 9), now: date(2026, 9, 18, 14, 32), calendar: calendar
+        )
+
+        #expect(seed.categoryId == nil)
+        #expect(seed.kind == nil)
     }
 
     /// An unfiltered Add has to behave exactly as it did before any of

@@ -12,8 +12,12 @@ struct ExportSelection: Equatable {
     var period: ExportPeriod?
     /// Carried over from the Transactions list's filters, each removable on
     /// the Export screen. `nil` everywhere for an export started from Profile.
-    var categoryId: UUID?
-    var kind: String?
+    /// Sets, matching the ledger's own multi-select axes — see
+    /// `ExportRequest`.
+    var categoryIds: Set<UUID>?
+    var kinds: Set<String>?
+    var createdByIds: Set<UUID>?
+    var sources: Set<PublicSchema.TransactionSource>?
     var search: String?
     var format: ExportFormat?
 
@@ -22,13 +26,14 @@ struct ExportSelection: Equatable {
         guard let period else { return nil }
         let interval = period.interval(now: now, calendar: calendar)
         return TransactionFilter(
-            categoryId: categoryId, kind: kind, from: interval?.start, through: interval?.end,
-            search: search, accountIds: accountIds
+            categoryIds: categoryIds, kinds: kinds, createdByIds: createdByIds, sources: sources,
+            from: interval?.start, through: interval?.end, search: search, accountIds: accountIds
         )
     }
 
     var hasCarriedFilters: Bool {
-        categoryId != nil || kind != nil || !(search?.isEmpty ?? true)
+        categoryIds != nil || kinds != nil || createdByIds != nil || sources != nil
+            || !(search?.isEmpty ?? true)
     }
 }
 

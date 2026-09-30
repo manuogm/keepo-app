@@ -44,8 +44,11 @@ extension TransactionsListView {
     /// comes back to this tab, long after they changed it to something else.
     func applyPendingRequest() {
         guard let navigation, let request = navigation.transactionsRequest else { return }
-        filter.categoryId = request.categoryId
-        filter.kind = request.kind
+        // One value each, as a set of one — the widget asks about a single
+        // category and a single direction, and `TransactionFilter` holds
+        // every axis as a set now.
+        filter.categoryIds = request.categoryId.map { [$0] }
+        filter.kinds = request.kind.map { [$0] }
         period = .custom
         isAllTime = false
         customFrom = request.from
@@ -54,9 +57,13 @@ extension TransactionsListView {
         navigation.transactionsRequest = nil
         // The ask came from another screen, so the controls that produced
         // this state are not the ones on screen — open the panel so the
-        // period and category the user is now looking at are visible rather
-        // than hidden behind the funnel.
-        isFiltersExpanded = true
+        // category the user is now looking at is visible rather than hidden
+        // behind the funnel. Only for a category or a type: the period the
+        // request also sets is on the always-visible bar now, so a request
+        // that narrows nothing else has nothing to reveal.
+        if filter.categoryIds != nil || filter.kinds != nil {
+            isFiltersExpanded = true
+        }
     }
 
     /// Whether the ledger on screen is still the slice the dashboard asked
@@ -75,8 +82,8 @@ extension TransactionsListView {
     /// more closely, so the way back survives it.
     var isShowingHandedOverSlice: Bool {
         guard let originRequest else { return false }
-        return filter.categoryId == originRequest.categoryId
-            && filter.kind == originRequest.kind
+        return filter.categoryIds == originRequest.categoryId.map { [$0] }
+            && filter.kinds == originRequest.kind.map { [$0] }
             && period == .custom
             && !isAllTime
             && customFrom == originRequest.from

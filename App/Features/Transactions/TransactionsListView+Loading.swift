@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import KeepoCore
 
 /// Data loading and mutation for `TransactionsListView` — split out purely
@@ -23,6 +24,7 @@ extension TransactionsListView {
             effective.through = range?.end
             return effective
         }()
+        let now = Date()
         do {
             let loaded: LoadedTransactionsState = try await dbQueue.read { database in
                 let transactions = try LocalTransactionRow.fetchFiltered(
@@ -37,17 +39,16 @@ extension TransactionsListView {
                     ),
                     completeTransferGroups: try LocalTransactionRow.completeTransferGroups(
                         database, among: Array(Set(transactions.compactMap { $0.transferGroupId?.uuidString }))
+                    ),
+                    allAccountsBalance: try Self.allAccountsBalance(
+                        database, scope: scope, baseCurrency: baseCurrency, now: now
+                    ),
+                    availableSources: try LocalTransactionRow.availableSources(
+                        database, scope: scope, ownerId: ownerId.uuidString
                     )
                 )
             }
-            transactions = loaded.transactions
-            completeTransferGroups = Set(loaded.completeTransferGroups.compactMap(UUID.init(uuidString:)))
-            filterCategories = loaded.categories
-            filterAccounts = loaded.accounts
-            // Day grouping and the category lookup are derived here, once,
-            // rather than recomputed inside `body` — see `regroup`'s own
-            // comment on why that mattered.
-            regroup()
+            adopt(loaded)
         } catch {
             // A cancelled load is not a failure the user needs told about —
             // it means the task id changed and a newer load is already in
@@ -60,6 +61,91 @@ extension TransactionsListView {
             }
         }
         isLoading = false
+    }
+
+    /// The day grouping and the category lookup the list draws from, built
+    /// **once per load** — beside the load that feeds them rather than in the
+    /// view, which is at the project's file-length limit.
+    func regroup() {
+        // Transfer legs are folded into one entry BEFORE the day grouping,
+        // not inside it — both legs carry the same `occurred_at`, but the
+        // pairing is a property of the transfer, not of the day it landed on.
+        let groups = Dictionary(grouping: TransactionEntry.collapsingTransfers(transactions)) { entry -> Date in
+            guard
+                let occurredAt = entry.transaction.occurredAt,
+                let date = PostgresDate.date(fromTimestamp: occurredAt)
+            else { return .distantPast }
+            return calendar.startOfDay(for: date)
+        }
+        groupedByDay = groups.keys.sorted(by: >).map { day in DayGroup(day: day, items: groups[day] ?? []) }
+        // Same reasoning: the filter list is small but the lookup runs once
+        // per row per render, so it is built once here instead.
+        categoriesById = Dictionary(filterCategories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    func category(
+        for transaction: PublicSchema.TransactionsWithDetailsSelect
+    ) -> PublicSchema.CategoriesSelect? {
+        transaction.categoryId.flatMap { categoriesById[$0] }
+    }
+
+    /// Everything one read produced, moved onto the screen together.
+    ///
+    /// Split from `load()` so that function stays inside the project's
+    /// `function_body_length` lint, and because the two halves are genuinely
+    /// different work: one asks the database a question, this one is the only
+    /// place the answer becomes state.
+    private func adopt(_ loaded: LoadedTransactionsState) {
+        transactions = loaded.transactions
+        completeTransferGroups = Set(loaded.completeTransferGroups.compactMap(UUID.init(uuidString:)))
+        filterCategories = loaded.categories
+        filterAccounts = loaded.accounts
+        allAccountsBalance = loaded.allAccountsBalance
+        availableSources = loaded.availableSources
+        // A source that has left the ledger — the last capture deleted, say —
+        // must not go on filtering from a pill that is no longer drawn. Same
+        // guard `loadAuthors` applies to a dissolved household.
+        if let sources = filter.sources {
+            let surviving = sources.intersection(loaded.availableSources)
+            filter.sources = surviving.isEmpty ? nil : surviving
+        }
+        // Day grouping and the category lookup are derived here, once, rather
+        // than recomputed inside `body` — see `regroup`'s own comment on why
+        // that mattered.
+        regroup()
+    }
+
+    /// The scope's net worth, in the viewer's base currency — what the
+    /// account chip and the picker's "All accounts" row show.
+    ///
+    /// `LocalMoneyConversion.netWorth` rather than a sum of anything on this
+    /// screen: the ledger holds one period of one filter, a balance holds every
+    /// transaction there has ever been, and the Home hero already asks this
+    /// exact question. `nil` when the base currency is unknown to the mirror or
+    /// any account's rate cannot be resolved — money rule 5, rendered `—`.
+    /// `nonisolated` because it runs **inside** the database read's own
+    /// closure, off the main actor: a `View` is `@MainActor`, and a static
+    /// member of one would have hopped the `Database` handle across actors to
+    /// get there — which is a data race, not a detail (Swift 6 rejects it).
+    nonisolated private static func allAccountsBalance(
+        _ database: Database, scope: PublicSchema.AccountScope, baseCurrency: String, now: Date
+    ) throws -> AccountFilterBalance? {
+        guard let currency = try LocalTableQueries.currencyInfo(database, code: baseCurrency) else { return nil }
+        let amountE4 = try LocalMoneyConversion.netWorth(
+            database, LocalMoneyScope(scope: scope, baseCurrency: baseCurrency),
+            asOf: PostgresDate.dateOnlyString(now, calendar: utcCalendar), now: now
+        )
+        return AccountFilterBalance(amountE4: amountE4, currency: currency)
+    }
+
+    /// Who the "Added by" filter may offer, and the one thing that has to
+    /// happen when it turns out to be nobody: **clear the filter**. A
+    /// household dissolved while this screen held an author filter would
+    /// otherwise keep narrowing the list with no pill left to say so — the
+    /// funnel's dot would be lit and point at nothing.
+    func loadAuthors() async {
+        authors = await TransactionAuthors.load(session: session)
+        if authors.isEmpty { filter.createdByIds = nil }
     }
 
     /// A: the local write-through already removes each row from the list
@@ -134,6 +220,8 @@ private struct LoadedTransactionsState {
     let categories: [PublicSchema.CategoriesSelect]
     let accounts: [LocalAccountRow]
     let completeTransferGroups: Set<String>
+    let allAccountsBalance: AccountFilterBalance?
+    let availableSources: [PublicSchema.TransactionSource]
 }
 
 /// What `load()` re-runs on — the list's `.task(id:)` key. Beside `load()`

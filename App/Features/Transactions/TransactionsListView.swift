@@ -38,12 +38,36 @@ struct TransactionsListView: View {
     @State var filterCategories: [PublicSchema.CategoriesSelect] = []
     @State var filterAccounts: [LocalAccountRow] = []
     @State private var isAddingTransaction = false
-    @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
-    @State private var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
-    @State private var editingRecurringRule: PublicSchema.RecurringRulesSelect?
+    // Not `private` — read/written from TransactionsListView+Adding.swift,
+    // which owns what a tap on a row opens.
+    @State var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
+    @State var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
+    @State var editingRecurringRule: PublicSchema.RecurringRulesSelect?
     @State var filter = TransactionFilter()
     // Not `private` — read/written from TransactionsListView+Filters.swift.
     @State var isSearching = false
+    /// Not `private` for the same reason, and `@FocusState` rather than a
+    /// `@State` flag because only the field can own whether it holds the
+    /// keyboard — see `searchField`, which claims it as it appears.
+    @FocusState var isSearchFieldFocused: Bool
+    /// The picker the pinned row's chevron opens; its body opens the form.
+    @State var isAccountPickerPresented = false
+    @State var editingAccountId: UUID?
+    /// Which of the drop-down's multi-select sheets is open, if any.
+    @State var activeFilterSheet: TransactionFilterSheet?
+    /// Who the "Added by" filter may offer — empty without a paired household,
+    /// which is also what hides that pill (`TransactionAuthors`).
+    @State var authors: [TransactionAuthor] = []
+    /// Which sources this ledger actually holds. Fewer than two and the Source
+    /// pill is hidden, for the reason the "Added by" pill hides without a
+    /// household: an axis with one option cannot narrow anything.
+    @State var availableSources: [PublicSchema.TransactionSource] = []
+    /// The scope's net worth, for the pinned row and the picker's "All
+    /// accounts". `load()` computes it through `LocalMoneyConversion.netWorth`,
+    /// the Home hero's own read, never by summing what is on screen — those
+    /// rows are one period of one filter, and a balance is neither. Not cleared
+    /// when a load starts, so stepping months does not flash an em dash.
+    @State var allAccountsBalance: AccountFilterBalance?
     /// Whether the header's filter panel is showing. Owned here rather than
     /// by the banner: `applyPendingRequest` opens it when another screen
     /// hands this one a filter, so the state has to outlive the button.
@@ -62,8 +86,10 @@ struct TransactionsListView: View {
     /// because the ledger is what it takes over *from* — the drawer cannot
     /// hide a sibling it does not own.
     @State private var isInboxExpanded = false
-    @State private var groupedByDay: [DayGroup] = []
-    @State private var categoriesById: [UUID: PublicSchema.CategoriesSelect] = [:]
+    // Not `private` — derived by `regroup()` in TransactionsListView+Loading.swift,
+    // which is where the load that produces them lives.
+    @State var groupedByDay: [DayGroup] = []
+    @State var categoriesById: [UUID: PublicSchema.CategoriesSelect] = [:]
 
     // Not `private` — read/written from TransactionsListView+Period.swift.
     @State var period: Period = .month
@@ -78,13 +104,24 @@ struct TransactionsListView: View {
     /// The pre-filled Export sheet — see TransactionsListView+Export.swift.
     @State var exportRequest: ExportRequest?
 
-    /// The filter pills' fixed width — the fix for the distortion
-    /// `pillLabel` documents, and the reason it is a *width* rather than a
-    /// minimum. `@ScaledMetric` so a chip still fits its own label at larger
-    /// Dynamic Type sizes instead of truncating "Categories" at AX1.
+    /// The filter pills' width while **unset** — wide enough for the longest
+    /// axis name, and the same for all three so they read as one control.
+    /// `@ScaledMetric` so a chip still fits its own label at larger Dynamic
+    /// Type sizes instead of truncating the axis name at AX1.
     ///
     /// Not `private` — read from TransactionsListView+Filters.swift.
     @ScaledMetric(relativeTo: .subheadline) var pillWidth: CGFloat = 104
+    /// The width of a pill that has an answer on it, which needs more room:
+    /// the label goes from "Category" to a category's name or "Category · 2",
+    /// in semibold. Three unset pills plus the search button fit a 402pt row
+    /// exactly; three *answered* ones do not, and scroll — which is the right
+    /// way round, since the row only outgrows the screen once the user has
+    /// actually narrowed something.
+    ///
+    /// Two fixed widths rather than one flexible one: a pill that sizes to its
+    /// own text makes the row re-lay itself out on every pick, and a `minWidth`
+    /// does the same thing more quietly. Not `private`, same reason as above.
+    @ScaledMetric(relativeTo: .subheadline) var answeredPillWidth: CGFloat = 132
 
     // Not `private` — read from TransactionsListView+Period.swift.
     let calendar = Calendar.current
@@ -114,33 +151,10 @@ struct TransactionsListView: View {
         var id: Date { day }
     }
 
-    func regroup() {
-        // Transfer legs are folded into one entry BEFORE the day grouping,
-        // not inside it — both legs carry the same `occurred_at`, but the
-        // pairing is a property of the transfer, not of the day it landed on.
-        let groups = Dictionary(grouping: TransactionEntry.collapsingTransfers(transactions)) { entry -> Date in
-            guard
-                let occurredAt = entry.transaction.occurredAt,
-                let date = PostgresDate.date(fromTimestamp: occurredAt)
-            else { return .distantPast }
-            return calendar.startOfDay(for: date)
-        }
-        groupedByDay = groups.keys.sorted(by: >).map { day in DayGroup(day: day, items: groups[day] ?? []) }
-        // Same reasoning: the filter list is small but the lookup runs once
-        // per row per render, so it is built once here instead.
-        categoriesById = Dictionary(filterCategories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-    }
-
-    private func category(
-        for transaction: PublicSchema.TransactionsWithDetailsSelect
-    ) -> PublicSchema.CategoriesSelect? {
-        transaction.categoryId.flatMap { categoriesById[$0] }
-    }
-
     // MARK: - Body
 
     var body: some View {
-        listContent
+        ledgerWithFilterSheets
             .dropsBottomSafeArea()
             .toolbar(.hidden, for: .navigationBar)
             .onChange(of: navigation?.pendingAdd) { _, _ in
@@ -177,6 +191,12 @@ struct TransactionsListView: View {
             .task(id: TransactionsLoadKey(
                 token: session.refresh.token, scope: session.scope, filter: filter, range: range
             )) { await load() }
+            // Its own task, not part of `load()`: resolving a partner's name
+            // can cost a network round trip on a first-ever read, and the
+            // ledger must not wait behind it. Keyed on the refresh token
+            // alone, so pairing or dissolving a household re-reads it while
+            // changing a filter or a period does not.
+            .task(id: session.refresh.token) { await loadAuthors() }
             // Another screen asking for a specific slice of the ledger — the
             // Cashflow widget's category chevron. `onAppear` as well as
             // `onChange` because the request is set in the same turn as the
@@ -192,7 +212,10 @@ struct TransactionsListView: View {
 
     // MARK: - Content
 
-    private var listContent: some View {
+    // Not `private` — wrapped by `ledgerWithFilterSheets` in
+    // TransactionsListView+FilterBar.swift, which attaches the filter
+    // controls' own sheets.
+    var listContent: some View {
         ZStack {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
@@ -219,8 +242,17 @@ struct TransactionsListView: View {
                     .zIndex(0)
 
                 if !isInboxExpanded {
+                    // Pinned rather than scrolling with the list: these
+                    // two say what the list is, and an explanation that
+                    // scrolls off is not one. Below the drawer because they
+                    // are the *ledger's* controls — when the inbox takes the
+                    // screen there is no list left for them to filter.
+                    filterBar
+                        .padding(.horizontal, AppTheme.Spacing.l)
+                        .padding(.top, AppTheme.Spacing.s)
+
                     ledger
-                        .padding(.top, AppTheme.Spacing.xs)
+                        .padding(.top, AppTheme.Spacing.s)
                         .fadingEdges()
                         .transition(.opacity)
                 }
@@ -238,8 +270,10 @@ struct TransactionsListView: View {
             Spacer()
         } else if transactions.isEmpty {
             Spacer()
-            Text("No transactions in this period")
+            Text(emptyLedgerMessage)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, AppTheme.Spacing.l)
             Spacer()
         } else {
             transactionList
@@ -342,43 +376,6 @@ struct TransactionsListView: View {
     private func offerLessons() async {
         guard firstTransactionId != nil else { return }
         await ftux?.offer([FTUXLessons.swipeDelete])
-    }
-
-    // MARK: - Adding
-
-    /// What the ledger is currently narrowed to, handed to the form so that
-    /// filtering and adding are one gesture instead of the same answers
-    /// given twice. Read at presentation time, so it is whatever the panel
-    /// says the moment the sheet opens rather than whatever it said when
-    /// this screen was built.
-    ///
-    /// The period travels as a **date**, clamped into the range on screen:
-    /// the list filters on `occurred_at`, so a transaction added while
-    /// looking at March and dated today would save and then vanish. See
-    /// `TransactionSeed.date(in:now:calendar:)`.
-    private var newTransactionSeed: TransactionSeed {
-        TransactionSeed(filter: filter, visible: range)
-    }
-
-    // MARK: - Transaction helpers
-
-    private func handleTap(on transaction: PublicSchema.TransactionsWithDetailsSelect) {
-        if transaction.recurringRuleId != nil {
-            recurringEditChoice = transaction
-        } else {
-            editingTransaction = transaction
-        }
-    }
-
-    private var recurringChoiceBinding: Binding<Bool> {
-        Binding(get: { recurringEditChoice != nil }, set: { if !$0 { recurringEditChoice = nil } })
-    }
-
-    private func openRecurringRule(for transaction: PublicSchema.TransactionsWithDetailsSelect) async {
-        guard let ruleId = transaction.recurringRuleId else { return }
-        editingRecurringRule = try? await session.dbQueue.read { database in
-            try LocalTableQueries.recurringRule(database, id: ruleId.uuidString)
-        }
     }
 }
 

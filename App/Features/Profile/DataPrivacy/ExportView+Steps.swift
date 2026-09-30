@@ -206,14 +206,34 @@ extension ExportView {
             Text("Also filtered by")
                 .font(AppTheme.Typography.label)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
+            // One chip per value, each dropped on its own: a ledger narrowed
+            // to three categories carries three chips, because "3 categories"
+            // on one chip could only be removed all at once, and the whole
+            // point of showing them is that the user can change their mind
+            // about any one of them.
+            //
+            // Sorted by the label rather than left in set order — a `Set` has
+            // none, and chips that reshuffle on every redraw read as a fault.
             TagFlowLayout(spacing: AppTheme.Spacing.s) {
-                if let categoryId = selection.categoryId {
-                    ExportFilterChip(title: categories.first { $0.id == categoryId }?.name ?? "Category") {
-                        selection.categoryId = nil
+                ForEach(categoryChips, id: \.id) { chip in
+                    ExportFilterChip(title: chip.title) {
+                        selection.categoryIds = FilterSelection.toggling(chip.id, in: selection.categoryIds)
                     }
                 }
-                if let kind = selection.kind {
-                    ExportFilterChip(title: Self.kindLabel(kind)) { selection.kind = nil }
+                ForEach(kindChips, id: \.id) { chip in
+                    ExportFilterChip(title: chip.title) {
+                        selection.kinds = FilterSelection.toggling(chip.id, in: selection.kinds)
+                    }
+                }
+                ForEach(sourceChips, id: \.id) { chip in
+                    ExportFilterChip(title: chip.title) {
+                        selection.sources = FilterSelection.toggling(chip.id, in: selection.sources)
+                    }
+                }
+                ForEach(authorChips, id: \.id) { chip in
+                    ExportFilterChip(title: chip.title) {
+                        selection.createdByIds = FilterSelection.toggling(chip.id, in: selection.createdByIds)
+                    }
                 }
                 if let search = selection.search, !search.isEmpty {
                     ExportFilterChip(title: "\u{201C}\(search)\u{201D}") { selection.search = nil }
@@ -223,12 +243,41 @@ extension ExportView {
         .padding(.vertical, AppTheme.Spacing.s)
     }
 
-    private static func kindLabel(_ kind: String) -> String {
-        switch kind {
-        case "income": return "Income"
-        case "transfer": return "Transfers"
-        default: return "Expenses"
+    private var categoryChips: [FilterChipLabel<UUID>] {
+        (selection.categoryIds ?? []).map { id in
+            FilterChipLabel(id: id, title: categories.first { $0.id == id }?.name ?? "Category")
         }
+        .sorted { $0.title < $1.title }
+    }
+
+    /// `TransactionsListView.kindTitle` rather than a second switch — the
+    /// three type names are spelled once, where the ledger's own sheet spells
+    /// them, so a file's chip and the pill it came from cannot disagree.
+    private var kindChips: [FilterChipLabel<String>] {
+        (selection.kinds ?? []).map {
+            FilterChipLabel(id: $0, title: TransactionsListView.kindTitle($0))
+        }
+        .sorted { $0.title < $1.title }
+    }
+
+    /// `TransactionsListView.sourceTitle`, so a chip here and the pill it came
+    /// from cannot spell the same source two ways.
+    private var sourceChips: [FilterChipLabel<PublicSchema.TransactionSource>] {
+        (selection.sources ?? []).map {
+            FilterChipLabel(id: $0, title: TransactionsListView.sourceTitle($0))
+        }
+        .sorted { $0.title < $1.title }
+    }
+
+    /// "Added by You". The name alone would read as a person's chip rather
+    /// than as a filter on who entered the row.
+    private var authorChips: [FilterChipLabel<UUID>] {
+        (selection.createdByIds ?? []).map { id in
+            FilterChipLabel(
+                id: id, title: "Added by \(authors.first { $0.id == id }?.name ?? "someone")"
+            )
+        }
+        .sorted { $0.title < $1.title }
     }
 
     private static func symbol(for format: ExportFormat) -> String {
@@ -250,4 +299,10 @@ extension ExportView {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityAddTraits(.isHeader)
     }
+}
+
+/// One carried filter chip: the value it drops and the words on it.
+struct FilterChipLabel<ID: Hashable>: Identifiable {
+    let id: ID
+    let title: String
 }

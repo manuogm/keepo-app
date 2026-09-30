@@ -9,8 +9,18 @@ struct ExportRequest: Identifiable, Equatable {
     /// `nil` means every account.
     let accountIds: Set<UUID>?
     let period: ExportPeriod
-    let categoryId: UUID?
-    let kind: String?
+    /// The ledger's own axes, each `nil` for "not narrowed". Sets, because the
+    /// ledger's drop-down is multi-select — a file exported from a list showing
+    /// three categories has to hold those three, or it is not the list in a
+    /// file (`LocalTransactionRow.filteredSource` is the one definition of
+    /// which rows a filter selects, and both sides read it).
+    let categoryIds: Set<UUID>?
+    let kinds: Set<String>?
+    /// Who entered the transaction — `transactions.created_by`, the ledger's
+    /// "Added by" filter.
+    let createdByIds: Set<UUID>?
+    /// How it got here — `transactions.source`, the ledger's Source filter.
+    let sources: Set<PublicSchema.TransactionSource>?
     let search: String?
 }
 
@@ -61,6 +71,10 @@ struct ExportView: View {
     // ExportView+Steps.swift, an extension in a different file.
     @State var accounts: [LocalAccountRow] = []
     @State var categories: [PublicSchema.CategoriesSelect] = []
+    /// Only to label a carried "Added by" filter — see `carriedFilters`. The
+    /// same list the ledger's own filter offers, loaded through the same
+    /// function, so a chip here names the person the pill there named.
+    @State var authors: [TransactionAuthor] = []
     @State var selection = ExportSelection()
     @State var step: Step = .accounts
     @State var entryCount: Int?
@@ -285,6 +299,11 @@ struct ExportView: View {
         // an export is the list the user was looking at, in a file.
         accounts = (loaded?.0 ?? []).filter { $0.archivedAt == nil }
         categories = loaded?.1 ?? []
+        // Only worth the lookup for an export that carried one over; an
+        // export started from Profile has no author filter to label.
+        if request?.createdByIds != nil {
+            authors = await TransactionAuthors.load(session: session)
+        }
 
         let everyAccount = Set(accounts.map(\.id))
         if let request {
@@ -295,8 +314,10 @@ struct ExportView: View {
                 range = DayRange(isAllTime: true)
             }
             selection.period = period(for: range)
-            selection.categoryId = request.categoryId
-            selection.kind = request.kind
+            selection.categoryIds = request.categoryIds
+            selection.kinds = request.kinds
+            selection.createdByIds = request.createdByIds
+            selection.sources = request.sources
             selection.search = request.search
             step = .format
         } else {
@@ -352,15 +373,19 @@ struct ExportView: View {
     private struct CountKey: Equatable {
         let accountIds: Set<UUID>
         let period: ExportPeriod?
-        let categoryId: UUID?
-        let kind: String?
+        let categoryIds: Set<UUID>?
+        let kinds: Set<String>?
+        let createdByIds: Set<UUID>?
+        let sources: Set<PublicSchema.TransactionSource>?
         let search: String?
 
         init(selection: ExportSelection) {
             accountIds = selection.accountIds
             period = selection.period
-            categoryId = selection.categoryId
-            kind = selection.kind
+            categoryIds = selection.categoryIds
+            kinds = selection.kinds
+            createdByIds = selection.createdByIds
+            sources = selection.sources
             search = selection.search
         }
     }
@@ -369,19 +394,4 @@ struct ExportView: View {
         let url: URL
         var id: URL { url }
     }
-}
-
-/// The system share sheet, reporting whether the file actually went
-/// somewhere — so the screen can clean up after it and confirm success.
-private struct ShareSheet: UIViewControllerRepresentable {
-    let fileURL: URL
-    let onComplete: (Bool) -> Void
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
-        controller.completionWithItemsHandler = { _, completed, _, _ in onComplete(completed) }
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

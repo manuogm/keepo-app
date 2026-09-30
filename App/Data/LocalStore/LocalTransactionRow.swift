@@ -86,8 +86,7 @@ enum LocalTransactionRow {
                t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                t.recurring_rule_id, t.original_amount_e4, t.original_currency,
                ocur.minor_unit AS original_minor_unit,
-               CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
-                    WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
+               \(kindExpression) AS kind
         \(source.sql)
         ORDER BY t.occurred_at DESC, t.id DESC
         """
@@ -121,55 +120,6 @@ enum LocalTransactionRow {
         return (sql, arguments)
     }
 
-    /// The user's own filter terms, appended to `sql` with their arguments
-    /// in the same order. Split out of `fetchFiltered` purely to keep that
-    /// function under the project's `function_body_length` lint.
-    private static func append(
-        _ filter: TransactionFilter, to sql: inout String, arguments: inout [DatabaseValueConvertible]
-    ) {
-        if let accountId = filter.accountId {
-            sql += " AND t.account_id = ?"
-            arguments.append(accountId.uuidString)
-        }
-        if let accountIds = filter.accountIds {
-            // An empty set is "no accounts", not "any account" — `IN ()` is
-            // not valid SQLite, so it is spelled as a clause that is false.
-            if accountIds.isEmpty {
-                sql += " AND 0"
-            } else {
-                sql += " AND t.account_id IN (\(databaseQuestionMarks(count: accountIds.count)))"
-                arguments.append(contentsOf: accountIds.map(\.uuidString))
-            }
-        }
-        if let categoryId = filter.categoryId {
-            sql += " AND t.category_id = ?"
-            arguments.append(categoryId.uuidString)
-        }
-        if let kind = filter.kind {
-            sql += """
-             AND (CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
-                       WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END) = ?
-            """
-            arguments.append(kind)
-        }
-        if let from = filter.from {
-            sql += " AND t.occurred_at >= ?"
-            arguments.append(PostgresDate.sqliteTimestampBoundaryString(from))
-        }
-        if let through = filter.through {
-            sql += " AND t.occurred_at <= ?"
-            arguments.append(PostgresDate.sqliteTimestampBoundaryString(through))
-        }
-        if let search = filter.search, !search.isEmpty {
-            sql += """
-             AND (t.title LIKE ? OR t.merchant_raw LIKE ? OR t.merchant_normalized LIKE ?
-                  OR c.name LIKE ? OR a.name LIKE ?)
-            """
-            let pattern = "%\(search)%"
-            arguments.append(contentsOf: [pattern, pattern, pattern, pattern, pattern])
-        }
-    }
-
     /// Every leg of a transfer this device holds, by group id — **the** way
     /// to find a transfer's other half. Two means the whole transfer; one
     /// means the other half is on an account this viewer cannot see (a
@@ -198,8 +148,7 @@ enum LocalTransactionRow {
                    t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                    t.recurring_rule_id, t.original_amount_e4, t.original_currency,
                    ocur.minor_unit AS original_minor_unit,
-                   CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
-                        WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
+                   \(kindExpression) AS kind
             FROM transactions t
             JOIN accounts a ON a.id = t.account_id AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
@@ -273,8 +222,7 @@ enum LocalTransactionRow {
                    t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
                    t.recurring_rule_id, t.original_amount_e4, t.original_currency,
                    ocur.minor_unit AS original_minor_unit,
-                   CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
-                        WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
+                   \(kindExpression) AS kind
             FROM transactions t
             LEFT JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id

@@ -43,10 +43,26 @@ public enum AmountParser {
     /// Scales a parsed `Decimal` to the fixed-point e4 `Int64`, rounding
     /// half away from zero (the L1 rounding contract) — a user can type more
     /// than 4 decimal digits even though the app only stores 4.
+    ///
+    /// **`nil` for anything too large to hold, and that guard is the whole
+    /// point of this function having a return type at all.**
+    /// `NSDecimalNumber.int64Value` does not trap or saturate on overflow —
+    /// it *wraps*. Forty nines came back as 80237960548581376: not an error,
+    /// not a refusal, a plausible-looking amount that is not the one anybody
+    /// typed. Found by a search-term test, but the search is the least of
+    /// it — every path that turns a string into money ends here, including
+    /// `parseFormattedCurrency`, where the string comes from a Wallet capture
+    /// and **no human is reading the number before it is written**.
+    ///
+    /// The bound is checked **before** the ×10,000, so the multiplication
+    /// cannot overflow either; the second check is on the rounded result,
+    /// since rounding half away from zero can carry.
     private static func toAmountE4(_ decimal: Decimal) -> Int64? {
+        guard decimal.magnitude <= Decimal(Int64.max) / 10_000 else { return nil }
         var rounded = Decimal()
         var scaled = decimal * 10_000
         NSDecimalRound(&rounded, &scaled, 0, .plain)
+        guard rounded >= Decimal(Int64.min), rounded <= Decimal(Int64.max) else { return nil }
         return NSDecimalNumber(decimal: rounded).int64Value
     }
 }

@@ -153,6 +153,24 @@ enum LocalTableQueries {
         try PublicSchema.CurrenciesSelect.fetchAll(database, sql: "SELECT * FROM currencies ORDER BY code")
     }
 
+    /// One currency as the thing every formatter actually wants: its code and
+    /// the minor unit a figure is rounded to for display (money rule 2 — JPY
+    /// is 0, and the scale is never assumed).
+    ///
+    /// `nil` for a code the mirror does not hold yet, which callers render as
+    /// `—` rather than guessing two decimals.
+    ///
+    /// Here rather than at each call site because "the viewer's base currency,
+    /// as a `CurrencyInfo`" was being assembled screen by screen — fetch every
+    /// currency, find the one row, unwrap its minor unit — and a screen that
+    /// forgot the last step would quietly format yen with cents.
+    static func currencyInfo(_ database: Database, code: String) throws -> CurrencyInfo? {
+        try Int.fetchOne(
+            database, sql: "SELECT minor_unit FROM currencies WHERE code = ?", arguments: [code]
+        )
+        .map { CurrencyInfo(code: code, minorUnit: $0) }
+    }
+
     static func account(_ database: Database, id: String) throws -> PublicSchema.AccountsSelect? {
         try PublicSchema.AccountsSelect.fetchOne(
             database, sql: "SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL", arguments: [id]

@@ -20,15 +20,9 @@ extension TransactionFormView {
             try LocalTableQueries.myHousehold(database, userId: ownerId.uuidString)
         }
         guard let householdId = household?.id else { return }
-
-        if let cached = HouseholdMemberNameCache.name(for: householdId) {
-            householdMemberName = cached
-            return
-        }
-
-        let peer = try? await HouseholdRepository.memberProfile(client: session.client)
-        guard let name = peer?.displayName ?? peer?.email else { return }
+        guard let name = await HouseholdMemberNameCache.resolvedName(
+            for: householdId, client: session.client
+        ) else { return }
         householdMemberName = name
-        HouseholdMemberNameCache.save(name, for: householdId)
     }
 }

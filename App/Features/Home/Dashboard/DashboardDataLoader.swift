@@ -36,10 +36,7 @@ enum DashboardDataLoader {
         let moneyScope = LocalMoneyScope(scope: scope, baseCurrency: baseCurrency)
         return try await dbQueue.read { database in
             var data = DashboardData()
-            let currencies = try LocalTableQueries.currencies(database)
-            if let row = currencies.first(where: { $0.code == baseCurrency }) {
-                data.baseCurrency = CurrencyInfo(code: row.code, minorUnit: Int(row.minorUnit))
-            }
+            data.baseCurrency = try LocalTableQueries.currencyInfo(database, code: baseCurrency)
             // Always, not gated on `kinds`: the catalogue needs these to
             // explain why a widget the user does not yet have is disabled.
             data.capabilities = DashboardCapabilities(

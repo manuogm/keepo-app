@@ -43,3 +43,37 @@ extension View {
         modifier(FadingEdges(top: top, bottom: bottom))
     }
 }
+
+/// The same trick along the other axis, for a row of controls that scrolls
+/// sideways: the Transactions drop-down's filter pills, which cannot all fit
+/// beside the search and clear glyphs at any font this panel should be using.
+///
+/// Only the trailing end. The leading one is flush against the panel's own
+/// inset and never has anything hidden behind it, while the trailing one runs
+/// into a glyph — and a pill sliced mid-word hard against a button reads as a
+/// rendering fault rather than as "there is more this way".
+///
+/// Deliberately short. It has to soften an edge without dimming the chevron
+/// of a pill that happens to end near it, since the mask cannot know whether
+/// the row is actually scrolled.
+struct FadingTrailingEdge: ViewModifier {
+    var width: CGFloat = AppTheme.Spacing.l
+
+    func body(content: Content) -> some View {
+        content.mask(alignment: .leading) {
+            HStack(spacing: 0) {
+                Color.black
+                LinearGradient(
+                    colors: [Color.black, Color.black.opacity(0)], startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: width)
+            }
+        }
+    }
+}
+
+extension View {
+    func fadingTrailingEdge(_ width: CGFloat = AppTheme.Spacing.l) -> some View {
+        modifier(FadingTrailingEdge(width: width))
+    }
+}

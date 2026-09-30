@@ -39,15 +39,37 @@ struct Checkbox: View {
 struct CheckboxRow: View {
     let title: String
     let isOn: Bool
+    /// A `KeepoIcon` asset name shown between the box and the label, for a row
+    /// whose answer has a glyph elsewhere in the app — the Source filter's
+    /// "Automatically captured" wears the same `icon-robot` a captured
+    /// transaction wears in the ledger. Optional, and most rows have none: an
+    /// icon on every row would make the two that mean something stop meaning
+    /// it.
+    var icon: String?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: AppTheme.Spacing.m) {
                 Checkbox(isOn: isOn)
-                Text(title)
-                    .font(AppTheme.Typography.labelEmphasis)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                // The glyph and the words are **one** label, so they sit at
+                // `xs` — the token's own definition is "between an icon and
+                // its label". Only the gap back to the box is `m`, which is
+                // the gap between two different things.
+                //
+                // The glyph **trails** the words, so every row in the list
+                // starts its text at the same x whether or not it has one.
+                // Leading, the icon indented one row's label past its
+                // neighbours' and the column of names stopped being a column.
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    Text(title)
+                        .font(AppTheme.Typography.labelEmphasis)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
+                    if let icon {
+                        KeepoIcon(name: icon, size: AppTheme.Size.glyphSmall)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
+                    }
+                }
                 Spacer(minLength: 0)
             }
             .padding(.vertical, AppTheme.Spacing.s)
