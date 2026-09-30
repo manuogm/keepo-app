@@ -148,6 +148,10 @@ struct CategorySuggestionRow: View {
     let suggestions: [PublicSchema.CategoriesSelect]
     /// Every category valid for the current kind — what the plus opens.
     let categories: [PublicSchema.CategoriesSelect]
+    /// How the sheet behind the plus offers a category that does not exist
+    /// yet. `nil` leaves it offering only the ones that do — see
+    /// `CategoryCreation`.
+    var creation: CategoryCreation?
 
     @State private var isPickingCategory = false
     /// **The row keeps its own seating plan**, rather than re-deriving the
@@ -196,7 +200,7 @@ struct CategorySuggestionRow: View {
         }
         .frame(maxWidth: .infinity)
         .sheet(isPresented: $isPickingCategory) {
-            CategoryPickerSheet(selection: $selection, categories: categories)
+            CategoryPickerSheet(selection: $selection, categories: categories, creation: creation)
         }
         .onAppear { reseat() }
         .onChange(of: suggestions.map(\.id)) { _, _ in reseat() }
@@ -264,8 +268,14 @@ struct CategorySuggestionRow: View {
     /// The swap, without the animation — for the selections that arrive
     /// from somewhere other than a tap on this row. A category picked out
     /// of the sheet came from no slot at all, so there is nowhere to send
-    /// the incumbent: it leaves the row, and the tiles that did not move
-    /// stay where they were.
+    /// the incumbent: one tile leaves the row.
+    ///
+    /// **It is the last tile that leaves, not the first.** Slot 0 is the
+    /// most considered guess the row has — the category the typed title
+    /// points at, when there is one — and writing the new selection over it
+    /// took that suggestion off the row the moment the user chose anything
+    /// else. Shifting drops the weakest guess instead, which is the one at
+    /// the end by construction.
     private func bringSelectionForward() {
         guard let selection else { return }
         if let index = arrangement.firstIndex(of: selection) {
@@ -274,11 +284,12 @@ struct CategorySuggestionRow: View {
         } else if arrangement.isEmpty {
             arrangement = [selection]
         } else {
-            arrangement[0] = selection
+            arrangement = [selection] + arrangement.dropLast()
         }
     }
 
-    /// The way to every other category, built to the same measurements as
+    /// The way to every other category — and, on the viewer's own account,
+    /// to one that does not exist yet — built to the same measurements as
     /// the three beside it — same disc size, same label slot — so the row
     /// reads as four of one thing rather than three and a stray glyph.
     ///
@@ -308,52 +319,5 @@ struct CategorySuggestionRow: View {
         }
         .buttonStyle(.pressableCard)
         .accessibilityLabel("All categories")
-    }
-}
-
-/// Every category for the kind on screen, as the same tiles the form's row
-/// is made of — icon, colour, name — rather than as menu text.
-///
-/// One tap selects, closes, and lands the category in the row's first
-/// slot, for the same reason the date picker dismisses on a tap: the tap
-/// IS the answer, and a Done button behind it asks the user to confirm a
-/// choice they have already made.
-struct CategoryPickerSheet: View {
-    @Binding var selection: UUID?
-    let categories: [PublicSchema.CategoriesSelect]
-
-    @Environment(\.dismiss) private var dismiss
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.s), count: 3)
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                AppTheme.Palette.bgCanvas.ignoresSafeArea()
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: AppTheme.Spacing.s) {
-                        ForEach(categories, id: \.id) { category in
-                            CategoryChoiceTile(
-                                category: category,
-                                isSelected: category.id == selection,
-                                diameter: AppTheme.Size.avatar
-                            ) {
-                                selection = category.id
-                                dismiss()
-                            }
-                        }
-                    }
-                    .padding(AppTheme.Spacing.l)
-                }
-            }
-            .navigationTitle("Category")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
     }
 }

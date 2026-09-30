@@ -52,6 +52,20 @@ public enum AccountCategories {
         return (held.id, mine + [held])
     }
 
+    /// Whether a category created from a form *on this account* could be
+    /// filed there at all.
+    ///
+    /// Only on the viewer's own account, and on none yet chosen. A category
+    /// the viewer creates is theirs and private: `offered` above gives a
+    /// private category no counterpart on somebody else's account, and the
+    /// server swaps in the owner's row on save. Offering to make one there
+    /// would be offering a choice that cannot be filed — the viewer shares an
+    /// existing category with the household instead, which is the only thing
+    /// that makes one valid on both accounts.
+    public static func canCreate(onAccountOwnedBy owner: UUID?, viewer: UUID) -> Bool {
+        owner == nil || owner == viewer
+    }
+
     private static func hasCounterpart(_ category: PublicSchema.CategoriesSelect) -> Bool {
         category.isDefault || category.sharedGroupId != nil
     }

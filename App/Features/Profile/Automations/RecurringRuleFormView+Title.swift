@@ -1,25 +1,19 @@
 import KeepoCore
 import SwiftUI
 
-// The transaction's title — the field, and what typing one does to the
-// category. Split out of TransactionFormView.swift for the project's
-// file-length and type-body-length lints, same precedent as
-// TransactionFormView+Date.swift. Nothing here is `private`, for that reason.
+// The rule's title — the field, and what typing one does to the category.
+// The transaction form's own +Title.swift, aimed at the future: a rule is
+// named the way a transaction is, and "Rent" points at the same category
+// whether it is being entered once or every month. Nothing here is
+// `private`, for the same file-length reason the other extensions give.
 
-extension TransactionFormView {
-    /// The user's own name for the entry — "Coffee with Beth", "Rent" —
-    /// above the account and the amount, because it is what the row will be
-    /// called in the ledger.
-    ///
-    /// **Bare, with no fill behind it.** It sits on the card's own surface
-    /// like a heading rather than in a well like a field, which is what it
-    /// becomes the moment it has text: the thing the entry is called. The
-    /// grey placeholder is the only sign it is editable before it is tapped,
-    /// the same way the note field below it works.
+extension RecurringRuleFormView {
+    /// What every occurrence will be called in the ledger, and — new here —
+    /// the thing Keepo reads to guess the category.
     ///
     /// The lookup rides on this view's own `.task(id:)` rather than on the
-    /// form's body, which is already close to the type checker's budget
-    /// (see `conversionInputs`).
+    /// form's body, which is already near the SwiftUI type checker's budget,
+    /// exactly as the transaction form does it.
     var titleField: some View {
         TextField("Title", text: titleBinding)
             .font(AppTheme.Typography.cardTitle)
@@ -30,10 +24,11 @@ extension TransactionFormView {
             .task(id: TitleLookup(title: title, kind: kind)) { await lookUpTitleCategory() }
     }
 
-    /// Caps at the server's limit as the user types, and records that they
-    /// typed — a setter only runs when the control writes, so a prefill can
-    /// never be mistaken for the user choosing a title (the same device
-    /// `chargedAmountEdited` uses).
+    /// Caps at the server's limit as the user types, rather than letting a
+    /// save fail on a constraint nobody can see, and records that they typed:
+    /// a setter only runs when the control writes, so a prefill — a seeded
+    /// rule's carried-over title, an edit's own — can never be mistaken for
+    /// the user naming this rule.
     var titleBinding: Binding<String> {
         Binding(
             get: { title },
@@ -57,9 +52,7 @@ extension TransactionFormView {
         )
     }
 
-    /// The chips, with the title's match in front of them when there is one —
-    /// so the match costs the weakest habit its seat rather than being one
-    /// more thing to scroll to.
+    /// The chips, with the title's match in front of them when there is one.
     var displayedCategorySuggestions: [PublicSchema.CategoriesSelect] {
         CategorySuggestions.prioritizing(
             titleCategoryId.flatMap { id in categoriesForKind.first { $0.id == id } }, in: suggestedCategories
@@ -67,19 +60,28 @@ extension TransactionFormView {
     }
 
     /// Whether the category on screen is still Keepo's guess rather than a
-    /// decision somebody made: always on a new entry, and on a capture being
-    /// reviewed, whose category was resolved with nobody watching. Never on
-    /// an ordinary edit — retitling a transaction must not quietly re-file
-    /// it; there the match is offered as the first chip and nothing more.
-    private var categoryIsProvisional: Bool {
-        !isEditing || isConfirmingCapture
+    /// decision somebody made — and so whether a title may *select* as well
+    /// as suggest.
+    ///
+    /// Only on a rule built from nothing. **"Make recurring" is not that**:
+    /// a seeded rule carries the category of the transaction the user was
+    /// looking at one screen back, which is a decision they already made and
+    /// a better one than a title can offer. Nor is an edit — renaming a
+    /// standing rule must not quietly re-file every occurrence it will go on
+    /// creating. In both cases the match is still offered as the first chip,
+    /// one tap away, and nothing more.
+    var categoryIsProvisional: Bool {
+        if case .create = mode { return true }
+        return false
     }
 
-    /// Asks the title memory what the typed title points at — the wait, the
+    /// Asks the title memory what the typed title points at. The wait, the
     /// read and the "is this category even on offer here" check are
     /// `LocalTitleMemory.categoryForTypedTitle`'s, shared with the
-    /// recurring-rule form. What is left here is this form's own half: the
-    /// match only *selects* while the category on screen is still a guess.
+    /// transaction form; what is left here is this form's own half.
+    ///
+    /// A transfer has no category at all, so it asks nothing — the same guard
+    /// `refreshCategorySuggestions` makes.
     func lookUpTitleCategory() async {
         guard kind != .transfer, let ownerId = session.profile?.id else {
             titleCategoryId = nil

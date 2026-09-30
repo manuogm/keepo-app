@@ -79,6 +79,46 @@ enum LocalTitleMemory {
         return nil
     }
 
+    /// **What a form does with a title being typed**, in one place: wait for
+    /// the typing to settle, ask the memory above, and keep the answer only
+    /// if it is a category this form may actually offer.
+    ///
+    /// The transaction form and the recurring-rule form ask the identical
+    /// question of the identical memory — a rule is named the same way a
+    /// transaction is, and "Rent" points at the same category whether it is
+    /// being entered once or every month. What the two screens genuinely
+    /// differ on is what they then *do* with the answer (whether it may
+    /// select as well as suggest), which stays with each of them.
+    ///
+    /// Cancellation is the caller's `.task(id:)`: the sleep and the read both
+    /// run in its task, so a title that changes again abandons this lookup
+    /// mid-flight and only the settled title is ever answered.
+    static func categoryForTypedTitle(
+        _ title: String,
+        categoryKind: PublicSchema.CategoryKind,
+        ownerId: UUID,
+        among offered: [PublicSchema.CategoriesSelect],
+        in dbQueue: DatabaseQueue
+    ) async -> UUID? {
+        guard !title.isEmpty else { return nil }
+        try? await Task.sleep(for: typingSettles)
+        guard !Task.isCancelled else { return nil }
+        let match = try? await dbQueue.read { database in
+            try suggestedCategory(
+                forTitle: title, ownerId: ownerId.uuidString, categoryKind: categoryKind.rawValue, in: database
+            )
+        }
+        guard !Task.isCancelled else { return nil }
+        return match
+            .flatMap(UUID.init(uuidString:))
+            .flatMap { id in offered.contains { $0.id == id } ? id : nil }
+    }
+
+    /// Long enough that a word being typed is not looked up letter by letter,
+    /// short enough that the category has moved by the time the eye comes
+    /// back down to it.
+    static let typingSettles: Duration = .milliseconds(350)
+
     /// `merchant_category_map` rows for exactly these patterns — already
     /// normalized on both sides, so plain equality is the right comparison.
     private static func learnedMerchants(

@@ -195,11 +195,21 @@ extension RecurringRuleFormView {
         }
     }
 
-    /// The three chips, from `LocalCategoryRanking` — the same ranking the
-    /// transaction form's chips and the capture notification's quick actions
-    /// read. Two passes for the same reason that form gives: this account's
-    /// own habits first, then the whole ledger's for the same kind, so an
-    /// account with no history still gets a sensible answer.
+    /// Re-reads the viewer's categories after one is created from the picker
+    /// — the counterpart of `TransactionFormView.reloadCategories`, and for
+    /// the reason stated there.
+    func reloadCategories() async {
+        guard let ownerId = session.profile?.id else { return }
+        guard let reloaded = try? await session.dbQueue.read({ database in
+            try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
+        }) else { return }
+        categories = reloaded
+    }
+
+    /// The three chips, exactly as the transaction form builds them — two
+    /// ranking passes for order, `CategorySuggestions` for how many. See
+    /// `TransactionFormView.refreshCategorySuggestions` for why each half is
+    /// there.
     func refreshCategorySuggestions() async {
         guard kind != .transfer, let ownerId = session.profile?.id else {
             suggestedCategories = []
@@ -207,26 +217,28 @@ extension RecurringRuleFormView {
         }
         let categoryKind = kind == .income ? "income" : "expense"
         let accountId = selectedAccountId?.uuidString
+        // **Not `suggestionCount`.** Every ranked id still has to survive
+        // `categoriesForKind` — on a household member's account most of the
+        // viewer's own categories are not on offer there — so asking for
+        // exactly three and then filtering is how a row ends up with one
+        // tile. The ranking groups by category, so this bound is simply
+        // "every category there could possibly be a row for".
+        let rankLimit = max(Self.suggestionCount, categories.count)
         let ranked = try? await session.dbQueue.read { database in
             (
                 try LocalCategoryRanking.mostUsed(
                     database, ownerId: ownerId.uuidString, accountId: accountId,
-                    categoryKind: categoryKind, limit: Self.suggestionCount
+                    categoryKind: categoryKind, limit: rankLimit
                 ),
                 try LocalCategoryRanking.mostUsed(
-                    database, ownerId: ownerId.uuidString, categoryKind: categoryKind,
-                    limit: Self.suggestionCount
+                    database, ownerId: ownerId.uuidString, categoryKind: categoryKind, limit: rankLimit
                 )
             )
         }
         let ids = ((ranked?.0 ?? []) + (ranked?.1 ?? [])).compactMap { UUID(uuidString: $0.id) }
-        let valid = categoriesForKind
-        var seen: Set<UUID> = []
-        suggestedCategories = ids
-            .filter { seen.insert($0).inserted }
-            .compactMap { id in valid.first { $0.id == id } }
-            .prefix(Self.suggestionCount)
-            .map { $0 }
+        suggestedCategories = CategorySuggestions.build(
+            ranked: ids, offered: categoriesForKind, count: Self.suggestionCount
+        )
     }
 
     /// Prefills every field from an existing rule.

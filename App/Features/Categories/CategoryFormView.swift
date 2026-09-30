@@ -24,6 +24,14 @@ struct CategoryFormView: View {
     /// them loaded already, and a form that had to fetch them would be a
     /// second read of a list the screen behind it is currently drawing.
     var existing: [PublicSchema.CategoriesSelect] = []
+    /// The id of the category this form just created, for a caller that has
+    /// to act on the new row rather than merely reload — the transaction
+    /// form's picker selects it, because somebody who made a category while
+    /// filing a transaction has already chosen it. Never fires for an edit.
+    ///
+    /// Declared before `onSaved` so that stays the trailing closure every
+    /// existing caller passes it as.
+    var onCreated: (UUID) -> Void = { _ in }
     var onSaved: () -> Void
 
     enum Mode {
@@ -221,6 +229,7 @@ struct CategoryFormView: View {
                 id: UUID(), ownerId: userId, kind: kind, name: trimmed, icon: icon, color: resolvedColor
             )
             await session.outbox.submitCreateCategory(payload)
+            onCreated(payload.id)
         case .edit(let category):
             let payload = UpdateCategoryPayload(id: category.id, name: trimmed, icon: icon, color: resolvedColor)
             await session.outbox.submitUpdateCategory(payload)

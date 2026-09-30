@@ -340,6 +340,7 @@ struct TransactionFormView: View {
                 accounts: kind == .transfer ? transferSourceAccounts : accounts,
                 categories: categoriesForKind,
                 suggestedCategories: displayedCategorySuggestions,
+                categoryCreation: categoryCreation,
                 isTransfer: kind == .transfer,
                 destinationAccounts: transferDestinations,
                 foreign: foreignAmount,

@@ -49,6 +49,15 @@ struct AccountCategoriesTests {
         #expect(offered.contains { $0.id == dining.id })
     }
 
+    @Test("a new category is only offered on your own account")
+    func creationOnlyOnYourOwnAccount() {
+        #expect(AccountCategories.canCreate(onAccountOwnedBy: partner, viewer: partner))
+        #expect(!AccountCategories.canCreate(onAccountOwnedBy: owner, viewer: partner))
+        // No account chosen yet: nothing narrows the categories on offer
+        // either, so nothing rules a new one out.
+        #expect(AccountCategories.canCreate(onAccountOwnedBy: nil, viewer: partner))
+    }
+
     @Test("the viewer's own row for the owner's shared category, or Other")
     func counterpart() {
         let kids = category("Kids", of: owner, group: group)

@@ -29,10 +29,15 @@ struct TransactionDetailCard: View {
     let accounts: [LocalAccountRow]
     let categories: [PublicSchema.CategoriesSelect]
     /// Up to three, most-used first, for the account and kind on screen —
-    /// `LocalCategoryRanking`. Empty is fine and simply means the row
-    /// draws nothing but "More": a ledger with no history has no habits to
-    /// read off it yet.
+    /// ordered by `LocalCategoryRanking`, filled out by
+    /// `CategorySuggestions`. Short only when the user has fewer than three
+    /// categories of this kind; empty only when they have none, which no
+    /// account reaches, since everybody keeps a default "Other".
     let suggestedCategories: [PublicSchema.CategoriesSelect]
+    /// How the category picker offers a category that does not exist yet.
+    /// `nil` — a form that cannot create one on the account on screen — draws
+    /// the picker exactly as it was. See `CategoryCreation`.
+    var categoryCreation: CategoryCreation?
     let isTransfer: Bool
     /// What the transfer's DESTINATION picker may offer, when that is
     /// narrower than `accounts`. `nil` means the same list on both ends. The
@@ -105,7 +110,8 @@ struct TransactionDetailCard: View {
             )
 
             CategorySuggestionRow(
-                selection: $categoryId, suggestions: suggestedCategories, categories: categories
+                selection: $categoryId, suggestions: suggestedCategories, categories: categories,
+                creation: categoryCreation
             )
 
             tagRow

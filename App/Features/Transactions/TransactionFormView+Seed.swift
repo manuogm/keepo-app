@@ -59,38 +59,43 @@ extension TransactionFormView {
         }
     }
 
-    /// The three chips, from `LocalCategoryRanking` — the same ranking the
-    /// capture notification's quick actions use.
+    /// The three chips: history decides their **order**,
+    /// `CategorySuggestions` decides how many there are.
     ///
-    /// Two passes, because an account with no history still deserves a
-    /// sensible answer: this account's own habits first, then the whole
-    /// ledger's for the same kind. The second is not a worse guess so much
-    /// as a wider one — a first purchase on a new card is still made by
-    /// somebody who mostly buys groceries.
+    /// Two ranking passes, because an account with no history of its own
+    /// still deserves a sensible answer: this account's habits first, then
+    /// the whole ledger's for the same kind. The second is not a worse guess
+    /// so much as a wider one — a first purchase on a new card is still made
+    /// by somebody who mostly buys groceries. Whatever the two passes leave
+    /// unfilled, `build` completes from the categories the user actually has,
+    /// so the row is short only when there is genuinely nothing else to put
+    /// on it.
     func refreshCategorySuggestions() async {
         guard let ownerId = session.profile?.id else { return }
         let categoryKind = kind == .income ? "income" : "expense"
         let accountId = selectedAccountId?.uuidString
+        // **Not `suggestionCount`.** Every ranked id still has to survive
+        // `categoriesForKind` — on a household member's account most of the
+        // viewer's own categories are not on offer there — so asking for
+        // exactly three and then filtering is how a row ends up with one
+        // tile. The ranking groups by category, so this bound is simply
+        // "every category there could possibly be a row for".
+        let rankLimit = max(Self.suggestionCount, categories.count)
         let ranked = try? await session.dbQueue.read { database in
             (
                 try LocalCategoryRanking.mostUsed(
                     database, ownerId: ownerId.uuidString, accountId: accountId,
-                    categoryKind: categoryKind, limit: Self.suggestionCount
+                    categoryKind: categoryKind, limit: rankLimit
                 ),
                 try LocalCategoryRanking.mostUsed(
-                    database, ownerId: ownerId.uuidString, categoryKind: categoryKind,
-                    limit: Self.suggestionCount
+                    database, ownerId: ownerId.uuidString, categoryKind: categoryKind, limit: rankLimit
                 )
             )
         }
         let ids = ((ranked?.0 ?? []) + (ranked?.1 ?? [])).compactMap { UUID(uuidString: $0.id) }
-        let valid = categoriesForKind
-        var seen: Set<UUID> = []
-        suggestedCategories = ids
-            .filter { seen.insert($0).inserted }
-            .compactMap { id in valid.first { $0.id == id } }
-            .prefix(Self.suggestionCount)
-            .map { $0 }
+        suggestedCategories = CategorySuggestions.build(
+            ranked: ids, offered: categoriesForKind, count: Self.suggestionCount
+        )
     }
 
     /// A transfer out of an account when the user owns exactly one other
