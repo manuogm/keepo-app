@@ -3,6 +3,8 @@
 
 # Claude Code local state
 .claude/
+.agents/
+skills-lock.json
 
 # Xcode
 build/
