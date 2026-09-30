@@ -75,7 +75,8 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     let onOpenProfile: () -> Void
     /// Rendered immediately before the privacy toggle. Home puts "Done"
     /// here while the dashboard is being rearranged; Transactions puts the
-    /// toggle for its own `filters` panel.
+    /// toggle for its own `filters` panel; Categories, which has no privacy
+    /// toggle, puts its way into tags in the toggle's corner.
     @ViewBuilder var accessory: Accessory
     @ViewBuilder var filters: Filters
 
@@ -385,12 +386,14 @@ extension ScopeBannerView where Filters == EmptyView {
     init(
         title: String,
         session: SessionStore,
+        showsPrivacyToggle: Bool = true,
         showsPrivacyLesson: Bool = false,
         onOpenProfile: @escaping () -> Void,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.init(
-            title: title, session: session, showsPrivacyLesson: showsPrivacyLesson,
+            title: title, session: session, showsPrivacyToggle: showsPrivacyToggle,
+            showsPrivacyLesson: showsPrivacyLesson,
             onOpenProfile: onOpenProfile, accessory: accessory, filters: { EmptyView() }
         )
     }

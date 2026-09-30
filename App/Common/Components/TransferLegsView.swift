@@ -50,6 +50,11 @@ struct TransferLegsView: View {
     /// amount the device does not have: an empty control says "fill me in",
     /// and this is not something the viewer can fill in.
     var hiddenSide: TransferSide?
+    /// The sent and received figures' issues, each shown on its own leg.
+    /// See `TransactionDetailContainer.amountIssue`.
+    var amountIssue: AmountIssue?
+    var receivedAmountIssue: AmountIssue?
+    var amountRejections = 0
 
     var body: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.s) {
@@ -63,7 +68,9 @@ struct TransferLegsView: View {
                         amountText: $amountText,
                         accounts: accounts,
                         excluding: toAccountId,
-                        showsAmountCalculator: showsAmountCalculator
+                        showsAmountCalculator: showsAmountCalculator,
+                        amountIssue: amountIssue,
+                        amountRejections: amountRejections
                     )
                 }
                 if hiddenSide == .destination {
@@ -78,7 +85,11 @@ struct TransferLegsView: View {
                         accounts: destinationAccounts ?? accounts,
                         excluding: fromAccountId,
                         isAmountEditable: needsReceivedAmount,
-                        showsAmountCalculator: showsAmountCalculator
+                        showsAmountCalculator: showsAmountCalculator,
+                        // A mirrored figure is the sent one, already
+                        // flagged on the leg above.
+                        amountIssue: needsReceivedAmount ? receivedAmountIssue : nil,
+                        amountRejections: amountRejections
                     )
                 }
             }

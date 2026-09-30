@@ -127,7 +127,7 @@ struct ProfileView: View {
         .task(id: session.refresh.token) { await load() }
         .task { await loadLastFXSyncedAt() }
         .sheet(isPresented: $isPickingCurrency) {
-            BaseCurrencySheet(currencies: currencies, selection: baseCurrency)
+            CurrencyWheelSheet(currencies: currencies, selection: baseCurrency, title: "Base Currency")
         }
         .avatarPicker(
             isPresentingOptions: $isPickingAvatar,

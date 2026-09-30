@@ -21,6 +21,9 @@ enum AppSettingsKeys {
     /// for the same reason the four above are: it is a convenience palette,
     /// not data about their money.
     static let customIconColors = "customIconColors"
+    /// The user's own currencies, most important first, comma-separated —
+    /// the currency wheel's pills. See `PreferredCurrencyCache`.
+    static let preferredCurrencies = "preferredCurrencies"
     /// The setup flow's in-progress draft, as JSON (see
     /// `OnboardingDraftStore`). Device-local like the rest of this list, and
     /// for the documented reason rather than by omission: **none of it has

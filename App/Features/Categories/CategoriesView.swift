@@ -90,7 +90,8 @@ struct CategoriesView: View {
             VStack(spacing: 0) {
                 ScopeBannerView(
                     title: "Categories", session: session, showsPrivacyToggle: false,
-                    onOpenProfile: { navigation?.openProfileRoot() }
+                    onOpenProfile: { navigation?.openProfileRoot() },
+                    accessory: { allTagsButton }
                 )
                 .padding(.bottom, AppTheme.Spacing.xs)
                 .zIndex(1)
@@ -127,21 +128,11 @@ struct CategoriesView: View {
                         }
                         .padding(.horizontal)
                     }
-                    // Pinned below rather than the tab bar's own distance: the
-                    // grid now hands off to the "All Tags" row sitting right
-                    // under it, not to the physical bottom of the display.
-                    .contentMargins(.bottom, AppTheme.Spacing.l, for: .scrollContent)
+                    // Runs under the floating tab bar like the Accounts list
+                    // does, now that no pinned row sits between the two.
+                    .contentMargins(.bottom, KeepoTabBarMetrics.clearance, for: .scrollContent)
                     .refreshable { await load() }
-                    .fadingEdges(bottom: 22)
-
-                    // Pinned below the grid instead of scrolling with it, so
-                    // it stays reachable at a glance instead of being the
-                    // last thing after however many categories exist — and
-                    // the grid gets the rest of the screen to itself.
-                    allTagsLink
-                        .padding(.horizontal)
-                        .padding(.top, AppTheme.Spacing.s)
-                        .padding(.bottom, KeepoTabBarMetrics.clearance)
+                    .fadingEdges()
                 }
             }
 
@@ -182,40 +173,23 @@ struct CategoriesView: View {
         .task(id: session.refresh.token) { await load() }
     }
 
-    /// Below the grid rather than in the toolbar: tags are a *second*
-    /// thing this screen is about, reached after looking at the categories,
-    /// not a competing primary action next to "+" — which on this tab
-    /// already means "new category".
-    ///
-    /// Pinned to the bottom of the screen rather than scrolling with the
-    /// grid: a household with a long category list would otherwise push it
-    /// past however many tiles exist, and the grid above it gets the whole
-    /// scroll area to itself instead of giving up its last slot to this row.
-    private var allTagsLink: some View {
+    /// In the header's trailing corner — the spot the privacy toggle holds
+    /// on Transactions, which this screen has nothing to mask with. It was a
+    /// full-width "All Tags" row pinned above the tab bar, which took a
+    /// band of screen from the grid on every visit to offer something most
+    /// visits never use. As a glyph it stays one tap away and costs nothing,
+    /// and the "+" still means a new category, not a tag.
+    private var allTagsButton: some View {
         Button {
             isShowingAllTags = true
         } label: {
-            HStack(spacing: AppTheme.Spacing.s) {
-                KeepoIcon(name: "icon-tag", size: AppTheme.Size.glyphSmall)
-                Text("All Tags")
-                    .font(AppTheme.Typography.label)
-                Spacer()
-                // Overridden against the row's own `textPrimary`: every
-                // disclosure chevron in the app is `textSecondary`, matching
-                // the system indicator `List` draws for a `NavigationLink`.
-                Image(systemName: "chevron.right")
-                    .font(AppTheme.Typography.micro)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
-            .foregroundStyle(AppTheme.Palette.textPrimary)
-            .padding(AppTheme.Spacing.l)
-            .background(
-                AppTheme.Palette.bgSurface,
-                in: RoundedRectangle(cornerRadius: AppTheme.Radius.card)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: AppTheme.Radius.card))
+            KeepoIcon(name: "icon-tag")
+                .foregroundStyle(.white)
+                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.pressableCard)
+        .buttonStyle(.plain)
+        .accessibilityLabel("All tags")
     }
 
     private func load() async {

@@ -145,14 +145,12 @@ struct CategoryFormView: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
                 }
             }
+            // Saving the catalogue counts as choosing: from that point the
+            // name-driven suggestion stops overriding what is on screen,
+            // whether the user changed it or confirmed it. A cancelled visit
+            // chose nothing, so the suggestion keeps working.
             .sheet(isPresented: $isPickingIcon) {
-                IconCatalogView(icon: $icon, color: $color)
-            }
-            // Visiting the catalogue at all counts as choosing: from that
-            // point the name-driven suggestion stops overriding what is on
-            // screen, whether the user changed it or confirmed it.
-            .onChange(of: isPickingIcon) { _, isPresented in
-                if !isPresented { hasPickedIcon = true }
+                IconCatalogView(icon: $icon, color: $color) { hasPickedIcon = true }
             }
             .alert("Delete \"\(name)\"?", isPresented: $showDeleteConfirm) {
                 Button("Delete", role: .destructive) {
@@ -168,6 +166,15 @@ struct CategoryFormView: View {
                 )
             }
         }
+        // A new category is an icon and a name, and a full-height sheet left
+        // most of the screen empty under them. `.medium` rather than a
+        // measured height: iOS 26's floating sheet does not report a
+        // container that tracks a `.height` detent, so a measured sheet
+        // clipped the name field. The content scrolls, so a larger Dynamic
+        // Type size still reaches it. Editing keeps the full sheet: its
+        // Delete button is pinned to the bottom edge.
+        .presentationDetents(isEditing ? [.large] : [.medium])
+        .presentationDragIndicator(isEditing ? .automatic : .visible)
         .task { prefill() }
     }
 

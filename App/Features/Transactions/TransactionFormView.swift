@@ -154,6 +154,9 @@ struct TransactionFormView: View {
     /// did not happen. `errorMessage` above stays inline because it is
     /// validation: a field that is wrong while you are looking at it.
     @State var actionError: ActionError?
+    /// See TransactionFormView+AmountCheck.swift.
+    @State var isAmountFinal = false
+    @State var amountRejections = 0
     @State var divergenceWarning: RateDivergence?
     @State var transferDivergenceConfirmed = false
 
@@ -228,7 +231,7 @@ struct TransactionFormView: View {
                 TagPickerSheet(session: session, selectedTagIds: $selectedTagIds)
             }
             .sheet(isPresented: $isPickingCurrency) {
-                CurrencyPickerSheet(currencies: currencies, selection: paidCurrencyBinding, title: "Paid In")
+                CurrencyWheelSheet(currencies: currencies, selection: paidCurrencyBinding, title: "Paid In")
             }
             // One observer over one value rather than four separate ones:
             // both the honest statement of the rule ("re-derive when any
@@ -349,8 +352,14 @@ struct TransactionFormView: View {
                 // out; a hand-entered one still gets the calculator.
                 showsAmountCalculator: !isCaptured,
                 needsReceivedAmount: needsReceivedAmount,
-                hiddenTransferSide: hiddenTransferSide
+                hiddenTransferSide: hiddenTransferSide,
+                amountIssue: amountIssue,
+                receivedAmountIssue: receivedAmountIssue,
+                amountRejections: amountRejections
             )
+            .modifier(AmountEditObserver(
+                texts: [amountText, receivedAmountText, chargedAmountText], isFinal: $isAmountFinal
+            ))
 
             // Every kind, including transfers, since migration
             // 20260904100000 gave `create_transfer`/`update_transfer` a

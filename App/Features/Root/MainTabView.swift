@@ -147,6 +147,7 @@ struct MainTabView: View {
             await loadNeedsReviewCount()
             await scopeContext.reload(session: session)
             await avatars.load(path: session.profile?.avatarPath, client: session)
+            await PreferredCurrencyCache.refresh(session: session)
         }
         // Also an overlay — a transient floating notice must not reflow the
         // screen under it every time connectivity blips. It rides above the

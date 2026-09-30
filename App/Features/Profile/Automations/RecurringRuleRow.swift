@@ -57,7 +57,7 @@ struct RecurringRuleRow: View {
                                 .foregroundStyle(AppTheme.Palette.textPrimary)
                                 .lineLimit(1)
                             Spacer(minLength: AppTheme.Spacing.xs)
-                            PrivateText(formattedAmount)
+                            PrivateText(formattedAmount(), spoken: formattedAmount(exact: true))
                                 .font(AppTheme.Typography.bodyEmphasis)
                                 .monospacedDigit()
                                 .foregroundStyle(amountColor)
@@ -222,9 +222,10 @@ struct RecurringRuleRow: View {
     /// `.ledger`, exactly like the same money in the Transactions tab: an
     /// outflow drops its minus sign and an inflow gains an explicit `+`. The
     /// stored value is untouched (money rule 1) — the row already says which
-    /// direction this goes by the category or the arrow beside it.
-    private var formattedAmount: String {
-        MoneyFormatter.format(rule.amountE4, currency: rule.currencyInfo, signStyle: .ledger)
+    /// direction this goes by the category or the arrow beside it. `exact`
+    /// is the VoiceOver reading.
+    private func formattedAmount(exact: Bool = false) -> String {
+        MoneyFormatter.format(rule.amountE4, currency: rule.currencyInfo, signStyle: .ledger, exact: exact)
     }
 
     /// Green means money arrives, by sign — the same rule `TransactionRow`

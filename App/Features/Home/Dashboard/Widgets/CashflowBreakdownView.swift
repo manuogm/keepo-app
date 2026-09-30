@@ -119,7 +119,7 @@ struct CashflowBreakdownView: View {
                     .lineLimit(1)
                 Spacer(minLength: AppTheme.Spacing.xs)
                 VStack(alignment: .trailing, spacing: 0) {
-                    PrivateText(amountLabel(category.amountE4))
+                    PrivateText(amountLabel(category.amountE4), spoken: amountLabel(category.amountE4, exact: true))
                         .font(AppTheme.Typography.labelEmphasis)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                     // The *share* is not hidden. It says how the money is
@@ -176,8 +176,9 @@ struct CashflowBreakdownView: View {
         return share.formatted(.percent.precision(.fractionLength(0)))
     }
 
-    private func amountLabel(_ amountE4: Int64?) -> String {
+    /// `exact` is the VoiceOver reading of the same figure.
+    private func amountLabel(_ amountE4: Int64?, exact: Bool = false) -> String {
         guard let currency else { return "—" }
-        return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger)
+        return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger, exact: exact)
     }
 }

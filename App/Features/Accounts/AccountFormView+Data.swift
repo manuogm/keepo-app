@@ -122,7 +122,7 @@ extension AccountFormView {
 
 extension AccountFormView {
     func save() async {
-        guard let balanceE4 = AmountParser.parse(balanceText) else {
+        guard let balanceE4 = AmountParser.parse(balanceText, minorUnit: selectedCurrencyInfo?.minorUnit) else {
             errorMessage = "Enter a valid balance."
             return
         }

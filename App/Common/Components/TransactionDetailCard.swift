@@ -62,6 +62,12 @@ struct TransactionDetailCard: View {
     /// The half of a transfer that is on an account this viewer cannot see,
     /// if one is. See `TransferLegsView.hiddenSide`.
     var hiddenTransferSide: TransferSide?
+    /// What is wrong with the amount — and, on a transfer between two
+    /// currencies, with the received amount — plus the counter that shakes
+    /// whichever block holds it. See `TransactionDetailContainer.amountIssue`.
+    var amountIssue: AmountIssue?
+    var receivedAmountIssue: AmountIssue?
+    var amountRejections = 0
 
     var body: some View {
         if isTransfer {
@@ -106,7 +112,9 @@ struct TransactionDetailCard: View {
                 accounts: accounts,
                 excluding: nil,
                 showsAmountCalculator: showsAmountCalculator,
-                foreign: foreign
+                foreign: foreign,
+                amountIssue: amountIssue,
+                amountRejections: amountRejections
             )
 
             CategorySuggestionRow(
@@ -131,7 +139,10 @@ struct TransactionDetailCard: View {
                 destinationAccounts: destinationAccounts,
                 needsReceivedAmount: needsReceivedAmount,
                 showsAmountCalculator: showsAmountCalculator,
-                hiddenSide: hiddenTransferSide
+                hiddenSide: hiddenTransferSide,
+                amountIssue: amountIssue,
+                receivedAmountIssue: receivedAmountIssue,
+                amountRejections: amountRejections
             )
             tagRow
         }
@@ -190,6 +201,17 @@ struct TransactionDetailContainer: View {
     /// Absent on a transfer, whose two legs are each already in their own
     /// account's currency — there is no third currency to name.
     var foreign: ForeignAmount?
+    /// What is wrong with a figure in this block, if anything — the paid
+    /// amount, or the charge beneath it, which the user reads as the same
+    /// block. Drawn as a red wash over the block and one line under it,
+    /// **there** rather than at the foot of the form: the mistake is in
+    /// this block, so this is where the eye already is.
+    var amountIssue: AmountIssue?
+    /// Bumped by the form when Save is tapped at an amount already flagged.
+    /// This block shakes and buzzes on it only while it holds an issue — a
+    /// transfer passes the same counter to both legs. A NEW issue needs no
+    /// bump; the block shakes on its arrival by itself.
+    var amountRejections = 0
 
     private var selected: LocalAccountRow? {
         accounts.first { $0.id == accountId }
@@ -208,11 +230,39 @@ struct TransactionDetailContainer: View {
     }
 
     @State private var isRefreshingRates = false
+    /// This block's own count of shakes, so a rejection meant for the other
+    /// leg of a transfer leaves this one still.
+    @State private var shakes = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            AccountPickerRow(selection: $accountId, accounts: accounts, excluding: excluding)
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+            block
+                .modifier(ShakeEffect(rejections: shakes))
+            if let amountIssue {
+                FormErrorText(message: amountIssue.message)
+            }
+        }
+        // Turned away as soon as a problem arrives or changes kind — never
+        // as one clears, which is the user fixing it — and again each time
+        // Save is tapped at one already showing.
+        .onChange(of: amountIssue) { old, new in
+            if new != nil && new != old { shake() }
+        }
+        .onChange(of: amountRejections) {
+            if amountIssue != nil { shake() }
+        }
+        .sensoryFeedback(AppTheme.Feedback.rejection, trigger: shakes)
+    }
 
+    private func shake() {
+        withAnimation(AppTheme.Motion.reject) { shakes += 1 }
+    }
+
+    private var block: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
+            // The picker is the amount's header: a figure shown in full on a
+            // line of its own sends the currency pill and calculator up into
+            // this row, and the account's name gives up the width.
             AmountField(
                 text: $amountText,
                 currency: paidCurrency,
@@ -220,7 +270,9 @@ struct TransactionDetailContainer: View {
                 onPickCurrency: foreign?.onPickCurrency,
                 showsCalculator: showsAmountCalculator,
                 size: AppTheme.Typography.Number.balance
-            )
+            ) {
+                AccountPickerRow(selection: $accountId, accounts: accounts, excluding: excluding)
+            }
 
             // Both codes are non-nil whenever `isForeign` is — unwrapping
             // them here rather than inside the block is what lets the
@@ -231,7 +283,17 @@ struct TransactionDetailContainer: View {
         }
         .padding(AppTheme.Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.Palette.bgSurfaceRaised, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
+        .background {
+            let shape = RoundedRectangle(cornerRadius: AppTheme.Radius.card)
+            shape.fill(AppTheme.Palette.bgSurfaceRaised)
+                .overlay {
+                    shape.fill(AppTheme.Palette.statusNegative)
+                        .opacity(amountIssue == nil ? 0 : AppTheme.Opacity.fill)
+                }
+                // Scoped to the wash: on the block itself this would
+                // animate the text field and the chip along with it.
+                .animation(AppTheme.Motion.colorSafe, value: amountIssue == nil)
+        }
     }
 
     /// **The caption carries the provenance, not a note off the right
@@ -243,22 +305,22 @@ struct TransactionDetailContainer: View {
     /// naming the account sits directly above, and repeating it here spent
     /// the caption on something already on screen.
     private func chargedBlock(_ foreign: ForeignAmount, paidCode: String, accountCode: String) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
+        AmountField(
+            text: foreign.$chargedText,
+            currency: selected?.currencyInfo,
+            size: AppTheme.Typography.Number.metricCompact,
+            headerSpacing: AppTheme.Spacing.xxs
+        ) {
             HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
                 Text(chargedCaption(foreign, paidCode: paidCode, accountCode: accountCode))
                     .font(AppTheme.Typography.nano)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .lineLimit(1)
                 if foreign.rateDate == nil && foreign.chargedText.isEmpty {
                     Spacer(minLength: 0)
                     refreshRatesButton(foreign)
                 }
             }
-
-            AmountField(
-                text: foreign.$chargedText,
-                currency: selected?.currencyInfo,
-                size: AppTheme.Typography.Number.metricCompact
-            )
         }
         .padding(.top, AppTheme.Spacing.xs)
     }

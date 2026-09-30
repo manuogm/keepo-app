@@ -249,7 +249,7 @@ struct UpcomingBillsWidget: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: AppTheme.Spacing.xs)
-                PrivateText(amountLabel(item.amountBaseE4))
+                PrivateText(amountLabel(item.amountBaseE4), spoken: amountLabel(item.amountBaseE4, exact: true))
                     .font(AppTheme.Typography.labelEmphasis)
                     .foregroundStyle(item.isInbound ? CashflowPalette.income : AppTheme.Palette.textPrimary)
             }
@@ -291,8 +291,9 @@ struct UpcomingBillsWidget: View {
     /// `.ledger`, so an outflow reads as its magnitude beside a row that
     /// already says which way it goes. The headline above keeps its sign,
     /// because there "up or down" is the whole answer.
-    private func amountLabel(_ amountE4: Int64?) -> String {
+    /// `exact` is the VoiceOver reading of the same figure.
+    private func amountLabel(_ amountE4: Int64?, exact: Bool = false) -> String {
         guard let currency else { return "—" }
-        return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger)
+        return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger, exact: exact)
     }
 }

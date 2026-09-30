@@ -27,14 +27,22 @@ struct CurrencyConversionLabel: View {
     var body: some View {
         if let text {
             Text(text)
+                .accessibilityLabel(spoken ?? text)
                 .font(AppTheme.Typography.micro)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
         }
     }
 
-    private var text: String? {
+    private var text: String? { formatted(exact: false) }
+
+    /// The exact figure behind a short one, for VoiceOver.
+    private var spoken: String? { formatted(exact: true) }
+
+    private func formatted(exact: Bool) -> String? {
         guard let baseCurrency, let baseMinorUnit, baseCurrency != nativeCurrency else { return nil }
         let currency = CurrencyInfo(code: baseCurrency, minorUnit: Int(baseMinorUnit))
-        return MoneyFormatter.format(hasMissingRate ? nil : amountBase, currency: currency, signStyle: signStyle)
+        return MoneyFormatter.format(
+            hasMissingRate ? nil : amountBase, currency: currency, signStyle: signStyle, exact: exact
+        )
     }
 }

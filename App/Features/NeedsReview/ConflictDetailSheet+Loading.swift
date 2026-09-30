@@ -103,7 +103,7 @@ extension ConflictDetailSheet {
     func formattedAmount(_ transaction: PublicSchema.TransactionsWithDetailsSelect) -> String {
         guard let amount = transaction.amountE4, let currency = transaction.currency else { return "—" }
         let info = CurrencyInfo(code: currency, minorUnit: Int(transaction.minorUnit ?? 2))
-        return MoneyFormatter.format(amount, currency: info)
+        return MoneyFormatter.format(amount, currency: info, exact: true)
     }
 
     func formattedDate(_ timestamp: String?) -> String {
@@ -211,7 +211,7 @@ extension ConflictDetailSheet {
         let serverAmount = formattedAmount(server)
         if let amount = attempted.attemptedAmountE4, let currency = attempted.currency ?? server.currency {
             let mineAmount = MoneyFormatter.format(
-                amount, currency: CurrencyInfo(code: currency, minorUnit: Int(server.minorUnit ?? 2))
+                amount, currency: CurrencyInfo(code: currency, minorUnit: Int(server.minorUnit ?? 2)), exact: true
             )
             if mineAmount != serverAmount {
                 built.append(ConflictField(label: "Amount", mine: mineAmount, server: serverAmount))

@@ -164,7 +164,8 @@ struct TestCaptureCard: View {
         return MoneyFormatter.format(
             capture.amountE4,
             currency: CurrencyInfo(code: code, minorUnit: capture.minorUnit),
-            signStyle: .ledger
+            signStyle: .ledger,
+            exact: true
         )
     }
 }

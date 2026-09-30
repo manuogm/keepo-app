@@ -221,7 +221,7 @@ extension CurrencyExposureWidget {
         _ nativeE4: Int64, converted convertedE4: Int64, in native: CurrencyInfo, share: String? = nil
     ) -> some View {
         VStack(alignment: .trailing, spacing: AppTheme.Spacing.xxs) {
-            PrivateText(MoneyFormatter.compact(nativeE4, currency: native))
+            PrivateText(MoneyFormatter.compact(nativeE4, currency: native), spoken: exactLabel(nativeE4, in: native))
                 .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(nativeE4 < 0 ? CashflowPalette.expense : AppTheme.Palette.textPrimary)
             HStack(spacing: AppTheme.Spacing.xs) {
@@ -230,7 +230,7 @@ extension CurrencyExposureWidget {
                 }
                 if let converted = convertedLabel(convertedE4, from: native) {
                     if share != nil { Text("·") }
-                    PrivateText(converted)
+                    PrivateText(converted, spoken: convertedLabel(convertedE4, from: native, exact: true))
                 }
             }
             .font(AppTheme.Typography.nano)

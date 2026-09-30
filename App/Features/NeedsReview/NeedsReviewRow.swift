@@ -84,7 +84,9 @@ struct NeedsReviewRow: View {
             // column contract does, and a later branch that has an amount
             // should not have to come back and add this.
             if let amount = entry.item.amountE4, let currencyCode = entry.item.currency {
-                Text(MoneyFormatter.format(amount, currency: CurrencyInfo(code: currencyCode, minorUnit: minorUnit)))
+                let currency = CurrencyInfo(code: currencyCode, minorUnit: minorUnit)
+                Text(MoneyFormatter.format(amount, currency: currency))
+                    .accessibilityLabel(MoneyFormatter.format(amount, currency: currency, exact: true))
                     .font(AppTheme.Typography.bodyEmphasis)
                     .monospacedDigit()
                     .foregroundStyle(AppTheme.Palette.textPrimary)

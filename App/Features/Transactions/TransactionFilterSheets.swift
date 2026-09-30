@@ -77,6 +77,11 @@ struct CategoryFilterSheet: View {
             .toolbar { filterSheetToolbar(dismiss: dismiss) { onCommit(draft) } }
         }
         .presentationDetents([.medium, .large])
+        // Stated rather than left to the system, which shows the grabber
+        // only for a sheet with more than one detent — the Type, Source and
+        // "Added by" sheets have one, and were the odd ones out without it.
+        // Every filter sheet off the ledger carries it.
+        .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder
@@ -169,6 +174,8 @@ struct FilterOptionsSheet<ID: Hashable>: View {
             .toolbar { filterSheetToolbar(dismiss: dismiss) { onCommit(draft) } }
         }
         .presentationDetents([.medium])
+        // See `CategoryFilterSheet`.
+        .presentationDragIndicator(.visible)
     }
 }
 

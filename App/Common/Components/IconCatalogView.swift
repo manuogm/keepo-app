@@ -7,16 +7,30 @@ import SwiftUI
 /// different-looking ways to do the same job.
 ///
 /// Presented as a sheet from the big round icon at the top of either form.
-/// Selection is applied live to the bindings so the hero preview at the top
-/// of this sheet, and the form underneath it, never disagree.
+///
+/// **It edits a draft and commits on the checkmark**, the same contract as
+/// the ledger's filter sheets and `CustomColorSheet`: the cross — or a swipe
+/// down — leaves the form exactly as it was. It used to write every tap
+/// straight through to the form, with a lone "Done" that could only ever
+/// agree, so there was no way to back out of a browse. The hero previews
+/// the draft; the form underneath only changes on save.
 struct IconCatalogView: View {
-    @Binding var icon: String
-    @Binding var color: Color
+    @Binding private var savedIcon: String
+    @Binding private var savedColor: Color
+    /// Runs on the checkmark only — for a caller that needs to know the
+    /// user made a choice even when it matches what was already there.
+    /// `CategoryFormView` stops suggesting an icon from the name once one
+    /// has been picked; a cancelled visit is not a pick.
+    private let onSave: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    /// Bound directly to the inline `ColorPicker` that replaced the old
-    /// custom-colour sheet — see `addColorSwatch`.
-    @State private var customDraft = Color.accentColor
+    @State private var icon: String
+    @State private var color: Color
+    /// Colours mixed in `CustomColorSheet` during this visit, newest first.
+    /// Shown in the swatch row at once, but only written to the device's
+    /// recent colours on save — a cancelled visit leaves that list alone too.
+    @State private var unsavedMixes: [String] = []
+    @State private var isMixingColor = false
     /// Custom colours the user mixed themselves, most recent first.
     /// Device-local on purpose: this is a palette, not data about their
     /// money — nothing downstream reads it, and syncing it would mean a
@@ -25,8 +39,20 @@ struct IconCatalogView: View {
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.m), count: 6)
 
-    private var customColors: [String] {
+    init(icon: Binding<String>, color: Binding<Color>, onSave: @escaping () -> Void = {}) {
+        _savedIcon = icon
+        _savedColor = color
+        self.onSave = onSave
+        _icon = State(initialValue: icon.wrappedValue)
+        _color = State(initialValue: color.wrappedValue)
+    }
+
+    private var storedColors: [String] {
         customColorsRaw.split(separator: ",").map(String.init)
+    }
+
+    private var customColors: [String] {
+        unsavedMixes + storedColors
     }
 
     /// Exactly two rows, with the "+" occupying the last cell — eleven
@@ -88,9 +114,24 @@ struct IconCatalogView: View {
             .navigationTitle("Icon Catalogue")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("Discard changes")
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
+                    Button { save() } label: { Image(systemName: "checkmark") }
+                        .accessibilityLabel("Use this icon and colour")
+                }
+            }
+            .sheet(isPresented: $isMixingColor) {
+                CustomColorSheet(initial: color) { mixed in
+                    // Round-tripped through hex before being applied, so the
+                    // swatch row and the stored value are the same colour —
+                    // `hexString` is nil exactly when a colour cannot
+                    // resolve to sRGB.
+                    guard let hex = mixed.hexString else { return }
+                    unsavedMixes = [hex] + unsavedMixes.filter { $0 != hex }
+                    color = Color(hex: hex)
                 }
             }
         }
@@ -146,13 +187,15 @@ struct IconCatalogView: View {
         .accessibilityLabel("Colour \(hex)")
     }
 
-    /// The system `ColorPicker` itself, laid transparently over the dashed
-    /// circle. It was previously a button opening our own sheet that then
-    /// opened the system picker — two taps and a screen to choose a colour.
-    /// `ColorPicker` draws its own swatch, so it is hidden behind ours and
-    /// only its tap target is used; the picker now opens on the first tap.
+    /// Opens `CustomColorSheet` on the first tap. This used to be the
+    /// system `ColorPicker` laid transparently over the dashed circle, which
+    /// writes through on **every** change: each colour the user merely
+    /// browsed past in the picker landed in the recent-colours row and on
+    /// the icon. The sheet holds a draft and commits once, on its checkmark.
     private var addColorSwatch: some View {
-        ZStack {
+        Button {
+            isMixingColor = true
+        } label: {
             Circle()
                 .strokeBorder(AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                 .overlay {
@@ -160,20 +203,10 @@ struct IconCatalogView: View {
                         .font(AppTheme.Typography.labelEmphasis)
                         .foregroundStyle(AppTheme.Palette.textSecondary)
                 }
-
-            ColorPicker("Custom colour", selection: $customDraft, supportsOpacity: false)
-                .labelsHidden()
-                .opacity(0.02)
+                .frame(height: AppTheme.Size.touchTarget)
+                .contentShape(Circle())
         }
-        .frame(height: AppTheme.Size.touchTarget)
-        .onChange(of: customDraft) { _, newValue in
-            // Round-tripped through hex before being applied, so the swatch
-            // row and the stored value are the same colour — `hexString` is
-            // nil exactly when a colour cannot resolve to sRGB.
-            guard let hex = newValue.hexString else { return }
-            remember(hex)
-            color = Color(hex: hex)
-        }
+        .buttonStyle(.pressableCard)
         .accessibilityLabel("Choose a custom colour")
     }
 
@@ -216,10 +249,100 @@ struct IconCatalogView: View {
             .font(AppTheme.Typography.rowTitle)
     }
 
+    private func save() {
+        // Oldest first, so the newest mix lands at the front of the list.
+        unsavedMixes.reversed().forEach(remember)
+        savedIcon = icon
+        savedColor = color
+        onSave()
+        dismiss()
+    }
+
     /// Newest first, de-duplicated, capped — a palette the user has to
     /// scroll is no longer a shortcut.
     private func remember(_ hex: String) {
-        let updated = ([hex] + customColors.filter { $0 != hex }).prefix(6)
+        let updated = ([hex] + storedColors.filter { $0 != hex }).prefix(6)
         customColorsRaw = updated.joined(separator: ",")
+    }
+}
+
+/// The system colour picker inside a sheet of Keepo's own, so that choosing
+/// a colour has the same two exits as every other sheet in the app: a cross
+/// that leaves everything as it was, and a checkmark that commits.
+///
+/// SwiftUI's `ColorPicker` offers neither. It presents
+/// `UIColorPickerViewController` itself — eyedropper top left, close top
+/// right — and writes to its binding on every change, so there was no
+/// moment at which a colour counted as *chosen* rather than passed through.
+/// Here the picker only ever edits `draft`, and nothing leaves the sheet
+/// until the checkmark.
+private struct CustomColorSheet: View {
+    let onChoose: (Color) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft: UIColor
+
+    init(initial: Color, onChoose: @escaping (Color) -> Void) {
+        self.onChoose = onChoose
+        _draft = State(initialValue: UIColor(initial))
+    }
+
+    var body: some View {
+        NavigationStack {
+            SystemColorPicker(color: $draft)
+                .ignoresSafeArea()
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button { dismiss() } label: { Image(systemName: "xmark") }
+                            .accessibilityLabel("Discard colour")
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button {
+                            onChoose(Color(uiColor: draft))
+                            dismiss()
+                        } label: {
+                            Image(systemName: "checkmark")
+                        }
+                        .accessibilityLabel("Use this colour")
+                    }
+                }
+        }
+    }
+}
+
+/// `UIColorPickerViewController`, embedded rather than presented. Embedded,
+/// it draws no close button of its own (UIKit adds one only when the picker
+/// is itself the presentation), which is what leaves the sheet's toolbar as
+/// the only way out. It keeps its own "Colors" header, which UIKit offers no
+/// way to hide; the eyedropper in it can only be switched off from iOS 26.
+private struct SystemColorPicker: UIViewControllerRepresentable {
+    @Binding var color: UIColor
+
+    func makeUIViewController(context: Context) -> UIColorPickerViewController {
+        let picker = UIColorPickerViewController()
+        picker.supportsAlpha = false
+        if #available(iOS 26, *) { picker.supportsEyedropper = false }
+        picker.selectedColor = color
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ picker: UIColorPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(color: $color) }
+
+    final class Coordinator: NSObject, UIColorPickerViewControllerDelegate {
+        private let color: Binding<UIColor>
+
+        init(color: Binding<UIColor>) {
+            self.color = color
+        }
+
+        func colorPickerViewController(
+            _ picker: UIColorPickerViewController, didSelect color: UIColor, continuously: Bool
+        ) {
+            self.color.wrappedValue = color
+        }
     }
 }

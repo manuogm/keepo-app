@@ -43,6 +43,9 @@ enum FormatterCache {
         /// Plain decimal, locale-aware, producing `NSDecimalNumber` — the
         /// parse direction (`AmountParser`).
         case parsing
+        /// A whole number with the locale's own grouping — the whole part of
+        /// a typed amount (`AmountFormatter.grouping`).
+        case grouping
     }
 
     static func currency(code: String, minorUnit: Int, locale: Locale) -> NumberFormatter {
@@ -60,6 +63,14 @@ enum FormatterCache {
             formatter.usesGroupingSeparator = false
             formatter.minimumFractionDigits = minorUnit
             formatter.maximumFractionDigits = minorUnit
+        }
+    }
+
+    static func grouping(locale: Locale) -> NumberFormatter {
+        formatter(.grouping, code: "", minorUnit: 0, locale: locale) { formatter in
+            formatter.numberStyle = .decimal
+            formatter.usesGroupingSeparator = true
+            formatter.maximumFractionDigits = 0
         }
     }
 

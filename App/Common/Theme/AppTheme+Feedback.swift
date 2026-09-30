@@ -121,6 +121,11 @@ extension AppTheme {
         static let warning = SensoryFeedback.warning
         /// A write failed.
         static let failure = SensoryFeedback.error
+        /// An entry turned away where it was typed — an amount the form
+        /// cannot save. Deliberately the same rhythm as `failure`: to the
+        /// hand both mean "no", and the shake that comes with it says
+        /// which field.
+        static let rejection = SensoryFeedback.error
     }
 }
 

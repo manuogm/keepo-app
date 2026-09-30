@@ -92,7 +92,7 @@ enum CaptureNotificationCopy {
         guard let charged = resolution.chargedAmountE4, let currency = resolution.accountCurrency else { return "" }
         let amount = MoneyFormatter.format(
             abs(charged), currency: CurrencyInfo(code: currency, minorUnit: resolution.accountMinorUnit ?? 2),
-            locale: locale
+            locale: locale, exact: true
         )
         return "\(amount) charged · "
     }
@@ -146,7 +146,8 @@ enum CaptureNotificationCopy {
     ) -> String {
         if let currency {
             return MoneyFormatter.format(
-                abs(amountE4), currency: CurrencyInfo(code: currency, minorUnit: minorUnit ?? 2), locale: locale
+                abs(amountE4), currency: CurrencyInfo(code: currency, minorUnit: minorUnit ?? 2), locale: locale,
+                exact: true
             )
         }
         let plain = plainAmountText(amountE4, locale: locale)

@@ -19,7 +19,7 @@ import SwiftUI
 /// 12th to nowhere" — is not a period anyone asked to see.
 ///
 /// The calendar itself is `RangeCalendar`, shared with Export's period page;
-/// this sheet is the draft, the All Time row, and Done.
+/// this sheet is the draft, the summary over it, the All Time row, and Done.
 struct CustomRangeSheet: View {
     let onDone: (Selection) -> Void
 
@@ -58,6 +58,11 @@ struct CustomRangeSheet: View {
                 AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
                 VStack(spacing: 0) {
+                    // First, above the controls: it is the answer the
+                    // calendar is being used to build, so it stays in view
+                    // above the grid rather than under a thumb at the foot
+                    // of the sheet.
+                    summaryBar
                     HStack(spacing: AppTheme.Spacing.m) {
                         CheckboxRow(title: "All Time", isOn: range.isAllTime) { range.isAllTime.toggle() }
                         MonthJumpMenu(range: range, focus: $focus)
@@ -65,7 +70,6 @@ struct CustomRangeSheet: View {
                     .padding(.horizontal, AppTheme.Spacing.l)
                     .padding(.bottom, AppTheme.Spacing.m)
                     RangeCalendar(range: $range, focus: $focus)
-                    summaryBar
                 }
                 .padding(.top, AppTheme.Spacing.m)
             }
@@ -81,6 +85,8 @@ struct CustomRangeSheet: View {
                 }
             }
         }
+        // Same grabber as the ledger's other filter sheets.
+        .presentationDragIndicator(.visible)
     }
 
     private func commit() {
@@ -97,7 +103,7 @@ struct CustomRangeSheet: View {
             .font(AppTheme.Typography.label)
             .foregroundStyle(AppTheme.Palette.textSecondary)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, AppTheme.Spacing.m)
+            .padding(.bottom, AppTheme.Spacing.m)
     }
 
     private var summary: String {

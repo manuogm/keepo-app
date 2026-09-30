@@ -292,7 +292,7 @@ extension RecurringRuleFormView {
     }
 
     func save() async {
-        guard let magnitude = AmountParser.parse(amountText), magnitude != 0,
+        guard let magnitude = AmountParser.parse(amountText, minorUnit: minorUnit), magnitude != 0,
               let accountId = selectedAccountId, let target, let currency = selectedAccount?.currency else {
             errorMessage = "Fill in every field."
             return

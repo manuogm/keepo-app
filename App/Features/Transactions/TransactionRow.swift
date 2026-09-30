@@ -50,11 +50,12 @@ struct TransactionRow: View {
 
     /// A transfer between two currencies does not have "an amount" — it has
     /// one on each side. Only then is the far side worth a second line.
-    private var arrivingAmount: String? {
+    /// `exact` is the VoiceOver reading.
+    private func arrivingAmount(exact: Bool = false) -> String? {
         guard let legs, legs.from.currency != legs.to.currency else { return nil }
         guard let code = legs.to.currency, let minorUnit = legs.to.minorUnit else { return nil }
         let currency = CurrencyInfo(code: code, minorUnit: Int(minorUnit))
-        return MoneyFormatter.format(legs.to.amountE4, currency: currency, signStyle: .magnitude)
+        return MoneyFormatter.format(legs.to.amountE4, currency: currency, signStyle: .magnitude, exact: exact)
     }
 
     private var isCombinedTransfer: Bool { counterpart != nil }
@@ -115,12 +116,12 @@ struct TransactionRow: View {
             Spacer(minLength: AppTheme.Spacing.s)
 
             VStack(alignment: .trailing, spacing: AppTheme.Spacing.xxs) {
-                PrivateText(formattedAmount)
+                PrivateText(formattedAmount(), spoken: formattedAmount(exact: true))
                     .font(AppTheme.Typography.bodyEmphasis)
                     .monospacedDigit()
                     .foregroundStyle(amountColor)
-                if let arrivingAmount {
-                    PrivateText("→ " + arrivingAmount)
+                if let arriving = arrivingAmount() {
+                    PrivateText("→ " + arriving, spoken: arrivingAmount(exact: true).map { "→ " + $0 })
                         .font(AppTheme.Typography.micro)
                         .monospacedDigit()
                         .foregroundStyle(AppTheme.Palette.textSecondary)
@@ -173,14 +174,16 @@ struct TransactionRow: View {
         return parts.joined(separator: " · ")
     }
 
-    private var formattedAmount: String {
+    /// `exact` is the VoiceOver reading.
+    private func formattedAmount(exact: Bool = false) -> String {
         guard let currencyCode = displayed.currency, let minorUnit = displayed.minorUnit else { return "—" }
         let currency = CurrencyInfo(code: currencyCode, minorUnit: Int(minorUnit))
         // `.magnitude`, not `.ledger`: a combined transfer is neither an
         // inflow nor an outflow — the money is still the user's — so the
         // row draws the figure alone and lets the arrow say the rest.
         return MoneyFormatter.format(
-            displayed.amountE4, currency: currency, signStyle: isCombinedTransfer ? .magnitude : .ledger
+            displayed.amountE4, currency: currency, signStyle: isCombinedTransfer ? .magnitude : .ledger,
+            exact: exact
         )
     }
 

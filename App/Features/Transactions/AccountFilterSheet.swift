@@ -61,6 +61,8 @@ struct AccountFilterSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        // See `CategoryFilterSheet`.
+        .presentationDragIndicator(.visible)
     }
 
     /// First, not last: it is the answer the list is narrowed *from*, and the
@@ -126,7 +128,8 @@ struct AllAccountsRowView: View {
             // `—` for a figure that cannot be computed, never 0 (money rule
             // 5): one unresolvable rate is not a zero net worth.
             PrivateText(
-                balance.map { MoneyFormatter.format($0.amountE4, currency: $0.currency) } ?? "—"
+                balance.map { MoneyFormatter.format($0.amountE4, currency: $0.currency) } ?? "—",
+                spoken: balance.map { MoneyFormatter.format($0.amountE4, currency: $0.currency, exact: true) }
             )
             .font(AppTheme.Typography.bodyEmphasis)
             .foregroundStyle(AppTheme.Palette.textPrimary)

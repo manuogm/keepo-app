@@ -65,7 +65,10 @@ struct HouseholdReportAccounts: View {
                     // recognisable from the user's bank app is the point —
                     // the converted total already had its own card on the
                     // screen before this one.
-                    PrivateText(MoneyFormatter.format(account.balanceE4, currency: account.currencyInfo))
+                    PrivateText(
+                        MoneyFormatter.format(account.balanceE4, currency: account.currencyInfo),
+                        spoken: MoneyFormatter.format(account.balanceE4, currency: account.currencyInfo, exact: true)
+                    )
                         .font(AppTheme.Typography.Number.inline)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                 }

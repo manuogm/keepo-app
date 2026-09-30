@@ -320,6 +320,7 @@ public final class SessionStore {
         // signs in on this device next.
         AvatarStore.clearAllCached()
         HouseholdMemberNameCache.clear()
+        PreferredCurrencyCache.clear()
         SyncCursorStore.resetAll()
         SyncCursorStore.clearLocalOwner()
         userId = nil

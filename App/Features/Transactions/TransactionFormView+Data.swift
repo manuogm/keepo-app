@@ -240,7 +240,11 @@ extension TransactionFormView {
             errorMessage = "Choose an account."
             return
         }
-        guard let magnitude = AmountParser.parse(amountText), magnitude > 0 else {
+        if rejectsAmount() { return }
+        // Unreachable once `rejectsAmount` has passed — kept so a parse the
+        // classifier and the parser ever disagree on stops here, visibly.
+        guard let magnitude = AmountParser.parse(amountText, minorUnit: paidCurrencyInfo?.minorUnit),
+              magnitude > 0 else {
             errorMessage = "Enter a valid amount."
             return
         }

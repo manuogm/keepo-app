@@ -43,6 +43,17 @@ extension TransactionFormView {
         currencies.map { CurrencyInfo(code: $0.code, minorUnit: Int($0.minorUnit)) }
     }
 
+    /// What the big figure is in: the chosen currency when there is one,
+    /// the account's own otherwise — the precision `amountText` is parsed
+    /// and rounded to. `TransactionDetailContainer.paidCurrency` answers the
+    /// same question for the field's placeholder.
+    var paidCurrencyInfo: CurrencyInfo? {
+        // A transfer's figure is always in its source account's currency —
+        // a paid-in choice left over from switching kind does not apply.
+        guard kind != .transfer, let code = paidCurrencyCode else { return fromAccount?.currencyInfo }
+        return currencyInfos.first { $0.code == code } ?? fromAccount?.currencyInfo
+    }
+
     /// Built here rather than inline in the card's initializer, which took
     /// the SwiftUI type checker past its limit ("unable to type-check this
     /// expression in reasonable time") — a long argument list with a
@@ -147,7 +158,7 @@ extension TransactionFormView {
             return
         }
         guard !chargedAmountEdited else { return }
-        guard let paid = AmountParser.parse(amountText), paid != 0 else {
+        guard let paid = AmountParser.parse(amountText, minorUnit: paidCurrencyInfo?.minorUnit), paid != 0 else {
             chargedAmountText = ""
             conversionRateDate = nil
             return
@@ -188,7 +199,8 @@ extension TransactionFormView {
         guard isForeign, let code = paidCurrencyCode else {
             return LedgerAmounts(signedAmountE4: signedPaid, original: nil)
         }
-        guard let charged = AmountParser.parse(chargedAmountText), charged > 0 else {
+        guard let charged = AmountParser.parse(chargedAmountText, minorUnit: fromAccount?.currencyInfo.minorUnit),
+              charged > 0 else {
             errorMessage = "Enter the amount charged to \(fromAccount?.name ?? "this account")."
             return nil
         }

@@ -78,6 +78,12 @@ extension AppTheme {
         /// `contentTransition(.numericText())`, and that needs one.
         static let colorSafe = Animation.easeInOut(duration: 0.2)
 
+        /// 0.4, **linear** — a field shaking its head at an entry it cannot
+        /// take (`ShakeEffect`). Linear because the curve is already in the
+        /// effect's own sine; a spring on top would smear the three
+        /// oscillations into a wobble.
+        static let reject = Animation.linear(duration: 0.4)
+
         /// A button's press state — **asymmetric, and that is the point.**
         /// Fast in (0.08) so the press registers on the first frame of the
         /// touch, before any `await`; gentle out (0.18) because a snap back

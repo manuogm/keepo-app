@@ -46,7 +46,7 @@ struct AccountRowView: View {
             Spacer(minLength: AppTheme.Spacing.s)
 
             VStack(alignment: .trailing, spacing: AppTheme.Spacing.xxs) {
-                PrivateText(formattedBalance)
+                PrivateText(formattedBalance(), spoken: formattedBalance(exact: true))
                     .font(AppTheme.Typography.bodyEmphasis)
                     .monospacedDigit()
                     .foregroundStyle(AppTheme.Palette.textPrimary)
@@ -64,8 +64,9 @@ struct AccountRowView: View {
         .padding(.vertical, AppTheme.Spacing.xs)
     }
 
-    private var formattedBalance: String {
-        MoneyFormatter.format(row.balanceE4, currency: row.currencyInfo)
+    /// `exact` is the VoiceOver reading.
+    private func formattedBalance(exact: Bool = false) -> String {
+        MoneyFormatter.format(row.balanceE4, currency: row.currencyInfo, exact: exact)
     }
 }
 
@@ -79,6 +80,8 @@ struct AccountRowView: View {
 struct AccountGroupHeaderRow: View {
     let title: String
     let subtitle: String
+    /// The exact subtotal behind a short one, for VoiceOver.
+    var spokenSubtitle: String?
     @Binding var isExpanded: Bool
 
     @Environment(\.isPrivacyMode) private var isPrivacyMode
@@ -91,7 +94,7 @@ struct AccountGroupHeaderRow: View {
                 Text(title)
                     .font(AppTheme.Typography.rowTitle)
                 Spacer()
-                PrivateText(subtitle)
+                PrivateText(subtitle, spoken: spokenSubtitle)
                     .font(AppTheme.Typography.label)
                     .monospacedDigit()
                     .foregroundStyle(AppTheme.Palette.textSecondary)

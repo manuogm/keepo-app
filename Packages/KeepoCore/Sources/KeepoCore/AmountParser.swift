@@ -10,10 +10,24 @@ import Foundation
 /// the app works in.
 public enum AmountParser {
     /// - Parameter text: raw field contents, e.g. "1250.75" or "1250,75".
+    /// - Parameter minorUnit: the currency's `currencies.minor_unit`. Pass it
+    ///   for every amount that is **money in a known currency** — a form
+    ///   field. Storage holds four decimals, so without it "12.345" typed
+    ///   against USD was stored as 12.3450: a figure no dollar account can
+    ///   hold, rendered as 12.35 everywhere and summed as 12.345. The value
+    ///   is rounded half away from zero (the L1 contract) to the currency's
+    ///   own precision *before* it becomes e4. `nil` only where no currency
+    ///   exists yet — an amount search term.
     /// - Returns: `nil` for empty or unparseable input — never `0`, so the
     ///   caller can distinguish "not entered yet" from "entered as zero."
-    public static func parse(_ text: String, locale: Locale = .current) -> Int64? {
-        parseDecimal(text, locale: locale).flatMap(toAmountE4)
+    public static func parse(_ text: String, minorUnit: Int? = nil, locale: Locale = .current) -> Int64? {
+        guard var decimal = parseDecimal(text, locale: locale) else { return nil }
+        if let minorUnit, (0..<4).contains(minorUnit) {
+            var rounded = Decimal()
+            NSDecimalRound(&rounded, &decimal, minorUnit, .plain)
+            decimal = rounded
+        }
+        return toAmountE4(decimal)
     }
 
     /// For ratio-typed fields (withdrawal rate, real return rate) that stay

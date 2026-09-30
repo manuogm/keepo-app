@@ -81,7 +81,7 @@ struct SetupAccountStep: View {
         // same act here as it is in My Profile, and two different controls
         // for it was the drift `CurrencyWheel` exists to prevent.
         .sheet(isPresented: $isPickingCurrency) {
-            BaseCurrencySheet(currencies: currencies, selection: $currency)
+            CurrencyWheelSheet(currencies: currencies, selection: $currency, title: "Currency")
         }
         .onChange(of: icon) { _, _ in hasChosenIcon = true }
         .task { restore() }
@@ -170,7 +170,7 @@ struct SetupAccountStep: View {
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private var balanceE4: Int64? {
-        balanceText.isEmpty ? nil : AmountParser.parse(balanceText)
+        balanceText.isEmpty ? nil : AmountParser.parse(balanceText, minorUnit: selectedCurrencyInfo?.minorUnit)
     }
 
     private var isComplete: Bool {

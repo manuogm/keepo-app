@@ -27,7 +27,8 @@ extension TransactionFormView {
             errorMessage = "Choose a destination account."
             return nil
         }
-        let receivedAmount = needsReceivedAmount ? AmountParser.parse(receivedAmountText) : nil
+        let receivedAmount = needsReceivedAmount
+            ? AmountParser.parse(receivedAmountText, minorUnit: toAccount?.currencyInfo.minorUnit) : nil
         if needsReceivedAmount && receivedAmount == nil {
             errorMessage = "Enter a valid received amount."
             return nil
@@ -52,7 +53,8 @@ extension TransactionFormView {
             errorMessage = "Missing transfer details."
             return
         }
-        let receivedAmount = needsReceivedAmount ? AmountParser.parse(receivedAmountText) : magnitude
+        let receivedAmount = needsReceivedAmount
+            ? AmountParser.parse(receivedAmountText, minorUnit: toAccount?.currencyInfo.minorUnit) : magnitude
         guard let toAmount = receivedAmount, toAmount > 0 else {
             errorMessage = "Enter a valid received amount."
             return

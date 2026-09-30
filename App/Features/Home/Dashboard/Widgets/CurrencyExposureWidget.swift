@@ -193,15 +193,17 @@ struct CurrencyExposureWidget: View {
     }
 
     /// The base-currency figure that a native one converts to, or nothing
-    /// when the two are the same money.
-    func convertedLabel(_ amountBaseE4: Int64, from native: CurrencyInfo) -> String? {
+    /// when the two are the same money. `exact` is the VoiceOver reading.
+    func convertedLabel(_ amountBaseE4: Int64, from native: CurrencyInfo, exact: Bool = false) -> String? {
         guard let currency, native.code != currency.code else { return nil }
-        return MoneyFormatter.compact(amountBaseE4, currency: currency)
+        return exact
+            ? MoneyFormatter.format(amountBaseE4, currency: currency, exact: true)
+            : MoneyFormatter.compact(amountBaseE4, currency: currency)
     }
 
     /// The unabbreviated figure, for VoiceOver. A screen reader has no width
     /// to run out of, so it gets the cents the visible row gives up.
     func exactLabel(_ amountE4: Int64, in native: CurrencyInfo) -> String {
-        MoneyFormatter.format(amountE4, currency: native)
+        MoneyFormatter.format(amountE4, currency: native, exact: true)
     }
 }

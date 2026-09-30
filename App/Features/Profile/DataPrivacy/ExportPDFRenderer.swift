@@ -94,11 +94,15 @@ enum ExportPDFRenderer {
 
         for totals in statement.totals {
             let currency = totals.currency
+            // Exact: an export is a record, not a glance.
+            let expenses = MoneyFormatter.format(
+                totals.expensesE4, currency: currency, signStyle: .magnitude, exact: true
+            )
             let line = [
                 currency.code,
-                "Income \(MoneyFormatter.format(totals.incomeE4, currency: currency))",
-                "Expenses \(MoneyFormatter.format(totals.expensesE4, currency: currency, signStyle: .magnitude))",
-                "Net \(MoneyFormatter.format(totals.netE4, currency: currency))"
+                "Income \(MoneyFormatter.format(totals.incomeE4, currency: currency, exact: true))",
+                "Expenses \(expenses)",
+                "Net \(MoneyFormatter.format(totals.netE4, currency: currency, exact: true))"
             ].joined(separator: "     ")
             _ = draw(line, font: font(.footnote, bold: true), color: ink, in: content, at: cursor)
             cursor += summaryLineHeight
@@ -147,7 +151,7 @@ enum ExportPDFRenderer {
             guard let code = shown.currency, let minorUnit = shown.minorUnit else { return "—" }
             let currency = CurrencyInfo(code: code, minorUnit: Int(minorUnit))
             return MoneyFormatter.format(
-                shown.amountE4, currency: currency, signStyle: legs == nil ? .standard : .magnitude
+                shown.amountE4, currency: currency, signStyle: legs == nil ? .standard : .magnitude, exact: true
             )
         }()
 

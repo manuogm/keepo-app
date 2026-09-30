@@ -194,6 +194,7 @@ struct AccountsListView: View {
             AccountGroupHeaderRow(
                 title: kind == .regular ? "Everyday" : "Investments",
                 subtitle: subtotalText(for: accounts(for: kind)),
+                spokenSubtitle: subtotalText(for: accounts(for: kind), exact: true),
                 isExpanded: kind == .regular ? $isEverydayExpanded : $isInvestmentsExpanded
             )
             .listRowInsets(EdgeInsets(top: 18, leading: 20, bottom: 6, trailing: 20))
@@ -282,11 +283,11 @@ struct AccountsListView: View {
     /// 5), never a partial sum, the moment any account in the section has a
     /// missing rate: a subtotal that silently excluded one account's
     /// balance would look like a real total while quietly being wrong.
-    private func subtotalText(for accounts: [LocalAccountRow]) -> String {
+    private func subtotalText(for accounts: [LocalAccountRow], exact: Bool = false) -> String {
         guard let baseCurrency = accounts.first?.baseCurrencyInfo else { return "—" }
         let hasMissingRate = accounts.contains { $0.balanceBaseE4 == nil }
         let total: Int64? = hasMissingRate ? nil : accounts.reduce(Int64(0)) { $0 + ($1.balanceBaseE4 ?? 0) }
-        return MoneyFormatter.format(total, currency: baseCurrency)
+        return MoneyFormatter.format(total, currency: baseCurrency, exact: exact)
     }
 
     func load() async {
