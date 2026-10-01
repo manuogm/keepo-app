@@ -62,7 +62,7 @@ extension DashboardCanvasView {
     /// be folded into `unavailableWidgets` as the sentence "Already on your
     /// dashboard" — but it is not the same kind of fact as a missing
     /// currency, and the catalogue now files the two differently: a placed
-    /// widget goes to its own group, a widget short of data stays where you
+    /// widget goes to its own shelf, a widget short of data stays where you
     /// would look for it with a note saying what it needs.
     var placedWidgets: Set<DashboardWidgetKind> {
         Set(DashboardWidgetKind.allCases.filter { store.arrangement.contains(kind: $0) })

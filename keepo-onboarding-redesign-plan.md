@@ -381,7 +381,7 @@ Notation: **[R]** = reuse existing code, **[N]** = new.
 ### 4.0 Shared chrome — built once, used by every setup screen
 
 - **[N] `OnboardingChrome`** — the top bar: centred progress dots (current step a pill, per the brief), a delayed `Skip`, and a `Back` when there is somewhere to go. Dots from `AppTheme.Size.dot` (8), pill = a capsule of the same height. `AppTheme.Motion.quick` for the pill's travel.
-- **[N] `DelayedSkipButton`** — fades in after `2.75s` on the step's appearance, resets per step. `AppTheme.Motion.colorSafe` (it is an opacity change — see the token's own doc comment on why a spring here is a rendering bug).
+- **[N] `DelayedSkipButton`** — **removed 2026-10-01: Skip now shows instantly** (inlined into `OnboardingChrome`; the user found the delay obstructive). Original spec: fades in after `2.75s` on the step's appearance, resets per step. `AppTheme.Motion.colorSafe` (it is an opacity change — see the token's own doc comment on why a spring here is a rendering bug).
 - **[N] `OnboardingScaffold`** — title / body / content / bottom bar, so eight screens cannot drift on spacing. Screen edge `Spacing.l`, block separation `Spacing.xxl`, per the brand doc.
 - **[N] `OnboardingPrimaryButton` / `OnboardingSecondaryButton`** — Next / Back. Bottom-right / bottom-left as specified. `AppTheme.Feedback.buttonPress`.
 

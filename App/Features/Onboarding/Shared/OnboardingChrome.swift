@@ -38,57 +38,23 @@ struct OnboardingChrome: View {
                     .accessibilityLabel("Back")
                 }
                 Spacer(minLength: 0)
+                // There the moment the screen appears. It used to fade in
+                // after 2.75 seconds, to make skipping a decision rather
+                // than a reflex; in practice that read as the app holding
+                // back a control the user had already decided to use.
                 if let onSkip {
-                    DelayedSkipButton(step: step, action: onSkip)
+                    Button(action: onSkip) {
+                        Text("Skip")
+                            .font(AppTheme.Typography.label)
+                            .foregroundStyle(AppTheme.Palette.textSecondary)
+                            .frame(height: AppTheme.Size.touchTarget)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
         .padding(.horizontal, AppTheme.Spacing.l)
         .frame(height: AppTheme.Size.touchTarget)
-    }
-}
-
-/// A `Skip` that is not there the instant the screen appears.
-///
-/// **2.75 seconds**, which is long enough that skipping is a decision
-/// rather than a reflex and short enough that it never reads as a hostage
-/// situation. It resets per step — `task(id:)` keyed on the step — because
-/// a Skip inherited from the previous screen would be visible before this
-/// screen had been read at all.
-///
-/// The fade uses `Motion.colorSafe` deliberately. It is an opacity change,
-/// and that token's own doc comment explains why a spring on one is a
-/// rendering bug rather than a matter of taste.
-struct DelayedSkipButton: View {
-    let step: SetupStep
-    let action: () -> Void
-
-    private static let delay = Duration.milliseconds(2750)
-
-    @State private var isVisible = false
-
-    var body: some View {
-        Button(action: action) {
-            Text("Skip")
-                .font(AppTheme.Typography.label)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .frame(height: AppTheme.Size.touchTarget)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .opacity(isVisible ? 1 : 0)
-        // Not merely invisible: a zero-opacity button is untappable in
-        // UIKit anyway (`hitTest` skips alpha ≤ 0.01 — see `AmountField`'s
-        // own header, where relying on the opposite was a real bug), and
-        // leaving it in the accessibility tree would offer VoiceOver a
-        // control sighted users cannot see yet.
-        .disabled(!isVisible)
-        .accessibilityHidden(!isVisible)
-        .animation(AppTheme.Motion.colorSafe, value: isVisible)
-        .task(id: step) {
-            isVisible = false
-            try? await Task.sleep(for: Self.delay)
-            isVisible = true
-        }
     }
 }

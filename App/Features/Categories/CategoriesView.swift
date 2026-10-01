@@ -35,6 +35,10 @@ struct CategoriesView: View {
     @State private var editingCategoryId: UUID?
     @State private var isShowingAllTags = false
     @State private var selectedTab: KindTab = .expense
+    /// Whether the user has never had a category beyond the seeded `Other`
+    /// rows (`LocalTableQueries.ownsOnlyStarterCategories`).
+    @State private var ownsOnlyStarterCategories = false
+    @State private var isShowingSuggestions = false
 
     @Environment(AppNavigation.self) private var navigation: AppNavigation?
     /// Shared with the three money screens (see `MainTabView`) purely for the
@@ -79,6 +83,20 @@ struct CategoriesView: View {
     /// as "no household" for a frame.
     private var showsHouseholdBlankState: Bool {
         session.scope == .household && scopeContext?.isLoaded == true && scopeContext?.hasHousehold == false
+    }
+
+    /// The catalogue onboarding offered, offered again to someone who
+    /// skipped it — over a grid holding nothing but `Other`, which is
+    /// otherwise a screen that looks broken rather than new.
+    ///
+    /// A fact about the data, not a flag: it lasts exactly until the user
+    /// owns a category of their own, from the sheet or from "+", and never
+    /// comes back — deleting everything later is a choice, not a fresh
+    /// start (the query counts tombstones for that reason). Not in
+    /// Household scope, where the grid is the categories you share and a
+    /// starter kit of private ones would be an answer to the wrong question.
+    private var offersSuggestions: Bool {
+        ownsOnlyStarterCategories && session.scope != .household
     }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.m), count: 3)
@@ -133,6 +151,9 @@ struct CategoriesView: View {
                     .contentMargins(.bottom, KeepoTabBarMetrics.clearance, for: .scrollContent)
                     .refreshable { await load() }
                     .fadingEdges()
+                    .overlay {
+                        if offersSuggestions { suggestionsPrompt }
+                    }
                 }
             }
 
@@ -159,6 +180,9 @@ struct CategoriesView: View {
             CategoryFormView(session: session, mode: .create(kind: selectedTab.categoryKind), existing: categories) {
                 session.refresh.bump()
             }
+        }
+        .sheet(isPresented: $isShowingSuggestions) {
+            SuggestedCategoriesSheet(session: session) { session.refresh.bump() }
         }
         .sheet(isPresented: $isShowingAllTags) {
             TagsListView(session: session)
@@ -192,6 +216,30 @@ struct CategoriesView: View {
         .accessibilityLabel("All tags")
     }
 
+    /// Centred in the space the `Other` tile leaves, and laid out like the
+    /// app's other empty states (`ScopeEmptyStateView`): a line of copy and
+    /// one capsule button.
+    private var suggestionsPrompt: some View {
+        VStack(spacing: AppTheme.Spacing.m) {
+            Text("Not sure where to start? See some commonly used categories here.")
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: AppTheme.Size.proseWidth)
+            Button("See categories") { isShowingSuggestions = true }
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .padding(.horizontal, AppTheme.Spacing.l)
+                .padding(.vertical, AppTheme.Spacing.m)
+                .background(AppTheme.Palette.brandPrimary, in: Capsule())
+                .buttonStyle(.plain)
+        }
+        .padding(.horizontal, AppTheme.Spacing.xxl)
+        // Centred in what the user can actually see, not in a region that
+        // runs under the floating tab bar.
+        .padding(.bottom, KeepoTabBarMetrics.clearance)
+    }
+
     private func load() async {
         errorMessage = nil
         guard let ownerId = session.profile?.id else {
@@ -199,8 +247,11 @@ struct CategoriesView: View {
             return
         }
         do {
-            categories = try await session.dbQueue.read { database in
-                try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
+            (categories, ownsOnlyStarterCategories) = try await session.dbQueue.read { database in
+                (
+                    try LocalTableQueries.categories(database, ownerId: ownerId.uuidString),
+                    try LocalTableQueries.ownsOnlyStarterCategories(database, ownerId: ownerId.uuidString)
+                )
             }
         } catch {
             errorMessage = UserFacingError.describe(error)

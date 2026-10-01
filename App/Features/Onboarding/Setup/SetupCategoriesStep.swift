@@ -10,7 +10,9 @@ import SwiftUI
 /// `categories_one_default_per_kind` means there can never be a second, so
 /// `DefaultCategoryCatalog` deliberately offers no "Other" of its own.
 /// Skipping this step is therefore not "no categories": it is those two
-/// rows, which is a working if blunt app.
+/// rows, which is a working if blunt app — and the Categories tab offers
+/// this same catalogue again until the user makes a category of their own
+/// (see `CategoriesView.offersSuggestions`).
 ///
 /// Seven arrive selected. A catalogue with everything ticked is a list
 /// nobody reads, and twenty categories on day one is twenty places to
@@ -18,10 +20,6 @@ import SwiftUI
 /// everyone files against, and the other thirteen are one tap away.
 struct SetupCategoriesStep: View {
     let store: OnboardingDraftStore
-
-    private static let columns = Array(
-        repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.s), count: 3
-    )
 
     var body: some View {
         OnboardingScaffold(
@@ -32,50 +30,15 @@ struct SetupCategoriesStep: View {
             onSkip: skip,
             onPrimary: store.advance
         ) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
-                group("Expenses", DefaultCategoryCatalog.expenses)
-                group("Income", DefaultCategoryCatalog.income)
-            }
-            .sensoryFeedback(AppTheme.Feedback.selection, trigger: store.draft.selectedCategories)
+            DefaultCategoryCatalogGrid(selection: selection)
         }
     }
 
-    private func group(_ title: String, _ categories: [DefaultCategory]) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
-            Text(title)
-                .font(AppTheme.Typography.rowTitle)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-            LazyVGrid(columns: Self.columns, spacing: AppTheme.Spacing.s) {
-                ForEach(categories) { category in
-                    Button {
-                        toggle(category.key)
-                    } label: {
-                        CategoryTile(category: category, isSelected: isSelected(category.key))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(category.name)
-                    .accessibilityAddTraits(isSelected(category.key) ? .isSelected : [])
-                }
-            }
-        }
-    }
-
-    private func isSelected(_ key: DefaultCategoryKey) -> Bool {
-        store.draft.selectedCategories.contains(key)
-    }
-
-    /// Appends rather than inserting in catalogue order, which costs
-    /// nothing here — categories have no hierarchy, unlike the dashboard's
-    /// widgets, so the only thing order affects is the sequence the outbox
-    /// writes them in.
-    private func toggle(_ key: DefaultCategoryKey) {
-        store.update { draft in
-            if let index = draft.selectedCategories.firstIndex(of: key) {
-                draft.selectedCategories.remove(at: index)
-            } else {
-                draft.selectedCategories.append(key)
-            }
-        }
+    private var selection: Binding<[DefaultCategoryKey]> {
+        Binding(
+            get: { store.draft.selectedCategories },
+            set: { keys in store.update { $0.selectedCategories = keys } }
+        )
     }
 
     /// Skip means the two `Other` rows the backend already seeded and

@@ -117,6 +117,10 @@ extension AppTheme {
         /// the number being retyped, differently, at every screen that
         /// explains itself.
         static let proseWidth: CGFloat = 280
+        /// 36 × 5 — the system sheet's drag indicator, for a panel that
+        /// slides up like a sheet without being one (the widget catalogue)
+        /// and has to draw its own.
+        static let grabber = CGSize(width: 36, height: 5)
 
         /// The leading inset that lines a `Divider` up with the text beside
         /// a row's leading icon, rather than with the icon itself.

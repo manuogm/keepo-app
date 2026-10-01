@@ -43,7 +43,7 @@ struct SetupCommitPlan {
             displayName: name(from: draft.displayName),
             avatarJPEG: draft.avatarJPEG,
             account: accountPayload(from: draft.account, ownerId: userId),
-            categories: categoryPayloads(for: draft.selectedCategories, ownerId: userId),
+            categories: CreateCategoryPayload.catalog(draft.selectedCategories, ownerId: userId),
             // **Arranged here, not on the step.** The user chooses a set;
             // `OnboardingDashboardPlan` decides the order that packs
             // without leaving a hole in the grid. Doing it at the commit
@@ -73,21 +73,6 @@ struct SetupCommitPlan {
             currency: account.currency, openingBalanceE4: account.openingBalanceE4,
             icon: account.icon, color: account.color
         )
-    }
-
-    /// A key with no catalogue entry is dropped rather than guessed at —
-    /// the only way to hold one is a draft written by a build that knew a
-    /// category this one does not, and inventing a row for it would put a
-    /// category in the user's list that nothing in the app can describe.
-    private static func categoryPayloads(
-        for keys: [DefaultCategoryKey], ownerId: UUID
-    ) -> [CreateCategoryPayload] {
-        keys.compactMap(DefaultCategoryCatalog.category(for:)).map { category in
-            CreateCategoryPayload(
-                id: UUID(), ownerId: ownerId, kind: category.kind,
-                name: category.name, icon: category.icon, color: category.color
-            )
-        }
     }
 
     private static func deduplicated(_ kinds: [DashboardWidgetKind]) -> [DashboardWidgetKind] {

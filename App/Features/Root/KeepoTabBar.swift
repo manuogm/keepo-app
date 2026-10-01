@@ -157,21 +157,6 @@ extension AppNavigation.Tab {
     }
 }
 
-private extension View {
-    /// iOS 26's Liquid Glass where it exists, the older material blur
-    /// where it doesn't — the deployment target is still 18.0. Both draw
-    /// their own edge, so nothing here adds a border of its own.
-    @ViewBuilder
-    func liquidGlass(in shape: some Shape) -> some View {
-        if #available(iOS 26.0, *) {
-            glassEffect(.regular, in: shape)
-        } else {
-            background(.regularMaterial, in: shape)
-                .overlay(shape.stroke(AppTheme.Palette.textPrimary.opacity(0.06), lineWidth: 0.5))
-        }
-    }
-}
-
 /// Shared because the bar floats *over* the screens rather than reserving a
 /// strip of its own, so every scrolling view has to know how far to let its
 /// last row travel before the glass eats it. One number, not four guesses.

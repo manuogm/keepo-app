@@ -50,6 +50,28 @@ enum LocalTableQueries {
         )
     }
 
+    /// Whether the owner has never had a category beyond the `Other` rows
+    /// signup seeds — the state a user who skipped onboarding's Categories
+    /// step lands in, and the one the Categories tab offers the catalogue
+    /// for.
+    ///
+    /// **Reads tombstones on purpose**, unlike every other query here. A
+    /// user who made categories and later deleted them all has made their
+    /// choice, and should not be offered a starter kit again; the deleted
+    /// rows are the record that they did. Requires a live default row too,
+    /// so a fresh install whose first pull has not landed — an empty table
+    /// — does not read as "only defaults".
+    static func ownsOnlyStarterCategories(_ database: Database, ownerId: String) throws -> Bool {
+        try Bool.fetchOne(
+            database,
+            sql: """
+                SELECT EXISTS (SELECT 1 FROM categories WHERE owner_id = ? AND deleted_at IS NULL)
+                   AND NOT EXISTS (SELECT 1 FROM categories WHERE owner_id = ? AND is_default = 0)
+                """,
+            arguments: [ownerId, ownerId]
+        ) ?? false
+    }
+
     /// One category, whoever owns it — a form editing someone else's row
     /// needs the owner's category that row carries.
     static func category(_ database: Database, id: String) throws -> PublicSchema.CategoriesSelect? {
