@@ -35,6 +35,12 @@ extension AppTheme {
         static let screenTitle = Font.title.weight(.bold)
         /// A section heading inside a screen or sheet.
         static let sectionTitle = Font.title2.weight(.semibold)
+        /// The title in the scope banner at the top of Dashboard, Accounts,
+        /// Transactions and Categories. One size and weight above
+        /// `cardTitle`, in SF Rounded — its own token so the banner's typeface can change
+        /// here without touching the 30 other card titles. Swap `.rounded`
+        /// for `.default` to take it back to SF Pro.
+        static let headerTitle = Font.system(.title2, design: .rounded, weight: .bold)
         /// A card's or a widget's own title.
         static let cardTitle = Font.title3.weight(.semibold)
         /// The bold line at the top of a list row or an alert.

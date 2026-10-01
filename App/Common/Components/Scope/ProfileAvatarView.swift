@@ -17,9 +17,21 @@ struct ProfileAvatarView: View {
     var image: UIImage?
     var size = AppTheme.Size.icon
     /// Drawn on a saturated gradient card (`onColor: true`) or on the app's
-    /// own neutral surface. Only the two fill/foreground colours differ, so
-    /// this is a flag rather than two views.
+    /// own neutral surface. The face and its outline differ, so this is a
+    /// flag rather than two views.
     var onColor = false
+    /// What an avatar without a photo shows. The banner is always the user
+    /// icon, whatever this says; other people's avatars keep the initial
+    /// that tells them apart; the user's own Profile is an invitation to add
+    /// a photo.
+    var placeholder = Placeholder.initial
+
+    enum Placeholder {
+        case initial
+        /// A plus in a dashed circle — the same "add one" mark the empty
+        /// dashboard and its widget slot use.
+        case addPhoto
+    }
 
     var body: some View {
         Group {
@@ -38,22 +50,39 @@ struct ProfileAvatarView: View {
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay {
-            if onColor {
+            // Only a photo needs an edge against the card. The user icon
+            // already is a ring, and a second one around it reads as two.
+            if onColor, image != nil {
                 Circle().strokeBorder(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.muted), lineWidth: 1)
             }
         }
     }
 
+    /// The user icon draws its own ring and needs no fill — the initial's
+    /// tinted fill is what makes a letter read as an avatar.
+    @ViewBuilder
     private var initialFace: some View {
-        ZStack {
-            Circle().fill(
-                onColor
-                    ? AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong)
-                    : AppTheme.Palette.textPrimary.opacity(AppTheme.Opacity.fill)
-            )
-            Text(initial)
-                .font(.system(size: size * 0.42, weight: .bold))
-                .foregroundStyle(onColor ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textPrimary)
+        if onColor {
+            KeepoIcon(name: "icon-user", size: size)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+        } else if placeholder == .addPhoto {
+            Image(systemName: "plus")
+                .font(.system(size: size * 0.35, weight: .light))
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .frame(width: size, height: size)
+                .overlay(
+                    Circle().strokeBorder(
+                        AppTheme.Palette.fillStrong,
+                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
+                    )
+                )
+        } else {
+            ZStack {
+                Circle().fill(AppTheme.Palette.textPrimary.opacity(AppTheme.Opacity.fill))
+                Text(initial)
+                    .font(.system(size: size * 0.42, weight: .bold))
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
+            }
         }
     }
 

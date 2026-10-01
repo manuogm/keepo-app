@@ -116,6 +116,10 @@ struct ProfileView: View {
                 #endif
             }
             .scrollContentBackground(.hidden)
+            // A grouped list leaves a band above its first section for a
+            // header to sit in, and the identity block has none — it read as
+            // a gap between the title and the avatar.
+            .contentMargins(.top, 0, for: .scrollContent)
         }
         .navigationTitle("My Profile")
         .navigationBarTitleDisplayMode(.inline)
@@ -131,7 +135,7 @@ struct ProfileView: View {
         }
         .avatarPicker(
             isPresentingOptions: $isPickingAvatar,
-            canRemove: session.profile?.avatarPath != nil,
+            canRemove: avatars.image != nil,
             onPicked: { image in Task { _ = await avatars.replace(with: image, session: session) } },
             onRemove: { Task { await avatars.removeAvatar(session: session) } }
         )
@@ -186,7 +190,8 @@ struct ProfileView: View {
                 // which is where the camera badge's own reasoning now lives.
                 AvatarButton(
                     name: session.profile?.displayName, email: session.userEmail,
-                    image: avatars.image, isBusy: avatars.isBusy
+                    image: avatars.image, isBusy: avatars.isBusy,
+                    placeholder: .addPhoto, showsCameraBadge: false
                 ) {
                     isPickingAvatar = true
                 }
@@ -197,7 +202,7 @@ struct ProfileView: View {
                 // stacked.
                 VStack(spacing: AppTheme.Spacing.xxs) {
                     TextField("Add your name", text: $draftName)
-                        .font(AppTheme.Typography.cardTitle)
+                        .font(AppTheme.Typography.headerTitle)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                         .multilineTextAlignment(.center)
                         .textContentType(.givenName)

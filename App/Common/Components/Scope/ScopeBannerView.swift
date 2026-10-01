@@ -170,7 +170,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
 
             HStack(spacing: AppTheme.Spacing.xs) {
                 Text(title)
-                    .font(AppTheme.Typography.cardTitle)
+                    .font(AppTheme.Typography.headerTitle)
                     .foregroundStyle(AppTheme.Palette.textOnAccent)
                 if let badge = scope.badgeTitle, let icon = scope.icon {
                     ScopeBadge(title: badge, icon: icon)
