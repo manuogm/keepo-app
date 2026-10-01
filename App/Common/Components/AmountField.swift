@@ -24,13 +24,14 @@ import SwiftUI
 ///
 /// **At rest it reads like every other amount in the app**: exact below a
 /// thousand, short from a thousand up ("56.8K", `MoneyFormatter.format`'s
-/// rule) with a chevron beside it that shows the exact figure. Shown, the
-/// exact figure keeps its line beside the currency pill and calculator if
-/// it fits there; if not, those move up into `header`, the caller's row
+/// rule) with a chevron beside it that shows the exact figure. Whichever
+/// figure is on show — short, exact, or being typed — keeps its line beside
+/// the currency pill and calculator if it fits there; if not ("NOK 100M"
+/// can fail even short), those move up into `header`, the caller's row
 /// above (the account picker, the account's name), which gives up width to
 /// make room — and if even the whole line is too short, the figure shrinks,
 /// symbol and all, never cut with "…". Editing ends the peek. While typing,
-/// the field is always the exact digits, by the same fitting rules.
+/// the field is always the exact digits.
 ///
 /// No figure passes `AmountIssue.maximumWholeDigits`: the keystroke that
 /// would cross it is refused, with the rejection haptic.
@@ -159,15 +160,24 @@ struct AmountField<Header: View>: View {
         return MoneyFormatter.compactFigure(amount)
     }
 
-    /// The figure has a line of its own, because the exact digits do not
-    /// fit beside the pill and calculator — so those move up, and the whole
-    /// value stays in view. While typing that is decided keystroke by
-    /// keystroke; at rest only once the chevron has asked for the exact
-    /// figure, which then also shares its line with the collapse chevron.
+    /// The short form is on show: at rest, a thousand or more, and the
+    /// chevron has not asked for the exact figure.
+    private var showsCompact: Bool { !isFocused && !isPeeking && compactFigure != nil }
+
+    /// At rest beside every figure that has a short form — to expand it, or,
+    /// peeking, to shorten it again.
+    private var showsExpandToggle: Bool { !isFocused && (isPeeking || compactFigure != nil) }
+
+    /// The figure has a line of its own, because what is on show — the
+    /// digits being typed, the exact figure peeked at, or the short form
+    /// ("NOK 100M": a long symbol leaves even that too little room) — does
+    /// not fit beside the pill and calculator. So those move up, and the
+    /// whole value stays in view. Decided keystroke by keystroke while
+    /// typing; at rest the expand or collapse chevron counts too.
     var isExpanded: Bool {
         guard collapsedFieldWidth > 0 else { return false }
-        if isFocused { return figureWidth > collapsedFieldWidth }
-        return isPeeking && figureWidth + AppTheme.Size.icon + AppTheme.Spacing.xs > collapsedFieldWidth
+        let toggle = showsExpandToggle ? AppTheme.Size.icon + AppTheme.Spacing.xs : 0
+        return figureWidth + toggle > collapsedFieldWidth
     }
 
     /// How far the whole figure — symbol, digits and fraction together —
@@ -176,13 +186,13 @@ struct AmountField<Header: View>: View {
     /// over them), and no floor: the expanded figure exists to be read
     /// whole, so it keeps shrinking rather than being cut with "…".
     ///
-    /// Only the glyphs scale: the gap after the symbol and the collapse
-    /// chevron come off the room first. The 2% margin is San Francisco
+    /// Only the glyphs scale: the gap after the symbol and the chevron
+    /// come off the room first. The 2% margin is San Francisco
     /// spacing its glyphs looser at smaller sizes, plus the caret.
     private var figureScale: CGFloat {
         guard isExpanded, figureWidth > 0 else { return 1 }
         let gap = symbol == nil ? 0 : AppTheme.Spacing.xs
-        let fixed = gap + (isFocused ? 0 : AppTheme.Size.icon + AppTheme.Spacing.xs)
+        let fixed = gap + (showsExpandToggle ? AppTheme.Size.icon + AppTheme.Spacing.xs : 0)
         return min(1, (fieldWidth - fixed) / (figureWidth - gap) * 0.98)
     }
 
@@ -299,9 +309,12 @@ struct AmountField<Header: View>: View {
         .background(alignment: .leading) {
             HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.xs) {
                 if let symbol { Text(symbol).font(figureFont(size)) }
-                // The uniform typing text, or the split rendering at rest.
+                // Whatever `display` is drawing: the uniform typing text,
+                // the short form, or the split rendering at rest.
                 if isFocused {
                     Text(AmountFormatter.grouping(text)).font(figureFont(size))
+                } else if showsCompact, let compactFigure {
+                    Text(compactFigure).font(figureFont(size))
                 } else {
                     splitText()
                 }
@@ -331,10 +344,10 @@ struct AmountField<Header: View>: View {
                 .monospacedDigit()
                 .foregroundStyle(AppTheme.Palette.fillStrong)
                 .allowsHitTesting(false)
-        } else if let compactFigure, !isPeeking {
+        } else if showsCompact, let compactFigure {
             HStack(spacing: AppTheme.Spacing.xs) {
                 Text(compactFigure)
-                    .font(figureFont(size))
+                    .font(figureFont(size * figureScale))
                     .monospacedDigit()
                     .lineLimit(1)
                     .allowsHitTesting(false)
