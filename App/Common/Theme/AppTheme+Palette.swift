@@ -101,6 +101,11 @@ extension AppTheme {
         /// An error, a destructive action, a trend down. Replaces
         /// `Color.red`.
         static let statusNegative = Color("StatusNegative")
+        /// Something is missing but nothing is wrong — a rate that has not
+        /// arrived. The system's own yellow, which already adapts to dark
+        /// mode and High Contrast; only ever a wash or a glyph, never text,
+        /// which it is too light to carry on the light canvas.
+        static let statusWarning = Color(uiColor: .systemYellow)
 
         // MARK: Money
         /// **Income is blue, not green.** Warm-vs-green is the canonical

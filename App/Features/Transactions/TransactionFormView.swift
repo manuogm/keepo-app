@@ -43,8 +43,7 @@ struct TransactionFormView: View {
         var id: String { rawValue }
     }
 
-    // Not `private` — read from TransactionFormView+Delete.swift, an
-    // extension in a different file (kept there purely for file-length).
+    // Not `private` — read from TransactionFormView+Delete.swift.
     @Environment(\.dismiss) var dismiss
 
     @State var kind: Kind = .expense
@@ -91,6 +90,9 @@ struct TransactionFormView: View {
     /// The day whose rate produced `chargedAmountText`; `nil` when none
     /// resolved, which the form shows rather than guessing (money rule 5).
     @State var conversionRateDate: Date?
+    /// The lookup finished and found no rate — not merely "not looked up
+    /// yet", which would flash the card's warning on every keystroke.
+    @State var isRateMissing = false
     @State var currencies: [PublicSchema.CurrenciesSelect] = []
     @State var isPickingCurrency = false
 
@@ -136,6 +138,8 @@ struct TransactionFormView: View {
     /// only the difference rather than re-upserting every chip.
     @State var originalTagIds: Set<UUID> = []
     @State var tagsById: [UUID: PublicSchema.TagsSelect] = [:]
+    /// Best first, at most three. See TransactionFormView+Tags.swift.
+    @State var suggestedTagIds: [UUID] = []
     /// The in-flight network delivery of a *newly created* transaction, so
     /// the tag links can wait for it. See `applyTagChanges(to:after:)`.
     @State var pendingDelivery: Task<OutboxSubmitResult, Never>?
@@ -239,12 +243,7 @@ struct TransactionFormView: View {
             // inside the SwiftUI type checker's budget — four more
             // modifiers here pushed it past "unable to type-check this
             // expression in reasonable time".
-            .onChange(of: conversionInputs) { previous, current in
-                // Changing the currency starts a new question, so a charge
-                // the user had corrected for the old one no longer applies.
-                if previous.paidCurrencyCode != current.paidCurrencyCode { chargedAmountEdited = false }
-                Task { await refreshConversion() }
-            }
+            .onChange(of: conversionInputs) { Task { await refreshConversion() } }
             .navigationDestination(isPresented: $isCreatingRecurringRule) {
                 RecurringRuleFormView(session: session, mode: recurringSeedMode) {
                     session.refresh.bump()
@@ -337,9 +336,7 @@ struct TransactionFormView: View {
                 categoryId: userCategoryBinding,
                 amountText: $amountText,
                 receivedAmountText: $receivedAmountText,
-                selectedTagIds: $selectedTagIds,
-                tagsById: tagsById,
-                onEditTags: { isPickingTags = true },
+                tags: tagRow,
                 accounts: kind == .transfer ? transferSourceAccounts : accounts,
                 categories: categoriesForKind,
                 suggestedCategories: displayedCategorySuggestions,
@@ -360,6 +357,7 @@ struct TransactionFormView: View {
             .modifier(AmountEditObserver(
                 texts: [amountText, receivedAmountText, chargedAmountText], isFinal: $isAmountFinal
             ))
+            .task(id: tagContext) { await loadTagContext() }
 
             // Every kind, including transfers, since migration
             // 20260904100000 gave `create_transfer`/`update_transfer` a
@@ -383,10 +381,8 @@ struct TransactionFormView: View {
     /// same screen, and two filled buttons would make the sheet argue with
     /// itself about which one finishes it.
     ///
-    /// The save confirms itself by clearing the amount, and by the haptic
-    /// — no running count. A tally of what this sheet has written is a
-    /// number the user did not ask for on a form that is about the next
-    /// transaction, not the last one.
+    /// The save confirms itself by clearing the amount, and by the haptic —
+    /// no running count: this form is about the next transaction.
     private var addAnotherAction: some View {
         SecondaryActionButton(
             title: "Save and Add Another", fillsWidth: true, isEnabled: !isSaveDisabled

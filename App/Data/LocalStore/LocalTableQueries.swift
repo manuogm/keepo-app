@@ -139,6 +139,20 @@ enum LocalTableQueries {
         )
     }
 
+    /// How many live transactions carry this tag — what deleting it would
+    /// take it off, and so what the All Tags list asks about first.
+    static func transactionCount(_ database: Database, tagId: String) throws -> Int {
+        try Int.fetchOne(
+            database,
+            sql: """
+                SELECT COUNT(*) FROM transaction_tags tt
+                JOIN transactions t ON t.id = tt.transaction_id AND t.deleted_at IS NULL
+                WHERE tt.tag_id = ? AND tt.deleted_at IS NULL
+                """,
+            arguments: [tagId]
+        ) ?? 0
+    }
+
     /// The tag ids currently on one recurring rule — the same query as
     /// `tagIds` above, one step earlier in the chain.
     static func recurringRuleTagIds(_ database: Database, ruleId: String) throws -> [String] {

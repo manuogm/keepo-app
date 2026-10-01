@@ -17,10 +17,22 @@ extension TransactionFormView {
     /// account's own". This is the one place the two meanings meet, and
     /// writing the account's own code back through it resets to `nil` so
     /// the common case never carries a redundant original.
+    ///
+    /// **Picking another currency starts a new question**, so a charge the
+    /// user had entered for the old one no longer applies. Said here, in the
+    /// wheel's setter, and not in an observer of `paidCurrencyCode`: loading
+    /// a saved foreign transaction sets that state too, and an observer
+    /// cannot tell the two apart — it took the load for a new pick, threw
+    /// away the charge the bank actually took and re-derived an estimate
+    /// over it (money rule 6), or with no rate, left it empty.
     var paidCurrencyBinding: Binding<String> {
         Binding(
             get: { paidCurrencyCode ?? fromAccount?.currency ?? "" },
-            set: { paidCurrencyCode = ($0 == fromAccount?.currency || $0.isEmpty) ? nil : $0 }
+            set: {
+                let picked = ($0 == fromAccount?.currency || $0.isEmpty) ? nil : $0
+                if picked != paidCurrencyCode { chargedAmountEdited = false }
+                paidCurrencyCode = picked
+            }
         )
     }
 
@@ -65,6 +77,7 @@ extension TransactionFormView {
             chargedText: chargedAmountBinding,
             currencies: currencyInfos,
             rateDate: conversionRateDate,
+            isRateMissing: isRateMissing,
             onPickCurrency: { isPickingCurrency = true },
             onRefreshRates: { await refreshRates() }
         )
@@ -155,12 +168,14 @@ extension TransactionFormView {
             chargedAmountText = ""
             chargedAmountEdited = false
             conversionRateDate = nil
+            isRateMissing = false
             return
         }
         guard !chargedAmountEdited else { return }
         guard let paid = AmountParser.parse(amountText, minorUnit: paidCurrencyInfo?.minorUnit), paid != 0 else {
             chargedAmountText = ""
             conversionRateDate = nil
+            isRateMissing = false
             return
         }
         let day = String(PostgresDate.sqliteTimestampBoundaryString(occurredAt).prefix(10))
@@ -177,10 +192,12 @@ extension TransactionFormView {
         guard let amount = converted ?? nil else {
             chargedAmountText = ""
             conversionRateDate = nil
+            isRateMissing = true
             return
         }
         chargedAmountText = AmountFormatter.editableString(amount, minorUnit: account.currencyInfo.minorUnit)
         conversionRateDate = occurredAt
+        isRateMissing = false
     }
 }
 

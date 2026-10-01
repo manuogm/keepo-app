@@ -219,9 +219,12 @@ struct RecurringRuleFormView: View {
             }
         }
         .sheet(isPresented: $isPickingDate) { datePickerSheet }
-        .sheet(isPresented: $isPickingTags) {
-            TagPickerSheet(session: session, selectedTagIds: $selectedTagIds)
-        }
+        // Re-read on close, so a tag created in the sheet has a name to draw.
+        .sheet(
+            isPresented: $isPickingTags,
+            onDismiss: { Task { await reloadTags() } },
+            content: { TagPickerSheet(session: session, selectedTagIds: $selectedTagIds) }
+        )
         .errorAlert($actionError)
         .task { await load() }
         // One observer over one value rather than two: both questions have
@@ -285,9 +288,9 @@ struct RecurringRuleFormView: View {
             categoryId: userCategoryBinding,
             amountText: $amountText,
             receivedAmountText: $mirroredAmountText,
-            selectedTagIds: $selectedTagIds,
-            tagsById: tagsById,
-            onEditTags: { isPickingTags = true },
+            tags: TagRowModel(
+                selectedTagIds: $selectedTagIds, tagsById: tagsById, onOpenSheet: { isPickingTags = true }
+            ),
             accounts: accounts,
             categories: categoriesForKind,
             suggestedCategories: displayedCategorySuggestions,

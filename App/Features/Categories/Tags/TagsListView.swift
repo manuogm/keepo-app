@@ -14,11 +14,10 @@ import SwiftUI
 /// there is nothing else a tag has, so a form containing one text field
 /// would be a sheet over a screen already showing that field.
 ///
-/// That same tap reveals the `RemoveBadge` that deletes it, the way a
-/// dashboard tile wears one in edit mode. A tag has exactly two things you
-/// can do to it and both belong to one "working on this one" state, so one
-/// tap opens both rather than making delete a separate long-press nobody can
-/// see is there.
+/// That same tap fills the pill and puts a red cross beside it that deletes
+/// it. A tag has exactly two things you can do to it and both belong to one
+/// "working on this one" state, so one tap opens both rather than making
+/// delete a separate long-press nobody can see is there.
 struct TagsListView: View {
     let session: SessionStore
 
@@ -34,11 +33,22 @@ struct TagsListView: View {
     @State private var newTagName = ""
     @State private var isShowingGuide = false
     @FocusState private var focusedField: Field?
+    /// Every pill's height — what the delete circle beside one matches.
+    @State private var pillHeight: CGFloat = 0
+    @Environment(\.colorScheme) private var colorScheme
 
     private enum Field: Hashable {
         case existing(UUID)
         case new
     }
+
+    /// A delete waiting on the user, for a tag that is on transactions.
+    private struct PendingDelete {
+        let tag: PublicSchema.TagsSelect
+        let transactionCount: Int
+    }
+
+    @State private var pendingDelete: PendingDelete?
 
     var body: some View {
         NavigationStack {
@@ -59,6 +69,19 @@ struct TagsListView: View {
                 ToolbarItem(placement: .principal) { titleWithInfo }
             }
             .task(id: session.refresh.token) { await load() }
+            // An alert, centred, not a confirmation dialog: on iOS 26 that
+            // draws as a popover pointing at the cross, which reads as a menu
+            // of options rather than a question to answer.
+            .alert(
+                "Delete \"\(pendingDelete?.tag.name ?? "")\"?",
+                isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                presenting: pendingDelete
+            ) { pending in
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) { Task { await delete(pending.tag) } }
+            } message: { pending in
+                Text(deleteWarning(pending))
+            }
         }
     }
 
@@ -132,7 +155,7 @@ struct TagsListView: View {
                 "A tag is a name that cuts across categories — a coffee habit, a trip, "
                     + "a side income. It can go on any transaction, whatever its category."
             )
-            Text("Tap a tag to rename it. The red minus deletes it.")
+            Text("Tap a tag to rename it. The red cross beside it deletes it.")
         }
         .font(AppTheme.Typography.caption)
         .foregroundStyle(AppTheme.Palette.textSecondary)
@@ -149,9 +172,9 @@ struct TagsListView: View {
         } else {
             // A household member's shared tag. It is visible here because it
             // is on a transaction in a shared account, but `tags_update` is
-            // owner-only — a caret and a minus would be offering two writes
+            // owner-only — a caret and a delete would be offering two writes
             // the server refuses.
-            TagChip(name: tag.name)
+            TagChip(name: tag.name, isSelected: false)
         }
     }
 
@@ -159,93 +182,66 @@ struct TagsListView: View {
     /// content so the capsule grows with the name as it is typed, which is
     /// what keeps it reading as the same object it was before the tap rather
     /// than an input that replaced it.
+    ///
+    /// Hollow at rest and filled while it is being edited — the one tag
+    /// being worked on is the selected one. Its delete sits **beside** it,
+    /// a red circle the pill's own height, and pushes the next pills along:
+    /// a badge on the corner covered the neighbour's edge and was a target
+    /// smaller than a fingertip.
     private func editablePill(_ tag: PublicSchema.TagsSelect) -> some View {
-        TextField(
-            "Tag",
-            text: Binding(
-                get: { drafts[tag.id] ?? tag.name },
-                set: { drafts[tag.id] = $0 }
+        let isEditing = focusedField == .existing(tag.id)
+        return HStack(spacing: AppTheme.Spacing.xs) {
+            TextField(
+                "Tag",
+                text: Binding(
+                    get: { drafts[tag.id] ?? tag.name },
+                    set: { drafts[tag.id] = $0 }
+                )
             )
-        )
-        .font(AppTheme.Typography.label)
-        .foregroundStyle(AppTheme.Palette.textOnAccent)
-        // The caret would otherwise be the system accent on a dark fill.
-        .tint(AppTheme.Palette.textOnAccent)
-        .textInputAutocapitalization(.words)
-        .submitLabel(.done)
-        .focused($focusedField, equals: .existing(tag.id))
-        .fixedSize()
-        .padding(.horizontal, AppTheme.Spacing.m)
-        .padding(.vertical, AppTheme.Spacing.s)
-        .background(Capsule().fill(AppTheme.Palette.tagTint))
-        .onSubmit { Task { await commitRename(tag) } }
-        // Blur commits too — tapping away from a pill just edited means the
-        // edit is finished, and losing it there would be the surprise.
-        .onChange(of: focusedField) { previous, _ in
-            if previous == .existing(tag.id) { Task { await commitRename(tag) } }
-        }
-        .overlay(alignment: .topTrailing) {
-            if focusedField == .existing(tag.id) {
-                RemoveBadge(label: "Delete tag \(tag.name)", diameter: AppTheme.Size.glyphSmall) {
-                    Task { await delete(tag) }
-                }
-                // Straddling the corner, not tucked inside it: a capsule's
-                // corner is empty space, so the badge sits over nothing and
-                // covers no part of the name it belongs to.
-                .offset(x: AppTheme.Spacing.m, y: -AppTheme.Spacing.m)
-                .transition(.scale.combined(with: .opacity))
+            .font(AppTheme.Typography.label)
+            .tint(AppTheme.Palette.inkOnPrimaryFill(colorScheme))
+            .textInputAutocapitalization(.words)
+            .submitLabel(.done)
+            .focused($focusedField, equals: .existing(tag.id))
+            .fixedSize()
+            .tagPill(isSelected: isEditing)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { pillHeight = $0 }
+            .onSubmit { Task { await commitRename(tag) } }
+            // Blur commits too — tapping away from a pill just edited means
+            // the edit is finished, and losing it there would be the surprise.
+            .onChange(of: focusedField) { previous, _ in
+                if previous == .existing(tag.id) { Task { await commitRename(tag) } }
+            }
+
+            if isEditing {
+                deleteButton(tag)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .animation(AppTheme.Motion.standard, value: focusedField)
+        .animation(AppTheme.Motion.standard, value: isEditing)
     }
 
-    /// Dashed until it is tapped, because a dashed outline reads as "a
-    /// slot, not a thing" — it is the one pill here that is not yet a tag.
-    /// The moment the caret lands in it, it **fills**: from then on the user
-    /// is typing a tag, and a hollow outline that only became a tag on
-    /// return made the thing they were naming look like it wasn't there yet.
-    ///
-    /// The plus and the placeholder go with the outline. Both say "start
-    /// something"; the caret already says it, and keeping them would leave a
-    /// filled tag with a `+` inside it.
-    ///
-    /// A minimum width so an empty field is still a target; `fixedSize`
-    /// alone would collapse it to the caret.
+    private func deleteButton(_ tag: PublicSchema.TagsSelect) -> some View {
+        Button {
+            Task { await requestDelete(tag) }
+        } label: {
+            Image(systemName: "xmark")
+                .font(AppTheme.Typography.microEmphasis)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .frame(width: pillHeight, height: pillHeight)
+                .background(Circle().fill(AppTheme.Palette.statusNegative))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.pressableCard)
+        .accessibilityLabel("Delete tag \(tag.name)")
+    }
+
+    /// See `NewTagField`.
     private var newTagPill: some View {
-        HStack(spacing: AppTheme.Spacing.xs) {
-            if !isNamingNewTag {
-                Image(systemName: "plus")
-                    .font(AppTheme.Typography.microEmphasis)
-            }
-            TextField(isNamingNewTag ? "" : "Add Tag", text: $newTagName)
-                .font(AppTheme.Typography.label)
-                .textInputAutocapitalization(.words)
-                .submitLabel(.done)
-                .focused($focusedField, equals: .new)
-                .tint(AppTheme.Palette.textOnAccent)
-                .fixedSize()
-                .frame(minWidth: AppTheme.Size.illustration, alignment: .leading)
-                .accessibilityLabel("New tag name")
-                .onSubmit { Task { await commitCreate() } }
-                .onChange(of: focusedField) { previous, _ in
-                    if previous == .new { Task { await commitCreate() } }
-                }
+        NewTagField(text: $newTagName, focus: $focusedField, field: .new) {
+            Task { await commitCreate() }
         }
-        .foregroundStyle(isNamingNewTag ? AppTheme.Palette.textOnAccent : AppTheme.Palette.fillStrong)
-        .padding(.horizontal, AppTheme.Spacing.m)
-        .padding(.vertical, AppTheme.Spacing.s)
-        .background {
-            if isNamingNewTag {
-                Capsule().fill(AppTheme.Palette.tagTint)
-            } else {
-                Capsule()
-                    .strokeBorder(AppTheme.Palette.fillStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-            }
-        }
-        .animation(AppTheme.Motion.standard, value: isNamingNewTag)
     }
-
-    private var isNamingNewTag: Bool { focusedField == .new }
 
     // MARK: - Writes
 
@@ -278,6 +274,28 @@ struct TagsListView: View {
         newTagName = ""
         await session.outbox.submitCreateTag(CreateTagPayload(id: UUID(), ownerId: ownerId, name: trimmed))
         session.refresh.bump()
+    }
+
+    /// A tag on no transaction goes at once — there is nothing to lose. One
+    /// that is on some asks first, the way deleting an account does: the
+    /// delete takes it off every one of them (the server's
+    /// `tags_cascade_soft_delete`), which the red cross alone does not say.
+    private func requestDelete(_ tag: PublicSchema.TagsSelect) async {
+        let count = (try? await session.dbQueue.read { database in
+            try LocalTableQueries.transactionCount(database, tagId: tag.id.uuidString)
+        }) ?? 0
+        if count == 0 {
+            await delete(tag)
+        } else {
+            pendingDelete = PendingDelete(tag: tag, transactionCount: count)
+        }
+    }
+
+    private func deleteWarning(_ pending: PendingDelete) -> String {
+        let count = pending.transactionCount
+        let transactions = count == 1 ? "1 transaction" : "\(count) transactions"
+        return "This tag is currently being used in \(transactions). Deleting it will permanently remove it "
+            + "from all of them. This action can't be undone."
     }
 
     /// Drops the draft before the focus, so the blur this causes has nothing

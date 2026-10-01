@@ -21,13 +21,24 @@ extension AmountIssue {
 /// offset: bumping the counter by one animates `shakes` whole sine periods
 /// from rest back to rest, so the view always lands exactly where it began
 /// however often it is turned away, and no state is left to reset.
+///
+/// `nudges` is the gentle form — one small sway (`Motion.nudge`) for an
+/// entry that is missing something rather than wrong.
 struct ShakeEffect: GeometryEffect {
     var animatableData: CGFloat
-    private let travel = AppTheme.Spacing.s
-    private let shakes: CGFloat = 3
+    private let travel: CGFloat
+    private let shakes: CGFloat
 
     init(rejections: Int) {
         animatableData = CGFloat(rejections)
+        travel = AppTheme.Spacing.s
+        shakes = 3
+    }
+
+    init(nudges: Int) {
+        animatableData = CGFloat(nudges)
+        travel = AppTheme.Spacing.xs
+        shakes = 1
     }
 
     func effectValue(size: CGSize) -> ProjectionTransform {

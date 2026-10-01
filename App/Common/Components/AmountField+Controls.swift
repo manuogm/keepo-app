@@ -50,7 +50,7 @@ extension AmountField {
     /// for attention on a screen whose whole point is that figure.
     var calculatorButton: some View {
         Button {
-            isCalculatorPresented = true
+            if let onCalculator { onCalculator() } else { isCalculatorPresented = true }
         } label: {
             KeepoIcon(name: "icon-calculator2", size: AppTheme.Size.glyphSmall)
                 .foregroundStyle(AppTheme.Palette.textSecondary)

@@ -156,7 +156,7 @@ private struct TagRetagSheet: View {
                 if let destination {
                     TagChip(name: destination.name)
                 } else {
-                    TagChip(name: "Choose a tag", isFilled: false)
+                    TagChip(name: "Choose a tag", isSelected: false)
                 }
             }
 
@@ -180,7 +180,7 @@ private struct TagRetagSheet: View {
                         Button {
                             destination = option
                         } label: {
-                            TagChip(name: option.name, isFilled: destination?.id == option.id)
+                            TagChip(name: option.name, isSelected: destination?.id == option.id)
                         }
                         .buttonStyle(.plain)
                     }

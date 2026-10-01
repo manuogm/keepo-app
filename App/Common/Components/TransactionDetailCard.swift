@@ -20,11 +20,10 @@ struct TransactionDetailCard: View {
     @Binding var amountText: String
     @Binding var receivedAmountText: String
 
-    /// The tags currently on this transaction, and the way into the picker.
-    /// Held by the form (it is what Save writes), rendered here.
-    @Binding var selectedTagIds: Set<UUID>
-    let tagsById: [UUID: PublicSchema.TagsSelect]
-    let onEditTags: () -> Void
+    /// The tags on this transaction, the ones suggested for it, and the way
+    /// into the sheet. Held by the form (it is what Save writes), rendered
+    /// here.
+    let tags: TagRowModel
 
     let accounts: [LocalAccountRow]
     let categories: [PublicSchema.CategoriesSelect]
@@ -69,6 +68,11 @@ struct TransactionDetailCard: View {
     var receivedAmountIssue: AmountIssue?
     var amountRejections = 0
 
+    /// Tags deselected in the row while this form is open. They stay in the
+    /// row, hollow, so a tap made by mistake is undone by tapping again
+    /// rather than by finding the tag in the sheet.
+    @State private var keptTagIds: Set<UUID> = []
+
     var body: some View {
         if isTransfer {
             transferBody
@@ -77,29 +81,56 @@ struct TransactionDetailCard: View {
         }
     }
 
-    /// One row of chips plus the add button, wrapping onto as many lines as
-    /// it needs. Shown for **every** kind, transfers included — a transfer
-    /// can carry an all-categories tag, and the picker is where that rule
-    /// gets expressed rather than by hiding the control here.
+    /// One row of pills plus the way into the sheet, wrapping onto as many
+    /// lines as it needs. Shown for **every** kind, transfers included.
+    ///
+    /// Every pill toggles in place: filled is on this transaction, hollow is
+    /// a suggestion or a tag just taken off. Nothing moves when tapped, so
+    /// the row can be worked by position.
     private var tagRow: some View {
         TagFlowLayout(spacing: AppTheme.Spacing.s) {
-            ForEach(orderedSelectedTags, id: \.id) { tag in
-                Button(action: onEditTags) { TagChip(name: tag.name) }
-                    .buttonStyle(.pressableCard)
-            }
-            Button(action: onEditTags) { AddTagButton() }
+            ForEach(rowTags, id: \.id) { tag in
+                let isSelected = tags.selectedTagIds.contains(tag.id)
+                Button { toggle(tag.id) } label: {
+                    TagChip(name: tag.name, isSelected: isSelected)
+                }
                 .buttonStyle(.pressableCard)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+            Button(action: tags.onOpenSheet) {
+                AddTagButton(title: suggestedTags.isEmpty ? "Add Tags" : "All Tags")
+            }
+            .buttonStyle(.pressableCard)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: tags.selectedTagIds)
+        .onChange(of: tags.entry) { keptTagIds = [] }
     }
 
-    /// Resolved through `tagsById` and sorted by name, so the chips keep a
-    /// stable order — a `Set` has none, and rendering it directly made the
-    /// chips jump around every time one was toggled.
-    private var orderedSelectedTags: [PublicSchema.TagsSelect] {
-        selectedTagIds
-            .compactMap { tagsById[$0] }
+    private var suggestedTags: [PublicSchema.TagsSelect] {
+        tags.suggestedTagIds.compactMap { tags.tagsById[$0] }
+    }
+
+    /// The suggestions first, best first, then every other tag on the
+    /// transaction — or taken off it here — by name. Resolved through
+    /// `tagsById`, so the order is stable: a `Set` has none, and rendering
+    /// one directly made the chips jump around every time one was toggled.
+    private var rowTags: [PublicSchema.TagsSelect] {
+        let suggested = Set(tags.suggestedTagIds)
+        let others = tags.selectedTagIds.union(keptTagIds)
+            .subtracting(suggested)
+            .compactMap { tags.tagsById[$0] }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        return suggestedTags + others
+    }
+
+    private func toggle(_ id: UUID) {
+        if tags.selectedTagIds.contains(id) {
+            tags.selectedTagIds.remove(id)
+            keptTagIds.insert(id)
+        } else {
+            tags.selectedTagIds.insert(id)
+        }
     }
 
     // MARK: - Expense / Income
@@ -149,214 +180,15 @@ struct TransactionDetailCard: View {
     }
 }
 
-/// Everything the "paid in another currency" half of an amount block needs,
-/// as one value — five parameters that are meaningless apart, and a single
-/// `nil` for the ordinary case where the purchase was in the account's own
-/// currency and none of this is drawn.
-struct ForeignAmount {
-    /// What the big figure is in. `nil` means the account's own currency,
-    /// so the common entry carries no extra state at all — the chip simply
-    /// shows the account's code and nothing below it appears.
-    @Binding var paidCurrencyCode: String?
-    /// The account-currency figure: prefilled from the rate, and **always
-    /// editable**, which is the whole basis of money rule 6. Keepo's ECB
-    /// reference rate is not what Visa or Revolut charged, and a balance is
-    /// a running sum — so the user gets to replace an estimate with the
-    /// real figure off their bank app.
-    @Binding var chargedText: String
-    let currencies: [CurrencyInfo]
-    /// The day whose rate produced `chargedText`. `nil` means no rate could
-    /// be resolved for that pair and date — money rule 5, so the field is
-    /// left empty for the user to fill rather than guessed at.
-    let rateDate: Date?
-    let onPickCurrency: () -> Void
-    /// Fetches fresh rates and re-derives the charge. Offered only in the
-    /// no-rate case, and only while the user has not already typed the
-    /// figure themselves — see `chargedBlock`.
-    let onRefreshRates: () async -> Void
-}
-
-/// One account + its amount. The account row on top doubles as the picker,
-/// keeping the exact visual format it has when it is merely displaying —
-/// the row does not turn into a different-looking control when tapped,
-/// which is what lets the same component serve "showing" and "choosing".
-///
-/// **The big figure is what was paid; the small one is what the account was
-/// charged.** They are the same number for almost every transaction ever
-/// entered, and then the block looks exactly as it always has. Pick another
-/// currency from the chip and the second field appears underneath, so the
-/// mental model is the same on all three surfaces this card serves —
-/// capture review, edit, and manual entry.
-struct TransactionDetailContainer: View {
-    @Binding var accountId: UUID?
-    @Binding var amountText: String
-    let accounts: [LocalAccountRow]
-    var excluding: UUID?
-    var isAmountEditable = true
-    /// Off for a captured transaction. The paid figure came out of the
-    /// Wallet automation's `Amount` string, so there is nothing to work
-    /// out — and the charged field below keeps its own calculator either
-    /// way, because that one IS typed, off a bank statement.
-    var showsAmountCalculator = true
-    /// Absent on a transfer, whose two legs are each already in their own
-    /// account's currency — there is no third currency to name.
-    var foreign: ForeignAmount?
-    /// What is wrong with a figure in this block, if anything — the paid
-    /// amount, or the charge beneath it, which the user reads as the same
-    /// block. Drawn as a red wash over the block and one line under it,
-    /// **there** rather than at the foot of the form: the mistake is in
-    /// this block, so this is where the eye already is.
-    var amountIssue: AmountIssue?
-    /// Bumped by the form when Save is tapped at an amount already flagged.
-    /// This block shakes and buzzes on it only while it holds an issue — a
-    /// transfer passes the same counter to both legs. A NEW issue needs no
-    /// bump; the block shakes on its arrival by itself.
-    var amountRejections = 0
-
-    private var selected: LocalAccountRow? {
-        accounts.first { $0.id == accountId }
-    }
-
-    /// What the big figure is in — the chosen currency when there is one,
-    /// the account's otherwise.
-    private var paidCurrency: CurrencyInfo? {
-        guard let foreign, let code = foreign.paidCurrencyCode else { return selected?.currencyInfo }
-        return foreign.currencies.first { $0.code == code } ?? selected?.currencyInfo
-    }
-
-    private var isForeign: Bool {
-        guard let account = selected, let code = foreign?.paidCurrencyCode else { return false }
-        return code != account.currency
-    }
-
-    @State private var isRefreshingRates = false
-    /// This block's own count of shakes, so a rejection meant for the other
-    /// leg of a transfer leaves this one still.
-    @State private var shakes = 0
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            block
-                .modifier(ShakeEffect(rejections: shakes))
-            if let amountIssue {
-                FormErrorText(message: amountIssue.message)
-            }
-        }
-        // Turned away as soon as a problem arrives or changes kind — never
-        // as one clears, which is the user fixing it — and again each time
-        // Save is tapped at one already showing.
-        .onChange(of: amountIssue) { old, new in
-            if new != nil && new != old { shake() }
-        }
-        .onChange(of: amountRejections) {
-            if amountIssue != nil { shake() }
-        }
-        .sensoryFeedback(AppTheme.Feedback.rejection, trigger: shakes)
-    }
-
-    private func shake() {
-        withAnimation(AppTheme.Motion.reject) { shakes += 1 }
-    }
-
-    private var block: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            // The picker is the amount's header: a figure shown in full on a
-            // line of its own sends the currency pill and calculator up into
-            // this row, and the account's name gives up the width.
-            AmountField(
-                text: $amountText,
-                currency: paidCurrency,
-                isEnabled: isAmountEditable,
-                onPickCurrency: foreign?.onPickCurrency,
-                showsCalculator: showsAmountCalculator,
-                size: AppTheme.Typography.Number.balance
-            ) {
-                AccountPickerRow(selection: $accountId, accounts: accounts, excluding: excluding)
-            }
-
-            // Both codes are non-nil whenever `isForeign` is — unwrapping
-            // them here rather than inside the block is what lets the
-            // no-rate caption name the actual pair instead of a fallback.
-            if isForeign, let foreign, let paid = foreign.paidCurrencyCode, let account = selected?.currency {
-                chargedBlock(foreign, paidCode: paid, accountCode: account)
-            }
-        }
-        .padding(AppTheme.Spacing.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            let shape = RoundedRectangle(cornerRadius: AppTheme.Radius.card)
-            shape.fill(AppTheme.Palette.bgSurfaceRaised)
-                .overlay {
-                    shape.fill(AppTheme.Palette.statusNegative)
-                        .opacity(amountIssue == nil ? 0 : AppTheme.Opacity.fill)
-                }
-                // Scoped to the wash: on the block itself this would
-                // animate the text field and the chip along with it.
-                .animation(AppTheme.Motion.colorSafe, value: amountIssue == nil)
-        }
-    }
-
-    /// **The caption carries the provenance, not a note off the right
-    /// edge.** Which rate produced this figure — or that none could be
-    /// found — is what decides whether the user accepts the number or
-    /// replaces it with what their bank actually charged (money rule 6), so
-    /// it belongs in the line that introduces the figure rather than
-    /// trailing it. The account's name comes out with it: the picker row
-    /// naming the account sits directly above, and repeating it here spent
-    /// the caption on something already on screen.
-    private func chargedBlock(_ foreign: ForeignAmount, paidCode: String, accountCode: String) -> some View {
-        AmountField(
-            text: foreign.$chargedText,
-            currency: selected?.currencyInfo,
-            size: AppTheme.Typography.Number.metricCompact,
-            headerSpacing: AppTheme.Spacing.xxs
-        ) {
-            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
-                Text(chargedCaption(foreign, paidCode: paidCode, accountCode: accountCode))
-                    .font(AppTheme.Typography.nano)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .lineLimit(1)
-                if foreign.rateDate == nil && foreign.chargedText.isEmpty {
-                    Spacer(minLength: 0)
-                    refreshRatesButton(foreign)
-                }
-            }
-        }
-        .padding(.top, AppTheme.Spacing.xs)
-    }
-
-    /// Says where the number came from, and says plainly when there is no
-    /// number at all rather than showing a zero (money rule 5). The no-rate
-    /// wording names the actual pair, because "no rate" on its own reads as
-    /// a fault in the app rather than a gap in the ECB's table for the two
-    /// currencies this particular purchase happens to span.
-    private func chargedCaption(_ foreign: ForeignAmount, paidCode: String, accountCode: String) -> String {
-        guard let rateDate = foreign.rateDate else { return "\(paidCode)/\(accountCode) rate not available" }
-        return "Charged to account based on \(PostgresDate.dateOnlyLabel(rateDate, calendar: .current)) Rate"
-    }
-
-    /// Only ever drawn when there is no rate **and** the field is still
-    /// empty. A rate that resolved needs no refreshing, and once the user
-    /// has typed what their bank charged, that figure is theirs — a fresh
-    /// rate would not be allowed to replace it (money rule 6), so offering
-    /// to fetch one would be offering a button that changes nothing.
-    private func refreshRatesButton(_ foreign: ForeignAmount) -> some View {
-        Button {
-            Task {
-                isRefreshingRates = true
-                await foreign.onRefreshRates()
-                isRefreshingRates = false
-            }
-        } label: {
-            if isRefreshingRates {
-                ProgressView()
-            } else {
-                Text("Refresh FX rates")
-                    .font(AppTheme.Typography.nanoEmphasis)
-                    .foregroundStyle(AppTheme.Palette.brandPrimary)
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(isRefreshingRates)
-    }
+/// What the tag row needs from its form, as one value.
+struct TagRowModel {
+    @Binding var selectedTagIds: Set<UUID>
+    let tagsById: [UUID: PublicSchema.TagsSelect]
+    /// Best first, at most three — `TagSuggestions`. Empty where a form
+    /// offers none.
+    var suggestedTagIds: [UUID] = []
+    /// Changes when the form starts a new entry without closing ("Save and
+    /// Add Another"), so tags taken off the last one leave the row.
+    var entry = 0
+    let onOpenSheet: () -> Void
 }

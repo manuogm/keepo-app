@@ -176,6 +176,7 @@ extension TransactionFormView {
         chargedAmountText = ""
         chargedAmountEdited = false
         conversionRateDate = nil
+        isRateMissing = false
         transferDivergenceConfirmed = false
         pendingDelivery = nil
         savedCount += 1

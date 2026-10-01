@@ -84,6 +84,12 @@ extension AppTheme {
         /// oscillations into a wobble.
         static let reject = Animation.linear(duration: 0.4)
 
+        /// 0.5, eased — `ShakeEffect`'s gentle form, one slow sway for an
+        /// entry that is missing something rather than wrong. Eased where
+        /// `reject` is linear: there is one swing, not three, and it should
+        /// settle rather than snap.
+        static let nudge = Animation.easeInOut(duration: 0.5)
+
         /// A button's press state — **asymmetric, and that is the point.**
         /// Fast in (0.08) so the press registers on the first frame of the
         /// touch, before any `await`; gentle out (0.18) because a snap back

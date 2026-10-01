@@ -386,3 +386,11 @@ extension RecurringRuleFormView {
         }
     }
 }
+
+extension RecurringRuleFormView {
+    func reloadTags() async {
+        let tags = try? await session.dbQueue.read { database in try LocalTableQueries.tags(database) }
+        guard let tags else { return }
+        tagsById = Dictionary(tags.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+}

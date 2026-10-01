@@ -57,6 +57,10 @@ struct AmountField<Header: View>: View {
     /// beside the figure there is one more thing to explain on the one
     /// screen that cannot be skipped.
     var showsCalculator = true
+    /// Set when the keypad button belongs to a calculator the caller owns —
+    /// the transaction card's one calculator for its two figures. `nil`
+    /// opens this field's own.
+    var onCalculator: (() -> Void)?
     /// Point size of the whole part, from `AppTheme.Typography.Number`. The
     /// fraction and the symbol derive from it, so a caller only ever picks
     /// one number.
@@ -91,6 +95,7 @@ struct AmountField<Header: View>: View {
         isEnabled: Bool = true,
         onPickCurrency: (() -> Void)? = nil,
         showsCalculator: Bool = true,
+        onCalculator: (() -> Void)? = nil,
         size: CGFloat = AppTheme.Typography.Number.balance,
         headerSpacing: CGFloat = AppTheme.Spacing.s,
         @ViewBuilder header: () -> Header
@@ -101,6 +106,7 @@ struct AmountField<Header: View>: View {
         self.isEnabled = isEnabled
         self.onPickCurrency = onPickCurrency
         self.showsCalculator = showsCalculator
+        self.onCalculator = onCalculator
         self.size = size
         self.headerSpacing = headerSpacing
         self.header = header()
