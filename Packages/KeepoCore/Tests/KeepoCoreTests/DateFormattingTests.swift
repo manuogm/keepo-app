@@ -120,3 +120,75 @@ struct DateOnlyLabelTests {
         #expect(shifted != correct)
     }
 }
+
+/// `currentDateOnly` exists because `utcCalendar.startOfDay(for: Date())` is
+/// UTC's today rather than the user's, and the difference is invisible from a
+/// machine set to UTC — which is every CI runner. So every case here pins an
+/// exact instant and an exact device zone rather than reading the clock.
+@Suite("Today, as a date-only value")
+struct CurrentDateOnlyTests {
+    private var utc: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+
+    private func device(_ identifier: String) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: identifier)!
+        return calendar
+    }
+
+    /// 2026-09-22 01:30 UTC — already the 22nd in UTC, still the evening of
+    /// the 21st in Chicago. The old spelling returned the 22nd here, which is
+    /// what made a rule due "tomorrow" read as due today all evening.
+    private var lateEveningInChicago: Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar.date(from: DateComponents(year: 2026, month: 9, day: 22, hour: 1, minute: 30))!
+    }
+
+    @Test("west of UTC, late in the day, it is still the user's yesterday-in-UTC-terms")
+    func westOfUTC() {
+        let today = PostgresDate.currentDateOnly(
+            in: utc, device: device("America/Chicago"), now: lateEveningInChicago
+        )
+        #expect(today == utc.date(from: DateComponents(year: 2026, month: 9, day: 21)))
+    }
+
+    @Test("the naive spelling disagrees, which is the whole reason this exists")
+    func naiveSpellingIsWrong() {
+        let naive = utc.startOfDay(for: lateEveningInChicago)
+        let correct = PostgresDate.currentDateOnly(
+            in: utc, device: device("America/Chicago"), now: lateEveningInChicago
+        )
+        #expect(naive != correct)
+    }
+
+    /// The same instant is already the 22nd in Auckland — so a fix that
+    /// merely subtracted a day would break the other half of the world.
+    @Test("east of UTC, the same instant is already the next day")
+    func eastOfUTC() {
+        let today = PostgresDate.currentDateOnly(
+            in: utc, device: device("Pacific/Auckland"), now: lateEveningInChicago
+        )
+        #expect(today == utc.date(from: DateComponents(year: 2026, month: 9, day: 22)))
+    }
+
+    @Test("in UTC itself it agrees with the naive spelling — the case that hid the bug")
+    func inUTC() {
+        let today = PostgresDate.currentDateOnly(in: utc, device: utc, now: lateEveningInChicago)
+        #expect(today == utc.startOfDay(for: lateEveningInChicago))
+    }
+
+    /// The returned value must be directly comparable with a decoded `date`
+    /// column, which is the entire point of expressing it in that frame.
+    @Test("is comparable with a date-only column decoded in the same frame")
+    func comparesWithDecodedColumn() {
+        let decoded = PostgresDate.dateOnly(from: "2026-09-21", calendar: utc)
+        let today = PostgresDate.currentDateOnly(
+            in: utc, device: device("America/Chicago"), now: lateEveningInChicago
+        )
+        #expect(decoded == today)
+    }
+}

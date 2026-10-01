@@ -104,9 +104,15 @@ struct HouseholdInfoSheet: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
             point("person.2.fill", "A shared account is 100% yours **and** 100% theirs. Never split.")
             point("coloncurrencysign.circle.fill", "Figures are in **your** base currency. Theirs may differ.")
-            point("arrow.triangle.2.circlepath", "Stop sharing an account and it returns to you, history intact.")
+            point(
+                "arrow.triangle.2.circlepath",
+                "Stop sharing an account and it stays yours. They keep a copy of what they saw."
+            )
             point("tag.fill", "Tags follow their account, both ways.")
-            point("exclamationmark.triangle.fill", "Leaving splits every shared account in two. Face ID required.")
+            point(
+                "exclamationmark.triangle.fill",
+                "Leaving gives each of you a copy of what you saw of the other's. Face ID required."
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -149,7 +155,10 @@ struct HouseholdMemberSheet: View {
                         facts
                         DestructiveActionButton(title: "Remove from Household", action: onRemove)
                             .padding(.top, AppTheme.Spacing.s)
-                        Text("Ends the household for both of you. Each keeps a private copy.")
+                        Text(
+                            "Ends the household for both of you. Each keeps their own accounts and a copy "
+                                + "of the other's."
+                        )
                             .font(AppTheme.Typography.micro)
                             .foregroundStyle(AppTheme.Palette.textSecondary)
                             .multilineTextAlignment(.center)
@@ -270,8 +279,8 @@ struct HouseholdDissolvedSheet: View {
                     .multilineTextAlignment(.center)
 
                 Text(
-                    "Your household has been dissolved. Every shared account is now a private copy "
-                        + "of your own — nothing was lost."
+                    "Your household has been dissolved. You keep your own accounts and a copy of what "
+                        + "you could see of theirs — nothing was lost."
                 )
                     .font(AppTheme.Typography.body)
                     .foregroundStyle(AppTheme.Palette.textSecondary)

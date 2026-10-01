@@ -63,6 +63,14 @@ final class AvatarStore {
         loadedPath = path
     }
 
+    /// Handed back by whoever displayed it. `lastError` is state this store
+    /// owns and a screen merely renders, so a screen that lifts it into an
+    /// alert has to clear it here — otherwise the value stays set and the
+    /// *next* failure, being identical, changes nothing and is never shown.
+    func clearLastError() {
+        lastError = nil
+    }
+
     /// Uploads, records the new path on the profile, and deletes the object
     /// the profile used to point at — in that order, so the moment anything
     /// fails the profile still names an object that exists. Returns the new

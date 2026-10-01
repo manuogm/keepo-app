@@ -51,10 +51,32 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     /// card by its own corner radius — so a screen's filters read as part of
     /// its header rather than as a toolbar underneath one.
     var isFiltersExpanded = false
+    /// Categories has nothing money-shaped to mask, so it's the one screen
+    /// that opts out — every other caller keeps the toggle by leaving this
+    /// at its default.
+    var showsPrivacyToggle = true
+    /// Whether the privacy toggle is the thing its coach mark points at.
+    ///
+    /// Opt-in, and only Home opts in — the banner renders on all four tabs,
+    /// so an anchor published unconditionally would put the hole on
+    /// whichever tab happened to register first rather than on "the screen
+    /// where it matters". Home is where the figures are largest and where
+    /// hiding them is most obviously worth knowing about. Same shape as
+    /// `showsPrivacyToggle` above, for the same reason.
+    var showsPrivacyLesson = false
+    /// The way back to the screen that sent the user here. `nil` — and so
+    /// no chevron at all — on a screen that is simply its own tab.
+    ///
+    /// A closure rather than a third `@ViewBuilder` slot: a header's leading
+    /// position holds a back control and nothing else, so the only thing a
+    /// caller decides is whether it is there — and the three screens that
+    /// never go back don't have to name a generic parameter they never use.
+    var onBack: (() -> Void)?
     let onOpenProfile: () -> Void
     /// Rendered immediately before the privacy toggle. Home puts "Done"
     /// here while the dashboard is being rearranged; Transactions puts the
-    /// toggle for its own `filters` panel.
+    /// toggle for its own `filters` panel; Categories, which has no privacy
+    /// toggle, puts its way into tags in the toggle's corner.
     @ViewBuilder var accessory: Accessory
     @ViewBuilder var filters: Filters
 
@@ -99,6 +121,10 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
             }
         }
         .elevation(.resting)
+        // What the scope coach mark points at. Published from here rather
+        // than measured by the overlay, because the banner is the only
+        // thing that knows where the banner is — see `SpotlightOverlay`.
+        .ftuxAnchor(FTUXLessons.scope)
         .animation(AppTheme.Motion.standard, value: isFiltersExpanded)
         // The one moment worth a bump: the card breaking free. Not the
         // finger touching down, not the spring settling — the instant the
@@ -132,6 +158,7 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
 
     private func card(_ scope: PublicSchema.AccountScope) -> some View {
         HStack(spacing: AppTheme.Spacing.m) {
+            backButton
             Button(action: onOpenProfile) {
                 ProfileAvatarView(
                     name: session.profile?.displayName, email: session.userEmail,
@@ -155,8 +182,18 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
             Spacer(minLength: AppTheme.Spacing.xs)
 
             accessory
-            PrivacyToggleButton(session: session, tint: .white)
-                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+            if showsPrivacyToggle {
+                PrivacyToggleButton(session: session, tint: .white)
+                    .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                    // **Only the card the user is actually looking at.**
+                    // The carousel keeps all three mounted, side by side
+                    // and off-screen, so anchoring every card's eye would
+                    // let a neighbour win the anchor and cut the hole
+                    // somewhere past the edge of the display.
+                    .ftuxAnchor(
+                        showsPrivacyLesson && scope == session.scope ? FTUXLessons.privacy : nil
+                    )
+            }
         }
         .padding(.horizontal, AppTheme.Spacing.l)
         .padding(.top, topSafeAreaInset + topOvershoot + 12)
@@ -176,6 +213,38 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(title), \(scope.title) scope")
+        // Scoped to the chevron arriving or leaving. Everything else on the
+        // card — tilt, shrink, colour — is driven by the drag and has to
+        // stay out of an implicit animation.
+        .animation(AppTheme.Motion.standard, value: onBack != nil)
+    }
+
+    /// The leading slot, which is where iOS puts back and so where the eye
+    /// looks for it. *Beside* the avatar rather than replacing it: Profile
+    /// is reached from the header on every screen, and one that stopped
+    /// offering it because a filter was applied would be the exception.
+    ///
+    /// At the title's font, not `Size.glyph` like the two controls on the
+    /// other end — a chevron is a stroke, not a filled shape, so in the same
+    /// box as the eye and the funnel it reads as a hairline. Narrow in
+    /// layout but 44pt to the finger, so a glyph this thin doesn't push the
+    /// title a finger's width across.
+    @ViewBuilder
+    private var backButton: some View {
+        if let onBack {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(AppTheme.Typography.cardTitle)
+                    .foregroundStyle(AppTheme.Palette.textOnAccent)
+                    .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.icon)
+                    .hitTarget()
+            }
+            // Dims rather than scales — the card emphasis is for things
+            // that look like surfaces, and this is a glyph.
+            .buttonStyle(.pressableRow)
+            .accessibilityLabel("Back")
+            .transition(.opacity.combined(with: .move(edge: .leading)))
+        }
     }
 
     /// The current scope's dot is a **pill**, not a bigger circle: length is
@@ -208,9 +277,13 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
                 // Breathing room under the card's edge — without it the
                 // first row of controls sits flush against the header and
                 // the panel reads as a continuation of it rather than as a
-                // drawer it opened.
+                // drawer it opened. Tight underneath, because everything
+                // below this panel is the screen's actual content: the
+                // drawer costs the ledger its height for as long as it is
+                // open, so it is one row of controls and the smallest
+                // surround that still reads as a surface.
                 .padding(.top, AppTheme.Spacing.s)
-                .padding(.bottom, AppTheme.Spacing.m)
+                .padding(.bottom, AppTheme.Spacing.s)
         }
         .frame(maxWidth: .infinity)
         .background(
@@ -298,10 +371,13 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
 }
 
 extension ScopeBannerView where Accessory == EmptyView, Filters == EmptyView {
-    init(title: String, session: SessionStore, onOpenProfile: @escaping () -> Void) {
+    init(
+        title: String, session: SessionStore, showsPrivacyToggle: Bool = true,
+        onOpenProfile: @escaping () -> Void
+    ) {
         self.init(
-            title: title, session: session, onOpenProfile: onOpenProfile,
-            accessory: { EmptyView() }, filters: { EmptyView() }
+            title: title, session: session, showsPrivacyToggle: showsPrivacyToggle,
+            onOpenProfile: onOpenProfile, accessory: { EmptyView() }, filters: { EmptyView() }
         )
     }
 }
@@ -310,33 +386,15 @@ extension ScopeBannerView where Filters == EmptyView {
     init(
         title: String,
         session: SessionStore,
+        showsPrivacyToggle: Bool = true,
+        showsPrivacyLesson: Bool = false,
         onOpenProfile: @escaping () -> Void,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.init(
-            title: title, session: session, onOpenProfile: onOpenProfile,
-            accessory: accessory, filters: { EmptyView() }
+            title: title, session: session, showsPrivacyToggle: showsPrivacyToggle,
+            showsPrivacyLesson: showsPrivacyLesson,
+            onOpenProfile: onOpenProfile, accessory: accessory, filters: { EmptyView() }
         )
-    }
-}
-
-/// The "you are not looking at everything" flag beside a screen title.
-/// Never shown for Total — see `badgeTitle`.
-struct ScopeBadge: View {
-    let title: String
-    let icon: String
-
-    var body: some View {
-        HStack(spacing: AppTheme.Spacing.xs) {
-            ScopeGlyph(name: icon, size: AppTheme.Size.glyphNano)
-                .font(AppTheme.Typography.nanoEmphasis)
-            Text(title.uppercased())
-                .font(AppTheme.Typography.nanoEmphasis)
-                .tracking(0.4)
-        }
-        .foregroundStyle(AppTheme.Palette.textOnAccent)
-        .padding(.horizontal, AppTheme.Spacing.s)
-        .padding(.vertical, AppTheme.Spacing.xxs)
-        .background(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule())
     }
 }

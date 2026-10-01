@@ -8,9 +8,17 @@ extension TransactionFormView {
     func deleteTransaction() async {
         isSaving = true
         errorMessage = nil
-        if let transferGroupId = editingTransferGroupId,
-           let fromExpectedVersion = editingFromVersion,
-           let toExpectedVersion = editingToVersion {
+        // A transfer is deleted as a transfer or not at all. Falling through
+        // to `delete_transaction` with one leg's id — which is what happened
+        // when the other leg's version was unknown — is refused server-side
+        // ("use delete_transfer") while the local write has already removed
+        // the leg, so the outbox retried it forever.
+        if let transferGroupId = editingTransferGroupId {
+            guard let fromExpectedVersion = editingFromVersion, let toExpectedVersion = editingToVersion else {
+                isSaving = false
+                errorMessage = "Only the owner of the other account can delete this transfer."
+                return
+            }
             let payload = DeleteTransferPayload(
                 transferGroupId: transferGroupId,
                 fromExpectedVersion: fromExpectedVersion, toExpectedVersion: toExpectedVersion

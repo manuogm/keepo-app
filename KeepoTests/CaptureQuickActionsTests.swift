@@ -19,7 +19,9 @@ struct CaptureQuickActionsTests {
     ) -> CaptureLocalWrite.Resolution {
         CaptureLocalWrite.Resolution(
             accountName: accountId != nil ? "Revolut" : nil, categoryName: "Coffee",
-            categoryIsDefault: categoryIsDefault, currency: accountId != nil ? "EUR" : nil, minorUnit: 2,
+            categoryIsDefault: categoryIsDefault, paidAmountE4: -45000, paidCurrency: "EUR", paidMinorUnit: 2,
+            chargedAmountE4: nil, accountCurrency: accountId != nil ? "EUR" : nil,
+            accountMinorUnit: accountId != nil ? 2 : nil,
             categoryId: UUID().uuidString, accountId: accountId, suggestedCategories: suggestedCategories,
             suggestedAccounts: suggestedAccounts, isPossibleDuplicate: isPossibleDuplicate
         )

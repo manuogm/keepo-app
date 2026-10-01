@@ -53,6 +53,8 @@ reset role;
 create temporary table twins on commit drop as
 select id, owner_id from categories
 where id not in ('c1000000-0000-0000-0000-00000000c001', 'c2000000-0000-0000-0000-00000000c001')
+  -- Only the fixture users': the local database can hold a household of its own.
+  and owner_id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222')
   and shared_group_id is not null and deleted_at is null;
 -- Temp tables belong to the superuser that made them; the assertions below
 -- read them back as `authenticated`.

@@ -11,11 +11,24 @@ import Foundation
 /// another phone its money data directly would put that data outside every
 /// guarantee the schema makes about who may read what.
 ///
-/// So this protocol carries exactly three things: who you are (so the other
-/// phone can draw your face before a household exists and RLS would rightly
-/// refuse), one single-use invite token, and where each side has got to in
-/// the ceremony. The animation is a narration of real server work, and this
-/// is the wire it is narrated over.
+/// So this protocol carries exactly four things: a six-digit code proof and
+/// its answer, who you are (so the other phone can draw your face before a
+/// household exists and RLS would rightly refuse), one single-use invite
+/// token, and where each side has got to in the ceremony. The animation is a
+/// narration of real server work, and this is the wire it is narrated over.
+///
+/// ## The code comes first, and that ordering is the security property
+///
+/// Identity is not sent when the link opens. It is sent when the code has
+/// been accepted, and not before. The distinction is the whole of security
+/// audit finding 6: gating only the *token* would still leave a name and a
+/// face readable by anything in Bluetooth range that connects, which was the
+/// original defect. The order on the wire is:
+///
+///     connect → codeProof → codeAccepted → identity (both ways) → invite
+///
+/// A wrong code never reaches the second arrow, so it never learns who is
+/// holding the other phone.
 ///
 /// ## On versioning
 ///
@@ -26,7 +39,21 @@ import Foundation
 /// side sits at "Looking for nearby devices" forever while the other shows a
 /// face. Better to say so.
 enum HouseholdPairingMessage: Codable, Hashable, Sendable {
-    /// Sent by both sides the instant the session connects.
+    /// Guest → owner. The six digits the owner read out, as typed.
+    ///
+    /// Sent over the `MCSession`, which is encrypted (`.required`), and sent
+    /// in the clear rather than hashed — deliberately. A hash of a six-digit
+    /// code is brute-forced offline in the time it takes to write the loop,
+    /// so hashing here would buy nothing while suggesting it had.
+    case codeProof(code: String)
+    /// Owner → guest. The digits were right; identities may now cross.
+    case codeAccepted
+    /// Owner → guest. They were not. `attemptsRemaining` is what the guest
+    /// puts on screen, because "wrong code" with no count is a screen that
+    /// gives no warning before the session is abandoned.
+    case codeRejected(attemptsRemaining: Int)
+    /// Sent by both sides once, and **only once the code has been accepted**
+    /// — never on connect. See `HouseholdPairingIdentity`.
     case identity(HouseholdPairingIdentity)
     /// Owner → guest. The one-time token minted by `create_invite`, which the
     /// guest immediately spends on `accept_invite`.
@@ -59,8 +86,37 @@ enum HouseholdPairingMessage: Codable, Hashable, Sendable {
 /// Capped hard at 24 KB. `MCSession` will carry far more, but this is sent
 /// over Bluetooth in the worst case and a slow identity exchange is a
 /// discovery screen that looks broken.
+/// ## What is deliberately not on this card either
+///
+/// **No email address.** It used to be here, as a fallback for the name, and
+/// the security audit of 2026-09-21 (finding 6) established what that cost:
+/// the owner advertises while sitting on the discovery screen, the advertiser
+/// accepts every invitation that arrives without asking, and both sides send
+/// this struct the instant the link opens — all before any human has
+/// confirmed anything. Anything in here is therefore readable by any device
+/// within Bluetooth range that speaks the protocol, with no interaction on
+/// the victim's phone at all.
+///
+/// A name and a face have to be here: recognising the person opposite is the
+/// entire job of the discovery card, and there is no way to do that job
+/// without showing them. An email address does not help with it — the card
+/// draws the face and the chosen name, and `ProfileAvatarView` only ever
+/// used the address for an initial it can take from the name instead.
+///
+/// Nothing downstream is affected: once the household exists, the peer's
+/// address comes from `household_member_profile()` on the server, under RLS,
+/// which is where `HouseholdView` and the report already read it from.
 struct HouseholdPairingIdentity: Codable, Hashable, Sendable {
-    static let protocolVersion = 1
+    /// Bumped to 2 when `email` was removed (20261004, audit finding 6).
+    ///
+    /// Decoding would have survived without a bump — an old phone's extra
+    /// key is ignored, a new phone's absent one lands in an `Optional` — and
+    /// that is exactly the problem. Left compatible, a new phone would still
+    /// receive, and an old phone would still send, the address this change
+    /// exists to stop putting on the air. Refusing the pair is the only way
+    /// the fix binds both ends, and the mismatch already has an honest
+    /// message telling both people to update.
+    static let protocolVersion = 2
     static let maxAvatarBytes = 24_000
 
     var protocolVersion: Int = HouseholdPairingIdentity.protocolVersion
@@ -70,7 +126,6 @@ struct HouseholdPairingIdentity: Codable, Hashable, Sendable {
     /// fail deep inside `accept_invite` with "cannot accept your own invite".
     let userId: UUID
     let displayName: String?
-    let email: String?
     let role: Role
     /// JPEG, already downscaled. Nil when the user has no avatar, which is
     /// the common case — the card falls back to the initial, exactly as every
@@ -84,14 +139,17 @@ struct HouseholdPairingIdentity: Codable, Hashable, Sendable {
         case guest
     }
 
-    /// The name to draw, never blank. Same fallback ladder as
-    /// `ProfileAvatarView`: a chosen name, then the address they signed up
-    /// with, then a word rather than an empty label.
+    /// The name to draw, never blank: the chosen name, then a word rather
+    /// than an empty label.
+    ///
+    /// The address used to sit between the two. Onboarding requires a display
+    /// name (`SetupAllSetView` will not let the step complete without one),
+    /// so in practice the fallback was already unreachable — which is part of
+    /// why sending the address to every device in range bought so little.
     var resolvedName: String {
-        let candidates = [displayName, email].compactMap {
-            $0?.trimmingCharacters(in: .whitespaces)
-        }
-        return candidates.first { !$0.isEmpty } ?? "Keepo user"
+        guard let name = displayName?.trimmingCharacters(in: .whitespaces),
+              !name.isEmpty else { return "Keepo user" }
+        return name
     }
 }
 

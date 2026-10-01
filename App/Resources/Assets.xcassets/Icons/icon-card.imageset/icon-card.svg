@@ -1,0 +1,10 @@
+<svg fill="none" viewBox="0 0 14 14" id="Credit-Card-1--Streamline-Core" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <desc id="desc1">
+    Credit Card 1 Streamline Icon: https://streamlinehq.com
+  </desc>
+  <g id="credit-card-1--credit-pay-payment-debit-card-finance-plastic-money-atm">
+    <path d="M 1.5,1.75 C 0.6774922,1.75 0,2.4274978 0,3.25 v 7.5 c 0,0.822512 0.67750427,1.5 1.5,1.5 h 11 c 0.822503,0 1.5,-0.677497 1.5,-1.5 v -7.5 c 0,-0.8224932 -0.677485,-1.5 -1.5,-1.5 z m 0,1 h 11 c 0.282085,0 0.5,0.2179332 0.5,0.5 v 7.5 c 0,0.282097 -0.217903,0.5 -0.5,0.5 H 1.5 C 1.2179257,11.25 1,11.032088 1,10.75 V 3.25 C 1,2.9679422 1.2179378,2.75 1.5,2.75 Z" id="Vector" baseline-shift="baseline" display="inline" overflow="visible" vector-effect="none" fill="#262626" stroke-linecap="round" stroke-linejoin="round" enable-background="accumulate" stop-color="#000000" stop-opacity="1" opacity="1"></path>
+    <path d="M 0.5,5.25 A 0.5,0.5 0 0 0 0,5.75 0.5,0.5 0 0 0 0.5,6.25 h 13 A 0.5,0.5 0 0 0 14,5.75 0.5,0.5 0 0 0 13.5,5.25 Z" id="Vector_2" baseline-shift="baseline" display="inline" overflow="visible" vector-effect="none" fill="#262626" stroke-linecap="round" stroke-linejoin="round" enable-background="accumulate" stop-color="#000000" stop-opacity="1" opacity="1"></path>
+    <path d="M 9.5,8.75 A 0.5,0.5 0 0 0 9,9.25 0.5,0.5 0 0 0 9.5,9.75 H 11 A 0.5,0.5 0 0 0 11.5,9.25 0.5,0.5 0 0 0 11,8.75 Z" id="Vector_3" baseline-shift="baseline" display="inline" overflow="visible" vector-effect="none" fill="#262626" stroke-linecap="round" stroke-linejoin="round" enable-background="accumulate" stop-color="#000000" stop-opacity="1" opacity="1"></path>
+  </g>
+</svg>

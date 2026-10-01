@@ -51,11 +51,16 @@ struct AddAccountFlowView: View {
     }
 }
 
-/// The two-card VStack itself, with no surrounding chrome — shared by
-/// `AddAccountFlowView`'s root and `OnboardingView`'s first-account step (an
-/// inline step in an already-full-screen flow, wraps this in its own header
-/// text instead), so the two entry points can never drift apart on what the
-/// two cards say or look like.
+/// The two-card VStack itself, with no surrounding chrome. One caller —
+/// `AddAccountFlowView`'s root, a screen whose only job is this choice,
+/// which is the size these cards are drawn for.
+///
+/// Setup's first-account step asks the same question with a segmented
+/// control instead: it has a name, an icon and a balance to fit underneath,
+/// and at this size the cards pushed all three below the fold. It reads its
+/// labels from `title(for:)` / `subtitle(for:)` below, so the two places
+/// cannot drift apart on what the kinds are called or what they mean —
+/// which is what sharing the whole view used to buy.
 ///
 /// Both kinds behave identically (income/expense/transfer, card mapping —
 /// all offered on either), so these cards are not sorting the account into
@@ -66,27 +71,36 @@ struct AddAccountFlowView: View {
 struct AccountKindPicker: View {
     let onSelect: (PublicSchema.AccountKind) -> Void
 
-    var body: some View {
-        VStack(spacing: AppTheme.Spacing.m) {
-            kindCard(
-                kind: .regular,
-                title: "Everyday",
-                subtitle: "Checking, cash, credit card, loan — money you spend and receive.",
-                icon: "creditcard.fill"
-            )
-            kindCard(
-                kind: .investment,
-                title: "Investment",
-                subtitle: "Brokerage, retirement, or anything you track as an investment.",
-                icon: "chart.line.uptrend.xyaxis"
-            )
+    /// What each kind is called and what it means, as the single source of
+    /// both. The cards below render them, and so does setup's first-account
+    /// step, which asks the same question with a segmented control because
+    /// it has a form to fit underneath it — two screens describing
+    /// "Everyday" differently would be the drift this avoids.
+    static func title(for kind: PublicSchema.AccountKind) -> String {
+        switch kind {
+        case .regular: return "Everyday"
+        case .investment: return "Investment"
         }
     }
 
-    private func kindCard(
-        kind: PublicSchema.AccountKind, title: String, subtitle: String, icon: String
-    ) -> some View {
-        Button {
+    static func subtitle(for kind: PublicSchema.AccountKind) -> String {
+        switch kind {
+        case .regular: return "Checking, cash, credit card, loan — money you spend and receive."
+        case .investment: return "Brokerage, retirement, or anything you track as an investment."
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: AppTheme.Spacing.m) {
+            kindCard(kind: .regular, icon: "creditcard.fill")
+            kindCard(kind: .investment, icon: "chart.line.uptrend.xyaxis")
+        }
+    }
+
+    private func kindCard(kind: PublicSchema.AccountKind, icon: String) -> some View {
+        let title = Self.title(for: kind)
+        let subtitle = Self.subtitle(for: kind)
+        return Button {
             onSelect(kind)
         } label: {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {

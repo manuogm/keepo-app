@@ -24,12 +24,19 @@ struct ArchiveAccountsView: View {
     /// user got a sentence with a raw UUID in it telling them to archive an
     /// account they had already archived, and no way forward. Knowing the
     /// number up front is what lets the alert ask the real question instead.
+    ///
+    /// `keptTransfers` are the transfers whose other half is on a live
+    /// account: those stay (migration 20261007100000), so the money they
+    /// moved is still in that account's history. They are counted apart so
+    /// the alert does not promise to delete what it will keep.
     private struct DeleteCandidate: Identifiable {
         let account: LocalAccountRow
         let transactionCount: Int
+        let keptTransfers: Int
 
         var id: UUID { account.id }
         var cascades: Bool { transactionCount > 0 }
+        var deletedCount: Int { transactionCount - keptTransfers }
     }
 
     private var archived: [LocalAccountRow] {
@@ -75,12 +82,15 @@ struct ArchiveAccountsView: View {
         .alert(item: $deleteCandidate) { candidate in
             if candidate.cascades {
                 Alert(
-                    title: Text("Delete \"\(candidate.account.name)\" and its \(countPhrase(candidate))?"),
-                    message: Text(
-                        "The account and every transaction on it will be permanently deleted, "
-                            + "and any recurring transactions set up on it will stop. This cannot be undone."
+                    title: Text(
+                        candidate.deletedCount > 0
+                            ? "Delete \"\(candidate.account.name)\" and its \(countPhrase(candidate))?"
+                            : "Delete \"\(candidate.account.name)\"?"
                     ),
-                    primaryButton: .destructive(Text("Delete Everything")) {
+                    message: Text(cascadeMessage(candidate)),
+                    // Not "Everything" when transfers stay behind: the
+                    // button must not promise more than the delete does.
+                    primaryButton: .destructive(Text(candidate.keptTransfers > 0 ? "Delete" : "Delete Everything")) {
                         Task { await performDelete(candidate) }
                     },
                     // Named for what it leaves behind, not for the button
@@ -106,8 +116,24 @@ struct ArchiveAccountsView: View {
     /// "3 transactions" / "1 transaction" — the count and its noun, so the
     /// title never reads "its 1 transactions".
     private func countPhrase(_ candidate: DeleteCandidate) -> String {
-        let count = candidate.transactionCount
+        let count = candidate.deletedCount
         return "\(count) transaction\(count == 1 ? "" : "s")"
+    }
+
+    /// What goes, what stops, and — when there are any — which transfers
+    /// stay behind in the other accounts' history.
+    private func cascadeMessage(_ candidate: DeleteCandidate) -> String {
+        let kept = candidate.keptTransfers
+        guard kept > 0 else {
+            return "The account and every transaction on it will be permanently deleted, "
+                + "and any recurring transactions set up on it will stop. This cannot be undone."
+        }
+        let whatGoes = candidate.deletedCount > 0 ? "The account and its other transactions" : "The account"
+        let transfers = kept == 1
+            ? "Its transfer to another account stays in that account's history."
+            : "Its \(kept) transfers to other accounts stay in those accounts' history."
+        return "\(whatGoes) will be permanently deleted, and any recurring transactions set up on it will stop. "
+            + "\(transfers) This cannot be undone."
     }
 
     private func archiveRow(_ row: LocalAccountRow) -> some View {
@@ -166,10 +192,13 @@ struct ArchiveAccountsView: View {
     /// a non-cascading delete rather than trusting this number.
     private func confirmDelete(_ row: LocalAccountRow) async {
         actionErrorMessage = nil
-        let count = (try? await session.dbQueue.read { database in
-            try LocalTableQueries.transactionCount(database, accountId: row.id.uuidString)
-        }) ?? 0
-        deleteCandidate = DeleteCandidate(account: row, transactionCount: count)
+        let counts = (try? await session.dbQueue.read { database in
+            (
+                try LocalTableQueries.transactionCount(database, accountId: row.id.uuidString),
+                try LocalTableQueries.transfersKeptOnDelete(database, accountId: row.id.uuidString)
+            )
+        }) ?? (0, 0)
+        deleteCandidate = DeleteCandidate(account: row, transactionCount: counts.0, keptTransfers: counts.1)
     }
 
     /// Online-only, like `CategoryFormView.performDelete` — `delete_account`

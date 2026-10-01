@@ -52,9 +52,37 @@ extension AppTheme {
         static let textPrimary = Color("TextPrimary")
         /// Metadata, timestamps, captions. Replaces `Color.secondary`.
         static let textSecondary = Color("TextSecondary")
+        /// A step lighter still than `textSecondary` — the disclosure
+        /// chevron on My Profile's Base Currency card, matched to the system
+        /// grey `List` itself draws for a `NavigationLink`'s chevron (which
+        /// is `UIColor.tertiaryLabel`, not a token this app otherwise
+        /// names). Baked as a flat colour rather than that system colour's
+        /// own alpha, matching how every other token here is authored.
+        static let textTertiary = Color("TextTertiary")
         /// Text and glyphs drawn on a saturated fill — a scope banner, a
         /// tinted circle. Replaces `Color.white` at every such call site.
         static let textOnAccent = Color("TextOnAccent")
+        /// Text drawn on a fill that is itself `textPrimary` — a selected
+        /// row inverted to stand out, whose background is therefore dark ink
+        /// in light mode but a near-white in dark mode. `textOnAccent`
+        /// (fixed white) only works for the light-mode half of that; this is
+        /// the fixed dark ink the dark-mode half needs instead, since
+        /// `textPrimary` itself already flips to supply the background.
+        static let textOnLight = Color("TextOnLight")
+
+        /// Text and glyphs drawn on a fill that is `textPrimary` itself —
+        /// an inverted selected row, the currency wheel's chosen pill, the
+        /// range calendar's endpoint discs.
+        ///
+        /// It has to be a function of the colour scheme rather than one
+        /// more asset, because the fill underneath is *already* adaptive:
+        /// dark ink in light mode, near-white in dark. One fixed colour can
+        /// only ever be right for one half of that. Three screens derived
+        /// this same pair privately before it moved here — which is the
+        /// signal CLAUDE.md names for extracting a shared helper.
+        static func inkOnPrimaryFill(_ scheme: ColorScheme) -> Color {
+            scheme == .dark ? textOnLight : textOnAccent
+        }
 
         // MARK: Neutral fills
         /// A neutral wash behind a chip or an icon well. Replaces
@@ -73,6 +101,11 @@ extension AppTheme {
         /// An error, a destructive action, a trend down. Replaces
         /// `Color.red`.
         static let statusNegative = Color("StatusNegative")
+        /// Something is missing but nothing is wrong — a rate that has not
+        /// arrived. The system's own yellow, which already adapts to dark
+        /// mode and High Contrast; only ever a wash or a glyph, never text,
+        /// which it is too light to carry on the light canvas.
+        static let statusWarning = Color(uiColor: .systemYellow)
 
         // MARK: Money
         /// **Income is blue, not green.** Warm-vs-green is the canonical

@@ -17,7 +17,10 @@ struct CategoryIconView: View {
     }
 
     /// Renders an explicit icon+color directly, bypassing the `nil`-category
-    /// placeholder — for badges that aren't backed by a category, like transfers.
+    /// placeholder — for badges that aren't backed by a category (a
+    /// transfer), and for one that wants no disc at all: `.clear` leaves the
+    /// white glyph alone on whatever is behind it, which is how a selected
+    /// `CategoryChoiceTile` draws its icon on its own flooded colour.
     init(icon: String, color: Color, diameter: CGFloat = 32) {
         self.icon = icon
         self.color = color

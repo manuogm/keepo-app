@@ -79,72 +79,64 @@ enum LocalTransactionRow {
         _ database: Database, filter: TransactionFilter, scope: PublicSchema.AccountScope,
         baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
-        var sql = """
+        let source = filteredSource(filter: filter, scope: scope, ownerId: ownerId)
+        let sql = """
         SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-               t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
-               t.recurring_rule_id,
-               CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
-                    WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
+               t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+               t.recurring_rule_id, t.original_amount_e4, t.original_currency,
+               ocur.minor_unit AS original_minor_unit,
+               \(kindExpression) AS kind
+        \(source.sql)
+        ORDER BY t.occurred_at DESC, t.id DESC
+        """
+
+        let rows = try Row.fetchAll(database, sql: sql, arguments: StatementArguments(source.arguments))
+        let base = try BaseCurrency(database, code: baseCurrency)
+        return try rows.map { try build($0, database: database, base: base) }
+    }
+
+    /// `FROM … WHERE …` for a filtered read, with its arguments in order —
+    /// the one definition of "the rows this filter selects". The ledger reads
+    /// rows through it and the export counts and totals through it
+    /// (`LocalExportQueries`), so a file can never contain a different set of
+    /// transactions from the list it was launched from.
+    static func filteredSource(
+        filter: TransactionFilter, scope: PublicSchema.AccountScope, ownerId: String
+    ) -> (sql: String, arguments: [DatabaseValueConvertible]) {
+        var sql = """
         FROM transactions t
         LEFT JOIN accounts a ON a.id = t.account_id
             AND a.deleted_at IS NULL AND a.archived_at IS NULL AND \(visibleAccountClause)
         LEFT JOIN categories c ON c.id = t.category_id
         LEFT JOIN currencies cur ON cur.code = t.currency
+        LEFT JOIN currencies ocur ON ocur.code = t.original_currency
         WHERE t.deleted_at IS NULL
           AND (t.account_id IS NULL AND t.owner_id = ? OR a.id IS NOT NULL)
         """
         sql += " AND (\(LocalMoneyQueries.scopeFilterSQL(scope, accountIdColumn: "t.account_id")))"
         var arguments: [DatabaseValueConvertible] = [ownerId, ownerId, ownerId]
         append(filter, to: &sql, arguments: &arguments)
-        sql += " ORDER BY t.occurred_at DESC, t.id DESC"
-
-        let rows = try Row.fetchAll(database, sql: sql, arguments: StatementArguments(arguments))
-        let base = try BaseCurrency(database, code: baseCurrency)
-        return try rows.map { try build($0, database: database, base: base) }
+        return (sql, arguments)
     }
 
-    /// The user's own filter terms, appended to `sql` with their arguments
-    /// in the same order. Split out of `fetchFiltered` purely to keep that
-    /// function under the project's `function_body_length` lint.
-    private static func append(
-        _ filter: TransactionFilter, to sql: inout String, arguments: inout [DatabaseValueConvertible]
-    ) {
-        if let accountId = filter.accountId {
-            sql += " AND t.account_id = ?"
-            arguments.append(accountId.uuidString)
-        }
-        if let categoryId = filter.categoryId {
-            sql += " AND t.category_id = ?"
-            arguments.append(categoryId.uuidString)
-        }
-        if let kind = filter.kind {
-            sql += """
-             AND (CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
-                       WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END) = ?
-            """
-            arguments.append(kind)
-        }
-        if let from = filter.from {
-            sql += " AND t.occurred_at >= ?"
-            arguments.append(PostgresDate.sqliteTimestampBoundaryString(from))
-        }
-        if let through = filter.through {
-            sql += " AND t.occurred_at <= ?"
-            arguments.append(PostgresDate.sqliteTimestampBoundaryString(through))
-        }
-        if let search = filter.search, !search.isEmpty {
-            sql += """
-             AND (t.merchant_raw LIKE ? OR t.merchant_normalized LIKE ? OR c.name LIKE ? OR a.name LIKE ?)
-            """
-            let pattern = "%\(search)%"
-            arguments.append(contentsOf: [pattern, pattern, pattern, pattern])
-        }
-    }
-
-    /// Both legs of a transfer, by group id — `TransactionFormView`'s
-    /// post-conflict reload needs both sides re-fetched together, the same
-    /// way it originally opened via `sibling(of:)`.
+    /// Every leg of a transfer this device holds, by group id — **the** way
+    /// to find a transfer's other half. Two means the whole transfer; one
+    /// means the other half is on an account this viewer cannot see (a
+    /// household member's private account).
+    ///
+    /// Independent of whatever a screen happens to have loaded. The edit
+    /// form and the ledger's swipe-to-delete used to find the other half
+    /// among the rows currently on screen, so any view that showed one half
+    /// alone — an account filter, a search, Private or Household scope, a
+    /// partner on an archived account — opened an empty form and deleted
+    /// through `delete_transaction`, which the server refuses for a transfer
+    /// leg.
+    ///
+    /// Not filtered on the account being live: a leg left on a deleted
+    /// account (`delete_account`'s cascade keeps those, migration
+    /// 20261007100000) is still half of a real transfer, and the survivor's
+    /// form has to be able to name it.
     static func fetchByTransferGroup(
         _ database: Database, transferGroupId: String, baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
@@ -153,14 +145,15 @@ enum LocalTransactionRow {
             sql: """
             SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-                   t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
-                   t.recurring_rule_id,
-                   CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
-                        WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
+                   t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+                   t.recurring_rule_id, t.original_amount_e4, t.original_currency,
+                   ocur.minor_unit AS original_minor_unit,
+                   \(kindExpression) AS kind
             FROM transactions t
-            JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
+            JOIN accounts a ON a.id = t.account_id AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
             JOIN currencies cur ON cur.code = t.currency
+            LEFT JOIN currencies ocur ON ocur.code = t.original_currency
             WHERE t.deleted_at IS NULL AND t.transfer_group_id = ?
             """,
             arguments: [ownerId, ownerId, transferGroupId]
@@ -169,39 +162,79 @@ enum LocalTransactionRow {
         return try rows.map { try build($0, database: database, base: base) }
     }
 
-    /// The one place a null-account pending capture (an unmapped Wallet
-    /// automation, or one whose card mapping hasn't resolved to an account
-    /// yet) must still be reachable — this is what both `RootView`'s
-    /// notification deep-link and `NeedsReviewView.openForReview` call to
-    /// open the review form. `LEFT JOIN` (not the `INNER JOIN` every other
-    /// query here keeps) so the row survives having no account yet; the
-    /// `WHERE` clause replaces what the join's `visibleAccountClause` used
-    /// to enforce on its own — a real, inaccessible `account_id` must still
-    /// exclude the row (`a.id IS NOT NULL` proves the join found a
-    /// *visible* account), while a genuinely unresolved capture is allowed
-    /// through only when it's the caller's own (`t.owner_id = ?`).
+    /// Which of `groupIds` this device holds both legs of — the transfers a
+    /// swipe can delete. One the ledger shows alone for a *view* reason (a
+    /// filter, a scope) is complete here; one whose other half is on an
+    /// account this viewer cannot see is not, and `delete_transfer` would
+    /// refuse it.
+    static func completeTransferGroups(_ database: Database, among groupIds: [String]) throws -> Set<String> {
+        guard !groupIds.isEmpty else { return [] }
+        return Set(
+            try String.fetchAll(
+                database,
+                sql: """
+                SELECT transfer_group_id FROM transactions
+                WHERE deleted_at IS NULL AND transfer_group_id IN (\(databaseQuestionMarks(count: groupIds.count)))
+                GROUP BY transfer_group_id HAVING COUNT(*) = 2
+                """,
+                arguments: StatementArguments(groupIds)
+            )
+        )
+    }
+
+    /// One row by id — `RootView`'s notification deep-link and
+    /// `NeedsReviewPanel.openForReview` both opening the review form.
     static func fetchOne(
         _ database: Database, id: String, baseCurrency: String, ownerId: String
     ) throws -> PublicSchema.TransactionsWithDetailsSelect? {
-        guard let row = try Row.fetchOne(
+        try fetch(database, ids: [id], baseCurrency: baseCurrency, ownerId: ownerId).first
+    }
+
+    /// Rows by id — **the one place a null-account pending capture** (an
+    /// unmapped Wallet automation, or one whose card mapping hasn't resolved
+    /// to an account yet) must still be reachable. `LEFT JOIN` (not the
+    /// `INNER JOIN` every other query here keeps) so the row survives having
+    /// no account yet; the `WHERE` clause replaces what the join's
+    /// `visibleAccountClause` used to enforce on its own — a real,
+    /// inaccessible `account_id` must still exclude the row (`a.id IS NOT
+    /// NULL` proves the join found a *visible* account), while a genuinely
+    /// unresolved capture is allowed through only when it's the caller's own
+    /// (`t.owner_id = ?`).
+    ///
+    /// Several ids in one statement, behind one `BaseCurrency` and therefore
+    /// one shared FX cache, because Needs Review draws each pending capture
+    /// with `TransactionRow` — the ledger's own row, rather than a second
+    /// transaction row that would drift from it — and `needs_review`'s
+    /// eight-column contract carries nothing like enough for that. Looping
+    /// `fetchOne` would have re-derived the base currency and thrown away
+    /// the rate cache once per row, the exact waste `BaseCurrency` exists to
+    /// stop.
+    static func fetch(
+        _ database: Database, ids: [String], baseCurrency: String, ownerId: String
+    ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
+        guard !ids.isEmpty else { return [] }
+        let arguments: [any DatabaseValueConvertible] = [ownerId, ownerId] + ids + [ownerId]
+        let rows = try Row.fetchAll(
             database,
             sql: """
             SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
                    t.amount_e4, t.currency, cur.minor_unit, t.occurred_at, t.merchant_raw, t.merchant_normalized,
-                   t.notes, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
-                   t.recurring_rule_id,
-                   CASE WHEN t.transfer_group_id IS NOT NULL THEN 'transfer'
-                        WHEN t.amount_e4 < 0 THEN 'expense' ELSE 'income' END AS kind
+                   t.notes, t.title, t.transfer_group_id, t.source, t.status, t.created_by, t.created_at, t.version,
+                   t.recurring_rule_id, t.original_amount_e4, t.original_currency,
+                   ocur.minor_unit AS original_minor_unit,
+                   \(kindExpression) AS kind
             FROM transactions t
             LEFT JOIN accounts a ON a.id = t.account_id AND a.deleted_at IS NULL AND \(visibleAccountClause)
             LEFT JOIN categories c ON c.id = t.category_id
             LEFT JOIN currencies cur ON cur.code = t.currency
-            WHERE t.deleted_at IS NULL AND t.id = ?
+            LEFT JOIN currencies ocur ON ocur.code = t.original_currency
+            WHERE t.deleted_at IS NULL AND t.id IN (\(databaseQuestionMarks(count: ids.count)))
               AND (t.account_id IS NULL AND t.owner_id = ? OR a.id IS NOT NULL)
             """,
-            arguments: [ownerId, ownerId, id, ownerId]
-        ) else { return nil }
-        return try build(row, database: database, base: try BaseCurrency(database, code: baseCurrency))
+            arguments: StatementArguments(arguments)
+        )
+        let base = try BaseCurrency(database, code: baseCurrency)
+        return try rows.map { try build($0, database: database, base: base) }
     }
 
     /// The base currency and its minor unit — looked up **once per fetch**,

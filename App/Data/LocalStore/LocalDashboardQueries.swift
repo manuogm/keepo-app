@@ -28,9 +28,16 @@ enum LocalDashboardQueries {
     /// insert and update, and the sign is the value money rule 1 makes
     /// authoritative.
     ///
-    /// Transfers can never appear here: `recurring_rules.category_id` is
-    /// `not null`, and a transfer leg has no category. Nothing filters them
-    /// out because nothing can produce one.
+    /// **Transfer rules are excluded, and now explicitly.** They used to be
+    /// impossible — `recurring_rules.category_id` was `not null` — so the
+    /// inner join to `categories` did the excluding by accident. Migration
+    /// 20260927100000 made them possible, and the accident would have
+    /// produced a wrong headline rather than an extra row: this projects ONE
+    /// row per rule, the outflow, while a transfer's pair nets to zero. The
+    /// fortnight would have read as money leaving that never left the user's
+    /// world. A forecast that says "transfer £500 to savings on the 1st"
+    /// belongs on this tile eventually; it needs both legs, which is a
+    /// change to the shape this returns, not a filter.
     ///
     /// Archived and deleted accounts are excluded, matching `net_worth`'s own
     /// exclusion — a bill on an account you've archived is not a bill you're
@@ -42,13 +49,14 @@ enum LocalDashboardQueries {
         let rows = try Row.fetchAll(
             database,
             sql: """
-            SELECT r.id, r.amount_e4, r.currency, r.frequency, r.next_due_at,
+            SELECT r.id, r.title, r.amount_e4, r.currency, r.frequency, r.next_due_at,
                    c.name AS category_name, c.icon AS category_icon, c.color AS category_color,
                    a.name AS account_name
             FROM recurring_rules r
             JOIN categories c ON c.id = r.category_id
             JOIN accounts a ON a.id = r.account_id
             WHERE r.active = 1
+              AND r.to_account_id IS NULL
               AND a.deleted_at IS NULL AND a.archived_at IS NULL AND c.deleted_at IS NULL
               AND (\(scopeClause))
             """
@@ -85,7 +93,7 @@ enum LocalDashboardQueries {
                 ruleId: row["id"], dueOn: dueOn, categoryName: row["category_name"],
                 categoryIcon: row["category_icon"], categoryColor: row["category_color"],
                 accountName: row["account_name"], amountBaseE4: converted, nativeAmountE4: amountE4,
-                nativeCurrency: currency
+                nativeCurrency: currency, title: row["title"]
             )
         }
     }
@@ -288,6 +296,10 @@ struct UpcomingTransactionLocal: Equatable, Identifiable {
     let amountBaseE4: Int64?
     let nativeAmountE4: Int64
     let nativeCurrency: String
+    /// The rule's own title, when it has one — what the bill is actually
+    /// called. Defaulted so samples and fixtures that predate titles still
+    /// build.
+    var title: String?
 
     /// Which way the money goes, from the sign of the rule's own amount —
     /// which the server's `validate_recurring_rule_sign` keeps in agreement

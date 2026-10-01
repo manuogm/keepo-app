@@ -11,13 +11,13 @@ import SwiftUI
 /// than in this view. What is here is only the keypad and what a key press
 /// does to the expression being built.
 struct CalculatorSheet: View {
-    let minorUnit: Int
-    /// Seeds the calculator with whatever is already in the field, so
-    /// "×3" on a number you just typed does not mean typing it twice.
-    var initialText: String = ""
-    let onUse: (String) -> Void
+    /// Where the result can go. One for an ordinary field; two on a
+    /// transaction paid in another currency, whose card has one calculator
+    /// for both its figures and a pill here to choose between them.
+    let targets: [CalculatorTarget]
 
     @Environment(\.dismiss) private var dismiss
+    @State private var targetIndex: Int
 
     /// Everything settled so far — `12 ×`. The number still being typed is
     /// `entry`, kept as text rather than a `Decimal` so a half-finished
@@ -32,6 +32,19 @@ struct CalculatorSheet: View {
     /// looking different but a `.sensoryFeedback` trigger has to *move*.
     /// A counter is the trigger, so every press fires exactly once.
     @State private var keyTick = 0
+
+    init(targets: [CalculatorTarget], initialTarget: Int = 0) {
+        self.targets = targets
+        _targetIndex = State(initialValue: targets.indices.contains(initialTarget) ? initialTarget : 0)
+    }
+
+    /// A field's own calculator: one target, no pill.
+    init(minorUnit: Int, initialText: String = "", onUse: @escaping (String) -> Void) {
+        self.init(targets: [CalculatorTarget(label: "", minorUnit: minorUnit, initialText: initialText, onUse: onUse)])
+    }
+
+    private var target: CalculatorTarget { targets[targetIndex] }
+    private var minorUnit: Int { target.minorUnit }
 
     private var separator: String { MoneyFormatter.decimalSeparator() }
 
@@ -95,19 +108,61 @@ struct CalculatorSheet: View {
         // visible behind it. The detent clamps itself on a shorter phone.
         .presentationDetents([.height(500)])
         .presentationDragIndicator(.hidden)
-        .onAppear {
-            guard AmountParser.parseRate(initialText) != nil else { return }
-            entry = initialText
-        }
+        .onAppear { seed() }
     }
 
+    /// Seeds the calculator with whatever is already in the field, so
+    /// "×3" on a number you just typed does not mean typing it twice.
+    private func seed() {
+        guard AmountParser.parseRate(target.initialText) != nil else { return }
+        entry = target.initialText
+    }
+
+    /// Which field "✓" fills. A tap swaps to the other: there are only ever
+    /// two, so a menu would be one more tap for the same choice. What has
+    /// been typed survives the switch — only a calculator nobody has touched
+    /// yet re-seeds from the newly chosen field.
+    private var targetPill: some View {
+        Button {
+            targetIndex = (targetIndex + 1) % targets.count
+            if keyTick == 0 {
+                clearAll()
+                seed()
+            }
+        } label: {
+            HStack(spacing: AppTheme.Spacing.xs) {
+                Text("Into").foregroundStyle(AppTheme.Palette.textSecondary)
+                Text(target.label).foregroundStyle(AppTheme.Palette.textPrimary)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(AppTheme.Typography.nano)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+            }
+            .font(AppTheme.Typography.captionEmphasis)
+            .padding(.horizontal, AppTheme.Spacing.m)
+            .frame(height: AppTheme.Size.icon)
+            .background(AppTheme.Palette.fillSubtle, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .sensoryFeedback(AppTheme.Feedback.selection, trigger: targetIndex)
+        .accessibilityLabel("Result goes into \(target.label). Switch field")
+    }
+
+    /// The target pill shares the expression's line rather than taking one
+    /// of its own: the sheet is sized to the keypad, and a row more pushed
+    /// the big figure into shrinking.
     private var readout: some View {
         VStack(alignment: .trailing, spacing: AppTheme.Spacing.xs) {
-            Text(expression.isEmpty ? " " : expression)
-                .font(AppTheme.Typography.label)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .lineLimit(1)
-                .truncationMode(.head)
+            HStack(spacing: AppTheme.Spacing.s) {
+                if targets.count > 1 { targetPill }
+                Spacer(minLength: 0)
+                Text(expression.isEmpty ? " " : expression)
+                    .font(AppTheme.Typography.label)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+            }
             Text(displayText)
                 .numberFont(AppTheme.Typography.Number.balance, weight: .semibold)
                 .lineLimit(1)
@@ -139,7 +194,7 @@ struct CalculatorSheet: View {
 
     private func use() {
         guard let result else { return }
-        onUse(AmountFormatter.editableString(decimal: result, minorUnit: minorUnit))
+        target.onUse(AmountFormatter.editableString(decimal: result, minorUnit: minorUnit))
         dismiss()
     }
 
@@ -315,4 +370,13 @@ private extension CalculatorOperator {
     Color.clear.sheet(isPresented: .constant(true)) {
         CalculatorSheet(minorUnit: 2, initialText: "12.50") { _ in }
     }
+}
+
+/// One field the calculator can fill.
+struct CalculatorTarget {
+    /// "Paid · USD" — what the switch pill names. Unused with one target.
+    let label: String
+    let minorUnit: Int
+    let initialText: String
+    let onUse: (String) -> Void
 }

@@ -42,7 +42,7 @@ struct ProfileView: View {
     // Internal, not private: `ProfileView+Sections.swift` reads them, and
     // `private` is file-scoped. Same convention as `NeedsReviewPanel`'s own
     // split.
-    @State var errorMessage: String?
+    @State var actionError: ActionError?
     @State var isSyncingFX = false
     @State var lastFXSyncedAt: Date?
     @State var isSigningOut = false
@@ -67,7 +67,11 @@ struct ProfileView: View {
                         ProfileRowLabel(icon: "icon-home", title: "My Household")
                     }
                     NavigationLink(value: AppNavigation.ProfileDestination.automations) {
-                        ProfileRowLabel(icon: "icon-robot", title: "My Automations")
+                        // `bolt.fill`, not the robot: the robot moved down a
+                        // level to label automatic capture specifically, and
+                        // the same glyph on the row that contains it said the
+                        // parent and the child were the same thing.
+                        ProfileRowLabel(icon: "bolt", title: "My Automations")
                     }
                 }
                 general
@@ -76,12 +80,38 @@ struct ProfileView: View {
                 legal
                 exits
                 #if DEBUG
-                Section("Developer") {
+                Section {
                     NavigationLink {
                         SimulateCaptureView(session: session)
                     } label: {
                         ProfileRowLabel(icon: "hammer", title: "Simulate Capture")
                     }
+                    // Walk the setup flow again on a real device without
+                    // deleting the app. Clears `onboarded_at` plus the
+                    // device-local draft — and nothing else, so the
+                    // accounts and categories a previous run created
+                    // survive (see `ProfileRepository.resetOnboarding`).
+                    Button {
+                        Task { await replayOnboarding() }
+                    } label: {
+                        ProfileRowLabel(icon: "hammer", title: "Replay Onboarding")
+                    }
+                    // The other half of the first-time experience, and the
+                    // half that cannot be replayed by walking setup again:
+                    // every coach mark fires once per device and then never
+                    // again. The same thing Show Me Around's button does —
+                    // this is the shortcut that skips the navigation. See
+                    // `FTUXCoordinator.replayAllLessons`.
+                    Button {
+                        replayLessons()
+                    } label: {
+                        ProfileRowLabel(icon: "hammer", title: "Replay Tips")
+                    }
+                } header: {
+                    Text("Developer")
+                } footer: {
+                    Text("Replay Tips arms every coach mark again. "
+                        + "Each one appears as you visit the screen it belongs to.")
                 }
                 #endif
             }
@@ -97,7 +127,7 @@ struct ProfileView: View {
         .task(id: session.refresh.token) { await load() }
         .task { await loadLastFXSyncedAt() }
         .sheet(isPresented: $isPickingCurrency) {
-            BaseCurrencySheet(currencies: currencies, selection: baseCurrency)
+            CurrencyWheelSheet(currencies: currencies, selection: baseCurrency, title: "Base Currency")
         }
         .avatarPicker(
             isPresentingOptions: $isPickingAvatar,
@@ -105,6 +135,18 @@ struct ProfileView: View {
             onPicked: { image in Task { _ = await avatars.replace(with: image, session: session) } },
             onRemove: { Task { await avatars.removeAvatar(session: session) } }
         )
+        // The avatar store owns its own failures — it is shared with
+        // onboarding's first step, which has no Profile screen to report
+        // into — so they are lifted into the same alert here rather than
+        // given a second, quieter channel of their own. It clears
+        // `lastError` at the start of every attempt, so the same failure
+        // twice in a row still arrives twice.
+        .onChange(of: avatars.lastError) { _, message in
+            guard let message else { return }
+            actionError = ActionError(title: "Couldn't Update Your Photo", message: message)
+            avatars.clearLastError()
+        }
+        .errorAlert($actionError)
     }
 
     // MARK: - Who you are
@@ -114,36 +156,40 @@ struct ProfileView: View {
     /// **text field**, not a row that pushes a form: it is one line of text
     /// with nothing else to configure, so a form containing it would be a
     /// screen over a screen already showing the field.
+    #if DEBUG
+    private func replayOnboarding() async {
+        guard let userId = session.profile?.id else { return }
+        UserDefaults.standard.removeObject(forKey: AppSettingsKeys.onboardingDraft)
+        try? await ProfileRepository.resetOnboarding(client: session.client, userId: userId)
+        // The phase is derived from the profile, so nothing moves until it
+        // is re-read — the sheet dismisses itself on the way out because
+        // `RootView` swaps the whole signed-in shell underneath it.
+        try? await session.refreshProfile()
+        dismiss()
+    }
+
+    /// Closes the **whole sheet**, for the reason `ShowMeAroundView` does:
+    /// the coach mark it just re-armed points at the scope banner on the
+    /// tab underneath, so left up, this button would appear to do nothing.
+    /// Dismissing is also what re-runs `retry()` in `MainTabView`, which
+    /// is what actually puts the first coach mark up.
+    private func replayLessons() {
+        FTUXCoordinator.replayAllLessons()
+        dismiss()
+    }
+    #endif
+
     private var identity: some View {
         Section {
             VStack(spacing: AppTheme.Spacing.s) {
-                Button {
+                // Shared with onboarding's first step — see `AvatarButton`,
+                // which is where the camera badge's own reasoning now lives.
+                AvatarButton(
+                    name: session.profile?.displayName, email: session.userEmail,
+                    image: avatars.image, isBusy: avatars.isBusy
+                ) {
                     isPickingAvatar = true
-                } label: {
-                    ProfileAvatarView(
-                        name: session.profile?.displayName, email: session.userEmail,
-                        image: avatars.image, size: AppTheme.Size.illustration
-                    )
-                    // The one affordance saying the circle is tappable at
-                    // all. Overlaid rather than placed beside it, because a
-                    // camera button next to an avatar reads as a second
-                    // control rather than as this one's verb.
-                    .overlay(alignment: .bottomTrailing) {
-                        if avatars.isBusy {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "camera.fill")
-                                .font(AppTheme.Typography.nanoEmphasis)
-                                .foregroundStyle(AppTheme.Palette.textOnAccent)
-                                .frame(width: AppTheme.Size.glyph, height: AppTheme.Size.glyph)
-                                .background(AppTheme.Palette.textPrimary, in: Circle())
-                                .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
-                        }
-                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(avatars.isBusy)
-                .accessibilityLabel("Change profile photo")
 
                 // Their own stack, tighter than the one around it. Name and
                 // email are one thing — who you are — and at the outer `s`
@@ -172,10 +218,6 @@ struct ProfileView: View {
                 }
 
                 metrics
-
-                if let message = errorMessage ?? avatars.lastError {
-                    FormErrorText(message: message)
-                }
             }
             .frame(maxWidth: .infinity)
             .padding(.top, AppTheme.Spacing.m)
@@ -262,14 +304,14 @@ struct ProfileView: View {
             draftName = session.profile?.displayName ?? ""
             return
         }
-        errorMessage = nil
+        actionError = nil
         do {
             try await ProfileRepository.updateDisplayName(
                 client: session.client, userId: userId, displayName: trimmed
             )
             try await session.refreshProfile()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Save Your Name", error)
             draftName = session.profile?.displayName ?? ""
         }
     }
@@ -290,7 +332,7 @@ struct ProfileView: View {
     }
 
     private func saveBaseCurrency(_ code: String, userId: UUID) async {
-        errorMessage = nil
+        actionError = nil
         do {
             try await ProfileRepository.updateBaseCurrency(
                 client: session.client, userId: userId, baseCurrency: code
@@ -298,7 +340,7 @@ struct ProfileView: View {
             try await session.refreshProfile()
             session.refresh.bump()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Change Your Base Currency", error)
         }
     }
 

@@ -50,6 +50,36 @@ enum LocalTableQueries {
         )
     }
 
+    /// Whether the owner has never had a category beyond the `Other` rows
+    /// signup seeds — the state a user who skipped onboarding's Categories
+    /// step lands in, and the one the Categories tab offers the catalogue
+    /// for.
+    ///
+    /// **Reads tombstones on purpose**, unlike every other query here. A
+    /// user who made categories and later deleted them all has made their
+    /// choice, and should not be offered a starter kit again; the deleted
+    /// rows are the record that they did. Requires a live default row too,
+    /// so a fresh install whose first pull has not landed — an empty table
+    /// — does not read as "only defaults".
+    static func ownsOnlyStarterCategories(_ database: Database, ownerId: String) throws -> Bool {
+        try Bool.fetchOne(
+            database,
+            sql: """
+                SELECT EXISTS (SELECT 1 FROM categories WHERE owner_id = ? AND deleted_at IS NULL)
+                   AND NOT EXISTS (SELECT 1 FROM categories WHERE owner_id = ? AND is_default = 0)
+                """,
+            arguments: [ownerId, ownerId]
+        ) ?? false
+    }
+
+    /// One category, whoever owns it — a form editing someone else's row
+    /// needs the owner's category that row carries.
+    static func category(_ database: Database, id: String) throws -> PublicSchema.CategoriesSelect? {
+        try PublicSchema.CategoriesSelect.fetchOne(
+            database, sql: "SELECT * FROM categories WHERE id = ? AND deleted_at IS NULL", arguments: [id]
+        )
+    }
+
     /// Every category this device can see, both members' included.
     ///
     /// Deliberately unfiltered, on the same reasoning as `tags` below: the
@@ -92,6 +122,36 @@ enum LocalTableQueries {
         )
     }
 
+    /// The tags both members of the viewer's household can see: the second
+    /// half of `can_read_tag`. A tag has no share switch; it is shared by
+    /// sitting on a live transaction that `transaction_shared_into` places in
+    /// the household, which is on a shared account and, for a share from a
+    /// date, on or after that date.
+    ///
+    /// The same set on both phones. The owner's phone holds all of its own
+    /// rows and filters them here; the partner's holds only the rows the
+    /// server sent, which are exactly these. `julianday`, as in
+    /// `SyncApply.purgeHistoryBeforeShares`: the two timestamps need not share
+    /// an offset or a precision.
+    static func householdTags(_ database: Database, viewerId: String) throws -> [PublicSchema.TagsSelect] {
+        try PublicSchema.TagsSelect.fetchAll(
+            database,
+            sql: """
+            SELECT * FROM tags WHERE deleted_at IS NULL AND id IN (
+                SELECT tt.tag_id FROM transaction_tags tt
+                JOIN transactions t ON t.id = tt.transaction_id
+                JOIN household_accounts ha ON ha.account_id = t.account_id AND ha.deleted_at IS NULL
+                JOIN household_members hm ON hm.household_id = ha.household_id
+                WHERE tt.deleted_at IS NULL AND t.deleted_at IS NULL
+                  AND hm.user_id = ? AND hm.deleted_at IS NULL
+                  AND (ha.history_from IS NULL OR julianday(t.occurred_at) >= julianday(ha.history_from))
+            )
+            ORDER BY name COLLATE NOCASE
+            """,
+            arguments: [viewerId]
+        )
+    }
+
     /// The tag ids currently on one transaction.
     static func tagIds(_ database: Database, transactionId: String) throws -> [String] {
         try String.fetchAll(
@@ -101,8 +161,50 @@ enum LocalTableQueries {
         )
     }
 
+    /// How many live transactions carry this tag — what deleting it would
+    /// take it off, and so what the All Tags list asks about first.
+    static func transactionCount(_ database: Database, tagId: String) throws -> Int {
+        try Int.fetchOne(
+            database,
+            sql: """
+                SELECT COUNT(*) FROM transaction_tags tt
+                JOIN transactions t ON t.id = tt.transaction_id AND t.deleted_at IS NULL
+                WHERE tt.tag_id = ? AND tt.deleted_at IS NULL
+                """,
+            arguments: [tagId]
+        ) ?? 0
+    }
+
+    /// The tag ids currently on one recurring rule — the same query as
+    /// `tagIds` above, one step earlier in the chain.
+    static func recurringRuleTagIds(_ database: Database, ruleId: String) throws -> [String] {
+        try String.fetchAll(
+            database,
+            sql: "SELECT tag_id FROM recurring_rule_tags WHERE recurring_rule_id = ? AND deleted_at IS NULL",
+            arguments: [ruleId]
+        )
+    }
+
     static func currencies(_ database: Database) throws -> [PublicSchema.CurrenciesSelect] {
         try PublicSchema.CurrenciesSelect.fetchAll(database, sql: "SELECT * FROM currencies ORDER BY code")
+    }
+
+    /// One currency as the thing every formatter actually wants: its code and
+    /// the minor unit a figure is rounded to for display (money rule 2 — JPY
+    /// is 0, and the scale is never assumed).
+    ///
+    /// `nil` for a code the mirror does not hold yet, which callers render as
+    /// `—` rather than guessing two decimals.
+    ///
+    /// Here rather than at each call site because "the viewer's base currency,
+    /// as a `CurrencyInfo`" was being assembled screen by screen — fetch every
+    /// currency, find the one row, unwrap its minor unit — and a screen that
+    /// forgot the last step would quietly format yen with cents.
+    static func currencyInfo(_ database: Database, code: String) throws -> CurrencyInfo? {
+        try Int.fetchOne(
+            database, sql: "SELECT minor_unit FROM currencies WHERE code = ?", arguments: [code]
+        )
+        .map { CurrencyInfo(code: code, minorUnit: $0) }
     }
 
     static func account(_ database: Database, id: String) throws -> PublicSchema.AccountsSelect? {
@@ -247,6 +349,25 @@ enum LocalTableQueries {
         try Int.fetchOne(
             database,
             sql: "SELECT COUNT(*) FROM transactions WHERE account_id = ? AND deleted_at IS NULL",
+            arguments: [accountId]
+        ) ?? 0
+    }
+
+    /// The transfers on an account whose other half is on a live account —
+    /// the ones deleting this account leaves in place, because the money
+    /// they moved is still in that other account's history
+    /// (`delete_account`, migration 20261007100000).
+    static func transfersKeptOnDelete(_ database: Database, accountId: String) throws -> Int {
+        try Int.fetchOne(
+            database,
+            sql: """
+            SELECT COUNT(*) FROM transactions mine
+            JOIN transactions other ON other.transfer_group_id = mine.transfer_group_id
+                AND other.id <> mine.id AND other.deleted_at IS NULL
+            JOIN accounts other_account ON other_account.id = other.account_id
+                AND other_account.deleted_at IS NULL
+            WHERE mine.account_id = ? AND mine.deleted_at IS NULL
+            """,
             arguments: [accountId]
         ) ?? 0
     }

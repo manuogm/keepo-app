@@ -1,3 +1,4 @@
+import KeepoCore
 import SwiftUI
 
 /// The app's own floating tab bar: four icon-only destinations in one
@@ -107,6 +108,10 @@ struct KeepoTabBar: View {
         // it stay silent — a bar that buzzed on every tab would make this
         // one stop meaning anything.
         .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: addTick)
+        // Published unconditionally — the anchor says *where the button
+        // is*, not that anything should be shown. Whether the coach mark
+        // appears, and on which tab, is `MainTabView`'s call.
+        .ftuxAnchor(FTUXLessons.add)
         .accessibilityLabel(tab.addLabel)
     }
 }
@@ -117,19 +122,19 @@ extension AppNavigation.Tab {
     /// the selected one. All are template-rendered and tinted by the caller.
     var icon: String {
         switch self {
-        case .home: return "icon-dashboard"
-        case .accounts: return "icon-account"
+        case .home: return "icon-chart"
+        case .accounts: return "icon-card"
         case .transactions: return "icon-transaction"
-        case .categories: return "icon-tag"
+        case .categories: return "icon-categories"
         }
     }
 
     var selectedIcon: String {
         switch self {
-        case .home: return "icon-dashboard-filled"
-        case .accounts: return "icon-account-filled"
+        case .home: return "icon-chart-filled"
+        case .accounts: return "icon-card-filled"
         case .transactions: return "icon-transaction-filled"
-        case .categories: return "icon-tag-filled"
+        case .categories: return "icon-categories-filled"
         }
     }
 
@@ -148,21 +153,6 @@ extension AppNavigation.Tab {
         case .accounts: return "Add an account"
         case .transactions: return "Add a transaction"
         case .categories: return "Add a category"
-        }
-    }
-}
-
-private extension View {
-    /// iOS 26's Liquid Glass where it exists, the older material blur
-    /// where it doesn't — the deployment target is still 18.0. Both draw
-    /// their own edge, so nothing here adds a border of its own.
-    @ViewBuilder
-    func liquidGlass(in shape: some Shape) -> some View {
-        if #available(iOS 26.0, *) {
-            glassEffect(.regular, in: shape)
-        } else {
-            background(.regularMaterial, in: shape)
-                .overlay(shape.stroke(AppTheme.Palette.textPrimary.opacity(0.06), lineWidth: 0.5))
         }
     }
 }

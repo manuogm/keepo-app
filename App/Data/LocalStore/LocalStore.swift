@@ -40,6 +40,7 @@ public enum LocalSchemaV1 {
         try createTagTables(database)
         try createPlanningTables(database)
         try createReferenceTables(database)
+        try createConflictTable(database)
         try createHouseholdTables(database)
     }
 
@@ -80,10 +81,21 @@ public enum LocalSchemaV1 {
             table.column("category_kind", .text)
             table.column("amount_e4", .integer).notNull()
             table.column("currency", .text)
+            // What was actually paid, when that differs from the account's
+            // currency — provenance only, never summed (CLAUDE.md money
+            // rule 6). Both null for the ordinary same-currency row, so
+            // "is this foreign?" is a null check. Nullable together:
+            // `LocalMoneyConversion` and every money query here read
+            // `amount_e4`, which is always in the account's currency.
+            table.column("original_amount_e4", .integer)
+            table.column("original_currency", .text)
             table.column("occurred_at", .text).notNull()
             table.column("merchant_raw", .text)
             table.column("merchant_normalized", .text)
             table.column("notes", .text)
+            // The user's own name for the row — never set by capture, and
+            // null rather than blank when there is none (the server's CHECK).
+            table.column("title", .text)
             // Only ever set for source='capture' rows — remembers which
             // card produced this row so resolving its account later (via
             // OutboxLocalWrite.updateTransaction) can auto-link the card.
@@ -145,9 +157,17 @@ public enum LocalSchemaV1 {
             table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("created_by", .text).notNull().collate(.nocase)
             table.column("account_id", .text).notNull().collate(.nocase)
-            table.column("category_id", .text).notNull().collate(.nocase)
+            // Both nullable, and exactly one of them is set on any row: a
+            // category for an expense/income rule, a destination account for
+            // a transfer. The server states that as a CHECK
+            // (`recurring_rules_shape_check`); the mirror only has to be able
+            // to hold either shape.
+            table.column("category_id", .text).collate(.nocase)
+            table.column("to_account_id", .text).collate(.nocase)
             table.column("amount_e4", .integer).notNull()
             table.column("currency", .text).notNull()
+            table.column("notes", .text)
+            table.column("title", .text)
             table.column("frequency", .text).notNull()
             table.column("next_due_at", .text).notNull()
             table.column("last_materialized_at", .text)
@@ -156,6 +176,19 @@ public enum LocalSchemaV1 {
             table.column("created_at", .text).notNull()
             table.column("updated_at", .text).notNull()
             table.column("sync_seq", .integer).notNull()
+        }
+
+        // The same shape as `transaction_tags`, because it is the same
+        // relationship one step earlier — see migration 20260930100000.
+        try database.create(table: "recurring_rule_tags") { table in
+            table.column("recurring_rule_id", .text).notNull().collate(.nocase)
+            table.column("tag_id", .text).notNull().collate(.nocase)
+            table.column("owner_id", .text).notNull().collate(.nocase)
+            table.column("created_at", .text).notNull()
+            table.column("updated_at", .text).notNull()
+            table.column("deleted_at", .text)
+            table.column("sync_seq", .integer).notNull()
+            table.primaryKey(["recurring_rule_id", "tag_id"])
         }
     }
 
@@ -214,7 +247,11 @@ public enum LocalSchemaV1 {
             table.column("sync_seq", .integer).notNull()
             table.primaryKey(["owner_id", "merchant_pattern"])
         }
+    }
 
+    /// Its own function only for the function-length lint — it was the table
+    /// that tipped `createReferenceTables` over when it gained a column.
+    private static func createConflictTable(_ database: Database) throws {
         try database.create(table: "sync_conflicts") { table in
             table.column("id", .text).primaryKey().collate(.nocase)
             table.column("table_name", .text).notNull()
@@ -222,6 +259,9 @@ public enum LocalSchemaV1 {
             table.column("owner_id", .text).notNull().collate(.nocase)
             table.column("client_version", .integer).notNull()
             table.column("server_version", .integer).notNull()
+            // The rejected write, as JSON text — `{"rpc": …, …arguments}`
+            // (migration 20261008100000). What "Keep mine" replays.
+            table.column("attempted_payload", .text)
             table.column("created_at", .text).notNull()
             table.column("resolved_at", .text)
             table.column("deleted_at", .text)
@@ -252,6 +292,9 @@ public enum LocalSchemaV1 {
             table.column("shared_at", .text).notNull()
             table.column("deleted_at", .text)
             table.column("sync_seq", .integer).notNull()
+            // Null for a share with full history; otherwise where a
+            // partner's view of the account begins (20261009100000).
+            table.column("history_from", .text)
             table.primaryKey(["household_id", "account_id"])
         }
 
@@ -260,6 +303,15 @@ public enum LocalSchemaV1 {
             table.column("base_currency", .text)
             table.column("display_name", .text)
             table.column("avatar_path", .text)
+            // Mirrors the server 1:1, NOT NULL and defaulted, as this
+            // store's header requires. It was briefly nullable here "to be
+            // safe", which `ProfilesSelect.timeZone` — non-optional, because
+            // the server column is NOT NULL — refused to decode the moment a
+            // row carried a NULL. The default is what actually provides the
+            // tolerance: a row arriving without the column takes 'UTC', which
+            // is exactly the server's own default and the pre-migration
+            // behaviour.
+            table.column("time_zone", .text).notNull().defaults(to: "UTC")
             table.column("onboarded_at", .text)
             table.column("created_at", .text).notNull()
             table.column("updated_at", .text).notNull()

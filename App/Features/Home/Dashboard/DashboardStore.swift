@@ -87,6 +87,28 @@ final class DashboardStore {
         return added
     }
 
+    /// Replaces the whole dashboard with these kinds, in this order.
+    ///
+    /// The one caller is setup's commit, and the ordering is the point:
+    /// `DashboardArrangement.append` fills the first free slot in reading
+    /// order, so appending the user's selection in the order they made it
+    /// *is* the hierarchy they built — no separate concept of rank to keep
+    /// in step.
+    ///
+    /// It starts from an empty arrangement rather than appending onto
+    /// whatever is there, because what is there on a fresh install is
+    /// `seed` — Net Worth — and Net Worth is also the first thing the
+    /// dashboard step offers. Appending would have given that user two of
+    /// them.
+    func replace(kinds: [DashboardWidgetKind]) {
+        var updated = DashboardArrangement(tiles: [])
+        var seen: Set<DashboardWidgetKind> = []
+        for kind in kinds where seen.insert(kind).inserted {
+            _ = updated.append(kind: kind)
+        }
+        apply(updated)
+    }
+
     func remove(id: UUID) {
         var updated = arrangement
         updated.remove(id: id)

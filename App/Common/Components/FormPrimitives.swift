@@ -49,20 +49,28 @@ struct IconPickerButton: View {
         Button(action: action) {
             CategoryIconView(icon: icon, color: color, diameter: diameter)
                 .overlay(alignment: .bottomTrailing) {
-                    KeepoIcon(name: "icon-edit", size: AppTheme.Size.glyphSmall)
+                    KeepoIcon(name: "icon-edit", size: badgeDiameter / 2)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
-                        .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                        .frame(width: badgeDiameter, height: badgeDiameter)
                         .background(AppTheme.Palette.bgSurface, in: Circle())
                         .overlay(Circle().strokeBorder(AppTheme.Palette.bgCanvas, lineWidth: 2))
                         // Nudged out along the diagonal so the badge rides the
                         // circle's rim instead of sitting on top of the chosen
                         // glyph.
-                        .offset(x: 8, y: 8)
+                        .offset(x: badgeDiameter / 4, y: badgeDiameter / 4)
                 }
         }
         .buttonStyle(.pressableCard)
         .accessibilityLabel("Change icon and colour")
     }
+
+    /// **`max`, not a bare ratio.** The badge has to grow with a hero-sized
+    /// well — onboarding's first account draws this at `Size.avatarHero`,
+    /// where a fixed 32pt disc reads as a speck — without shrinking or
+    /// nudging the badge on every form that already uses the 88pt default.
+    /// At that default the ratio lands just under `Size.icon`, so the floor
+    /// is what every existing caller keeps drawing.
+    private var badgeDiameter: CGFloat { max(AppTheme.Size.icon, diameter * 0.36) }
 }
 
 /// The "shared with your household" marker. One component so the Accounts
@@ -127,5 +135,100 @@ struct FormErrorText: View {
             .font(AppTheme.Typography.caption)
             .foregroundStyle(AppTheme.Palette.statusNegative)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The one forward action on a screen — a setup step, sign-in, or the
+/// transaction form's "Save and Add Another". Named for the job rather
+/// than for onboarding, which is where it started and has not been the
+/// only caller for a long time: it now lives beside the other shapes
+/// every form reaches for.
+///
+/// **Disabled is a neutral fill, not a faded accent.** A dimmed amber still
+/// reads as a coloured button with white text on it — as a live control
+/// someone will tap and be confused by — so the disabled state drops the
+/// accent entirely and takes `textSecondary` with it. The difference has to
+/// be a difference in *kind*, because "not yet" is what it means.
+struct PrimaryActionButton: View {
+    let title: String
+    var isEnabled = true
+    /// Swaps the label for a spinner while a network call is in flight,
+    /// keeping the button's own size so nothing reflows around it.
+    var isLoading = false
+    /// Sign-in's button and the transaction form's span their content; a
+    /// setup step's hugs its label in the bottom bar.
+    var fillsWidth = false
+    let action: () -> Void
+
+    private var isActive: Bool { isEnabled && !isLoading }
+
+    var body: some View {
+        Button(action: action) {
+            label
+                .padding(.horizontal, fillsWidth ? 0 : AppTheme.Spacing.xl)
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
+                .frame(height: AppTheme.Size.touchTarget)
+                .background(
+                    isActive ? AppTheme.Palette.brandPrimary : AppTheme.Palette.fillStrong,
+                    in: Capsule()
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.pressableCard)
+        .disabled(!isActive)
+        .animation(AppTheme.Motion.colorSafe, value: isActive)
+        .sensoryFeedback(AppTheme.Feedback.buttonPress, trigger: title)
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if isLoading {
+            ProgressView().tint(AppTheme.Palette.textSecondary)
+        } else {
+            Text(title)
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(isActive ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textSecondary)
+        }
+    }
+}
+
+/// The quieter of the two actions on a screen — onboarding's Back, and
+/// the transaction form's "Save and Add Another". An escape hatch or a
+/// second path, not the thing the screen is asking for — but
+/// **outlined**, so it still reads as a control. Bare text on the
+/// canvas, with no fill and no border, read as a label that happened to
+/// be tappable.
+///
+/// The outline rather than a fill is what keeps the hierarchy: same
+/// capsule and same height as the primary beside it, so the pair looks
+/// deliberate, with the weight carried entirely by the primary's fill.
+struct SecondaryActionButton: View {
+    let title: String
+    /// Matches `PrimaryActionButton`'s own flag, for the one place the
+    /// two sit side by side and have to share a row equally.
+    var fillsWidth = false
+    /// Disabled drops to the neutral `fillStrong` in both the outline and
+    /// the label, for the same reason the primary drops its accent: "not
+    /// yet" has to look like a different KIND of control, not a faded one.
+    var isEnabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(isEnabled ? AppTheme.Palette.textSecondary : AppTheme.Palette.fillStrong)
+                .padding(.horizontal, fillsWidth ? 0 : AppTheme.Spacing.l)
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
+                .frame(height: AppTheme.Size.touchTarget)
+                .overlay(
+                    Capsule().stroke(
+                        isEnabled ? AppTheme.Palette.textSecondary : AppTheme.Palette.fillStrong, lineWidth: 1
+                    )
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
     }
 }

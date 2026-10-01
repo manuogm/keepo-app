@@ -95,8 +95,8 @@ struct HouseholdSetupIntro<Footer: View>: View {
             .init(
                 icon: "icon-info",
                 title: "Don't worry, Nothing is permanent",
-                detail: "Either member can leave the household anytime and get a private copy "
-                    + "of everything. Nothing is lost."
+                detail: "Either member can leave the household anytime. Each keeps their own accounts "
+                    + "and gets a copy of what they could see of the other's."
             )
         ]
     }

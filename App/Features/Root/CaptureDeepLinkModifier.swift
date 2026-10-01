@@ -39,7 +39,7 @@ struct CaptureDeepLinkModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(item: $deepLinkedCapture) { transaction in
-                TransactionFormView(session: session, mode: .edit(transaction, sibling: nil)) {
+                TransactionFormView(session: session, mode: .edit(transaction)) {
                     session.refresh.bump()
                 }
             }

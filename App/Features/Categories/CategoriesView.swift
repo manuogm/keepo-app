@@ -35,8 +35,18 @@ struct CategoriesView: View {
     @State private var editingCategoryId: UUID?
     @State private var isShowingAllTags = false
     @State private var selectedTab: KindTab = .expense
+    /// Whether the user has never had a category beyond the seeded `Other`
+    /// rows (`LocalTableQueries.ownsOnlyStarterCategories`).
+    @State private var ownsOnlyStarterCategories = false
+    @State private var isShowingSuggestions = false
 
     @Environment(AppNavigation.self) private var navigation: AppNavigation?
+    /// Shared with the three money screens (see `MainTabView`) purely for the
+    /// one fact this screen also needs: whether a household exists at all.
+    /// Its account-shaped emptiness cases (`noAccounts`, `noSharedAccounts`,
+    /// ...) don't apply here — a category isn't scoped money — so this reads
+    /// `hasHousehold` directly rather than going through `emptiness(for:)`.
+    @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
 
     private var expenseCategories: [PublicSchema.CategoriesSelect] {
         categories.filter { $0.kind == .expense }
@@ -66,6 +76,29 @@ struct CategoriesView: View {
         }
     }
 
+    /// Household scope with nobody to share a category with — the same
+    /// "nothing behind this scope" state the money screens show, minus the
+    /// account-specific cases that don't mean anything here. Gated on
+    /// `isLoaded` so a household that simply hasn't loaded yet doesn't flash
+    /// as "no household" for a frame.
+    private var showsHouseholdBlankState: Bool {
+        session.scope == .household && scopeContext?.isLoaded == true && scopeContext?.hasHousehold == false
+    }
+
+    /// The catalogue onboarding offered, offered again to someone who
+    /// skipped it — over a grid holding nothing but `Other`, which is
+    /// otherwise a screen that looks broken rather than new.
+    ///
+    /// A fact about the data, not a flag: it lasts exactly until the user
+    /// owns a category of their own, from the sheet or from "+", and never
+    /// comes back — deleting everything later is a choice, not a fresh
+    /// start (the query counts tombstones for that reason). Not in
+    /// Household scope, where the grid is the categories you share and a
+    /// starter kit of private ones would be an answer to the wrong question.
+    private var offersSuggestions: Bool {
+        ownsOnlyStarterCategories && session.scope != .household
+    }
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.m), count: 3)
 
     var body: some View {
@@ -74,22 +107,31 @@ struct CategoriesView: View {
 
             VStack(spacing: 0) {
                 ScopeBannerView(
-                    title: "Categories", session: session, onOpenProfile: { navigation?.openProfileRoot() }
+                    title: "Categories", session: session, showsPrivacyToggle: false,
+                    onOpenProfile: { navigation?.openProfileRoot() },
+                    accessory: { allTagsButton }
                 )
                 .padding(.bottom, AppTheme.Spacing.xs)
                 .zIndex(1)
 
-                Picker("Kind", selection: $selectedTab) {
-                    ForEach(KindTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                // Hidden in the household blank state: there is nothing behind
+                // either tab to switch to, so the control would offer a choice
+                // between two views of the same emptiness.
+                if !showsHouseholdBlankState {
+                    Picker("Kind", selection: $selectedTab) {
+                        ForEach(KindTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding()
+                    .sensoryFeedback(AppTheme.Feedback.selection, trigger: selectedTab)
                 }
-                .pickerStyle(.segmented)
-                .padding()
-                .sensoryFeedback(AppTheme.Feedback.selection, trigger: selectedTab)
 
                 if isLoading {
                     Spacer()
                     ProgressView()
                     Spacer()
+                } else if showsHouseholdBlankState {
+                    ScopeEmptyStateView(emptiness: .noHousehold, session: session)
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: AppTheme.Spacing.m) {
@@ -104,21 +146,14 @@ struct CategoriesView: View {
                         }
                         .padding(.horizontal)
                     }
-                    // Pinned below rather than the tab bar's own distance: the
-                    // grid now hands off to the "All Tags" row sitting right
-                    // under it, not to the physical bottom of the display.
-                    .contentMargins(.bottom, AppTheme.Spacing.l, for: .scrollContent)
+                    // Runs under the floating tab bar like the Accounts list
+                    // does, now that no pinned row sits between the two.
+                    .contentMargins(.bottom, KeepoTabBarMetrics.clearance, for: .scrollContent)
                     .refreshable { await load() }
-                    .fadingEdges(bottom: 22)
-
-                    // Pinned below the grid instead of scrolling with it, so
-                    // it stays reachable at a glance instead of being the
-                    // last thing after however many categories exist — and
-                    // the grid gets the rest of the screen to itself.
-                    allTagsLink
-                        .padding(.horizontal)
-                        .padding(.top, AppTheme.Spacing.s)
-                        .padding(.bottom, KeepoTabBarMetrics.clearance)
+                    .fadingEdges()
+                    .overlay {
+                        if offersSuggestions { suggestionsPrompt }
+                    }
                 }
             }
 
@@ -142,16 +177,19 @@ struct CategoriesView: View {
         // form is opened for that kind rather than asking a second time. Two
         // entry points, one form — the kind is a parameter, not a control.
         .sheet(isPresented: $isAddingCategory) {
-            CategoryFormView(session: session, mode: .create(kind: selectedTab.categoryKind)) {
+            CategoryFormView(session: session, mode: .create(kind: selectedTab.categoryKind), existing: categories) {
                 session.refresh.bump()
             }
+        }
+        .sheet(isPresented: $isShowingSuggestions) {
+            SuggestedCategoriesSheet(session: session) { session.refresh.bump() }
         }
         .sheet(isPresented: $isShowingAllTags) {
             TagsListView(session: session)
         }
         .sheet(item: $editingCategoryId) { id in
             if let category = categories.first(where: { $0.id == id }) {
-                CategoryFormView(session: session, mode: .edit(category)) {
+                CategoryFormView(session: session, mode: .edit(category), existing: categories) {
                     session.refresh.bump()
                 }
             }
@@ -159,36 +197,47 @@ struct CategoriesView: View {
         .task(id: session.refresh.token) { await load() }
     }
 
-    /// Below the grid rather than in the toolbar: tags are a *second*
-    /// thing this screen is about, reached after looking at the categories,
-    /// not a competing primary action next to "+" — which on this tab
-    /// already means "new category".
-    ///
-    /// Pinned to the bottom of the screen rather than scrolling with the
-    /// grid: a household with a long category list would otherwise push it
-    /// past however many tiles exist, and the grid above it gets the whole
-    /// scroll area to itself instead of giving up its last slot to this row.
-    private var allTagsLink: some View {
+    /// In the header's trailing corner — the spot the privacy toggle holds
+    /// on Transactions, which this screen has nothing to mask with. It was a
+    /// full-width "All Tags" row pinned above the tab bar, which took a
+    /// band of screen from the grid on every visit to offer something most
+    /// visits never use. As a glyph it stays one tap away and costs nothing,
+    /// and the "+" still means a new category, not a tag.
+    private var allTagsButton: some View {
         Button {
             isShowingAllTags = true
         } label: {
-            HStack(spacing: AppTheme.Spacing.s) {
-                KeepoIcon(name: "icon-tag", size: AppTheme.Size.glyphSmall)
-                Text("All Tags")
-                    .font(AppTheme.Typography.label)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(AppTheme.Typography.micro)
-            }
-            .foregroundStyle(AppTheme.Palette.textPrimary)
-            .padding(AppTheme.Spacing.l)
-            .background(
-                AppTheme.Palette.bgSurface,
-                in: RoundedRectangle(cornerRadius: AppTheme.Radius.card)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: AppTheme.Radius.card))
+            KeepoIcon(name: "icon-tag")
+                .foregroundStyle(.white)
+                .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.pressableCard)
+        .buttonStyle(.plain)
+        .accessibilityLabel("All tags")
+    }
+
+    /// Centred in the space the `Other` tile leaves, and laid out like the
+    /// app's other empty states (`ScopeEmptyStateView`): a line of copy and
+    /// one capsule button.
+    private var suggestionsPrompt: some View {
+        VStack(spacing: AppTheme.Spacing.m) {
+            Text("Not sure where to start? See some commonly used categories here.")
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: AppTheme.Size.proseWidth)
+            Button("See categories") { isShowingSuggestions = true }
+                .font(AppTheme.Typography.labelEmphasis)
+                .foregroundStyle(AppTheme.Palette.textOnAccent)
+                .padding(.horizontal, AppTheme.Spacing.l)
+                .padding(.vertical, AppTheme.Spacing.m)
+                .background(AppTheme.Palette.brandPrimary, in: Capsule())
+                .buttonStyle(.plain)
+        }
+        .padding(.horizontal, AppTheme.Spacing.xxl)
+        // Centred in what the user can actually see, not in a region that
+        // runs under the floating tab bar.
+        .padding(.bottom, KeepoTabBarMetrics.clearance)
     }
 
     private func load() async {
@@ -198,34 +247,15 @@ struct CategoriesView: View {
             return
         }
         do {
-            categories = try await session.dbQueue.read { database in
-                try LocalTableQueries.categories(database, ownerId: ownerId.uuidString)
+            (categories, ownsOnlyStarterCategories) = try await session.dbQueue.read { database in
+                (
+                    try LocalTableQueries.categories(database, ownerId: ownerId.uuidString),
+                    try LocalTableQueries.ownsOnlyStarterCategories(database, ownerId: ownerId.uuidString)
+                )
             }
         } catch {
             errorMessage = UserFacingError.describe(error)
         }
         isLoading = false
-    }
-}
-
-private struct CategoryTile: View {
-    let category: PublicSchema.CategoriesSelect
-
-    var body: some View {
-        VStack(spacing: AppTheme.Spacing.s) {
-            Image(systemName: category.icon)
-                .font(AppTheme.Typography.sectionTitle)
-                .foregroundStyle(AppTheme.Palette.textOnAccent)
-                .frame(width: AppTheme.Size.touchTarget, height: AppTheme.Size.touchTarget)
-                .background(Color(hex: category.color))
-                .clipShape(Circle())
-            Text(category.name)
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-                .lineLimit(1)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, AppTheme.Spacing.s)
     }
 }

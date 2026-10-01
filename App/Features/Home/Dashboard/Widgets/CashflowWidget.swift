@@ -134,7 +134,7 @@ struct CashflowWidget: View {
             Text(side.title)
                 .font(AppTheme.Typography.micro)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
-            PrivateText(compactLabel(amountE4))
+            PrivateText(compactLabel(amountE4), spoken: compactLabel(amountE4, exact: true))
                 .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(side.color)
         }
@@ -207,7 +207,7 @@ struct CashflowWidget: View {
         HStack(spacing: AppTheme.Spacing.s) {
             segment(.moneyIn)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            PrivateText(directionTotalLabel)
+            PrivateText(directionTotalLabel, spoken: amountLabel(highlightedDirectionE4, exact: true))
                 .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(direction.color)
                 .lineLimit(1)
@@ -263,8 +263,12 @@ struct CashflowWidget: View {
         ]
     }
 
+    private var highlightedDirectionE4: Int64? {
+        series.series(direction.metric).first { $0.bucket == series.highlighted }?.amountE4
+    }
+
     private var directionTotalLabel: String {
-        amountLabel(series.series(direction.metric).first { $0.bucket == series.highlighted }?.amountE4)
+        amountLabel(highlightedDirectionE4)
     }
 
     private var badgeCaption: String {
@@ -301,17 +305,20 @@ struct CashflowWidget: View {
         )
     }
 
-    private func amountLabel(_ amountE4: Int64?) -> String {
+    /// `exact` is the VoiceOver reading of the same figure.
+    private func amountLabel(_ amountE4: Int64?, exact: Bool = false) -> String {
         guard let currency else { return "—" }
-        return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger)
+        return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger, exact: exact)
     }
 
     /// Rounded and abbreviated, for the collapsed tile only — see
     /// `MoneyFormatter.compact`. The expanded widget has the width for the
-    /// exact figure and uses `amountLabel`.
-    private func compactLabel(_ amountE4: Int64?) -> String {
+    /// exact figure and uses `amountLabel`. `exact` is the VoiceOver reading.
+    private func compactLabel(_ amountE4: Int64?, exact: Bool = false) -> String {
         guard let currency else { return "—" }
-        return MoneyFormatter.compact(amountE4, currency: currency, signStyle: .magnitude)
+        return exact
+            ? MoneyFormatter.format(amountE4, currency: currency, signStyle: .magnitude, exact: true)
+            : MoneyFormatter.compact(amountE4, currency: currency, signStyle: .magnitude)
     }
 }
 

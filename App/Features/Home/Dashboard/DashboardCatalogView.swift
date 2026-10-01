@@ -30,7 +30,7 @@ struct DashboardCatalogView: View {
     let geometry: DashboardGeometry
     let maxHeight: CGFloat
     /// Which widgets are already on the dashboard. They move to their own
-    /// group rather than sitting greyed among the ones you can still add —
+    /// shelf rather than sitting greyed among the ones you can still add —
     /// the rule is one of each, so a used widget is not an entry that
     /// happens to be disabled, it is an entry that has already been spent.
     var placed: Set<DashboardWidgetKind> = []
@@ -50,11 +50,13 @@ struct DashboardCatalogView: View {
     /// see the comment on `onDrag` below.
     let onLift: (DashboardWidgetKind) -> Void
 
-    /// Which groups are shut. "Used" starts shut because it is the one
-    /// group whose entries you cannot act on — it exists to get widgets out
-    /// of the way, and leaving it open would put them straight back in the
-    /// way.
-    @State private var collapsed: Set<CatalogGroup> = [.used]
+    /// Which shelf is showing. Opens on Keepo, the one whose entries you
+    /// can act on — Used exists to get placed widgets out of the way.
+    @State private var shelf: Shelf = .keepo
+    /// How far the panel has been pulled down by its grabber. Not reset
+    /// when the pull dismisses: the panel leaves from where the finger let
+    /// go rather than snapping back up first.
+    @State private var dragOffset: CGFloat = 0
     /// Which widget's explainer is open. The catalogue's ⓘ opens the **same**
     /// sheet the widget's own header does — one description of a widget,
     /// wherever you meet it.
@@ -64,14 +66,10 @@ struct DashboardCatalogView: View {
         VStack(spacing: 0) {
             header
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: AppTheme.Spacing.l, pinnedViews: []) {
-                    ForEach(CatalogGroup.allCases) { group in
-                        section(group)
-                    }
-                }
-                .padding(.horizontal, inset)
-                .padding(.top, AppTheme.Spacing.s)
-                .padding(.bottom, 24 + KeepoTabBarMetrics.clearance)
+                shelfContents
+                    .padding(.horizontal, inset)
+                    .padding(.top, AppTheme.Spacing.l)
+                    .padding(.bottom, AppTheme.Spacing.xl + KeepoTabBarMetrics.clearance)
             }
             .scrollIndicators(.hidden)
         }
@@ -87,46 +85,97 @@ struct DashboardCatalogView: View {
                 .elevation(.floating)
                 .ignoresSafeArea(edges: .bottom)
         }
+        // After the background, so the panel's surface travels with the
+        // pull rather than staying behind as an empty card.
+        .offset(y: dragOffset)
         .sheet(item: $explaining) { kind in
             WidgetGuideSheet(title: kind.title, guide: kind.guide)
         }
     }
 
-    private var inset: CGFloat { 16 }
+    private var inset: CGFloat { AppTheme.Spacing.l }
 
+    /// Dressed as a sheet, because it behaves like one: it slides up from
+    /// the bottom and goes away on a pull down. The grabber, and the X at
+    /// the leading edge as glass, are what every real sheet in the app
+    /// shows — this panel was the one place the X sat trailing in a grey
+    /// disc, and it read as a different kind of thing.
+    ///
+    /// The pull is on the grabber and title row only. The list below has to
+    /// keep its scroll (see the type's header), and the shelf picker runs
+    /// its own pan to slide between segments.
     private var header: some View {
-        HStack {
-            Text("Add Widget")
-                .font(AppTheme.Typography.rowTitle)
-            Spacer()
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(AppTheme.Typography.captionEmphasis)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
-                    .background(AppTheme.Palette.fillSubtle, in: Circle())
+        VStack(spacing: AppTheme.Spacing.m) {
+            VStack(spacing: AppTheme.Spacing.s) {
+                Capsule()
+                    .fill(AppTheme.Palette.textTertiary)
+                    .frame(width: AppTheme.Size.grabber.width, height: AppTheme.Size.grabber.height)
+                    .accessibilityHidden(true)
+                ZStack {
+                    Text("Add Widget")
+                        .font(AppTheme.Typography.rowTitle)
+                    HStack {
+                        closeButton
+                        Spacer(minLength: 0)
+                    }
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Close")
+            .contentShape(Rectangle())
+            .gesture(pullToDismiss)
+
+            Picker("Show", selection: $shelf) {
+                ForEach(Shelf.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .sensoryFeedback(AppTheme.Feedback.selection, trigger: shelf)
         }
         .padding(.horizontal, inset)
-        .padding(.top, AppTheme.Spacing.l)
-        .padding(.bottom, AppTheme.Spacing.xs)
+        .padding(.top, AppTheme.Spacing.s)
     }
 
-    // MARK: - Groups
+    /// The toolbar X every sheet carries — a glyph on a glass circle — drawn
+    /// by hand because a panel has no toolbar to put it in.
+    private var closeButton: some View {
+        Button(action: onClose) {
+            Image(systemName: "xmark")
+                .font(AppTheme.Typography.bodyEmphasis)
+                .foregroundStyle(AppTheme.Palette.textPrimary)
+                .frame(width: AppTheme.Size.touchTarget, height: AppTheme.Size.touchTarget)
+                .liquidGlass(in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
+    }
 
-    /// The three shelves a widget can be on.
-    ///
-    /// Not a filter over one list: a widget is on exactly one of these, and
-    /// which one answers a different question each time. "Keepo" is what
-    /// you can add, "Yours" is what you have built, "Used" is what is
-    /// already out. Collapsing is what makes that useful on a phone — six
-    /// widgets is a scroll, and the group you want is usually the first
-    /// one.
-    enum CatalogGroup: String, CaseIterable, Identifiable {
+    /// How far a pull has to travel to dismiss — or a flick has to be
+    /// projected to travel, at twice this. Anything less springs back.
+    private static let dismissDistance: CGFloat = 80
+
+    /// Down only — an upward pull has nowhere to go.
+    private var pullToDismiss: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                dragOffset = max(0, value.translation.height)
+            }
+            .onEnded { value in
+                if value.translation.height > Self.dismissDistance
+                    || value.predictedEndTranslation.height > Self.dismissDistance * 2 {
+                    onClose()
+                } else {
+                    withAnimation(AppTheme.Motion.standard) { dragOffset = 0 }
+                }
+            }
+    }
+
+    // MARK: - Shelves
+
+    /// The two shelves a widget can be on, one at a time. A widget is on
+    /// exactly one: "Keepo" is what you can add, "Used" is what is already
+    /// out. A filter rather than stacked collapsible groups, so the panel
+    /// opens on the list you came for instead of on a row of headers.
+    enum Shelf: String, CaseIterable, Identifiable {
         case keepo
-        case yours
         case used
 
         var id: String { rawValue }
@@ -134,90 +183,44 @@ struct DashboardCatalogView: View {
         var title: String {
             switch self {
             case .keepo: return "Keepo Widgets"
-            case .yours: return "Your Widgets"
             case .used: return "Used Widgets"
             }
         }
 
         /// What an empty shelf says. Never a bare "nothing here" — an empty
-        /// group is either an achievement (everything is on the dashboard)
-        /// or a promise (this is where your own widgets will live), and
-        /// both are worth saying.
+        /// shelf is an achievement (everything is on the dashboard) or a
+        /// pointer to the other one.
         var blankState: String {
             switch self {
             case .keepo: return "Every Keepo widget is on your dashboard."
-            case .yours: return "Widgets you build yourself will show up here."
-            case .used: return "Nothing on your dashboard yet — add one from above."
+            case .used: return "Nothing on your dashboard yet — add one from Keepo Widgets."
             }
         }
     }
 
-    /// The widgets on each shelf. `yours` is deliberately empty rather than
-    /// absent: the group is the promise, and a promise you can see is worth
-    /// more than a group that appears the day the feature does.
-    private func kinds(in group: CatalogGroup) -> [DashboardWidgetKind] {
-        switch group {
+    private func kinds(on shelf: Shelf) -> [DashboardWidgetKind] {
+        switch shelf {
         case .keepo: return DashboardWidgetKind.allCases.filter { !placed.contains($0) }
-        case .yours: return []
         case .used: return DashboardWidgetKind.allCases.filter { placed.contains($0) }
         }
     }
 
     @ViewBuilder
-    private func section(_ group: CatalogGroup) -> some View {
-        let members = kinds(in: group)
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
-            sectionHeader(group, count: members.count)
-            if !collapsed.contains(group) {
-                if members.isEmpty {
-                    Text(group.blankState)
-                        .font(AppTheme.Typography.label)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, AppTheme.Spacing.m)
-                } else {
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
-                        ForEach(members, id: \.self) { kind in
-                            entry(kind, isPlaced: group == .used)
-                        }
-                    }
+    private var shelfContents: some View {
+        let members = kinds(on: shelf)
+        if members.isEmpty {
+            Text(shelf.blankState)
+                .font(AppTheme.Typography.label)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, AppTheme.Spacing.m)
+        } else {
+            LazyVStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
+                ForEach(members, id: \.self) { kind in
+                    entry(kind, isPlaced: shelf == .used)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func sectionHeader(_ group: CatalogGroup, count: Int) -> some View {
-        Button {
-            withAnimation(AppTheme.Motion.standard) {
-                if collapsed.contains(group) { collapsed.remove(group) } else { collapsed.insert(group) }
-            }
-        } label: {
-            HStack(spacing: AppTheme.Spacing.s) {
-                Image(systemName: "chevron.right")
-                    .font(AppTheme.Typography.captionEmphasis)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .rotationEffect(.degrees(collapsed.contains(group) ? 0 : 90))
-                Text(group.title)
-                    .font(AppTheme.Typography.rowTitle)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                // The count is what makes a shut group readable: "Used
-                // Widgets 0" and "Used Widgets 4" are different situations
-                // and the chevron alone cannot tell them apart.
-                Text(verbatim: "\(count)")
-                    .font(AppTheme.Typography.labelEmphasis)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .monospacedDigit()
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 36)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(group.title)
-        .accessibilityValue("\(count) widgets")
-        .accessibilityHint(collapsed.contains(group) ? "Expands the group" : "Collapses the group")
     }
 
     // MARK: - Entries
@@ -238,7 +241,7 @@ struct DashboardCatalogView: View {
     /// they can act on.
     private func entry(_ kind: DashboardWidgetKind, isPlaced: Bool) -> some View {
         // A placed widget carries no orange warning. It isn't a problem to
-        // fix — the group it is sitting in already says why it can't be
+        // fix — the shelf it is sitting on already says why it can't be
         // added again.
         let reason = isPlaced ? nil : unavailable[kind]
         return VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {

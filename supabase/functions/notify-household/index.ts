@@ -12,10 +12,12 @@
 // HouseholdRepository.fetchEvents — is already fully wired, so swapping
 // this file's body for a real push send is the only change Phase 20 needs.
 
+import { secretMatches } from "../_shared/secret.ts";
+
 Deno.serve(async (req) => {
   const expectedSecret = Deno.env.get("NOTIFY_HOUSEHOLD_SECRET");
   const providedSecret = req.headers.get("x-notify-household-secret");
-  if (!expectedSecret || providedSecret !== expectedSecret) {
+  if (!secretMatches(expectedSecret, providedSecret)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "content-type": "application/json" },

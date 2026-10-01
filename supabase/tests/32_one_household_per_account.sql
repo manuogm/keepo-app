@@ -99,10 +99,12 @@ select is(
   'the fork retires the sharing row, so nothing points at a household the account has left'
 );
 
-select isnt(
-  (select archived_at from accounts where id = 'a1000000-0000-0000-0000-00000000e001'),
-  null::timestamptz,
-  'the original is archived rather than deleted, and each member keeps a private fork'
+-- The owner keeps her account as it was, and the guest keeps a copy
+-- (20261012100000; the old fork archived the original and copied it for both).
+select is(
+  (select count(*) from accounts where name = 'A Joint' and archived_at is null and deleted_at is null),
+  2::bigint,
+  'the owner keeps the original, unarchived, and the guest keeps a private copy'
 );
 
 select * from finish();

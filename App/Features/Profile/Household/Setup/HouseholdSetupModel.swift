@@ -36,7 +36,22 @@ final class HouseholdSetupModel {
     var categories: [PublicSchema.CategoriesSelect] = []
 
     var selectedAccountIds: Set<UUID> = []
+    /// The selected accounts that come with their past transactions. Off by
+    /// default (user's decision, 2026-09-23): an account the user switches
+    /// on is shared from the day the household is made.
+    var fullHistoryAccountIds: Set<UUID> = []
     var selectedCategoryIds: Set<UUID> = []
+
+    /// What the pickers amount to, as `create_invite`/`accept_invite` take
+    /// it. A history choice on an account that was switched back off is not
+    /// a choice about anything, so it is dropped here.
+    var choices: HouseholdShareChoices {
+        HouseholdShareChoices(
+            accountIds: Array(selectedAccountIds),
+            fullHistoryAccountIds: Array(fullHistoryAccountIds.intersection(selectedAccountIds)),
+            categoryIds: Array(selectedCategoryIds)
+        )
+    }
 
     /// False until the first read lands. The pickers draw a spinner rather
     /// than "you have no accounts to share yet", which is a claim about the
@@ -64,4 +79,15 @@ final class HouseholdSetupModel {
         categories = loaded.1.filter { !$0.isDefault }
         isLoaded = true
     }
+}
+
+/// What one member brings into the household, carried unchanged from the
+/// pickers to the server: the owner's to `create_invite`, the guest's to
+/// `accept_invite`.
+struct HouseholdShareChoices {
+    var accountIds: [UUID] = []
+    /// The chosen accounts shared with their past transactions; the rest are
+    /// shared from the day the invite is accepted.
+    var fullHistoryAccountIds: [UUID] = []
+    var categoryIds: [UUID] = []
 }

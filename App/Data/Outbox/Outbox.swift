@@ -9,6 +9,15 @@ public enum OutboxSubmitResult: Equatable, Sendable {
     case applied
     case conflict
     case queued
+    /// The server refused the write for a reason sending it again cannot
+    /// fix (`UserFacingError.isFinalRefusal`). Nothing is queued; see
+    /// `Outbox.refusal`.
+    case refused
+}
+
+/// A write the server refused outright — what the app-wide alert says.
+public struct OutboxRefusal: Equatable, Sendable {
+    public let message: String
 }
 
 public enum OutboxCaptureResult: Equatable, Sendable {
@@ -53,6 +62,19 @@ public final class Outbox {
     /// symptom looked identical to a client sync bug. A write that cannot
     /// reach the server must always be able to say why.
     public internal(set) var lastError: String?
+    /// The last write the server refused outright, until the user has seen
+    /// it — `RootView` raises an alert from this. A refusal is dropped from
+    /// the queue rather than retried, so without this it would vanish
+    /// without a word. See `Outbox+Refusal.swift`.
+    public internal(set) var refusal: OutboxRefusal?
+    /// Set by a refusal: the local mirror still holds the optimistic copy of
+    /// a write the server rejected, and no incremental pull will ever correct
+    /// it — the server's rows never changed, so nothing about them is past
+    /// the cursor. `SessionStore` answers it with a full re-sync once the
+    /// queue is empty.
+    public internal(set) var needsFullResync = false
+    /// Called after a refusal is recorded. `SessionStore` sets it.
+    var onRefusal: (() -> Void)?
 
     let dbQueue: DatabaseQueue
     let sender: OutboxSending
@@ -205,6 +227,9 @@ public final class Outbox {
         do {
             let applied = try await send()
             return applied ? .applied : .conflict
+        } catch where UserFacingError.isFinalRefusal(error) {
+            recordRefusal(error)
+            return .refused
         } catch {
             await enqueue(
                 id: id, kind: kind, payload: payload, expectedVersion: expectedVersion,
@@ -227,13 +252,25 @@ public final class Outbox {
     /// its `createdAt` sorts after the create's, so `drainAll`'s FIFO order
     /// replays the create first and this write second, same outcome as if
     /// both had gone out over the wire in the order the user made them.
+    ///
+    /// **Every** create, not only a capture's. The guard was first written
+    /// for `.captureTransaction` alone, and the identical overwrite went on
+    /// happening to the others: a transaction or transfer created offline
+    /// and then edited or deleted before reconnecting had its create
+    /// replaced by the edit, so the row never reached the server at all —
+    /// the edit then failed forever with "not found", and the next full
+    /// re-pull deleted a transaction the user could still see. A transfer's
+    /// edit is keyed by its group id, which is its sending leg's id
+    /// (migration 20261006100000) and therefore the same key its create is
+    /// queued under.
     func enqueue<P: Encodable>(
         id: UUID, kind: OutboxKind, payload: P, expectedVersion: Int?, lastError: String?
     ) async {
         guard let data = try? encoder.encode(payload) else { return }
         try? await dbQueue.write { database in
             if let existing = try OutboxItemRecord.fetchOne(database, key: id),
-               existing.kind == OutboxKind.captureTransaction.rawValue, kind != .captureTransaction {
+               let existingKind = OutboxKind(rawValue: existing.kind), existingKind.createsRow,
+               kind != existingKind {
                 try OutboxItemRecord(
                     id: UUID(), kind: kind.rawValue, payloadJSON: data, expectedVersion: expectedVersion,
                     createdAt: Date(), attempts: 1, lastError: lastError
@@ -261,6 +298,11 @@ public final class Outbox {
         do {
             _ = try await replay(item)
             try? await dbQueue.write { database in _ = try item.delete(database) }
+        } catch where UserFacingError.isFinalRefusal(error) {
+            // Sending it again cannot succeed, and retrying it forever is
+            // what kept every such failure silent. Drop it and say so.
+            try? await dbQueue.write { database in _ = try item.delete(database) }
+            recordRefusal(error)
         } catch {
             try? await dbQueue.write { database in
                 if var current = try OutboxItemRecord.fetchOne(database, key: item.id) {

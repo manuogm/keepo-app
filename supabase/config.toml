@@ -179,7 +179,14 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
+# Raised from 6 by the security audit of 2026-09-21 (finding 9). Inert for
+# the shipped flow, which is OTP-only and mints no passwords — but this file
+# is what `supabase config push` applies to the hosted project, so a 6 here
+# is a 6 the day a password path is added (Sign in with Apple / Google is
+# planned, and either could arrive alongside one). The only password Keepo
+# creates today is StubAuthProvider's fixed local-dev one, which is 23
+# characters and unaffected.
+minimum_password_length = 12
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
 password_requirements = ""
@@ -388,6 +395,14 @@ deno_version = 2
 # sync-fx-rates is gated by an X-Fx-Sync-Secret header (the caller is a
 # cron job, not a signed-in user), so no user JWT is required.
 [functions.sync-fx-rates]
+verify_jwt = false
+
+# capture-shortcut is a public 302 to the published "Keepo Capture" shortcut.
+# It has to be reachable with no JWT at all: the link is tapped from setup by
+# a signed-in user, but it is also shareable — from Safari, a support email,
+# or a device whose session has lapsed — and a 401 there would be the same
+# dead end the redirect exists to prevent.
+[functions.capture-shortcut]
 verify_jwt = false
 
 # alert-operator is gated by an X-Alert-Operator-Secret header — the caller

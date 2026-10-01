@@ -97,6 +97,56 @@ public struct KeychainSessionStorage: AuthLocalStorage {
     }
 }
 
+extension KeychainSessionStorage {
+    /// The marker whose **absence** means this install is new. It lives in
+    /// `UserDefaults`, which is the entire trick: iOS deletes an app's
+    /// container — Preferences included — when the app is deleted, and
+    /// deliberately does *not* delete its Keychain items. Absence is
+    /// therefore not "we never wrote it", it is "the container this would
+    /// have been written into no longer exists."
+    static let installMarkerKey = "keepo.hasLaunchedSinceInstall"
+
+    /// Removes a stored session that outlived the app it belonged to.
+    ///
+    /// **Deleting the app is not signing out, and every user believes it
+    /// is.** Keychain items survive an uninstall by design — they are
+    /// scoped to the app's keychain access group, not to its container — so
+    /// deleting Keepo, reinstalling it and launching restored the previous
+    /// refresh token and signed the user straight back in, with no sign-in
+    /// screen and no way to reach one. Reported from a real device after a
+    /// delete-and-rebuild, and it is worse than a surprise: on a shared or
+    /// resold phone the next person to install Keepo inherits the last
+    /// person's financial history.
+    ///
+    /// Reinstalling is the one gesture every user already knows for "start
+    /// over", so this makes it mean that. A session the user actually wants
+    /// kept is untouched — the marker is written on first launch and
+    /// survives every launch after it.
+    ///
+    /// Only Keepo's own item is removed, under Keepo's own service. The
+    /// local dev stack's SDK-default storage lives elsewhere and is left
+    /// alone, which costs nothing: `StubAuthProvider` signs itself in there
+    /// regardless.
+    ///
+    /// Returns whether it purged, which is what the tests assert — the
+    /// `SecItemDelete` itself is device-only, for the entitlement reason
+    /// this file's test suite documents at length.
+    @discardableResult
+    public static func purgeSessionIfReinstalled(
+        defaults: UserDefaults = .standard,
+        storage: KeychainSessionStorage = KeychainSessionStorage()
+    ) -> Bool {
+        guard !defaults.bool(forKey: installMarkerKey) else { return false }
+        // `try?`, not `try`: a fresh install has no item to remove and
+        // `remove` already treats `errSecItemNotFound` as success, so the
+        // only errors reachable here are ones where refusing to launch
+        // would be a far worse answer than launching signed out.
+        try? storage.remove(key: sessionStorageKey)
+        defaults.set(true, forKey: installMarkerKey)
+        return true
+    }
+}
+
 public enum KeychainSessionStorageError: Error, Equatable {
     case accessControlCreationFailed
     case osStatus(OSStatus)

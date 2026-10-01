@@ -28,7 +28,8 @@ enum SyncApply {
         ],
         "transactions": [
             "id", "owner_id", "created_by", "account_id", "category_id", "category_kind",
-            "amount_e4", "currency", "occurred_at", "merchant_raw", "merchant_normalized", "notes",
+            "amount_e4", "currency", "original_amount_e4", "original_currency",
+            "occurred_at", "merchant_raw", "merchant_normalized", "notes", "title",
             "card_identifier", "transfer_group_id", "source", "status", "external_id", "recurring_rule_id",
             "version", "deleted_at", "created_at", "updated_at", "sync_seq"
         ],
@@ -38,8 +39,12 @@ enum SyncApply {
             "created_as_twin", "version", "deleted_at", "created_at", "updated_at", "sync_seq"
         ],
         "recurring_rules": [
-            "id", "owner_id", "created_by", "account_id", "category_id", "amount_e4", "currency", "frequency",
-            "next_due_at", "last_materialized_at", "active", "version", "created_at", "updated_at", "sync_seq"
+            "id", "owner_id", "created_by", "account_id", "category_id", "to_account_id", "amount_e4",
+            "currency", "notes", "title", "frequency", "next_due_at", "last_materialized_at", "active", "version",
+            "created_at", "updated_at", "sync_seq"
+        ],
+        "recurring_rule_tags": [
+            "recurring_rule_id", "tag_id", "owner_id", "created_at", "updated_at", "deleted_at", "sync_seq"
         ],
         "tags": [
             "id", "owner_id", "name", "version", "deleted_at", "created_at", "updated_at", "sync_seq"
@@ -57,14 +62,14 @@ enum SyncApply {
             "owner_id", "merchant_pattern", "category_id", "updated_at", "deleted_at", "sync_seq"
         ],
         "sync_conflicts": [
-            "id", "table_name", "row_id", "owner_id", "client_version", "server_version", "created_at",
-            "resolved_at", "deleted_at", "sync_seq"
+            "id", "table_name", "row_id", "owner_id", "client_version", "server_version", "attempted_payload",
+            "created_at", "resolved_at", "deleted_at", "sync_seq"
         ],
         "households": ["id", "created_at", "deleted_at", "sync_seq"],
         "household_members": ["household_id", "user_id", "joined_at", "deleted_at", "sync_seq"],
-        "household_accounts": ["household_id", "account_id", "shared_at", "deleted_at", "sync_seq"],
+        "household_accounts": ["household_id", "account_id", "shared_at", "deleted_at", "sync_seq", "history_from"],
         "profiles": [
-            "id", "base_currency", "display_name", "avatar_path", "onboarded_at",
+            "id", "base_currency", "display_name", "avatar_path", "time_zone", "onboarded_at",
             "created_at", "updated_at", "deleted_at", "sync_epoch", "sync_seq"
         ]
     ]
@@ -72,6 +77,7 @@ enum SyncApply {
     private static let primaryKeys: [String: [String]] = [
         "accounts": ["id"], "transactions": ["id"], "categories": ["id"],
         "recurring_rules": ["id"], "tags": ["id"],
+        "recurring_rule_tags": ["recurring_rule_id", "tag_id"],
         "transaction_tags": ["transaction_id", "tag_id"], "currencies": ["code"],
         "fx_rates": ["currency", "rate_date"], "card_mappings": ["id"],
         "merchant_category_map": ["owner_id", "merchant_pattern"], "sync_conflicts": ["id"], "households": ["id"],
@@ -179,6 +185,11 @@ enum SyncApply {
         )
     }
 
+    /// A nested object or array is stored as its JSON text. The first synced
+    /// `jsonb` column is `sync_conflicts.attempted_payload` (migration
+    /// 20261008100000); before it this branch returned `nil`, which would
+    /// have stored every conflict's payload as NULL — silently, since the
+    /// column is nullable.
     private static func databaseValue(_ json: AnyJSON) -> DatabaseValueConvertible? {
         switch json {
         case .null: return nil
@@ -186,8 +197,36 @@ enum SyncApply {
         case .integer(let value): return Int64(value)
         case .double(let value): return value
         case .string(let value): return value
-        case .object, .array: return nil
+        case .object, .array:
+            return (try? JSONEncoder().encode(json)).flatMap { String(data: $0, encoding: .utf8) }
         }
+    }
+
+    /// Drops what this phone holds of someone else's account from before
+    /// the day it was shared with its user, and those rows' tag links.
+    ///
+    /// The server never sends such a row to a partner (RLS reads the same
+    /// start date), and a partner's copy of the account opens on the balance
+    /// carried into that day — which already counts every one of them. A row
+    /// from there that is still on the phone, from before the share began on
+    /// a date or from an optimistic write the server went on to refuse, would
+    /// therefore be counted twice by the one balance formula. Run after every
+    /// pull, so the mirror never holds the two together.
+    ///
+    /// `julianday`, not a string comparison: the two timestamps need not
+    /// share an offset or a precision, and SQLite compares text byte by byte.
+    static func purgeHistoryBeforeShares(viewerId: String, in database: Database) throws {
+        let hidden = """
+            SELECT t.id FROM transactions t
+            JOIN accounts a ON a.id = t.account_id
+            JOIN household_accounts ha
+              ON ha.account_id = t.account_id AND ha.deleted_at IS NULL AND ha.history_from IS NOT NULL
+            WHERE a.owner_id <> ? AND julianday(t.occurred_at) < julianday(ha.history_from)
+            """
+        try database.execute(
+            sql: "DELETE FROM transaction_tags WHERE transaction_id IN (\(hidden))", arguments: [viewerId]
+        )
+        try database.execute(sql: "DELETE FROM transactions WHERE id IN (\(hidden))", arguments: [viewerId])
     }
 
     /// The epoch-mismatch response the plan calls for: drop every

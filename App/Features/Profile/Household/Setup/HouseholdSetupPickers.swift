@@ -16,12 +16,14 @@ struct HouseholdAccountPicker<Footer: View>: View {
     /// than showing nothing — the same rule `ScopeContext.isLoaded` exists for.
     let isLoaded: Bool
     @Binding var selection: Set<UUID>
+    /// Which selected accounts also bring their past transactions.
+    @Binding var fullHistory: Set<UUID>
     @ViewBuilder var footer: Footer
 
     var body: some View {
         HouseholdPickerScaffold(
             title: "Shared accounts",
-            subtitle: nil,
+            subtitle: "Your household sees an account's transactions from today, unless you include its past ones.",
             isLoaded: isLoaded,
             isEmpty: accounts.isEmpty,
             emptyMessage: "You have no accounts to share yet.",
@@ -36,14 +38,21 @@ struct HouseholdAccountPicker<Footer: View>: View {
                             selection: $selection
                         ) {
                             ForEach(rows) { account in
-                                HouseholdAccountRow(
-                                    name: account.name,
-                                    icon: account.icon,
-                                    color: Color(hex: account.color),
-                                    isInvestment: account.kind == .investment
-                                ) {
-                                    HouseholdPickerToggle(isOn: binding(for: account.id))
+                                VStack(spacing: 0) {
+                                    HouseholdAccountRow(
+                                        name: account.name,
+                                        icon: account.icon,
+                                        color: Color(hex: account.color),
+                                        isInvestment: account.kind == .investment
+                                    ) {
+                                        HouseholdPickerToggle(isOn: binding(for: account.id))
+                                    }
+                                    if selection.contains(account.id) {
+                                        HouseholdHistoryToggleRow(isOn: historyBinding(for: account.id))
+                                            .transition(.opacity.combined(with: .move(edge: .top)))
+                                    }
                                 }
+                                .animation(AppTheme.Motion.standard, value: selection.contains(account.id))
                             }
                         }
                     }
@@ -59,6 +68,38 @@ struct HouseholdAccountPicker<Footer: View>: View {
                 if isOn { selection.insert(id) } else { selection.remove(id) }
             }
         )
+    }
+
+    private func historyBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { fullHistory.contains(id) },
+            set: { isOn in
+                if isOn { fullHistory.insert(id) } else { fullHistory.remove(id) }
+            }
+        )
+    }
+}
+
+/// The second question an account asks once it is switched on: does the
+/// household see what happened on it before today? Off by default (user's
+/// decision, 2026-09-23) — sharing an account's future is the ordinary case,
+/// and handing over its whole past should be a choice someone made.
+///
+/// Indented to the account's name, so it reads as belonging to the row
+/// above it rather than as one more account.
+struct HouseholdHistoryToggleRow: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(spacing: AppTheme.Spacing.m) {
+            Text("Include past transactions")
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Palette.textSecondary)
+            Spacer(minLength: AppTheme.Spacing.s)
+            HouseholdPickerToggle(isOn: $isOn)
+        }
+        .padding(.leading, AppTheme.Size.dividerInset(icon: AppTheme.Size.icon, leading: 0))
+        .padding(.bottom, AppTheme.Spacing.xs)
     }
 }
 
@@ -123,9 +164,10 @@ struct HouseholdCategoryPicker<Footer: View>: View {
 // MARK: - Shared shell
 
 /// The page both pickers are: a title, an optional sentence explaining the
-/// consequence, and grouped cards of switches. The intro screen now carries
-/// the explanation, so both pickers pass `subtitle: nil` and the row of
-/// switches sits directly under the heading.
+/// consequence, and grouped cards of switches. The intro screen carries the
+/// explanation, so the categories picker passes `subtitle: nil`; the accounts
+/// picker keeps one sentence the intro cannot, about how much of each
+/// account's history the household sees.
 private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
     let title: String
     let subtitle: String?

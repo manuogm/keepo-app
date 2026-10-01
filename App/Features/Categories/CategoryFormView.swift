@@ -20,6 +20,18 @@ import SwiftUI
 struct CategoryFormView: View {
     let session: SessionStore
     var mode: Mode = .create(kind: .expense)
+    /// The user's own categories, for the duplicate check — the caller has
+    /// them loaded already, and a form that had to fetch them would be a
+    /// second read of a list the screen behind it is currently drawing.
+    var existing: [PublicSchema.CategoriesSelect] = []
+    /// The id of the category this form just created, for a caller that has
+    /// to act on the new row rather than merely reload — the transaction
+    /// form's picker selects it, because somebody who made a category while
+    /// filing a transaction has already chosen it. Never fires for an edit.
+    ///
+    /// Declared before `onSaved` so that stays the trailing closure every
+    /// existing caller passes it as.
+    var onCreated: (UUID) -> Void = { _ in }
     var onSaved: () -> Void
 
     enum Mode {
@@ -133,14 +145,12 @@ struct CategoryFormView: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
                 }
             }
+            // Saving the catalogue counts as choosing: from that point the
+            // name-driven suggestion stops overriding what is on screen,
+            // whether the user changed it or confirmed it. A cancelled visit
+            // chose nothing, so the suggestion keeps working.
             .sheet(isPresented: $isPickingIcon) {
-                IconCatalogView(icon: $icon, color: $color)
-            }
-            // Visiting the catalogue at all counts as choosing: from that
-            // point the name-driven suggestion stops overriding what is on
-            // screen, whether the user changed it or confirmed it.
-            .onChange(of: isPickingIcon) { _, isPresented in
-                if !isPresented { hasPickedIcon = true }
+                IconCatalogView(icon: $icon, color: $color) { hasPickedIcon = true }
             }
             .alert("Delete \"\(name)\"?", isPresented: $showDeleteConfirm) {
                 Button("Delete", role: .destructive) {
@@ -156,6 +166,15 @@ struct CategoryFormView: View {
                 )
             }
         }
+        // A new category is an icon and a name, and a full-height sheet left
+        // most of the screen empty under them. `.medium` rather than a
+        // measured height: iOS 26's floating sheet does not report a
+        // container that tracks a `.height` detent, so a measured sheet
+        // clipped the name field. The content scrolls, so a larger Dynamic
+        // Type size still reaches it. Editing keeps the full sheet: its
+        // Delete button is pinned to the bottom edge.
+        .presentationDetents(isEditing ? [.large] : [.medium])
+        .presentationDragIndicator(isEditing ? .automatic : .visible)
         .task { prefill() }
     }
 
@@ -197,21 +216,51 @@ struct CategoryFormView: View {
     private func save() async {
         isSaving = true
         errorMessage = nil
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        // Refused here rather than by `categories_one_name_per_kind` after
+        // the sheet has closed. This write goes through the outbox, so a
+        // server-side rejection would surface minutes later as a failed
+        // sync on a category the user believes they created — the same
+        // reasoning `TagsListView.commitRename` states for tags.
+        guard !isDuplicate(trimmed) else {
+            errorMessage = "You already have \(kind == .income ? "an income" : "an expense") category called "
+                + "\"\(trimmed)\"."
+            isSaving = false
+            return
+        }
         let resolvedColor = color.hexString ?? CategoryAppearance.randomColor()
         switch mode {
         case .create:
             guard let userId = session.profile?.id else { return }
             let payload = CreateCategoryPayload(
-                id: UUID(), ownerId: userId, kind: kind, name: name, icon: icon, color: resolvedColor
+                id: UUID(), ownerId: userId, kind: kind, name: trimmed, icon: icon, color: resolvedColor
             )
             await session.outbox.submitCreateCategory(payload)
+            onCreated(payload.id)
         case .edit(let category):
-            let payload = UpdateCategoryPayload(id: category.id, name: name, icon: icon, color: resolvedColor)
+            let payload = UpdateCategoryPayload(id: category.id, name: trimmed, icon: icon, color: resolvedColor)
             await session.outbox.submitUpdateCategory(payload)
         }
         onSaved()
         dismiss()
         isSaving = false
+    }
+
+    /// Compares the way the index does — trimmed, case-insensitive, within
+    /// one kind, over live rows only. The two kinds are separate
+    /// namespaces on purpose: "Gift" as an expense and "Gift" as income is
+    /// two different categories, not one mistake.
+    private func isDuplicate(_ candidate: String) -> Bool {
+        let editingId: UUID? = {
+            if case .edit(let category) = mode { return category.id }
+            return nil
+        }()
+        return existing.contains { category in
+            category.id != editingId
+                && category.kind == kind
+                && category.deletedAt == nil
+                && category.name.trimmingCharacters(in: .whitespaces).lowercased() == candidate.lowercased()
+        }
     }
 
     /// Reads a live transaction count before showing the warning — offline,

@@ -7,6 +7,36 @@ import SwiftUI
 /// out of TransactionsListView.swift purely to keep that file under the
 /// project's file-length/type-body-length lint thresholds.
 extension TransactionsListView {
+    /// The window on screen — or `nil` for **All Time**, which is the
+    /// absence of a window rather than a very wide one. The query then
+    /// drops both bounds instead of inventing a start nobody chose, and
+    /// nothing downstream has to agree on how far back "everything" goes.
+    ///
+    /// **The custom branch is written defensively, and that is a fix
+    /// rather than a precaution.** `DateInterval(start:end:)` *traps* on a
+    /// reversed interval, and this used to read the two dates straight off
+    /// two independent pickers — setting From later than Through took the
+    /// app down, with no way back in but a relaunch. `CustomRangeSheet`
+    /// cannot produce that pair any more (a tap before the start begins a
+    /// new selection), and the `max` here is what guarantees nothing else
+    /// ever will.
+    ///
+    /// The custom end is the **start of the day after** `customThrough`,
+    /// not that day's last second: it matches what every other period
+    /// already does (`dateInterval(of:for:)` ends at the next period's
+    /// first instant) and it cannot lose a row in the final second of the
+    /// day the way a `23:59:59` bound can, since timestamps here carry
+    /// milliseconds.
+    var range: DateInterval? {
+        guard let component = period.component else {
+            guard !isAllTime else { return nil }
+            let start = calendar.startOfDay(for: customFrom)
+            let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: customThrough)) ?? start
+            return DateInterval(start: start, end: max(start, end))
+        }
+        return calendar.dateInterval(of: component, for: anchor) ?? DateInterval(start: anchor, duration: 0)
+    }
+
     /// Adopts a period another screen asked for — the Cashflow widget's
     /// category chevron — and clears the request.
     ///
@@ -14,17 +44,70 @@ extension TransactionsListView {
     /// comes back to this tab, long after they changed it to something else.
     func applyPendingRequest() {
         guard let navigation, let request = navigation.transactionsRequest else { return }
-        filter.categoryId = request.categoryId
-        filter.kind = request.kind
+        // One value each, as a set of one — the widget asks about a single
+        // category and a single direction, and `TransactionFilter` holds
+        // every axis as a set now.
+        filter.categoryIds = request.categoryId.map { [$0] }
+        filter.kinds = request.kind.map { [$0] }
         period = .custom
+        isAllTime = false
         customFrom = request.from
         customThrough = request.through
+        originRequest = request
         navigation.transactionsRequest = nil
         // The ask came from another screen, so the controls that produced
         // this state are not the ones on screen — open the panel so the
-        // period and category the user is now looking at are visible rather
-        // than hidden behind the funnel.
-        isFiltersExpanded = true
+        // category the user is now looking at is visible rather than hidden
+        // behind the funnel. Only for a category or a type: the period the
+        // request also sets is on the always-visible bar now, so a request
+        // that narrows nothing else has nothing to reveal.
+        if filter.categoryIds != nil || filter.kinds != nil {
+            isFiltersExpanded = true
+        }
+    }
+
+    /// Whether the ledger on screen is still the slice the dashboard asked
+    /// for — and so whether the header's back chevron would still be
+    /// telling the truth about where it goes.
+    ///
+    /// Compared against the request rather than tracked with a flag. The
+    /// user can undo the hand-over with any control in the filter panel,
+    /// and a flag would have to be cleared from every one of them — the
+    /// category menu, the kind menu, all five period segments, the stepper
+    /// and the range sheet — which is six places to forget. Comparing the
+    /// state to what was asked for cannot be forgotten anywhere.
+    ///
+    /// Only the fields the request actually sets are compared. Narrowing
+    /// further by account or by search is still the same drill-down seen
+    /// more closely, so the way back survives it.
+    var isShowingHandedOverSlice: Bool {
+        guard let originRequest else { return false }
+        return filter.categoryIds == originRequest.categoryId.map { [$0] }
+            && filter.kinds == originRequest.kind.map { [$0] }
+            && period == .custom
+            && !isAllTime
+            && customFrom == originRequest.from
+            && customThrough == originRequest.through
+    }
+
+    /// Back to the dashboard the category chevron came from, or `nil` when
+    /// there is nothing to go back to and the header draws no chevron.
+    ///
+    /// **A tab switch is all it takes, and that is not a shortcut.** The
+    /// hand-over was itself a tab switch (`AppNavigation.openTransactions`),
+    /// and `MainTabView` keeps all four tabs mounted — so Home's
+    /// `DashboardCanvasView` was never torn down. Its `expandedId`, its
+    /// expansion step, and the Cashflow widget's own direction and
+    /// highlighted bucket are all still exactly as they were left. There is
+    /// no state to restore, and anything that tried to restore it would be
+    /// a second source of truth for it.
+    ///
+    /// The filter is deliberately **not** cleared on the way out: coming
+    /// back to this tab later should find the ledger where it was left,
+    /// chevron included.
+    var backToDashboard: (() -> Void)? {
+        guard isShowingHandedOverSlice, let navigation else { return nil }
+        return { navigation.tab = .home }
     }
 
     /// Picking "Custom" opens the range sheet; *becoming* custom does not.
@@ -46,19 +129,20 @@ extension TransactionsListView {
         )
     }
 
+    /// The range picker itself lives in `CustomRangeSheet.swift` — it is a
+    /// calendar rather than two fields now, and it edits a **draft** it
+    /// only commits on Done, so the ledger behind it does not reload
+    /// against a half-made selection.
     var customRangeSheet: some View {
-        NavigationStack {
-            Form {
-                DatePicker("From", selection: $customFrom, displayedComponents: .date)
-                DatePicker("Through", selection: $customThrough, displayedComponents: .date)
+        CustomRangeSheet(
+            from: customFrom, through: customThrough, isAllTime: isAllTime
+        ) { selection in
+            isAllTime = selection.isAllTime
+            if let range = selection.range {
+                customFrom = range.lowerBound
+                customThrough = range.upperBound
             }
-            .navigationTitle("Custom Range")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { isCustomRangePresented = false } label: { Image(systemName: "checkmark") }
-                }
-            }
+            isCustomRangePresented = false
         }
     }
 
@@ -71,8 +155,13 @@ extension TransactionsListView {
             return formatter.string(from: anchor)
         case .week:
             formatter.dateFormat = "MMM d"
-            let end = calendar.date(byAdding: .day, value: -1, to: range.end) ?? range.end
-            return "\(formatter.string(from: range.start)) – \(formatter.string(from: end))"
+            // Built from the anchor rather than from `range`, which is
+            // optional now — a week is never All Time, but a `guard` here
+            // to say so would be answering a question nobody asked.
+            let week = calendar.dateInterval(of: .weekOfYear, for: anchor)
+            let start = week?.start ?? anchor
+            let end = week.flatMap { calendar.date(byAdding: .day, value: -1, to: $0.end) } ?? anchor
+            return "\(formatter.string(from: start)) – \(formatter.string(from: end))"
         case .month:
             formatter.dateFormat = "MMMM yyyy"
             return formatter.string(from: anchor)
@@ -80,8 +169,13 @@ extension TransactionsListView {
             formatter.dateFormat = "yyyy"
             return formatter.string(from: anchor)
         case .custom:
+            guard !isAllTime else { return "All Time" }
             formatter.dateFormat = "MMM d, yyyy"
-            return "\(formatter.string(from: customFrom)) – \(formatter.string(from: customThrough))"
+            let from = formatter.string(from: customFrom)
+            // One day picked twice is one day, and saying it twice reads as
+            // a mistake in the app rather than a range the user chose.
+            let through = formatter.string(from: customThrough)
+            return from == through ? from : "\(from) – \(through)"
         }
     }
 

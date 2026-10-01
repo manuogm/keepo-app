@@ -125,5 +125,59 @@ extension LocalStore {
         // device drops the column from its whitelist intersection, and every
         // pulled category then hits a NOT NULL violation on insert.
         migrator.registerMigration("v15_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260923100000 adds
+        // transactions.original_amount_e4/original_currency server-side.
+        // Additive, so nothing hard-fails; a stale device would silently
+        // drop both from every pulled transaction (`SyncApply` intersects
+        // its whitelist with the local schema), and a purchase made abroad
+        // would lose the record of what was actually paid — on that device
+        // only, while the other phone showed it. A mirror that quietly
+        // holds less than the server is the failure mode this whole list
+        // exists for.
+        migrator.registerMigration("v16_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260927100000 adds
+        // recurring_rules.to_account_id server-side AND drops NOT NULL from
+        // recurring_rules.category_id. Both halves matter, and the second is
+        // the one that hard-fails: a stale device keeps `category_id NOT
+        // NULL`, so every pulled TRANSFER rule — which has none — hits a NOT
+        // NULL violation on insert and takes the whole pull down with it.
+        // The first half is the quieter failure this list is mostly about:
+        // the new column would be dropped from the whitelist intersection,
+        // leaving a transfer rule that points at no destination.
+        migrator.registerMigration("v17_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260928100000 adds
+        // profiles.time_zone server-side. Additive, so nothing hard-fails; a
+        // stale device would silently drop it from every pulled profile
+        // (`SyncApply` intersects its whitelist with the local schema), and
+        // the mirror would hold less than the server about which calendar the
+        // user's recurring rules are rendered against.
+        migrator.registerMigration("v18_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20260930100000 adds
+        // recurring_rules.notes and the whole `recurring_rule_tags` table
+        // server-side. The table is the half that hard-fails without this:
+        // `SyncApply` skips a table the local schema does not have, so the
+        // rule's tags would be pulled and silently dropped, and the form
+        // would open showing none of them.
+        migrator.registerMigration("v19_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20261005100000 adds
+        // transactions.title and recurring_rules.title server-side. Additive,
+        // so nothing hard-fails; a stale device would silently drop both from
+        // every pulled row (`SyncApply` intersects its whitelist with the
+        // local schema), and a title typed on one phone would simply never
+        // appear on the other — the mirror holding less than the server,
+        // which is what every entry in this list exists to prevent.
+        migrator.registerMigration("v20_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20261008100000 adds
+        // sync_conflicts.attempted_payload. Without it a stale device drops
+        // the column (`SyncApply` intersects its whitelist with the local
+        // schema), and "Keep mine" has nothing to replay for any conflict
+        // it pulls.
+        migrator.registerMigration("v21_rebuild_syncable_tables", migrate: rebuildSyncableTables)
+        // Same rebuild again — migration 20261009100000 adds
+        // household_accounts.history_from. A stale device would drop it
+        // (`SyncApply` intersects its whitelist with the local schema), so a
+        // partner's phone would never learn where their view of an account
+        // begins: no purge of older rows, no date limit on the forms.
+        migrator.registerMigration("v22_rebuild_syncable_tables", migrate: rebuildSyncableTables)
     }
 }

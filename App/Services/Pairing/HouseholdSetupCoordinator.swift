@@ -88,8 +88,7 @@ final class HouseholdSetupCoordinator {
     /// `HouseholdSetupCoordinator+Teardown.swift` — `pairing` and `role`
     /// beside it already are.
     let session: SessionStore
-    private let selectedAccountIds: [UUID]
-    private let selectedCategoryIds: [UUID]
+    private let choices: HouseholdShareChoices
     /// Kept so the report can tell an original category from a twin that
     /// `accept_invite` auto-created — see `autoMergeCategories()`.
     private(set) var mergedGroupIds: Set<UUID> = []
@@ -112,14 +111,12 @@ final class HouseholdSetupCoordinator {
         session: SessionStore,
         pairing: HouseholdPairingSession,
         role: HouseholdPairingIdentity.Role,
-        accountIds: [UUID],
-        categoryIds: [UUID]
+        choices: HouseholdShareChoices
     ) {
         self.session = session
         self.pairing = pairing
         self.role = role
-        self.selectedAccountIds = accountIds
-        self.selectedCategoryIds = categoryIds
+        self.choices = choices
     }
 
     // MARK: - Running
@@ -174,8 +171,9 @@ final class HouseholdSetupCoordinator {
             try await self.ensureHousehold()
             let token = try await HouseholdRepository.createInvite(
                 client: self.session.client,
-                accountIds: self.selectedAccountIds,
-                categoryIds: self.selectedCategoryIds
+                accountIds: self.choices.accountIds,
+                categoryIds: self.choices.categoryIds,
+                fullHistoryAccountIds: self.choices.fullHistoryAccountIds
             )
             self.pairing.send(.invite(token: token))
         }
@@ -245,8 +243,9 @@ final class HouseholdSetupCoordinator {
         try await HouseholdRepository.acceptInvite(
             client: session.client,
             token: token,
-            accountIds: selectedAccountIds,
-            categoryIds: selectedCategoryIds
+            accountIds: choices.accountIds,
+            categoryIds: choices.categoryIds,
+            fullHistoryAccountIds: choices.fullHistoryAccountIds
         )
         hasJoined = true
         await session.syncNow()
@@ -273,7 +272,10 @@ final class HouseholdSetupCoordinator {
                     reason ?? "\(peer?.resolvedName ?? "The other phone") stopped before the household was built."
                 )
                 return
-            case .identity, .invite, .joined:
+            // Code messages never reach here: the session answers them and
+            // does not deliver them. Listed, not defaulted, so a new message
+            // keeps failing this switch until somebody decides about it.
+            case .identity, .invite, .joined, .codeProof, .codeAccepted, .codeRejected:
                 continue
             }
         }
@@ -345,14 +347,16 @@ final class HouseholdSetupCoordinator {
         while let message = await pairing.nextMessage() {
             switch message {
             case .invite(let token): return token
-            case .cancelled(let reason): throw HouseholdLinkError.stopped(reason)
+            // **Not fatal here, unlike every other `.cancelled` arm**: the
+            // owner burning the code sends this before offering a new one, so
+            // this loop must still be listening when the guest types it.
+            // Throwing killed the guest's only reader and hung the ceremony.
+            case .cancelled: continue
             // The owner announces the first phase *before* it mints the
-            // token, so this arrives first. Dropping it — which the obvious
-            // `default: continue` does — leaves the guest on the discovery
-            // screen until the token lands, and the two phones visibly start
-            // the ceremony at different moments.
+            // token, so this arrives first. Dropping it leaves the guest on
+            // discovery until the token lands, starting the two phones apart.
             case .phase(let announced): try await renderPhase(announced)
-            case .identity, .joined, .finished: continue
+            case .identity, .joined, .finished, .codeProof, .codeAccepted, .codeRejected: continue
             }
         }
         throw HouseholdLinkError.lost
@@ -389,7 +393,7 @@ final class HouseholdSetupCoordinator {
     /// fallback has to run exactly the same one without a coordinator.
     private func autoMergeCategories() async throws {
         mergedGroupIds = try await HouseholdAutoMerge.run(
-            session: session, selectedCategoryIds: selectedCategoryIds
+            session: session, selectedCategoryIds: choices.categoryIds
         )
     }
 }

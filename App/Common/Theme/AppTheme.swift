@@ -106,12 +106,21 @@ extension AppTheme {
         static let avatar: CGFloat = 56
         /// 80 — the mark an empty state is built around.
         static let illustration: CGFloat = 80
+        /// 140 — an avatar that is the subject of the screen rather than a
+        /// marker on it: onboarding's profile step, where it and one text
+        /// field are the only things present and `illustration` left the
+        /// screen looking mostly empty.
+        static let avatarHero: CGFloat = 140
         /// 280 — how wide a bubble of wrapping prose may be: an info
         /// popover. The one member here that is not a square, and it earns
         /// its place for the same reason as the rest — the alternative is
         /// the number being retyped, differently, at every screen that
         /// explains itself.
         static let proseWidth: CGFloat = 280
+        /// 36 × 5 — the system sheet's drag indicator, for a panel that
+        /// slides up like a sheet without being one (the widget catalogue)
+        /// and has to draw its own.
+        static let grabber = CGSize(width: 36, height: 5)
 
         /// The leading inset that lines a `Divider` up with the text beside
         /// a row's leading icon, rather than with the icon itself.
@@ -152,6 +161,14 @@ extension AppTheme {
         static let dim: Double = 0.35
         /// 0.5 — disabled, or half-there.
         static let muted: Double = 0.5
+        /// 0.6 — a coach mark's scrim. The only value on this scale that
+        /// exists to make the app behind it *unreadable* rather than
+        /// quieter, which is why it sits past `muted` and why nothing but
+        /// `SpotlightOverlay` uses it: a modal curtain in Keepo is
+        /// `.ultraThinMaterial` over `fill` (see `MappedCardSheet`), which
+        /// deliberately keeps its background legible as context. A spotlight
+        /// wants the opposite.
+        static let scrim: Double = 0.6
     }
 }
 

@@ -23,7 +23,16 @@ extension AppTheme {
     /// difference nobody could name the reason for.
     enum Typography {
         /// The one big title on a screen that has one.
-        static let screenTitle = Font.largeTitle.weight(.bold)
+        ///
+        /// `.title`, not `.largeTitle`. At 34pt almost every screen title in
+        /// the app wrapped to two lines on a 6.1" phone — "Choose your
+        /// starting categories", "Automatic payment detection", "Create your
+        /// first account" — which cost a whole line of vertical space on
+        /// screens that then had to compress everything under it. At 28pt
+        /// most of them fit on one line and the ones that do not are
+        /// genuinely long. It is still unambiguously the largest text on any
+        /// screen that has one.
+        static let screenTitle = Font.title.weight(.bold)
         /// A section heading inside a screen or sheet.
         static let sectionTitle = Font.title2.weight(.semibold)
         /// A card's or a widget's own title.

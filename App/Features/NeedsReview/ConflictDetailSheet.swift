@@ -18,10 +18,15 @@ import SwiftUI
 /// threshold — same reasoning as `TransactionsListView`'s own split.
 ///
 /// "Keep Mine" is intentionally scoped to what this app's conflicts
-/// actually are: a transaction re-submits its current local edit; an
+/// actually are: a transaction replays the write the server rejected, kept
+/// on the conflict row since migration 20261008100000 (`attempted_payload`)
+/// — edit, review, confirm or delete, ledger row or transfer alike; an
 /// account re-submits its archived flag, the one account field a version
 /// conflict has actually been observed to come from (a local delete/
-/// unavailable row disables the option rather than guessing).
+/// unavailable row disables the option rather than guessing). A transaction
+/// conflict recorded before that migration falls back to this device's copy
+/// of the row, which cannot describe a transfer, so a transfer without a
+/// record is not offered "Keep Mine" at all.
 struct ConflictDetailSheet: View {
     let session: SessionStore
     let conflictId: UUID
@@ -42,7 +47,12 @@ struct ConflictDetailSheet: View {
 
     private var canKeepMine: Bool {
         guard let detail else { return false }
-        return detail.tableName == "accounts" ? myAccount != nil : myTransaction != nil
+        if detail.tableName == "accounts" { return myAccount != nil }
+        if detail.attemptedWrite != nil { return true }
+        // A conflict recorded before 20261008100000 kept no record of the
+        // attempt. A ledger edit can still be rebuilt from this device's
+        // copy; a transfer cannot, so it is not offered.
+        return myTransaction != nil && myTransaction?.transferGroupId == nil
     }
 
     private var subjectName: String {

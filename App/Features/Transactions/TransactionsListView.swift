@@ -31,42 +31,97 @@ struct TransactionsListView: View {
     // Not `private` — read/written from TransactionsListView+Loading.swift,
     // an extension in a different file (kept there purely for file-length).
     @State var transactions: [PublicSchema.TransactionsWithDetailsSelect] = []
+    /// Transfers this device holds both halves of — see `canDelete(_:)`.
+    @State var completeTransferGroups: Set<UUID> = []
     @State var isLoading = true
     @State var loadErrorMessage: String?
     @State var filterCategories: [PublicSchema.CategoriesSelect] = []
     @State var filterAccounts: [LocalAccountRow] = []
     @State private var isAddingTransaction = false
-    @State private var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
-    @State private var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
-    @State private var editingRecurringRule: PublicSchema.RecurringRulesSelect?
+    // Not `private` — read/written from TransactionsListView+Adding.swift,
+    // which owns what a tap on a row opens.
+    @State var editingTransaction: PublicSchema.TransactionsWithDetailsSelect?
+    @State var recurringEditChoice: PublicSchema.TransactionsWithDetailsSelect?
+    @State var editingRecurringRule: PublicSchema.RecurringRulesSelect?
     @State var filter = TransactionFilter()
     // Not `private` — read/written from TransactionsListView+Filters.swift.
     @State var isSearching = false
+    /// Not `private` for the same reason, and `@FocusState` rather than a
+    /// `@State` flag because only the field can own whether it holds the
+    /// keyboard — see `searchField`, which claims it as it appears.
+    @FocusState var isSearchFieldFocused: Bool
+    /// The picker the pinned row's chevron opens; its body opens the form.
+    @State var isAccountPickerPresented = false
+    @State var editingAccountId: UUID?
+    /// Which of the drop-down's multi-select sheets is open, if any.
+    @State var activeFilterSheet: TransactionFilterSheet?
+    /// Who the "Added by" filter may offer — empty without a paired household,
+    /// which is also what hides that pill (`TransactionAuthors`).
+    @State var authors: [TransactionAuthor] = []
+    /// Which sources this ledger actually holds. Fewer than two and the Source
+    /// pill is hidden, for the reason the "Added by" pill hides without a
+    /// household: an axis with one option cannot narrow anything.
+    @State var availableSources: [PublicSchema.TransactionSource] = []
+    /// The scope's net worth, for the pinned row and the picker's "All
+    /// accounts". `load()` computes it through `LocalMoneyConversion.netWorth`,
+    /// the Home hero's own read, never by summing what is on screen — those
+    /// rows are one period of one filter, and a balance is neither. Not cleared
+    /// when a load starts, so stepping months does not flash an em dash.
+    @State var allAccountsBalance: AccountFilterBalance?
     /// Whether the header's filter panel is showing. Owned here rather than
     /// by the banner: `applyPendingRequest` opens it when another screen
     /// hands this one a filter, so the state has to outlive the button.
     @State var isFiltersExpanded = false
+    /// The slice another screen handed this one, kept **after** it has been
+    /// applied so the header can offer the way back to where it came from.
+    ///
+    /// Deliberately not the same thing as `AppNavigation.transactionsRequest`,
+    /// which is cleared the moment it is consumed so it cannot re-apply
+    /// itself on a later visit. This is the memory of that hand-over, and
+    /// `isShowingHandedOverSlice` is what decides whether it is still true.
+    ///
+    /// Not `private` — read/written from TransactionsListView+Period.swift.
+    @State var originRequest: TransactionsRequest?
     /// Whether the Needs Review drawer has taken over the screen. Owned here
     /// because the ledger is what it takes over *from* — the drawer cannot
     /// hide a sibling it does not own.
     @State private var isInboxExpanded = false
-    @State private var groupedByDay: [DayGroup] = []
-    @State private var categoriesById: [UUID: PublicSchema.CategoriesSelect] = [:]
+    // Not `private` — derived by `regroup()` in TransactionsListView+Loading.swift,
+    // which is where the load that produces them lives.
+    @State var groupedByDay: [DayGroup] = []
+    @State var categoriesById: [UUID: PublicSchema.CategoriesSelect] = [:]
 
     // Not `private` — read/written from TransactionsListView+Period.swift.
     @State var period: Period = .month
     @State var anchor = Date()
     @State var customFrom = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State var customThrough = Date()
+    /// Custom's third state: no bounds at all. Not a sixth period pill —
+    /// six options do not fit the track's one row — and not a very wide
+    /// range either, which is the point: see `range`.
+    @State var isAllTime = false
     @State var isCustomRangePresented = false
+    /// The pre-filled Export sheet — see TransactionsListView+Export.swift.
+    @State var exportRequest: ExportRequest?
 
-    /// The filter pills' fixed width — the fix for the distortion
-    /// `pillLabel` documents, and the reason it is a *width* rather than a
-    /// minimum. `@ScaledMetric` so a chip still fits its own label at larger
-    /// Dynamic Type sizes instead of truncating "Categories" at AX1.
+    /// The filter pills' width while **unset** — wide enough for the longest
+    /// axis name, and the same for all three so they read as one control.
+    /// `@ScaledMetric` so a chip still fits its own label at larger Dynamic
+    /// Type sizes instead of truncating the axis name at AX1.
     ///
     /// Not `private` — read from TransactionsListView+Filters.swift.
     @ScaledMetric(relativeTo: .subheadline) var pillWidth: CGFloat = 104
+    /// The width of a pill that has an answer on it, which needs more room:
+    /// the label goes from "Category" to a category's name or "Category · 2",
+    /// in semibold. Three unset pills plus the search button fit a 402pt row
+    /// exactly; three *answered* ones do not, and scroll — which is the right
+    /// way round, since the row only outgrows the screen once the user has
+    /// actually narrowed something.
+    ///
+    /// Two fixed widths rather than one flexible one: a pill that sizes to its
+    /// own text makes the row re-lay itself out on every pick, and a `minWidth`
+    /// does the same thing more quietly. Not `private`, same reason as above.
+    @ScaledMetric(relativeTo: .subheadline) var answeredPillWidth: CGFloat = 132
 
     // Not `private` — read from TransactionsListView+Period.swift.
     let calendar = Calendar.current
@@ -77,16 +132,11 @@ struct TransactionsListView: View {
     /// instead. Not `private` — read from TransactionsListView+Period.swift.
     @Environment(AppNavigation.self) var navigation: AppNavigation?
     @Environment(ScopeContext.self) private var scopeContext: ScopeContext?
+    /// Optional for the same reason as `navigation` above.
+    @Environment(FTUXCoordinator.self) private var ftux: FTUXCoordinator?
 
     // Not `private` — read from TransactionsListView+Filters.swift.
     var scope: PublicSchema.AccountScope { session.scope }
-
-    var range: DateInterval {
-        guard let component = period.component else {
-            return DateInterval(start: calendar.startOfDay(for: customFrom), end: customThrough)
-        }
-        return calendar.dateInterval(of: component, for: anchor) ?? DateInterval(start: anchor, duration: 0)
-    }
 
     /// Computed once per load into `@State`, never as a computed property
     /// read from `body`. SwiftUI re-evaluates a body on every unrelated
@@ -101,45 +151,22 @@ struct TransactionsListView: View {
         var id: Date { day }
     }
 
-    func regroup() {
-        // Transfer legs are folded into one entry BEFORE the day grouping,
-        // not inside it — both legs carry the same `occurred_at`, but the
-        // pairing is a property of the transfer, not of the day it landed on.
-        let groups = Dictionary(grouping: TransactionEntry.collapsingTransfers(transactions)) { entry -> Date in
-            guard
-                let occurredAt = entry.transaction.occurredAt,
-                let date = PostgresDate.date(fromTimestamp: occurredAt)
-            else { return .distantPast }
-            return calendar.startOfDay(for: date)
-        }
-        groupedByDay = groups.keys.sorted(by: >).map { day in DayGroup(day: day, items: groups[day] ?? []) }
-        // Same reasoning: the filter list is small but the lookup runs once
-        // per row per render, so it is built once here instead.
-        categoriesById = Dictionary(filterCategories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-    }
-
-    private func category(
-        for transaction: PublicSchema.TransactionsWithDetailsSelect
-    ) -> PublicSchema.CategoriesSelect? {
-        transaction.categoryId.flatMap { categoriesById[$0] }
-    }
-
     // MARK: - Body
 
     var body: some View {
-        listContent
+        ledgerWithFilterSheets
             .dropsBottomSafeArea()
             .toolbar(.hidden, for: .navigationBar)
             .onChange(of: navigation?.pendingAdd) { _, _ in
                 if navigation?.consumeAdd(.transactions) == true { isAddingTransaction = true }
             }
             .sheet(isPresented: $isAddingTransaction) {
-                TransactionFormView(session: session) {
+                TransactionFormView(session: session, seed: newTransactionSeed) {
                     session.refresh.bump()
                 }
             }
             .sheet(item: $editingTransaction) { transaction in
-                TransactionFormView(session: session, mode: .edit(transaction, sibling: sibling(of: transaction))) {
+                TransactionFormView(session: session, mode: .edit(transaction)) {
                     session.refresh.bump()
                 }
             }
@@ -160,21 +187,35 @@ struct TransactionsListView: View {
             .sheet(isPresented: $isCustomRangePresented) {
                 customRangeSheet
             }
+            .modifier(ExportSheetModifier(request: $exportRequest, session: session))
             .task(id: TransactionsLoadKey(
                 token: session.refresh.token, scope: session.scope, filter: filter, range: range
             )) { await load() }
+            // Its own task, not part of `load()`: resolving a partner's name
+            // can cost a network round trip on a first-ever read, and the
+            // ledger must not wait behind it. Keyed on the refresh token
+            // alone, so pairing or dissolving a household re-reads it while
+            // changing a filter or a period does not.
+            .task(id: session.refresh.token) { await loadAuthors() }
             // Another screen asking for a specific slice of the ledger — the
             // Cashflow widget's category chevron. `onAppear` as well as
             // `onChange` because the request is set in the same turn as the
             // tab switch, and this screen may not have been on screen to
             // observe the change.
             .onAppear { applyPendingRequest() }
+            // Only with a row to point at. The inbox drawer offers its own
+            // lesson when it has something in it — see `NeedsReviewPanel`.
+            .onAppear { Task { await offerLessons() } }
+            .task(id: firstTransactionId) { await offerLessons() }
             .onChange(of: navigation?.transactionsRequest) { _, _ in applyPendingRequest() }
     }
 
     // MARK: - Content
 
-    private var listContent: some View {
+    // Not `private` — wrapped by `ledgerWithFilterSheets` in
+    // TransactionsListView+FilterBar.swift, which attaches the filter
+    // controls' own sheets.
+    var listContent: some View {
         ZStack {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
 
@@ -183,8 +224,9 @@ struct TransactionsListView: View {
                     title: "Transactions",
                     session: session,
                     isFiltersExpanded: isFiltersExpanded,
+                    onBack: backToDashboard,
                     onOpenProfile: { navigation?.openProfileRoot() },
-                    accessory: { filterToggle },
+                    accessory: { headerActions },
                     filters: { filterPanel }
                 )
                 .zIndex(1)
@@ -200,8 +242,17 @@ struct TransactionsListView: View {
                     .zIndex(0)
 
                 if !isInboxExpanded {
+                    // Pinned rather than scrolling with the list: these
+                    // two say what the list is, and an explanation that
+                    // scrolls off is not one. Below the drawer because they
+                    // are the *ledger's* controls — when the inbox takes the
+                    // screen there is no list left for them to filter.
+                    filterBar
+                        .padding(.horizontal, AppTheme.Spacing.l)
+                        .padding(.top, AppTheme.Spacing.s)
+
                     ledger
-                        .padding(.top, AppTheme.Spacing.xs)
+                        .padding(.top, AppTheme.Spacing.s)
                         .fadingEdges()
                         .transition(.opacity)
                 }
@@ -219,8 +270,10 @@ struct TransactionsListView: View {
             Spacer()
         } else if transactions.isEmpty {
             Spacer()
-            Text("No transactions in this period")
+            Text(emptyLedgerMessage)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, AppTheme.Spacing.l)
             Spacer()
         } else {
             transactionList
@@ -254,6 +307,23 @@ struct TransactionsListView: View {
                             )
                         }
                         .buttonStyle(.pressableRow)
+                        // The top row is what the swipe coach mark cuts its
+                        // hole around, and it stays swipeable underneath —
+                        // so a touch on it is the lesson being performed,
+                        // and ends it. Zero distance for the reason the
+                        // accounts row uses zero: a list claims a drag
+                        // before a competing gesture reaches any threshold.
+                        .ftuxAnchor(
+                            transaction.transactionId == firstTransactionId
+                                ? FTUXLessons.swipeDelete : nil,
+                            expandedBy: Self.rowTileExpansion
+                        )
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { _ in ftux?.dismiss(FTUXLessons.swipeDelete) },
+                            including: transaction.transactionId == firstTransactionId
+                                && ftux?.isVisible(FTUXLessons.swipeDelete) == true ? .all : .none
+                        )
                         .swipeActions(edge: .trailing) {
                             // A second, quick path to confirm a capture,
                             // alongside the full review form's Save — only
@@ -268,6 +338,10 @@ struct TransactionsListView: View {
                                 .tint(AppTheme.Palette.textPrimary)
                             }
                         }
+                        // Half of a transfer whose other half is on an account
+                        // this viewer cannot see: `delete_transfer` would
+                        // refuse it, so the swipe is not offered at all.
+                        .deleteDisabled(!canDelete(entry))
                     }
                     .onDelete { offsets in
                         Task { await delete(at: offsets, in: group.items.map(\.transaction)) }
@@ -282,32 +356,26 @@ struct TransactionsListView: View {
         .refreshable { await load() }
     }
 
-    // MARK: - Transaction helpers
+    // MARK: - Coach marks
 
-    func sibling(
-        of transaction: PublicSchema.TransactionsWithDetailsSelect
-    ) -> PublicSchema.TransactionsWithDetailsSelect? {
-        guard let groupId = transaction.transferGroupId else { return nil }
-        return transactions.first { $0.transferGroupId == groupId && $0.transactionId != transaction.transactionId }
+    /// How far the white tile reaches past the row's own bounds.
+    ///
+    /// Unlike the Accounts list, this one lets the system draw each row's
+    /// card, and an inset-grouped `List` insets the content a good way
+    /// inside it. Without this the hole was 44×338 inside a tile of 55×369
+    /// — a highlight visibly smaller than the thing it highlights, which is
+    /// the one mistake a cut-out cannot get away with. Measured from a
+    /// screenshot rather than reasoned from the row's padding, because half
+    /// of it is the system's and not ours to read.
+    private static let rowTileExpansion = CGSize(width: AppTheme.Spacing.l, height: 6)
+
+    private var firstTransactionId: UUID? {
+        groupedByDay.first?.items.first?.transaction.transactionId
     }
 
-    private func handleTap(on transaction: PublicSchema.TransactionsWithDetailsSelect) {
-        if transaction.recurringRuleId != nil {
-            recurringEditChoice = transaction
-        } else {
-            editingTransaction = transaction
-        }
-    }
-
-    private var recurringChoiceBinding: Binding<Bool> {
-        Binding(get: { recurringEditChoice != nil }, set: { if !$0 { recurringEditChoice = nil } })
-    }
-
-    private func openRecurringRule(for transaction: PublicSchema.TransactionsWithDetailsSelect) async {
-        guard let ruleId = transaction.recurringRuleId else { return }
-        editingRecurringRule = try? await session.dbQueue.read { database in
-            try LocalTableQueries.recurringRule(database, id: ruleId.uuidString)
-        }
+    private func offerLessons() async {
+        guard firstTransactionId != nil else { return }
+        await ftux?.offer([FTUXLessons.swipeDelete])
     }
 }
 
@@ -318,11 +386,4 @@ extension PublicSchema.TransactionsWithDetailsSelect: Identifiable {
     /// a freshly-minted fallback identity does to a `List` row and to
     /// `.sheet(item:)`.
     public var id: UUID? { transactionId }
-}
-
-private struct TransactionsLoadKey: Equatable {
-    let token: Int
-    let scope: PublicSchema.AccountScope
-    let filter: TransactionFilter
-    let range: DateInterval
 }

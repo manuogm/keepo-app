@@ -37,22 +37,17 @@ enum CaptureQuickActionSuggestions {
     /// visit, or every past visit used the same category `excluding` just
     /// dropped) — and the primary source for the "category unknown" branch,
     /// where there's no learned category to exclude at all.
+    ///
+    /// The query itself is `LocalCategoryRanking.mostUsed` — the same one
+    /// the transaction form's suggested chips ask, since a capture and a
+    /// hand-typed entry are the same person filing the same purchase. This
+    /// stays as the name the capture path calls it by.
     static func topCategoriesForAccount(
         _ database: Database, ownerId: String, accountId: String, excluding: String?, limit: Int
     ) throws -> [CaptureLocalWrite.Suggestion] {
-        try Row.fetchAll(
-            database,
-            sql: """
-            SELECT t.category_id AS id, c.name AS name, COUNT(*) AS uses
-            FROM transactions t JOIN categories c ON c.id = t.category_id
-            WHERE t.owner_id = ? AND t.account_id = ? AND t.category_id IS NOT NULL
-              AND (? IS NULL OR t.category_id != ?) AND t.deleted_at IS NULL AND c.deleted_at IS NULL
-            GROUP BY t.category_id, c.name
-            ORDER BY uses DESC
-            LIMIT ?
-            """,
-            arguments: [ownerId, accountId, excluding, excluding, limit]
-        ).map(CaptureLocalWrite.Suggestion.init(row:))
+        try LocalCategoryRanking.mostUsed(
+            database, ownerId: ownerId, accountId: accountId, excluding: excluding, limit: limit
+        )
     }
 
     /// Candidates for "which account does this new card belong to" —

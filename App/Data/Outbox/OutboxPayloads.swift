@@ -5,26 +5,45 @@ import KeepoCore
 
 public struct CreateTransactionPayload: Codable, Sendable {
     public let id: UUID
+    /// The account's owner, who owns every row on it — not necessarily the
+    /// person entering it (`(account_id, owner_id)` is a foreign key).
     public let ownerId: UUID
+    /// Who entered it, when that is not the owner: a partner logging on the
+    /// owner's shared account. Nil means the owner, which is also what an
+    /// item queued before this existed decodes to.
+    public let createdBy: UUID?
     public let accountId: UUID
     public let categoryId: UUID
     public let amountE4: Int64
     public let currency: String
     public let occurredAt: Date
     public let notes: String?
+    /// Non-nil only for a purchase made in another currency. Optional in
+    /// the stored payload as well as in the type, so an item queued before
+    /// this existed still decodes — `decodeIfPresent` is what Swift
+    /// synthesizes for an `Optional` property.
+    public let original: ForeignOriginal?
+    /// The user's own name for the row, trimmed, or `nil` for none. Optional
+    /// in the stored payload too, so an item queued before titles existed
+    /// still decodes.
+    public let title: String?
 
     public init(
-        id: UUID, ownerId: UUID, accountId: UUID, categoryId: UUID, amountE4: Int64, currency: String,
-        occurredAt: Date, notes: String? = nil
+        id: UUID, ownerId: UUID, createdBy: UUID? = nil, accountId: UUID, categoryId: UUID, amountE4: Int64,
+        currency: String, occurredAt: Date, notes: String? = nil, original: ForeignOriginal? = nil,
+        title: String? = nil
     ) {
         self.id = id
         self.ownerId = ownerId
+        self.createdBy = createdBy
         self.accountId = accountId
         self.categoryId = categoryId
         self.amountE4 = amountE4
         self.currency = currency
         self.occurredAt = occurredAt
         self.notes = notes
+        self.original = original
+        self.title = title
     }
 }
 
@@ -41,10 +60,12 @@ public struct CreateTransferPayload: Codable, Sendable {
     /// Optional so an already-queued payload from before migration
     /// 20260904100000 still decodes.
     public let notes: String?
+    /// Both legs, like `notes`, and for the same reason.
+    public let title: String?
 
     public init(
         fromId: UUID, toId: UUID, fromAccountId: UUID, toAccountId: UUID,
-        fromAmountE4: Int64, toAmountE4: Int64?, occurredAt: Date, notes: String? = nil
+        fromAmountE4: Int64, toAmountE4: Int64?, occurredAt: Date, notes: String? = nil, title: String? = nil
     ) {
         self.fromId = fromId
         self.toId = toId
@@ -54,6 +75,7 @@ public struct CreateTransferPayload: Codable, Sendable {
         self.toAmountE4 = toAmountE4
         self.occurredAt = occurredAt
         self.notes = notes
+        self.title = title
     }
 }
 
@@ -67,10 +89,18 @@ public struct UpdateTransactionPayload: Codable, Sendable {
     public let occurredAt: Date
     public let merchantRaw: String?
     public let notes: String?
+    /// See `CreateTransactionPayload.original`. Passing `nil` on an edit
+    /// **clears** a stored original, which is how a row wrongly marked
+    /// foreign is corrected.
+    public let original: ForeignOriginal?
+    /// `nil` **clears** a title, the same way `original` and `notes` clear —
+    /// an edit states the whole row.
+    public let title: String?
 
     public init(
         id: UUID, expectedVersion: Int, accountId: UUID, categoryId: UUID,
-        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?, notes: String? = nil
+        amountE4: Int64, currency: String, occurredAt: Date, merchantRaw: String?, notes: String? = nil,
+        original: ForeignOriginal? = nil, title: String? = nil
     ) {
         self.id = id
         self.expectedVersion = expectedVersion
@@ -81,6 +111,8 @@ public struct UpdateTransactionPayload: Codable, Sendable {
         self.occurredAt = occurredAt
         self.merchantRaw = merchantRaw
         self.notes = notes
+        self.original = original
+        self.title = title
     }
 }
 
@@ -93,10 +125,18 @@ public struct UpdateTransferPayload: Codable, Sendable {
     public let occurredAt: Date
     /// See `CreateTransferPayload.notes` — same both-legs rule.
     public let notes: String?
+    public let title: String?
+    /// Where each leg should now be. Optional so a payload queued by a build
+    /// that predates moving a transfer still decodes (synthesized `Codable`
+    /// reads a missing optional key as `nil`), and `nil` is exactly what the
+    /// RPC reads as "unchanged".
+    public let fromAccountId: UUID?
+    public let toAccountId: UUID?
 
     public init(
         transferGroupId: UUID, fromExpectedVersion: Int, toExpectedVersion: Int,
-        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date, notes: String? = nil
+        fromAmountE4: Int64, toAmountE4: Int64, occurredAt: Date, notes: String? = nil, title: String? = nil,
+        fromAccountId: UUID? = nil, toAccountId: UUID? = nil
     ) {
         self.transferGroupId = transferGroupId
         self.fromExpectedVersion = fromExpectedVersion
@@ -105,6 +145,9 @@ public struct UpdateTransferPayload: Codable, Sendable {
         self.toAmountE4 = toAmountE4
         self.occurredAt = occurredAt
         self.notes = notes
+        self.title = title
+        self.fromAccountId = fromAccountId
+        self.toAccountId = toAccountId
     }
 }
 
@@ -115,35 +158,6 @@ public struct DeleteTransactionPayload: Codable, Sendable {
     public init(id: UUID, expectedVersion: Int) {
         self.id = id
         self.expectedVersion = expectedVersion
-    }
-}
-
-/// The App Intent's write, generalized into the outbox as its 7th
-/// operation (anticipated in Phase 11's log). No `expectedVersion` — a
-/// capture has nothing to conflict against, it's an insert-or-noop keyed by
-/// `externalId`, not an edit of an existing row.
-public struct CaptureTransactionPayload: Codable, Sendable {
-    public let id: UUID
-    public let cardIdentifier: String
-    public let merchantRaw: String
-    public let merchantNormalized: String
-    public let amountE4: Int64
-    public let occurredAt: Date
-    public let externalId: String
-    public let notes: String?
-
-    public init(
-        id: UUID, cardIdentifier: String, merchantRaw: String, merchantNormalized: String,
-        amountE4: Int64, occurredAt: Date, externalId: String, notes: String? = nil
-    ) {
-        self.id = id
-        self.cardIdentifier = cardIdentifier
-        self.merchantRaw = merchantRaw
-        self.merchantNormalized = merchantNormalized
-        self.amountE4 = amountE4
-        self.occurredAt = occurredAt
-        self.externalId = externalId
-        self.notes = notes
     }
 }
 

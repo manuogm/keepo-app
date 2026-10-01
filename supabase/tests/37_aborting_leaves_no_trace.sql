@@ -106,7 +106,12 @@ select is(
 );
 
 select is(
-  (select count(*) from household_accounts where deleted_at is null),
+  -- Only this file's accounts: the local database the suite runs against can
+  -- hold a household of its own.
+  (select count(*) from household_accounts ha
+   join accounts a on a.id = ha.account_id
+   where ha.deleted_at is null
+     and a.owner_id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222')),
   0::bigint,
   'and takes the listing down with it'
 );
@@ -143,7 +148,8 @@ select is(
 );
 
 select is(
-  (select count(*) from household_members where deleted_at is null),
+  (select count(*) from household_members where deleted_at is null
+   and user_id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222')),
   0::bigint,
   'neither of them is in a household any more'
 );

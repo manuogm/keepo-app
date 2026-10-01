@@ -232,17 +232,24 @@ struct UpcomingBillsWidget: View {
             HStack(spacing: AppTheme.Spacing.m) {
                 CategoryIconView(icon: item.categoryIcon, color: Color(hex: item.categoryColor))
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(item.categoryName)
+                    // Titled like the ledger row: the rule's own name first,
+                    // and the category pushed down beside the account rather
+                    // than dropped.
+                    Text(item.title ?? item.categoryName)
                         .font(AppTheme.Typography.label)
                         .foregroundStyle(AppTheme.Palette.textPrimary)
                         .lineLimit(1)
-                    Text("\(dueLabel(item.dueOn)) · \(item.accountName)")
+                    Text(
+                        [dueLabel(item.dueOn), item.title.map { _ in item.categoryName }, item.accountName]
+                            .compactMap { $0 }
+                            .joined(separator: " · ")
+                    )
                         .font(AppTheme.Typography.nano)
                         .foregroundStyle(AppTheme.Palette.textSecondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: AppTheme.Spacing.xs)
-                PrivateText(amountLabel(item.amountBaseE4))
+                PrivateText(amountLabel(item.amountBaseE4), spoken: amountLabel(item.amountBaseE4, exact: true))
                     .font(AppTheme.Typography.labelEmphasis)
                     .foregroundStyle(item.isInbound ? CashflowPalette.income : AppTheme.Palette.textPrimary)
             }
@@ -256,9 +263,16 @@ struct UpcomingBillsWidget: View {
 
     // MARK: - Helpers
 
-    /// Truncated to a UTC day, so it is stable across re-renders and lines up
-    /// with the date-only values the occurrences carry.
-    private var today: Date { utcCalendar.startOfDay(for: Date()) }
+    /// The **user's** calendar day, expressed in UTC so it lines up with the
+    /// date-only values the occurrences carry, and stable across re-renders.
+    ///
+    /// `utcCalendar.startOfDay(for: Date())` is the spelling this used to
+    /// have and is UTC's today, not the device's — so the ring marked "today"
+    /// was the wrong circle for anyone west of UTC from mid-afternoon on, and
+    /// the strip started a day late. See `PostgresDate.currentDateOnly`.
+    private var today: Date {
+        PostgresDate.currentDateOnly(in: utcCalendar) ?? utcCalendar.startOfDay(for: Date())
+    }
 
     private func accessibilityLabel(_ day: Date, items: [UpcomingTransactionLocal]) -> String {
         let date = PostgresDate.dateOnlyLabel(day, calendar: utcCalendar)
@@ -277,8 +291,9 @@ struct UpcomingBillsWidget: View {
     /// `.ledger`, so an outflow reads as its magnitude beside a row that
     /// already says which way it goes. The headline above keeps its sign,
     /// because there "up or down" is the whole answer.
-    private func amountLabel(_ amountE4: Int64?) -> String {
+    /// `exact` is the VoiceOver reading of the same figure.
+    private func amountLabel(_ amountE4: Int64?, exact: Bool = false) -> String {
         guard let currency else { return "—" }
-        return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger)
+        return MoneyFormatter.format(amountE4, currency: currency, signStyle: .ledger, exact: exact)
     }
 }

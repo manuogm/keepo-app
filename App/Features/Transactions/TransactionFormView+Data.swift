@@ -10,28 +10,60 @@ extension TransactionFormView {
     /// current, never needs a cache-fallback chain the way a network fetch
     /// used to.
     func load() async {
+        var legs: [PublicSchema.TransactionsWithDetailsSelect] = []
+        var heldCategory: PublicSchema.CategoriesSelect?
         if let ownerId = session.profile?.id, let baseCurrency = session.profile?.baseCurrency {
+            let edited: PublicSchema.TransactionsWithDetailsSelect? = {
+                guard case .edit(let transaction) = mode else { return nil }
+                return transaction
+            }()
+            let editedGroupId = edited?.transferGroupId?.uuidString
             let loaded = try? await session.dbQueue.read { database in
-                (
-                    try LocalAccountRow.fetchAll(database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency),
+                // Both legs first, so the accounts read can include the one
+                // a surviving half was left on even when it has been deleted.
+                let found = try editedGroupId.map {
+                    try LocalTransactionRow.fetchByTransferGroup(
+                        database, transferGroupId: $0, baseCurrency: baseCurrency, ownerId: ownerId.uuidString
+                    )
+                } ?? []
+                return (
+                    try LocalAccountRow.fetchAll(
+                        database, ownerId: ownerId.uuidString, baseCurrency: baseCurrency,
+                        alsoIncluding: found.compactMap { $0.accountId?.uuidString }
+                    ),
                     try LocalTableQueries.categories(database, ownerId: ownerId.uuidString),
-                    try LocalTableQueries.tags(database)
+                    try LocalTableQueries.tags(database),
+                    try LocalTableQueries.currencies(database),
+                    found,
+                    try edited?.categoryId.flatMap { try LocalTableQueries.category(database, id: $0.uuidString) }
                 )
             }
             accounts = loaded?.0 ?? []
             categories = loaded?.1 ?? []
             tagsById = Dictionary(uniqueKeysWithValues: (loaded?.2 ?? []).map { ($0.id, $0) })
+            currencies = loaded?.3 ?? []
+            legs = loaded?.4 ?? []
+            heldCategory = loaded?.5 ?? nil
         }
 
-        if case .edit(let transaction, let sibling) = mode {
-            apply(transaction: transaction, sibling: sibling)
+        if case .edit(let transaction) = mode {
+            apply(transaction: transaction, legs: legs)
+            adoptEditedCategory(heldCategory)
             await loadAppliedTags()
+            if addedByHouseholdMember {
+                await loadHouseholdMemberName()
+            }
         } else {
             seedCreateDefaults()
+            // Explicitly, rather than leaving it to the `.task(id:)`
+            // observer: that one fires before this load has an account to
+            // rank against, and whether it fires again depends on whether
+            // seeding happened to change the value it keys on.
+            await adoptContext()
         }
     }
 
-    /// Read after `apply(transaction:sibling:)`, which is what sets
+    /// Read after `apply(transaction:legs:)`, which is what sets
     /// `editingId`. `originalTagIds` is the baseline Save diffs against, so
     /// re-saving a transaction nobody re-tagged writes nothing at all.
     private func loadAppliedTags() async {
@@ -86,35 +118,19 @@ extension TransactionFormView {
         }
     }
 
-    /// A new transaction opens on something rather than on nothing: the
-    /// first account and the first category of the current kind. Both are
-    /// changeable in one tap, and pre-selecting them means the common case
-    /// (an expense on the account you use most) is amount-then-save.
-    private func seedCreateDefaults() {
-        if selectedAccountId == nil {
-            selectedAccountId = accounts.first { $0.archivedAt == nil }?.id
-        }
-        if selectedCategoryId == nil {
-            selectedCategoryId = categoriesForKind.first?.id
-        }
-    }
-
     /// Populates the form from a server row — the initial edit-mode prefill.
+    /// `legs` is every leg of the transfer this device holds, when the row is
+    /// one; empty otherwise.
     func apply(
         transaction: PublicSchema.TransactionsWithDetailsSelect,
-        sibling: PublicSchema.TransactionsWithDetailsSelect?
+        legs: [PublicSchema.TransactionsWithDetailsSelect]
     ) {
-        kind = {
-            switch transaction.kind {
-            case "income": return .income
-            case "transfer": return .transfer
-            default: return .expense
-            }
-        }()
+        kind = Kind(ledgerKind: transaction.kind)
 
         if let occurredAtString = transaction.occurredAt,
            let date = PostgresDate.date(fromTimestamp: occurredAtString) {
             occurredAt = date
+            originalOccurredAt = date
         }
 
         addedByHouseholdMember = transaction.createdBy != nil && transaction.createdBy != session.profile?.id
@@ -126,7 +142,7 @@ extension TransactionFormView {
         case .expense, .income:
             applyLedger(transaction)
         case .transfer:
-            applyTransfer(transaction, sibling: sibling)
+            applyTransfer(transaction, legs: legs.isEmpty ? [transaction] : legs)
         }
     }
 
@@ -134,34 +150,61 @@ extension TransactionFormView {
         editingId = transaction.transactionId
         editingFromVersion = transaction.version.map(Int.init)
         selectedAccountId = transaction.accountId
+        originalAccountId = transaction.accountId
         selectedCategoryId = transaction.categoryId
         merchantRaw = transaction.merchantRaw
         notes = transaction.notes ?? ""
+        title = transaction.title ?? ""
         isConfirmingCapture = transaction.status == .pending && transaction.source == .capture
-        if let amount = transaction.amountE4 {
-            amountText = AmountFormatter.editableString(amount, minorUnit: Int(transaction.minorUnit ?? 2))
-        }
+        applyForeignAmounts(transaction)
     }
 
     private func applyTransfer(
         _ transaction: PublicSchema.TransactionsWithDetailsSelect,
-        sibling: PublicSchema.TransactionsWithDetailsSelect?
+        legs: [PublicSchema.TransactionsWithDetailsSelect]
     ) {
-        let legs = [transaction, sibling].compactMap { $0 }
-        guard
-            let from = legs.first(where: { ($0.amountE4 ?? 0) < 0 }),
-            let destination = legs.first(where: { ($0.amountE4 ?? 0) > 0 })
-        else { return }
+        let from = legs.first(where: { ($0.amountE4 ?? 0) < 0 })
+        let destination = legs.first(where: { ($0.amountE4 ?? 0) > 0 })
+        let known = from ?? destination ?? transaction
         editingTransferGroupId = transaction.transferGroupId
+        // The outflow leg, because that is the leg a transfer's tags live on
+        // (see `applyTagChanges`). Without it `loadAppliedTags` had no row to
+        // read, so an existing transfer opened with no tags showing, and
+        // `write` returned no id to tag — anything added while editing was
+        // silently dropped.
+        editingId = from?.transactionId
+        selectedAccountId = from?.accountId
+        selectedToAccountId = destination?.accountId
+        // Both legs carry the same note and title, so either is the
+        // transfer's. The note was never prefilled here, which meant saving
+        // any edit to a transfer silently wiped what the user had written —
+        // `update_transfer` stores exactly what it is sent.
+        notes = known.notes ?? ""
+        title = known.title ?? ""
+
+        guard let from, let destination else {
+            // The other half is on an account this viewer cannot see — a
+            // household member's private one. Show the half there is, and
+            // nothing else: no versions, so neither save nor delete can run.
+            hiddenTransferSide = from == nil ? .source : .destination
+            if let amount = known.amountE4 {
+                amountText = AmountFormatter.editableString(amount, minorUnit: Int(known.minorUnit ?? 2))
+            }
+            return
+        }
         editingFromVersion = from.version.map(Int.init)
         editingToVersion = destination.version.map(Int.init)
-        selectedAccountId = from.accountId
-        selectedToAccountId = destination.accountId
         if let amount = from.amountE4 {
             amountText = AmountFormatter.editableString(amount, minorUnit: Int(from.minorUnit ?? 2))
         }
         if from.currency != destination.currency, let amount = destination.amountE4 {
             receivedAmountText = AmountFormatter.editableString(amount, minorUnit: Int(destination.minorUnit ?? 2))
+        }
+        if let sent = from.amountE4, let received = destination.amountE4 {
+            editingTransferBaseline = TransferBaseline(
+                fromAccountId: from.accountId, toAccountId: destination.accountId,
+                fromAmountE4: -sent, toAmountE4: received
+            )
         }
     }
 }
@@ -169,36 +212,51 @@ extension TransactionFormView {
 // MARK: - Writes
 
 extension TransactionFormView {
-    func save() async {
+    /// Everything the write below needs, present and parseable. Lives
+    /// beside `save()` rather than in the view: it is the same question
+    /// that function asks, answered before the tap instead of after.
+    var isSaveDisabled: Bool {
+        if isSaving || hiddenTransferSide != nil || selectedAccountId == nil || amountText.isEmpty { return true }
+        if kind == .transfer {
+            if selectedToAccountId == nil { return true }
+            if needsReceivedAmount && receivedAmountText.isEmpty { return true }
+        } else if selectedCategoryId == nil {
+            return true
+        }
+        // Exactly the `needsReceivedAmount` rule above, for the same
+        // reason: a second amount the entry genuinely needs and does not
+        // have yet. Blocking Save says so before the tap rather than after.
+        if isForeign && chargedAmountText.isEmpty { return true }
+        return false
+    }
+
+    /// `thenAddAnother` is the only difference between the two saves: one
+    /// dismisses, the other clears what belonged to the transaction just
+    /// written and leaves the sheet standing. Everything before that point
+    /// — validation, signing, the write, the tags — is deliberately the
+    /// same code, because two save paths is how two save paths drift.
+    func save(thenAddAnother: Bool = false) async {
         guard let accountId = selectedAccountId else {
             errorMessage = "Choose an account."
             return
         }
-        guard let magnitude = AmountParser.parse(amountText), magnitude > 0 else {
+        if rejectsAmount() { return }
+        // Unreachable once `rejectsAmount` has passed — kept so a parse the
+        // classifier and the parser ever disagree on stops here, visibly.
+        guard let magnitude = AmountParser.parse(amountText, minorUnit: paidCurrencyInfo?.minorUnit),
+              magnitude > 0 else {
             errorMessage = "Enter a valid amount."
             return
         }
+        guard let amounts = resolveLedgerAmounts(magnitude: magnitude) else { return }
+        if presentSharedHistoryRefusal() { return }
 
         isSaving = true
         errorMessage = nil
         do {
-            var taggedTransactionId: UUID?
-            switch (isEditing, kind) {
-            case (false, .expense), (false, .income):
-                taggedTransactionId = try await saveLedgerTransaction(accountId: accountId, magnitude: magnitude)
-            case (false, .transfer):
-                taggedTransactionId = try await saveTransfer(accountId: accountId, magnitude: magnitude)
-            case (true, .expense), (true, .income):
-                if isConfirmingCapture {
-                    try await reviewCaptureTransaction(accountId: accountId, magnitude: magnitude)
-                } else {
-                    try await updateLedgerTransaction(accountId: accountId, magnitude: magnitude)
-                }
-                taggedTransactionId = editingId
-            case (true, .transfer):
-                try await updateTransfer(magnitude: magnitude)
-                taggedTransactionId = editingId
-            }
+            let taggedTransactionId = try await write(
+                accountId: accountId, magnitude: magnitude, amounts: amounts
+            )
 
             // Skipped when a divergence warning stopped the write — there is
             // no transaction to tag, and the user has not confirmed yet.
@@ -211,8 +269,14 @@ extension TransactionFormView {
             // later via Needs Review, not as a reason to keep this sheet
             // open; `divergenceWarning` is the one remaining pre-write gate.
             if divergenceWarning == nil {
+                // `onSaved()` either way: the ledger behind the sheet is
+                // refreshed whether or not this one closes it.
                 onSaved()
-                dismiss()
+                if thenAddAnother {
+                    resetForNextEntry()
+                } else {
+                    dismiss()
+                }
             }
         } catch {
             errorMessage = UserFacingError.describe(error)
@@ -220,30 +284,69 @@ extension TransactionFormView {
         isSaving = false
     }
 
+    /// The one write this save actually is, chosen from the kind and
+    /// whether this is an edit. Split out of `save()` so that function stays
+    /// what it reads as — validate, write, then tag and dismiss — rather
+    /// than carrying a five-way switch in the middle of it.
+    ///
+    /// `magnitude` is what a transfer needs (its two legs are each already
+    /// in their own account's currency); `amounts` is what a ledger row
+    /// needs, where the figure stored and the figure paid can differ.
+    private func write(accountId: UUID, magnitude: Int64, amounts: LedgerAmounts) async throws -> UUID? {
+        switch (isEditing, kind) {
+        case (false, .expense), (false, .income):
+            return try await saveLedgerTransaction(accountId: accountId, amounts: amounts)
+        case (false, .transfer):
+            return try await saveTransfer(accountId: accountId, magnitude: magnitude)
+        case (true, .expense), (true, .income):
+            if isConfirmingCapture {
+                try await reviewCaptureTransaction(accountId: accountId, amounts: amounts)
+            } else {
+                try await updateLedgerTransaction(accountId: accountId, amounts: amounts)
+            }
+            return editingId
+        case (true, .transfer):
+            try await updateTransfer(magnitude: magnitude)
+            return editingId
+        }
+    }
+
+    /// What the form's one or two amount fields mean for the row about to
+    /// be written.
+    struct LedgerAmounts {
+        /// **Always in the account's currency** — the figure that moves the
+        /// balance, and the only one any sum ever touches.
+        let signedAmountE4: Int64
+        /// Non-nil only when the purchase was made in another currency.
+        /// Provenance, never arithmetic (CLAUDE.md money rule 6).
+        let original: ForeignOriginal?
+    }
+
     /// Every write below goes through `session.outbox` (Phase 11), never
     /// `TransactionRepository` directly — an offline save queues instead of
     /// erroring; the app-wide stale-pending banner surfaces that, not this.
     @discardableResult
-    func saveLedgerTransaction(accountId: UUID, magnitude: Int64) async throws -> UUID? {
+    func saveLedgerTransaction(accountId: UUID, amounts: LedgerAmounts) async throws -> UUID? {
         guard let userId = session.profile?.id, let categoryId = selectedCategoryId, let account = fromAccount else {
             errorMessage = "Choose a category."
             return nil
         }
-        // Sign applied here, once, from the kind the user picked — never
-        // re-derived elsewhere (money rule: never re-sign in application
-        // code beyond this single point; the DB's sign_matches_category_kind
-        // CHECK is the actual backstop).
-        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
+        // The sign is applied once, in `resolveLedgerAmounts`, from the kind
+        // the user picked — never re-derived here (money rule: never re-sign
+        // in application code beyond that single point; the DB's
+        // sign_matches_category_kind CHECK is the actual backstop).
+        // The row is the account owner's even when a partner enters it; the
+        // server swaps the category for the owner's counterpart.
         let payload = CreateTransactionPayload(
-            id: UUID(), ownerId: userId, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            notes: notes.isEmpty ? nil : notes
+            id: UUID(), ownerId: account.ownerId, createdBy: userId, accountId: accountId, categoryId: categoryId,
+            amountE4: amounts.signedAmountE4, currency: account.currency, occurredAt: occurredAt,
+            notes: notes.isEmpty ? nil : notes, original: amounts.original, title: TransactionTitle.stored(title)
         )
         pendingDelivery = await session.outbox.submitCreateTransaction(payload)
         return payload.id
     }
 
-    func updateLedgerTransaction(accountId: UUID, magnitude: Int64) async throws {
+    func updateLedgerTransaction(accountId: UUID, amounts: LedgerAmounts) async throws {
         guard
             let categoryId = selectedCategoryId,
             let account = fromAccount,
@@ -253,11 +356,11 @@ extension TransactionFormView {
             errorMessage = "Choose a category."
             return
         }
-        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
         let payload = UpdateTransactionPayload(
             id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes
+            amountE4: amounts.signedAmountE4, currency: account.currency, occurredAt: occurredAt,
+            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes, original: amounts.original,
+            title: TransactionTitle.stored(title)
         )
         await session.outbox.submitUpdateTransaction(payload)
     }
@@ -269,7 +372,7 @@ extension TransactionFormView {
     /// race (whichever arrived second sent a now-stale `expectedVersion`),
     /// and offline, the outbox's own collapse-by-row-id rule could let the
     /// confirm silently discard the edit outright.
-    func reviewCaptureTransaction(accountId: UUID, magnitude: Int64) async throws {
+    func reviewCaptureTransaction(accountId: UUID, amounts: LedgerAmounts) async throws {
         guard
             let categoryId = selectedCategoryId,
             let account = fromAccount,
@@ -279,11 +382,11 @@ extension TransactionFormView {
             errorMessage = "Choose a category."
             return
         }
-        let signedAmountE4 = kind == .expense ? -magnitude : magnitude
         let payload = ReviewCaptureTransactionPayload(
             id: id, expectedVersion: expectedVersion, accountId: accountId, categoryId: categoryId,
-            amountE4: signedAmountE4, currency: account.currency, occurredAt: occurredAt,
-            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes
+            amountE4: amounts.signedAmountE4, currency: account.currency, occurredAt: occurredAt,
+            merchantRaw: merchantRaw, notes: notes.isEmpty ? nil : notes, original: amounts.original,
+            title: TransactionTitle.stored(title)
         )
         await session.outbox.submitReviewCaptureTransaction(payload)
     }

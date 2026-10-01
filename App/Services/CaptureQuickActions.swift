@@ -30,7 +30,12 @@ enum CaptureQuickActions {
     }
 
     /// Mirrors `CaptureNotificationCopy.appliedLocally`'s own four-way split
-    /// on `(accountKnown, categoryKnown)`, plus the duplicate override that
+    /// on `(accountKnown, categoryKnown)` — the same two facts the Needs
+    /// Review inbox weighs in `NeedsReviewPanel.isReadyToConfirm` before it
+    /// will let a swipe confirm a capture, and for the same reason: Confirm
+    /// only flips `status`, so offering it on a half-known capture files a
+    /// guess. Change the rule here and change it there. Plus the duplicate
+    /// override that
     /// applies across all four. Every branch that shows buttons at all also
     /// offers "More options" (device-testing feedback: a successful capture
     /// still needs an escape hatch into the full form without hunting for

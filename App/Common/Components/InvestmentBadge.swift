@@ -11,8 +11,10 @@ import SwiftUI
 /// caller's job.
 ///
 /// `compact` shortens the label to "Inv." for the Accounts list, where the
-/// row is tight on horizontal space beside the name; every other caller
-/// keeps the spelled-out "Investment" the accessibility label always uses.
+/// row is tight on horizontal space beside the name, and in the account
+/// form whenever the name would otherwise be cut (`AccountNameRow`); every
+/// other caller keeps the spelled-out "Investment" the accessibility label
+/// always uses.
 struct InvestmentBadge: View {
     var compact: Bool = false
 

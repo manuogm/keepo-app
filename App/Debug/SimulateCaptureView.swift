@@ -72,10 +72,19 @@ struct SimulateCaptureView: View {
         let externalId = CaptureIdentity.externalId(
             card: card, amount: parsedAmount, merchant: merchantNormalized, at: occurredAt
         )
+        // Read out of the typed string exactly as the real intent does, so
+        // typing "€50,00" here exercises the whole multi-currency path —
+        // detection, conversion, and the two-amount review form — without
+        // needing a foreign card in Wallet to test against.
+        let detectedCurrency = try? await session.dbQueue.read { database in
+            CurrencyDetector.detect(
+                in: amount, supported: try LocalTableQueries.currencies(database).map(\.code)
+            )
+        }
         let payload = CaptureTransactionPayload(
             id: UUID(), cardIdentifier: card, merchantRaw: merchant, merchantNormalized: merchantNormalized,
             amountE4: parsedAmount, occurredAt: occurredAt, externalId: externalId,
-            notes: "Paid with \(card) at \(merchant)"
+            notes: "Paid with \(card) at \(merchant)", detectedCurrency: detectedCurrency ?? nil
         )
 
         switch await session.outbox.submitCaptureTransaction(payload, ownerId: session.profile?.id) {
@@ -84,7 +93,8 @@ struct SimulateCaptureView: View {
                 + "Notification scheduled — background the app, long-press it to test the quick actions."
             session.refresh.bump()
             await CaptureNotificationScheduler.scheduleAppliedLocally(
-                resolution: resolution, amountE4: parsedAmount, transactionId: payload.id
+                resolution: resolution, symbolHint: CurrencyDetector.symbol(in: amount),
+                transactionId: payload.id
             )
         case .applied:
             resultMessage = "Captured — check Needs Review."

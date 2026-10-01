@@ -1,0 +1,27 @@
+// Copy this file to Debug-Local.xcconfig (gitignored) and paste in the
+// values `supabase status` prints on your own machine.
+//
+// This is the config behind the Keepo-Local scheme: the same DEBUG build as
+// Debug, pointed at the local `supabase start` stack instead of the hosted
+// project. Keeping them apart is the point — there used to be one Debug
+// config, so aiming it at hosted (the only way to get a DEBUG build onto a
+// real phone) silently took the local stack away from the Simulator too, and
+// every casual run wrote to production.
+//
+// The `$()` in the URL is load-bearing, not a typo. xcconfig treats `//` as
+// the start of a comment, so a plain `http://127.0.0.1:54321` is read as
+// `http:` and the build gets a nonsense URL with no warning anywhere.
+// `$()` expands to nothing and breaks the `//` up so it survives.
+//
+// 127.0.0.1 means *this device*, so a build using this file only works in
+// the Simulator, which shares the Mac's loopback. On a real phone it reaches
+// nothing and the app stops at "Couldn't connect" — use the Keepo scheme for
+// device builds.
+//
+// Nothing here is secret: the local stack's anon key is the same fixed demo
+// JWT on every machine that runs `supabase start`. It is still not committed,
+// because *.xcconfig is gitignored as a category and carving out exceptions
+// is how a real key eventually slips through.
+
+SUPABASE_URL = http:/$()/127.0.0.1:54321
+SUPABASE_ANON_KEY = paste-the-ANON_KEY-from-supabase-status

@@ -24,9 +24,11 @@ public struct LiveOutboxSender: OutboxSending {
     public func createTransaction(_ payload: CreateTransactionPayload) async throws {
         do {
             try await TransactionRepository.create(
-                client: client, id: payload.id, ownerId: payload.ownerId, accountId: payload.accountId,
-                categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
-                occurredAt: payload.occurredAt, notes: payload.notes
+                client: client, id: payload.id, ownerId: payload.ownerId, createdBy: payload.createdBy,
+                accountId: payload.accountId, categoryId: payload.categoryId, amountE4: payload.amountE4,
+                currency: payload.currency,
+                occurredAt: payload.occurredAt, notes: payload.notes, original: payload.original,
+                title: payload.title
             )
         } catch {
             if Self.isDuplicateKey(error) { return }
@@ -39,7 +41,7 @@ public struct LiveOutboxSender: OutboxSending {
             try await TransactionRepository.createTransfer(
                 client: client, fromAccountId: payload.fromAccountId, toAccountId: payload.toAccountId,
                 fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4, occurredAt: payload.occurredAt,
-                fromId: payload.fromId, toId: payload.toId, notes: payload.notes
+                fromId: payload.fromId, toId: payload.toId, notes: payload.notes, title: payload.title
             )
         } catch {
             if Self.isDuplicateKey(error) { return }
@@ -51,7 +53,8 @@ public struct LiveOutboxSender: OutboxSending {
         let result = try await TransactionRepository.update(
             client: client, id: payload.id, expectedVersion: payload.expectedVersion, accountId: payload.accountId,
             categoryId: payload.categoryId, amountE4: payload.amountE4, currency: payload.currency,
-            occurredAt: payload.occurredAt, merchantRaw: payload.merchantRaw, notes: payload.notes
+            occurredAt: payload.occurredAt, merchantRaw: payload.merchantRaw, notes: payload.notes,
+            original: payload.original, title: payload.title
         )
         switch result {
         case .saved: return true
@@ -64,7 +67,8 @@ public struct LiveOutboxSender: OutboxSending {
             client: client, transferGroupId: payload.transferGroupId,
             fromExpectedVersion: payload.fromExpectedVersion, toExpectedVersion: payload.toExpectedVersion,
             fromAmountE4: payload.fromAmountE4, toAmountE4: payload.toAmountE4,
-            occurredAt: payload.occurredAt, notes: payload.notes
+            occurredAt: payload.occurredAt, notes: payload.notes, title: payload.title,
+            fromAccountId: payload.fromAccountId, toAccountId: payload.toAccountId
         )
         switch result {
         case .saved: return true
@@ -89,7 +93,8 @@ public struct LiveOutboxSender: OutboxSending {
                 client: client, id: payload.id, cardIdentifier: payload.cardIdentifier,
                 merchantRaw: payload.merchantRaw, merchantNormalized: payload.merchantNormalized,
                 amountE4: payload.amountE4, occurredAt: payload.occurredAt, externalId: payload.externalId,
-                notes: payload.notes
+                notes: payload.notes, detectedCurrency: payload.detectedCurrency,
+                categoryHint: payload.categoryHint
             )
         } catch {
             // A retried capture already landed under this id — the write

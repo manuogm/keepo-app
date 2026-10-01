@@ -76,8 +76,33 @@ extension ProfileView {
             ComingSoonRow(icon: "questionmark.circle", title: "FAQ")
             ComingSoonRow(icon: "envelope", title: "Contact the Keepo Team")
             ComingSoonRow(icon: "text.bubble", title: "Give Us Feedback")
+            // Available and never mandatory — which is the whole shape of
+            // §3.11's answer. The tips fire once each, just-in-time; this is
+            // where somebody who dismissed one, or never triggered it, can
+            // read all of them.
+            NavigationLink(value: AppNavigation.ProfileDestination.showMeAround) {
+                ProfileRowLabel(icon: "sparkles", title: "Show Me Around")
+            }
+            rateKeepoRow
         } header: {
             Text("Help and Support")
+        }
+    }
+
+    /// The permanent way to rate Keepo, for the person who decided to —
+    /// never an interruption. It is the one path that always works: the
+    /// in-app prompt (`ReviewPromptModifier`) may silently show nothing,
+    /// capped at three displays a year by a system that reports neither.
+    ///
+    /// Hidden entirely until the app exists in App Store Connect. A row
+    /// that opens a 404 is worse than no row, because the user has already
+    /// left Keepo by the time they find out.
+    @ViewBuilder
+    var rateKeepoRow: some View {
+        if let url = AppStoreListing.writeReviewURL {
+            Link(destination: url) {
+                ProfileRowLabel(icon: "star", title: "Rate Keepo")
+            }
         }
     }
 
@@ -93,15 +118,10 @@ extension ProfileView {
     func syncFXRates() async {
         isSyncingFX = true
         do {
-            struct SyncBody: Encodable { let days: Int }
-            try await session.client.functions.invoke(
-                "sync-fx-rates",
-                options: FunctionInvokeOptions(body: SyncBody(days: 400))
-            )
-            session.refresh.bump()
+            try await FXRateSync.run(session: session)
             await loadLastFXSyncedAt()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Sync Exchange Rates", error)
         }
         isSyncingFX = false
     }
@@ -155,23 +175,28 @@ extension ProfileView {
 
     func signOut() async {
         isSigningOut = true
-        errorMessage = nil
+        actionError = nil
         do {
             try await session.signOut()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Sign Out", error)
             isSigningOut = false
         }
     }
 
+    /// Both halves report into the same alert, and both have to: a step-up
+    /// that never got past `canEvaluatePolicy` and a server that refused are
+    /// equally invisible from the outside, and this is the one button in the
+    /// app where "nothing appeared to happen" is indistinguishable from
+    /// "your account is gone".
     func deleteAccount() async {
         isDeletingAccount = true
-        errorMessage = nil
+        actionError = nil
         do {
             try await session.stepUp(reason: "Confirm account deletion")
             try await session.deleteAccount()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Delete Your Account", error)
             isDeletingAccount = false
         }
     }

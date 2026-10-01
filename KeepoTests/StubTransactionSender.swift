@@ -19,6 +19,9 @@ final class StubTransactionSender: OutboxSending, @unchecked Sendable {
     var captureTransactionResult: Result<Void, Error> = .success(())
 
     private(set) var lastUpdateTransactionPayload: UpdateTransactionPayload?
+    /// The transfer writes that got through, in the order they did — what
+    /// the server would have seen.
+    private(set) var deliveredTransferWrites: [String] = []
 
     func createTransaction(_ payload: CreateTransactionPayload) async throws {
         try createTransactionResult.get()
@@ -26,6 +29,7 @@ final class StubTransactionSender: OutboxSending, @unchecked Sendable {
 
     func createTransfer(_ payload: CreateTransferPayload) async throws {
         try createTransferResult.get()
+        deliveredTransferWrites.append("create")
     }
 
     func updateTransaction(_ payload: UpdateTransactionPayload) async throws -> Bool {
@@ -34,7 +38,9 @@ final class StubTransactionSender: OutboxSending, @unchecked Sendable {
     }
 
     func updateTransfer(_ payload: UpdateTransferPayload) async throws -> Bool {
-        try updateTransferResult.get()
+        let applied = try updateTransferResult.get()
+        deliveredTransferWrites.append("update")
+        return applied
     }
 
     func deleteTransaction(_ payload: DeleteTransactionPayload) async throws -> Bool {
@@ -51,8 +57,14 @@ final class StubTransactionSender: OutboxSending, @unchecked Sendable {
     /// as before (governed purely by `confirmCaptureTransactionResult`).
     var requireCaptureBeforeConfirm = false
 
+    /// What the last capture actually sent — the category hint is decided
+    /// after the payload is built, so the payload a test constructs is not
+    /// the one that reaches the network.
+    private(set) var lastCapturePayload: CaptureTransactionPayload?
+
     func captureTransaction(_ payload: CaptureTransactionPayload) async throws {
         captureTransactionCallCount += 1
+        lastCapturePayload = payload
         try captureTransactionResult.get()
     }
 

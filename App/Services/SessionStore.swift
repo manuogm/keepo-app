@@ -69,6 +69,11 @@ public final class SessionStore {
         // that already chooses the provider itself, mirrored here for
         // storage. Never biometric-gated (see `KeychainSessionStorage`'s
         // own header comment for why that broke real-device use entirely).
+        // Before the client is built, because building it is what reads the
+        // stored session. A Keychain item outlives the app that wrote it, so
+        // without this a delete-and-reinstall silently restores the previous
+        // identity — see `purgeSessionIfReinstalled`.
+        KeychainSessionStorage.purgeSessionIfReinstalled()
         let client = makeSupabaseClient(config: config, localStorage: config.isLocal ? nil : KeychainSessionStorage())
         self.client = client
         // The only place this branches: StubAuthProvider refuses to run
@@ -111,6 +116,22 @@ public final class SessionStore {
         }
         self.outbox = Outbox(dbQueue: dbQueue, sender: LiveOutboxSender(client: client))
         self.outbox.startRetryLoop()
+        self.outbox.onRefusal = { [weak self] in
+            Task { await self?.resyncAfterRefusal() }
+        }
+    }
+
+    /// A refused write left an optimistic copy in the mirror that no
+    /// incremental pull can correct, so the mirror is rebuilt from the server
+    /// — but only once nothing else is queued: a rebuild drops every
+    /// optimistic row, including those of writes still waiting to be sent,
+    /// and those must not vanish from the screen before they land. If the
+    /// queue is not empty yet, the next `syncNow` gets there instead.
+    private func resyncAfterRefusal() async {
+        guard outbox.needsFullResync, outbox.pendingCount == 0, let syncEngine else { return }
+        await syncEngine.resync()
+        outbox.markResynced()
+        refresh.bump()
     }
 
     /// Rebuilds `syncEngine` for the now-known `userId` — called from every
@@ -140,7 +161,14 @@ public final class SessionStore {
     /// `.task(id: refresh.token)` re-fires. Every other caller just omits it.
     public func syncNow(afterPull: (() async -> Void)? = nil) async {
         await outbox.drainAll()
-        await syncEngine?.pull()
+        // A refusal during the drain — or one still waiting on an empty
+        // queue — asks for the mirror to be rebuilt, not merely advanced.
+        if outbox.needsFullResync, outbox.pendingCount == 0, let syncEngine {
+            await syncEngine.resync()
+            outbox.markResynced()
+        } else {
+            await syncEngine?.pull()
+        }
         await afterPull?()
         refresh.bump()
     }
@@ -286,10 +314,13 @@ public final class SessionStore {
     public func signOut() async throws {
         try await client.auth.signOut()
         try? await dbQueue.write { database in try SyncApply.wipeAllLocalData(database) }
-        // Same reasoning as the store wipe above, for the one piece of the
-        // user's data that does not live in it: a cached photo of their face,
-        // on disk, for whoever signs in on this device next.
+        // Same reasoning as the store wipe above, for the two pieces of the
+        // user's data that do not live in it: a cached photo of their face,
+        // and their household partner's cached name, on disk, for whoever
+        // signs in on this device next.
         AvatarStore.clearAllCached()
+        HouseholdMemberNameCache.clear()
+        PreferredCurrencyCache.clear()
         SyncCursorStore.resetAll()
         SyncCursorStore.clearLocalOwner()
         userId = nil
@@ -345,14 +376,9 @@ public final class SessionStore {
         let profile = try await ProfileRepository.fetchOwn(client: client, userId: userId)
         self.profile = profile
         phase = profile.onboardedAt == nil ? .needsOnboarding : .ready
-    }
-
-    public func completeOnboarding(baseCurrency: String, displayName: String) async throws {
-        guard let userId else { return }
-        try await ProfileRepository.completeOnboarding(
-            client: client, userId: userId, baseCurrency: baseCurrency, displayName: displayName
-        )
-        try await refreshProfile()
+        if let realigned = await reconcileTimeZone(profile, userId: userId) {
+            self.profile = realigned
+        }
     }
 
     /// Info.plist keys are set via INFOPLIST_KEY_SupabaseURL/SupabaseAnonKey

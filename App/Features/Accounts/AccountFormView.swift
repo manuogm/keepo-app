@@ -72,6 +72,13 @@ struct AccountFormView: View {
     @State var hasHousehold = false
     @State var createdAt: String?
     @State var sharedAt: String?
+    /// Where the household's view of this account begins, when it was
+    /// shared from a date; nil for full history.
+    @State var sharedFrom: Date?
+    /// The account's `opening_balance_at` as this viewer holds it — for a
+    /// partner on a dated share, the owner's calendar day it began.
+    @State var loadedOpeningBalanceAt: String?
+    @State var editingOwnerId: UUID?
 
     @State var editingId: UUID?
     @State var editingVersion: Int?
@@ -87,6 +94,11 @@ struct AccountFormView: View {
     @State var showDeleteOptions = false
     @State var isShowingCardHelp = false
     @State var showUnshareConfirm = false
+    @State var showShareChoice = false
+    @State var showIncludePast = false
+    /// A sharing action the server refused — a pop-up, like every failed
+    /// action (`ActionError`). `errorMessage` stays for validation.
+    @State var actionError: ActionError?
 
     @State var cardMappings: [PublicSchema.CardMappingsSelect] = []
     @State var editingCard: MappedCardEditor?
@@ -164,8 +176,10 @@ struct AccountFormView: View {
         .sheet(isPresented: $isPickingIcon) {
             IconCatalogView(icon: $icon, color: $color)
         }
+        // The wheel, the same sheet onboarding's first account opens — an
+        // account's currency is the same question in both places.
         .sheet(isPresented: $isPickingCurrency) {
-            CurrencyPickerSheet(currencies: currencies, selection: $currency)
+            CurrencyWheelSheet(currencies: currencies, selection: $currency, title: "Currency")
         }
         .sheet(isPresented: $isShowingCardHelp) {
             LinkedCardsHelpSheet()
@@ -184,6 +198,13 @@ struct AccountFormView: View {
         .unshareConfirmation(isPresented: $showUnshareConfirm) {
             Task { await setShared(false) }
         }
+        .shareAccountDialog(accountName: name, isPresented: $showShareChoice) { fullHistory in
+            Task { await setShared(true, fullHistory: fullHistory) }
+        }
+        .includePastConfirmation(isPresented: $showIncludePast) {
+            Task { await includePastTransactions() }
+        }
+        .errorAlert($actionError)
         .task { await load() }
     }
 
@@ -213,50 +234,29 @@ struct AccountFormView: View {
     /// already said so.
     private var identityAndBalanceCard: some View {
         FormCard {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
-                HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
-                    TextField("Account Name", text: $name)
-                        .font(AppTheme.Typography.cardTitle)
-                        .textInputAutocapitalization(.words)
-                    if editingKind == .investment {
-                        InvestmentBadge()
-                    }
-                    if isShared {
-                        SharedWithHouseholdIcon()
-                    }
-                }
-
-                HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.m) {
-                    AmountField(text: $balanceText, currency: selectedCurrencyInfo, size: AppTheme.Size.touchTarget)
-                    // Create only. An account's currency is immutable once it
-                    // exists (no RPC changes it), so on edit there is nothing
-                    // to offer — the symbol in front of the figure already
-                    // says which currency this is, and a disabled pill
-                    // repeating it in code form is just noise.
-                    if !isEditing {
-                        currencyPicker
-                    }
-                }
+            // The name row is the balance's header: a figure shown in full on
+            // a line of its own sends the currency pill and calculator up
+            // into it, and the name field gives up the width.
+            //
+            // The pill is `AmountField`'s own — flag, code, chevron — so it
+            // matches the transaction form's exactly, in the same place:
+            // after the figure, before the calculator, all three on one
+            // centred row.
+            //
+            // Create only. An account's currency is immutable once it exists
+            // (no RPC changes it), so on edit there is nothing to offer — the
+            // symbol in front of the figure already says which currency this
+            // is, and a disabled pill repeating it is just noise.
+            AmountField(
+                text: $balanceText,
+                currency: selectedCurrencyInfo,
+                onPickCurrency: isEditing ? nil : { isPickingCurrency = true },
+                size: AppTheme.Size.touchTarget,
+                headerSpacing: AppTheme.Spacing.m
+            ) {
+                AccountNameRow(name: $name, isInvestment: editingKind == .investment, isShared: isShared)
             }
         }
-    }
-
-    private var currencyPicker: some View {
-        Button {
-            isPickingCurrency = true
-        } label: {
-            HStack(spacing: AppTheme.Spacing.xs) {
-                Text(currency)
-                    .font(AppTheme.Typography.labelEmphasis)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(AppTheme.Typography.nanoEmphasis)
-            }
-            .foregroundStyle(AppTheme.Palette.textPrimary)
-            .padding(.horizontal, AppTheme.Spacing.m)
-            .padding(.vertical, AppTheme.Spacing.s)
-            .background(AppTheme.Palette.bgSurfaceRaised, in: Capsule())
-        }
-        .buttonStyle(.pressableCard)
     }
 
     /// Include in Balance first: it is the one that changes a number the
@@ -274,27 +274,6 @@ struct AccountFormView: View {
                 shareToggleRow
             }
         }
-    }
-
-    /// Sharing is the one control here that is not offline-capable and not
-    /// symmetrical: `share_account` is a plain link, but `unshare_account`
-    /// FORKS the account into an independent copy for the other member
-    /// (migration 20260816100000). Turning the toggle off is therefore not
-    /// an undo, and it says so before it happens.
-    @ViewBuilder
-    private var shareToggleRow: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            Toggle("Share with Household", isOn: shareBinding)
-                .tint(AppTheme.Palette.statusPositive)
-                .disabled(!hasHousehold || isSaving)
-            if !hasHousehold {
-                Text("Create a household in Profile first.")
-                    .font(AppTheme.Typography.micro)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-            }
-        }
-        .padding(.horizontal, AppTheme.Spacing.l)
-        .padding(.vertical, AppTheme.Spacing.m)
     }
 
     /// Provenance, not a control — grey and out of the way, right above the
@@ -315,23 +294,76 @@ struct AccountFormView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var shareBinding: Binding<Bool> {
-        Binding(
-            get: { isShared },
-            set: { newValue in
-                if newValue {
-                    Task { await setShared(true) }
-                } else {
-                    showUnshareConfirm = true
-                }
-            }
-        )
-    }
-
     var isSaveDisabled: Bool {
         isLoading || isSaving
             || name.trimmingCharacters(in: .whitespaces).isEmpty
             || balanceText.isEmpty
             || (!isEditing && currency.isEmpty)
+    }
+}
+
+/// The account's name and its markers, as the header of the balance field.
+///
+/// **"Investment" gives way to "Inv." only when the name needs the room** —
+/// when the name, the full badge and the shared marker together would not
+/// fit on the line, which is what happens once a long balance sends the
+/// currency pill and calculator up into this row. A name that fits keeps
+/// the spelled-out badge; one that would be cut gets the badge's room
+/// instead. Measured against the full badge, never the one on screen, so
+/// the choice cannot flip-flop as the badge changes size.
+struct AccountNameRow: View {
+    @Binding var name: String
+    let isInvestment: Bool
+    let isShared: Bool
+
+    @State private var rowWidth: CGFloat = 0
+    @State private var nameWidth: CGFloat = 0
+    @State private var fullMarkersWidth: CGFloat = 0
+
+    private var needsShortBadge: Bool {
+        rowWidth > 0 && nameWidth + AppTheme.Spacing.s + fullMarkersWidth > rowWidth
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
+            TextField("Account Name", text: $name)
+                .font(AppTheme.Typography.cardTitle)
+                .textInputAutocapitalization(.words)
+            markers(shortBadge: needsShortBadge)
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
+        .background(alignment: .leading) {
+            // The placeholder counts: an empty field still shows it.
+            Text(name.isEmpty ? "Account Name" : name)
+                .font(AppTheme.Typography.cardTitle)
+                .hidden()
+                .onIdealWidthChange { nameWidth = $0 }
+            HStack(spacing: AppTheme.Spacing.s) { markers(shortBadge: false) }
+                .hidden()
+                .onIdealWidthChange { fullMarkersWidth = $0 }
+        }
+    }
+
+    @ViewBuilder
+    private func markers(shortBadge: Bool) -> some View {
+        if isInvestment {
+            InvestmentBadge(compact: shortBadge)
+        }
+        if isShared {
+            SharedWithHouseholdIcon()
+        }
+    }
+}
+
+private extension View {
+    /// Reports the width this view would take if nothing constrained it,
+    /// measured off a hidden, unconstrained copy — the view's own layout is
+    /// untouched.
+    func onIdealWidthChange(_ action: @escaping (CGFloat) -> Void) -> some View {
+        background(alignment: .leading) {
+            fixedSize()
+                .hidden()
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { action($0) }
+        }
     }
 }

@@ -39,6 +39,10 @@ extension AppTheme {
         /// appearing. Absorbs the old 0.18 and 0.22.
         static let quick = Animation.snappy(duration: 0.2)
 
+        /// The same 0.2, as a number — see `standardDuration` for why one
+        /// of these exists at all.
+        static let quickDuration: TimeInterval = 0.2
+
         /// 0.25 — **the default.** A view arriving, leaving, expanding or
         /// collapsing: a drawer, a disclosure row, a mode change, a sheet.
         /// Absorbs the old 0.24, 0.28 and most of 0.30.
@@ -46,6 +50,14 @@ extension AppTheme {
         /// If you are unsure which token a new animation wants, it wants
         /// this one.
         static let standard = Animation.snappy(duration: 0.25)
+
+        /// The same 0.25, as a number. For the one kind of caller that has
+        /// to *sequence* against `standard` rather than merely use it —
+        /// the category row, whose fill may only start once the tile it
+        /// belongs to has finished travelling. Written twice in one place
+        /// beats a literal 0.25 sitting in a view file, drifting the first
+        /// time this token is ever retuned.
+        static let standardDuration: TimeInterval = 0.25
 
         /// 0.32 — the dashboard grid settling into a new arrangement: a tile
         /// expanding, a drop committing, a widget added or removed.
@@ -65,6 +77,18 @@ extension AppTheme {
         /// entirely: a chart highlight also rolls digits through
         /// `contentTransition(.numericText())`, and that needs one.
         static let colorSafe = Animation.easeInOut(duration: 0.2)
+
+        /// 0.4, **linear** — a field shaking its head at an entry it cannot
+        /// take (`ShakeEffect`). Linear because the curve is already in the
+        /// effect's own sine; a spring on top would smear the three
+        /// oscillations into a wobble.
+        static let reject = Animation.linear(duration: 0.4)
+
+        /// 0.5, eased — `ShakeEffect`'s gentle form, one slow sway for an
+        /// entry that is missing something rather than wrong. Eased where
+        /// `reject` is linear: there is one swing, not three, and it should
+        /// settle rather than snap.
+        static let nudge = Animation.easeInOut(duration: 0.5)
 
         /// A button's press state — **asymmetric, and that is the point.**
         /// Fast in (0.08) so the press registers on the first frame of the

@@ -253,3 +253,63 @@ struct LocalTransactionRowTests {
         #expect(Set(legs.map { $0.amountE4 }) == [-40000, 40000])
     }
 }
+
+// Split from the struct body above only for SwiftLint's `type_body_length`.
+extension LocalTransactionRowTests {
+    /// `delete_account` leaves a transfer half on the deleted account when
+    /// its partner is live (migration 20261007100000). The survivor's form
+    /// has to find that half to show where the money came from, and the
+    /// ledger has to know the transfer is still whole to offer a delete; a
+    /// group with only one leg on this device is neither.
+    @Test("a half on a deleted account is still found, and still completes its transfer")
+    func transferHalfOnADeletedAccountIsFound() async throws {
+        let dbQueue = try makeDatabase()
+        let ownerId = UUID().uuidString
+        let wholeGroup = UUID().uuidString
+        let loneGroup = UUID().uuidString
+        let (liveAccountId, _) = try await dbQueue.write { database in try seed(database, ownerId: ownerId) }
+        let deletedAccountId = UUID().uuidString
+        try await dbQueue.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO accounts (id, owner_id, created_by, kind, name, currency,
+                    opening_balance_e4, opening_balance_at, include_in_total, icon, color, version,
+                    archived_at, deleted_at, created_at, updated_at, sync_seq)
+                VALUES (?, ?, ?, 'regular', 'Old Checking', 'EUR', 0, '2026-01-01', 1, 'banknote', '#8E8E93', 1,
+                    '2026-05-01T00:00:00.000000+00:00', '2026-05-02T00:00:00.000000+00:00',
+                    '2026-01-01T00:00:00.000000+00:00', '2026-01-01T00:00:00.000000+00:00', 1)
+                """,
+                arguments: [deletedAccountId, ownerId, ownerId]
+            )
+            for (accountId, amount, group) in [
+                (deletedAccountId, Int64(-40000), wholeGroup), (liveAccountId, Int64(40000), wholeGroup),
+                (liveAccountId, Int64(-5000), loneGroup)
+            ] {
+                try database.execute(
+                    sql: """
+                    INSERT INTO transactions (id, owner_id, created_by, account_id, category_id, amount_e4, currency,
+                        occurred_at, transfer_group_id, source, status, version, created_at, updated_at, sync_seq)
+                    VALUES (?, ?, ?, ?, NULL, ?, 'EUR', '2026-06-15T12:00:00.000000+00:00', ?, 'manual', 'confirmed',
+                        1, '2026-06-15T12:00:00.000000+00:00', '2026-06-15T12:00:00.000000+00:00', 1)
+                    """,
+                    arguments: [UUID().uuidString, ownerId, ownerId, accountId, amount, group]
+                )
+            }
+        }
+
+        let (legs, complete) = try await dbQueue.read { database in
+            (
+                try LocalTransactionRow.fetchByTransferGroup(
+                    database, transferGroupId: wholeGroup, baseCurrency: "EUR", ownerId: ownerId
+                ),
+                try LocalTransactionRow.completeTransferGroups(
+                    database, among: [wholeGroup.uppercased(), loneGroup.uppercased()]
+                )
+            )
+        }
+
+        #expect(legs.count == 2)
+        #expect(legs.contains { $0.accountName == "Old Checking" })
+        #expect(complete.map { $0.lowercased() } == [wholeGroup.lowercased()])
+    }
+}

@@ -2,8 +2,9 @@ import KeepoCore
 import SwiftUI
 import UIKit
 
-/// Routes on SessionStore.phase: loading while signing in, OnboardingView
-/// until a base currency + first account exist, main TabView after.
+/// Routes on SessionStore.phase: loading while signing in, the intro and
+/// sign-in before there is a session, `SetupFlowView` until a base
+/// currency exists, main TabView after.
 struct RootView: View {
     @State private var session = SessionStore()
     /// `let`, not `@State`: `NetworkMonitor` is a process-wide singleton, so
@@ -24,6 +25,16 @@ struct RootView: View {
     @State private var isSceneActive = true
     @State private var captureObserver: DarwinNotificationObserver?
     @Environment(\.scenePhase) private var scenePhase
+    /// The app's **only** writer of `.preferredColorScheme`, and deliberately
+    /// optional: `.system` resolves to `nil`, which is the one value that
+    /// leaves iOS in charge. Nothing below this line may resolve it to a
+    /// concrete scheme, because `.preferredColorScheme` is a *preference* —
+    /// it travels up to the window, including out of a sheet's content — so
+    /// a descendant that pins `light`/`dark` also pins the window, and any
+    /// view reading `@Environment(\.colorScheme)` to *decide* the override
+    /// is then reading back its own output. That loop is what stopped the
+    /// app following a live system flip: the resolve could never see a value
+    /// it had not itself just written.
     @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
 
     /// iOS greys every tinted view in a window while a modal is presented
@@ -61,9 +72,10 @@ struct RootView: View {
             case .needsSignIn:
                 OTPSignInView(session: session)
             case .needsOnboarding:
-                OnboardingView(session: session) {
-                    Task { try? await session.refreshProfile() }
-                }
+                // No completion closure: the setup flow refreshes the
+                // profile itself, at the very end of its own commit, and
+                // that refresh is what removes this branch from under it.
+                SetupFlowView(session: session)
             case .ready:
                 MainTabView(session: session, network: network)
             case .failed(let message):
@@ -71,8 +83,29 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(appearanceMode.colorScheme)
+        // A write the server refused outright. The outbox no longer retries
+        // one forever (it cannot succeed), so this alert is the only place
+        // the user learns their change did not stick — and that what they
+        // see now is what the server has.
+        .errorAlert(Binding(
+            get: {
+                session.outbox.refusal.map {
+                    ActionError(
+                        title: "Couldn't Save a Change",
+                        message: $0.message + "\n\nThe change wasn't saved, and Keepo is showing what the "
+                            + "server has instead."
+                    )
+                }
+            },
+            set: { if $0 == nil { session.outbox.dismissRefusal() } }
+        ))
         .task { await session.start() }
         .onOpenURL { url in
+            // Capture setup's `x-callback-url` answer comes back on the
+            // same scheme as the magic link, and `handleMagicLink` would
+            // read it as a malformed one and surface a sign-in error over
+            // a signed-in app. Claimed first, then.
+            guard !CaptureTestCoordinator.shared.handle(url) else { return }
             Task { await session.handleMagicLink(url: url) }
         }
         // C-09: a capture landing while this RootView is already running

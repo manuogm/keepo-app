@@ -20,6 +20,13 @@ enum CaptureEnvironment {
 
     static func makeOutbox() async throws -> Environment {
         let config = try SupabaseConfig.fromInfoPlist()
+        // Here too, and not only at launch: a Shortcuts automation can fire
+        // this before the reinstalled app is ever opened. Skipping it would
+        // let a capture land in the *previous* identity's account — the one
+        // case where doing nothing is worse than failing, since a write is
+        // harder to notice than a refusal. Whichever of the two runs first
+        // purges; the other sees the marker and leaves the session alone.
+        KeychainSessionStorage.purgeSessionIfReinstalled()
         let client = makeSupabaseClient(
             config: config, localStorage: config.isLocal ? nil : KeychainSessionStorage()
         )

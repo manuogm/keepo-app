@@ -21,7 +21,8 @@ public extension TransactionRepository {
         occurredAt: Date = Date(),
         fromId: UUID? = nil,
         toId: UUID? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        title: String? = nil
     ) async throws {
         let params = CreateTransferParams(
             fromAccountId: fromAccountId,
@@ -31,7 +32,8 @@ public extension TransactionRepository {
             occurredAt: PostgresDate.timestampString(occurredAt),
             fromId: fromId,
             toId: toId,
-            notes: notes
+            notes: notes,
+            title: title
         )
         try await client.rpc("create_transfer", params: params).execute()
     }
@@ -130,6 +132,14 @@ struct UpdateTransactionParams: Encodable {
     let occurredAt: String
     let merchantRaw: String?
     let notes: String?
+    /// Omitted from the JSON when nil, which is exactly right here: both
+    /// carry `default null` in SQL, and omitting them is how an edit
+    /// **clears** an original that no longer applies.
+    let originalAmountE4: Int64?
+    let originalCurrency: String?
+    /// Same omit-to-clear semantics as the pair above: `p_title` defaults to
+    /// null, so an edit that names no title leaves the row without one.
+    let title: String?
     enum CodingKeys: String, CodingKey {
         case id = "p_id"
         case expectedVersion = "p_expected_version"
@@ -140,6 +150,9 @@ struct UpdateTransactionParams: Encodable {
         case occurredAt = "p_occurred_at"
         case merchantRaw = "p_merchant_raw"
         case notes = "p_notes"
+        case originalAmountE4 = "p_original_amount_e4"
+        case originalCurrency = "p_original_currency"
+        case title = "p_title"
     }
 }
 
@@ -151,6 +164,10 @@ struct UpdateTransferParams: Encodable {
     let toAmountE4: Int64
     let occurredAt: String
     let notes: String?
+    let title: String?
+    /// `nil` leaves that leg where it is — `update_transfer` defaults both.
+    let fromAccountId: UUID?
+    let toAccountId: UUID?
     enum CodingKeys: String, CodingKey {
         case transferGroupId = "p_transfer_group_id"
         case fromExpectedVersion = "p_from_expected_version"
@@ -159,6 +176,9 @@ struct UpdateTransferParams: Encodable {
         case toAmountE4 = "p_to_amount_e4"
         case occurredAt = "p_occurred_at"
         case notes = "p_notes"
+        case title = "p_title"
+        case fromAccountId = "p_from_account_id"
+        case toAccountId = "p_to_account_id"
     }
 }
 
@@ -191,6 +211,7 @@ private struct CreateTransferParams: Encodable {
     let fromId: UUID?
     let toId: UUID?
     let notes: String?
+    let title: String?
     enum CodingKeys: String, CodingKey {
         case fromAccountId = "p_from_account_id"
         case toAccountId = "p_to_account_id"
@@ -200,5 +221,6 @@ private struct CreateTransferParams: Encodable {
         case fromId = "p_from_id"
         case toId = "p_to_id"
         case notes = "p_notes"
+        case title = "p_title"
     }
 }

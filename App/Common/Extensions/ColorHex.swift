@@ -12,12 +12,24 @@ extension Color {
     /// (e.g. a dynamic system color never round-tripped through `init(
     /// hex:)`) — callers fall back to `CategoryAppearance.randomColor()`
     /// rather than persist a wrong value.
+    ///
+    /// **Converted, then rounded.** It read the raw components and
+    /// truncated them, which was wrong twice. Truncating: the components
+    /// come back from `init(hex:)` a hair under the byte they encode, so
+    /// `#34C759` read back as `#33C758` — 16 of the 24 palette colours
+    /// moved a step on every save of an untouched account or category, and
+    /// the catalogue could never find the selected swatch among its own (it
+    /// grew a second, near-identical one instead). Raw
+    /// components: the system colour picker hands back greys in a
+    /// two-component grayscale space, which read as "no colour", and
+    /// vivid picks in extended sRGB, whose components run outside 0…1.
     var hexString: String? {
-        guard let components = UIColor(self).cgColor.components, components.count >= 3 else { return nil }
-        let red = Int(components[0] * 255)
-        let green = Int(components[1] * 255)
-        let blue = Int(components[2] * 255)
-        return String(format: "#%02X%02X%02X", red, green, blue)
+        guard let sRGB = CGColorSpace(name: CGColorSpace.sRGB),
+              let converted = UIColor(self).cgColor.converted(to: sRGB, intent: .defaultIntent, options: nil),
+              let components = converted.components, components.count >= 3
+        else { return nil }
+        let channels = components.prefix(3).map { Int((min(max($0, 0), 1) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", channels[0], channels[1], channels[2])
     }
 }
 

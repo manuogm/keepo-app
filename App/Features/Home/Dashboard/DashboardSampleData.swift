@@ -171,7 +171,7 @@ extension DashboardData {
     /// A fortnight with money moving both ways — a preview showing only
     /// outflows would promise a narrower widget than the one being added.
     private static var sampleUpcoming: [UpcomingTransactionLocal] {
-        let today = utcCalendar.startOfDay(for: Date())
+        let today = PostgresDate.currentDateOnly(in: utcCalendar) ?? utcCalendar.startOfDay(for: Date())
         return [
             upcoming(inDays: 2, "Rent", "house.fill", "#007AFF", "Current Account", -120_000_000, from: today),
             upcoming(inDays: 5, "Internet", "bolt.fill", "#FF9500", "Current Account", -4_500_000, from: today),

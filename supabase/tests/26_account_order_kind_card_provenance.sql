@@ -153,7 +153,19 @@ select results_eq(
   'map_card — the only user-facing entry point — records manual provenance'
 );
 
-select link_card_to_account(auth.uid(), 'AUTOCARD', 'a8000000-0000-0000-0000-000000000002');
+-- Written as postgres, for the same reason the placeholder insert below is:
+-- migration 20261002100000 took `link_card_to_account` away from
+-- `authenticated`. It takes the owner as a parameter, so a caller who can
+-- name a different one can write into that person's card mappings — an
+-- audit demonstrated exactly that. Its real callers are `map_card` and the
+-- capture path, both SECURITY DEFINER, so postgres is the honest stand-in.
+reset role;
+select link_card_to_account(
+  '11111111-1111-1111-1111-111111111111', 'AUTOCARD', 'a8000000-0000-0000-0000-000000000002'
+);
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
 select results_eq(
   $$ select source::text from card_mappings
      where owner_id = auth.uid() and card_identifier = 'AUTOCARD' $$,
@@ -172,9 +184,13 @@ select results_eq(
 reset role;
 insert into card_mappings (owner_id, card_identifier)
 values ('11111111-1111-1111-1111-111111111111', 'PLACEHOLDERCARD');
+
+-- postgres for the link (20261002100000, as above), authenticated for the read.
+select link_card_to_account(
+  '11111111-1111-1111-1111-111111111111', 'PLACEHOLDERCARD', 'a8000000-0000-0000-0000-000000000002'
+);
 set local role authenticated;
 
-select link_card_to_account(auth.uid(), 'PLACEHOLDERCARD', 'a8000000-0000-0000-0000-000000000002');
 select results_eq(
   $$ select source::text from card_mappings
      where owner_id = auth.uid() and card_identifier = 'PLACEHOLDERCARD' $$,
@@ -184,7 +200,12 @@ select results_eq(
 
 -- ...but a card the user named themselves keeps saying so, even after a
 -- later capture re-links it.
-select link_card_to_account(auth.uid(), 'MANUALCARD', 'a8000000-0000-0000-0000-000000000003');
+reset role;
+select link_card_to_account(
+  '11111111-1111-1111-1111-111111111111', 'MANUALCARD', 'a8000000-0000-0000-0000-000000000003'
+);
+set local role authenticated;
+
 select results_eq(
   $$ select source::text from card_mappings
      where owner_id = auth.uid() and card_identifier = 'MANUALCARD' $$,

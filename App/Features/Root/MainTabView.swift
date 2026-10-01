@@ -17,14 +17,20 @@ struct MainTabView: View {
     @State private var navigation = AppNavigation()
     /// Loaded here, once, for the same reason: the three money screens all
     /// render the identical "this scope is empty" answer, and the read
-    /// behind it is the same read whichever screen asks. Categories is not
-    /// among them — a category is not scoped money.
+    /// behind it is the same read whichever screen asks. Categories reads
+    /// only `hasHousehold` off this same instance — a category is not scoped
+    /// money, so the account-shaped emptiness cases don't apply to it.
     @State private var scopeContext = ScopeContext()
     /// Also owned here, and for the third time the same reason: two views
     /// draw the avatar — this tab's scope banner and the Profile sheet — and
     /// a store per view would download and cache the same image twice, then
     /// disagree the moment one of them changed it.
     @State private var avatars = AvatarStore()
+    /// The first-time experience's one piece of hand-rolled state — the
+    /// scope-banner spotlight. Owned here because this is the view that can
+    /// overlay it, and because the Profile sheet's "Show me around" row
+    /// needs to reach the same instance to replay it.
+    @State private var ftux = FTUXCoordinator()
     /// Measured here and handed down, because this is the last view that
     /// still sees it — see `EnvironmentValues.topSafeAreaInset`.
     @State private var topSafeAreaInset: CGFloat = 0
@@ -64,6 +70,10 @@ struct MainTabView: View {
         .environment(navigation)
         .environment(scopeContext)
         .environment(avatars)
+        // Read by the screens that host a coach-marked control — Accounts
+        // asks for its own, because only it knows whether there is a row to
+        // point at.
+        .environment(ftux)
         .environment(\.isPrivacyMode, session.isPrivacyMode)
         .environment(\.topSafeAreaInset, topSafeAreaInset)
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets in
@@ -76,7 +86,14 @@ struct MainTabView: View {
         // which is the whole point of the material.
         .overlay(alignment: .bottom) {
             KeepoTabBar(
-                tab: $navigation.tab, needsReviewCount: needsReviewCount, onAdd: { navigation.requestAdd() }
+                tab: $navigation.tab, needsReviewCount: needsReviewCount,
+                // Pressing the button *is* the lesson, so pressing it ends
+                // the lesson — the hole in the scrim passes the tap
+                // straight through to here.
+                onAdd: {
+                    ftux.dismiss(FTUXLessons.add)
+                    navigation.requestAdd()
+                }
             )
             // Negative on a home-indicator phone, and that is the point:
             // the margin is measured from the true screen edge, not from
@@ -95,11 +112,42 @@ struct MainTabView: View {
                         profileDestination(destination)
                     }
             }
+            // No `.preferredColorScheme` here, or anywhere but `RootView` —
+            // see its `appearanceMode`. A sheet's preference travels up to
+            // the window, so pinning a concrete scheme here pinned the whole
+            // app and broke system-appearance following.
         }
+        // Every coach mark is resolved here, because this is the view that
+        // spans the whole screen — the hole has to be cut in the app, not
+        // inside the banner or the row that publishes the anchor.
+        .spotlight(ftux.visible, onDismiss: { ftux.dismiss() }, onUnanchored: { ftux.suspend() })
+        // Suppressed while the Profile sheet is up — a coach mark under a
+        // modal points at something the user cannot see, and it would spend
+        // its one showing doing it.
+        .task(id: navigation.isProfilePresented) {
+            ftux.isModalPresented = navigation.isProfilePresented
+            guard !navigation.isProfilePresented else { return }
+            // The screen is its own again, so whatever it was offering can
+            // have another go.
+            await ftux.retry()
+        }
+        // A tab change replaces every control on screen at once, which is
+        // the one moment an offer is definitely stale — each screen offers
+        // its own again as it appears.
+        .onChange(of: navigation.tab) { _, _ in ftux.clearQueue() }
+        // The one place in the app that asks for a rating, and the only
+        // one that can: `requestReview` needs a foreground-active scene and
+        // SwiftUI's environment. Deliberately **not** in onboarding — see
+        // `SetupAllSetView`.
+        .reviewPrompt(
+            signedUpAt: session.profile.flatMap { PostgresDate.date(fromTimestamp: $0.createdAt) },
+            isPresentingModal: navigation.isProfilePresented
+        )
         .task(id: session.refresh.token) {
             await loadNeedsReviewCount()
             await scopeContext.reload(session: session)
             await avatars.load(path: session.profile?.avatarPath, client: session)
+            await PreferredCurrencyCache.refresh(session: session)
         }
         // Also an overlay — a transient floating notice must not reflow the
         // screen under it every time connectivity blips. It rides above the
@@ -134,6 +182,8 @@ struct MainTabView: View {
         case .notifications: NotificationSettingsView()
         case .export: ExportView(session: session)
         case .archive: ArchiveAccountsView(session: session)
+        case .showMeAround:
+            ShowMeAroundView(ftux: ftux, onClose: { navigation.isProfilePresented = false })
         }
     }
 

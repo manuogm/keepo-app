@@ -112,7 +112,10 @@ enum CaptureQuickActionHandler {
         let payload = ReviewCaptureTransactionPayload(
             id: transactionId, expectedVersion: version, accountId: accountId, categoryId: categoryId,
             amountE4: amountE4, currency: currency, occurredAt: occurredAt,
-            merchantRaw: row["merchant_raw"] as String?, notes: row["notes"] as String?
+            merchantRaw: row["merchant_raw"] as String?, notes: row["notes"] as String?,
+            // Carried through rather than left nil: a review states the whole
+            // row, and nil would clear a title the user had already typed.
+            title: row["title"] as String?
         )
         await outbox.submitReviewCaptureTransaction(payload)
     }
@@ -130,7 +133,7 @@ enum CaptureQuickActionHandler {
             try Row.fetchOne(
                 database,
                 sql: """
-                SELECT version, account_id, category_id, amount_e4, currency, occurred_at, merchant_raw, notes
+                SELECT version, account_id, category_id, amount_e4, currency, occurred_at, merchant_raw, notes, title
                 FROM transactions WHERE id = ?
                 """,
                 arguments: [transactionId.uuidString]

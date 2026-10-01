@@ -24,11 +24,16 @@ enum PrivacyMask {
 /// app could and could not compute.
 struct PrivateText: View {
     let text: String
+    /// What VoiceOver reads in place of `text`: the exact figure behind a
+    /// short one, so "$56.8K" is heard as "$56,846.50" — a screen reader
+    /// has no width to run out of. Masked like the text in privacy mode.
+    let spoken: String?
 
     @Environment(\.isPrivacyMode) private var isPrivacyMode
 
-    init(_ text: String) {
+    init(_ text: String, spoken: String? = nil) {
         self.text = text
+        self.spoken = spoken
     }
 
     var body: some View {
@@ -36,5 +41,6 @@ struct PrivateText: View {
             .monospacedDigit()
             .contentTransition(.numericText())
             .animation(AppTheme.Motion.colorSafe, value: isPrivacyMode)
+            .accessibilityLabel(isPrivacyMode ? PrivacyMask.hidden : spoken ?? text)
     }
 }

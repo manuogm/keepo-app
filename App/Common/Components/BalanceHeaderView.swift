@@ -38,6 +38,13 @@ struct BalanceHeaderView: View {
             .foregroundStyle(AppTheme.Palette.textPrimary)
             .contentTransition(.numericText())
             .animation(AppTheme.Motion.colorSafe, value: isPrivacyMode)
+            // The exact figure behind a short one ("$56.8K"), for VoiceOver.
+            .accessibilityLabel(isPrivacyMode ? PrivacyMask.hidden : spokenAmount)
+    }
+
+    private var spokenAmount: String {
+        guard let currency else { return "—" }
+        return MoneyFormatter.format(amount, currency: currency, signStyle: signStyle, exact: true)
     }
 
     /// The whole part carries the size — it's the number people actually

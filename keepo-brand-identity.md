@@ -128,6 +128,8 @@ Tokens are named by the **role** a piece of text plays, not by the SF style behi
 
 Figures larger than any text style go through `Number.display(_:weight:scale:)` at one of four sizes — `hero` 48, `balance` 40, `metric` 32, `metricCompact` 28 — or the `.numberFont(_:)` modifier, which applies the `@ScaledMetric` for you. **Never `.system(size:)` directly**; that is text that does not grow (see §3).
 
+**Decided: money reads short from 1,000.** Every figure a person reads is exact below a thousand (`$842.37`) and K/M/B from a thousand up, one decimal at most, rounded to nearest (`$56.8K`, `$1K`, `$123.5B`) — `MoneyFormatter.format`, so no screen decides this itself. Exact stays for records and checks (`exact: true`): the PDF export, capture notifications, Needs Review conflicts, and every VoiceOver reading. An amount field rests short too, with a chevron that shows the exact figure; that figure moves the currency pill and calculator up only when it does not fit beside them, and shrinks rather than truncating when even the whole line is short.
+
 **Decided:** no `.rounded` design variant — the default SF Pro design everywhere. (SF Pro's `.rounded` could preserve some of the "young, playful" character the original bespoke fonts were chosen for, but it is explicitly not in use.)
 
 ---

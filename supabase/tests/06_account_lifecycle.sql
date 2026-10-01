@@ -7,7 +7,7 @@
 \ir _helpers.psql
 
 begin;
-select plan(10);
+select plan(14);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -28,7 +28,9 @@ select throws_ok(
 );
 
 -- 2. A correct-version edit succeeds, applies every editable column, and
--- bumps version to 2.
+-- bumps version to 2. The opening balance is not one of them: it is ignored
+-- since 20261009100000 (the form only echoes it; `set_account_balance` is how
+-- a balance changes), so it keeps the 100 it was created with.
 select results_eq(
   $$ select conflict, (account).name, (account).opening_balance_e4,
             (account).include_in_total, (account).icon, (account).color, (account).version
@@ -37,10 +39,10 @@ select results_eq(
        'Main Checking', 2500000, false, 'wrench.and.screwdriver.fill', '#123456'
      ) $$,
   $$ values (
-       false, 'Main Checking', 2500000::bigint, false,
+       false, 'Main Checking', 100::bigint, false,
        'wrench.and.screwdriver.fill', '#123456', 2
      ) $$,
-  'a correct-version edit applies every editable column and bumps version to 2'
+  'a correct-version edit applies every editable column, leaves the opening balance, and bumps version to 2'
 );
 
 -- 3. A stale-version edit reports conflict = true, applies no data change,
@@ -115,6 +117,53 @@ select is(
   (select conflict from delete_account('a0000000-0000-0000-0000-000000000011', 1)),
   false,
   'delete_account soft-deletes an account with no transactions'
+);
+
+-- 7–10. A cascade keeps a transfer whole (20261007100000). The half on the
+-- deleted account stays as an anchor while its partner's account is live —
+-- a lone live leg is what check_transfer_integrity refuses, and the delete
+-- used to raise at COMMIT for exactly that reason. Every assertion forces
+-- the deferred trigger: without it none of this would have been tested.
+insert into accounts (id, owner_id, created_by, kind, name, currency, opening_balance_e4)
+values
+  ('a0000000-0000-0000-0000-000000000012', auth.uid(), auth.uid(), 'regular', 'Old Checking', 'EUR', 0),
+  ('a0000000-0000-0000-0000-000000000013', auth.uid(), auth.uid(), 'regular', 'Savings', 'EUR', 0);
+select create_transfer(
+  'a0000000-0000-0000-0000-000000000012', 'a0000000-0000-0000-0000-000000000013', 300000, null, now(),
+  'd0000000-0000-0000-0000-000000000012', 'd0000000-0000-0000-0000-000000000013'
+);
+set constraints all immediate;
+set constraints all deferred;
+
+select delete_account('a0000000-0000-0000-0000-000000000012', 1, true);
+select lives_ok(
+  $$ set constraints all immediate $$,
+  'deleting an account that holds half of a transfer to a live account passes the integrity check at commit'
+);
+set constraints all deferred;
+
+select is(
+  account_balance_on('a0000000-0000-0000-0000-000000000013', current_date),
+  300000::bigint,
+  'the live account keeps the money that arrived in it'
+);
+
+select is(
+  (select deleted_at is null from transactions where id = 'd0000000-0000-0000-0000-000000000012'),
+  true,
+  'the half on the deleted account stays, as the anchor of a whole transfer'
+);
+
+-- Once the partner's account is deleted too, there is nothing left to
+-- anchor, and the pair goes whole — two legs to zero, never one.
+select delete_account('a0000000-0000-0000-0000-000000000013', 1, true);
+set constraints all immediate;
+set constraints all deferred;
+select is(
+  (select count(*)::int from transactions
+   where transfer_group_id = 'd0000000-0000-0000-0000-000000000012' and deleted_at is null),
+  0,
+  'a transfer between two deleted accounts is tombstoned whole'
 );
 
 select * from finish();

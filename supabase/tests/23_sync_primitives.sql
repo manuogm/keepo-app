@@ -233,11 +233,12 @@ select is(
   'unshare_account with another member present forks a full replica for the other member'
 );
 
--- 13. The original is archived, not deleted — history is never destroyed.
+-- 13. The sharer owns the account, so she keeps it as it was: not archived,
+-- not deleted (20261012100000; the old fork archived it).
 select is(
-  (select archived_at is not null from accounts where id = 'e0000000-0000-0000-0000-00000000e001'),
+  (select archived_at is null and deleted_at is null from accounts where id = 'e0000000-0000-0000-0000-00000000e001'),
   true,
-  'the original shared account is archived after an unshare-with-fork, never deleted'
+  'the sharer keeps her account after an unshare-with-fork, unarchived'
 );
 
 -- 14. household_accounts holds a tombstone (soft-deleted), not a hard
