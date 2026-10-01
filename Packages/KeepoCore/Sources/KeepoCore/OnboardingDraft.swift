@@ -6,11 +6,11 @@ import Foundation
 /// **One commit point, at the end.** The flow this replaces wrote the
 /// account and completed onboarding from inside step 4, so abandoning after
 /// that left an orphan account behind and Back was only correct by
-/// accident. Holding all eight steps in one value gives three things at
+/// accident. Holding every step in one value gives three things at
 /// once: Back is trivially correct everywhere, an abandoned flow leaves
 /// nothing, and failure is handled in one place instead of four.
 ///
-/// **It is persisted because step 4 sends the user to Shortcuts.** They are
+/// **It is persisted because the capture step sends the user to Shortcuts.** They are
 /// gone for minutes, and iOS may *terminate* Keepo in that time rather than
 /// merely background it — so `@State` alone loses the flow, which is what
 /// today's version does. Written to `UserDefaults` on every step change,
@@ -22,11 +22,6 @@ import Foundation
 /// testable without a UI.
 public struct OnboardingDraft: Codable, Equatable, Sendable {
     public var step: SetupStep
-    public var displayName: String?
-    /// Held as JPEG bytes and uploaded at commit. Small by construction —
-    /// `AvatarStore` centre-crops and re-encodes to 512px before this ever
-    /// sees it — so `UserDefaults` is an appropriate home for one of them.
-    public var avatarJPEG: Data?
     public var baseCurrency: String?
     /// The id is minted **here**, not at commit: client-generated UUIDs are
     /// this codebase's convention precisely so a retried write lands on the
@@ -49,9 +44,7 @@ public struct OnboardingDraft: Codable, Equatable, Sendable {
     public var captureVerifiedAt: Date?
 
     public init(
-        step: SetupStep = .profile,
-        displayName: String? = nil,
-        avatarJPEG: Data? = nil,
+        step: SetupStep = .currency,
         baseCurrency: String? = nil,
         account: DraftAccount? = nil,
         selectedCategories: [DefaultCategoryKey] = DefaultCategoryCatalog.preselected,
@@ -61,8 +54,6 @@ public struct OnboardingDraft: Codable, Equatable, Sendable {
         captureVerifiedAt: Date? = nil
     ) {
         self.step = step
-        self.displayName = displayName
-        self.avatarJPEG = avatarJPEG
         self.baseCurrency = baseCurrency
         self.account = account
         self.selectedCategories = selectedCategories
@@ -73,15 +64,18 @@ public struct OnboardingDraft: Codable, Equatable, Sendable {
     }
 }
 
-/// The eight setup screens. Nine in the original brief — the card-naming
-/// screen was cut once the prebuilt shortcut removed the need to type a
-/// card identifier by hand.
+/// The setup screens. Nine in the original brief — the card-naming screen
+/// was cut once the prebuilt shortcut removed the need to type a card
+/// identifier by hand, and the profile screen (a name and a photo) was cut
+/// on 2026-10-01 for adding nothing the app needs; both stay editable in
+/// My Profile.
 ///
 /// `Int` raw values so the progress dots and "is this before that?" are
 /// arithmetic rather than a `switch`, and **stable** because a persisted
-/// draft names its step by this value.
+/// draft names its step by this value — which is why the first case is 1,
+/// not 0. A draft saved on the removed profile step (0) fails to decode and
+/// the flow starts clean.
 public enum SetupStep: Int, Codable, Sendable, CaseIterable, Comparable {
-    case profile = 0
     case currency = 1
     case account = 2
     case capture = 3
@@ -94,30 +88,27 @@ public enum SetupStep: Int, Codable, Sendable, CaseIterable, Comparable {
 
     /// The dots only count the steps the user is *working* through. The
     /// commit and the all-set screen are the end of the flow, not two more
-    /// things to do, and showing 6-of-8 on a screen with nothing to answer
+    /// things to do, and showing 5-of-7 on a screen with nothing to answer
     /// would be counting the applause.
     public static let progressSteps: [SetupStep] = [
-        .profile, .currency, .account, .capture, .categories, .dashboard
+        .currency, .account, .capture, .categories, .dashboard
     ]
 
-    /// **Two steps have no Skip, for opposite reasons.**
-    ///
-    /// `.account` has nothing to skip *to*. Keepo cannot hold money without
-    /// somewhere to hold it, so a skipped account leaves an app that can do
-    /// nothing at all.
-    ///
-    /// `.currency` has nothing to skip *from*. The wheel always holds a
-    /// value — `onboarded_requires_base_currency` is a CHECK, so the step
-    /// cannot produce "nothing" even in principle — which made Skip there a
-    /// second button running the identical code path as Next, three seconds
-    /// later and in a different corner. A control that cannot do anything
-    /// the adjacent control does not already do is noise on a screen whose
+    /// **Only `.currency` has no Skip.** The wheel always holds a value —
+    /// `onboarded_requires_base_currency` is a CHECK, so the step cannot
+    /// produce "nothing" even in principle — which made Skip there a second
+    /// button running the identical code path as Next, three seconds later
+    /// and in a different corner. A control that cannot do anything the
+    /// adjacent control does not already do is noise on a screen whose
     /// whole job is one decision.
     ///
-    /// The rule the remaining four keep: Skip never means "no value", it
-    /// means "accept the default" — and each of them has a real default to
-    /// accept.
-    public var isSkippable: Bool { self != .account && self != .currency }
+    /// `.account` was the other exclusion, on the argument that a skipped
+    /// account leaves an app with nowhere to hold money. **Reversed
+    /// 2026-10-01**: the app has a "no accounts" empty state that leads
+    /// back to creating one, so skipping is a postponement, not a dead end.
+    /// It is also the one Skip that means "no value" rather than "accept
+    /// the default" — there is no honest default for an account.
+    public var isSkippable: Bool { self != .currency }
 
     public var next: SetupStep? { SetupStep(rawValue: rawValue + 1) }
     public var previous: SetupStep? { SetupStep(rawValue: rawValue - 1) }

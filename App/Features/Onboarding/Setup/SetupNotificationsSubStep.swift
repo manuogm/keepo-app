@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
-/// Step 4a — why notifications, then an explicit ask.
+/// Step 3a — why notifications, then an explicit ask.
 ///
 /// **The explanation is not marketing, it is the feature's actual shape.**
 /// A captured purchase never opens Keepo: the notification *is* the review

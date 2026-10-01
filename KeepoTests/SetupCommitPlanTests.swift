@@ -3,7 +3,7 @@ import KeepoCore
 import Testing
 @testable import Keepo
 
-/// Six screens of draft become a profile patch, an account, some
+/// A draft becomes a base currency, an account, some
 /// categories and a dashboard. This is the translation, and it is where
 /// the mistakes would be invisible: a category filed under the wrong kind
 /// or a selection order quietly sorted looks fine in a screenshot and is
@@ -30,33 +30,6 @@ struct SetupCommitPlanTests {
         var value = draft()
         value.baseCurrency = nil
         #expect(SetupCommitPlan.make(draft: value, userId: userId) == nil)
-    }
-
-    // MARK: - The name
-
-    /// `profiles_display_name_length` allows null but refuses the empty
-    /// string, so "skipped the profile step" has to be absence.
-    @Test("a skipped or blank name commits as nothing, never as an empty string")
-    func blankNameIsAbsent() {
-        for raw in [nil, "", "   ", "\n"] as [String?] {
-            let plan = SetupCommitPlan.make(draft: draft { $0.displayName = raw }, userId: userId)
-            #expect(plan?.displayName == nil)
-        }
-    }
-
-    @Test("a name is trimmed, not rejected, for the whitespace around it")
-    func nameIsTrimmed() {
-        let plan = SetupCommitPlan.make(draft: draft { $0.displayName = "  Manu " }, userId: userId)
-        #expect(plan?.displayName == "Manu")
-    }
-
-    /// The field caps typing at 60; this is the backstop for a draft
-    /// restored from a build that did not.
-    @Test("a name past the column's ceiling is clamped rather than failing the patch")
-    func nameIsClamped() {
-        let plan = SetupCommitPlan.make(draft: draft { $0.displayName = String(repeating: "a", count: 90) },
-                                        userId: userId)
-        #expect(plan?.displayName?.count == 60)
     }
 
     // MARK: - The account
@@ -156,18 +129,14 @@ struct SetupCommitPlanTests {
 
     // MARK: - Skipping everything skippable
 
-    /// Profile skipped, categories skipped, dashboard left at its seed:
+    /// Categories skipped, dashboard left at its seed:
     /// the flow still produces a committable plan, because the account and
     /// the currency are the only two things it genuinely needs.
     @Test("a run that skipped everything it could still commits")
     func minimalRun() throws {
         var value = draft()
-        value.displayName = nil
-        value.avatarJPEG = nil
         value.selectedCategories = []
         let plan = try #require(SetupCommitPlan.make(draft: value, userId: userId))
-        #expect(plan.displayName == nil)
-        #expect(plan.avatarJPEG == nil)
         #expect(plan.categories.isEmpty)
         #expect(plan.account != nil)
         #expect(plan.baseCurrency == "EUR")

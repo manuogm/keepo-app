@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 2 — the one answer setup cannot finish without.
+/// Step 1 — the one answer setup cannot finish without.
 ///
 /// `onboarded_requires_base_currency` is a CHECK, not a preference:
 /// `onboarded_at` cannot be written without a `base_currency`.
@@ -27,7 +27,6 @@ struct SetupCurrencyStep: View {
             subtitle: "Every balance converts to it. Change it any time",
             subtitleOnOneLine: true,
             step: .currency,
-            onBack: store.goBack,
             isPrimaryEnabled: !code.isEmpty,
             // Under the heading, not floating below it. The shortcuts are a
             // continuation of the question — three answers to "which one?" —

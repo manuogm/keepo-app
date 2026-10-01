@@ -23,7 +23,7 @@ struct OnboardingDraftStoreTests {
     @Test("a first run starts on the first step and is not a resume")
     func freshStart() {
         let store = OnboardingDraftStore(defaults: makeDefaults())
-        #expect(store.draft.step == .profile)
+        #expect(store.draft.step == .currency)
         #expect(store.didResume == false)
     }
 
@@ -34,14 +34,12 @@ struct OnboardingDraftStoreTests {
         let first = OnboardingDraftStore(defaults: defaults)
         first.update {
             $0.step = .capture
-            $0.displayName = "Manu"
             $0.baseCurrency = "EUR"
         }
 
         // A second store is what the next launch builds.
         let relaunched = OnboardingDraftStore(defaults: defaults)
         #expect(relaunched.draft.step == .capture)
-        #expect(relaunched.draft.displayName == "Manu")
         #expect(relaunched.draft.baseCurrency == "EUR")
         #expect(relaunched.didResume)
     }
@@ -52,7 +50,7 @@ struct OnboardingDraftStoreTests {
     @Test("stopping on the very first step is not a resume")
     func firstStepIsNotAResume() {
         let defaults = makeDefaults()
-        OnboardingDraftStore(defaults: defaults).update { $0.displayName = "Manu" }
+        OnboardingDraftStore(defaults: defaults).update { $0.baseCurrency = "EUR" }
         #expect(OnboardingDraftStore(defaults: defaults).didResume == false)
     }
 
@@ -60,7 +58,6 @@ struct OnboardingDraftStoreTests {
     func mutationsPersist() {
         let defaults = makeDefaults()
         let store = OnboardingDraftStore(defaults: defaults)
-        store.advance()
         store.advance()
         #expect(OnboardingDraftStore(defaults: defaults).draft.step == .account)
         store.goBack()
@@ -71,7 +68,7 @@ struct OnboardingDraftStoreTests {
     func stepsClampAtBothEnds() {
         let store = OnboardingDraftStore(defaults: makeDefaults())
         store.goBack()
-        #expect(store.draft.step == .profile)
+        #expect(store.draft.step == .currency)
         for _ in SetupStep.allCases { store.advance() }
         #expect(store.draft.step == .allSet)
         store.advance()
@@ -88,7 +85,7 @@ struct OnboardingDraftStoreTests {
         store.update { $0.step = .dashboard }
         store.clear()
 
-        #expect(store.draft.step == .profile)
+        #expect(store.draft.step == .currency)
         #expect(defaults.data(forKey: AppSettingsKeys.onboardingDraft) == nil)
         #expect(OnboardingDraftStore(defaults: defaults).didResume == false)
     }
@@ -100,7 +97,7 @@ struct OnboardingDraftStoreTests {
         let defaults = makeDefaults()
         defaults.set(Data([0x00, 0x01, 0x02]), forKey: AppSettingsKeys.onboardingDraft)
         let store = OnboardingDraftStore(defaults: defaults)
-        #expect(store.draft.step == .profile)
+        #expect(store.draft.step == .currency)
         #expect(store.didResume == false)
     }
 }

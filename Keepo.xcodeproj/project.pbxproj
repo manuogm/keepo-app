@@ -131,7 +131,6 @@
 		50FD89717A08A3A5CD6C40F3 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D5F67DEB6549433EA3B40C8 /* ShareSheet.swift */; };
 		50FE45A6E2499611801E6C79 /* UpcomingBillsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F1A025C92FE107062438BE2 /* UpcomingBillsWidget.swift */; };
 		50FEDE6442856BA78C4547ED /* TransactionFormView+Transfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C2F3F64823347A025EBB9D /* TransactionFormView+Transfer.swift */; };
-		51A74FE55891D73B32D391A2 /* SetupProfileStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79557DF2B36BA379D0A222B /* SetupProfileStep.swift */; };
 		51BA6A30B9400096154FA704 /* TagsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0722C7D32EF6A7D41AC4C27 /* TagsListView.swift */; };
 		53B6766AF8B573E922F1A2E8 /* LocalTitleMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E275E268E79E191D77B111 /* LocalTitleMemory.swift */; };
 		53DDDCB9693C26D604738006 /* HouseholdCeremonyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3A3B1E628DB2EC5C721FAA /* HouseholdCeremonyView.swift */; };
@@ -736,7 +735,6 @@
 		D621FA324F7CDB455E50A5B6 /* SetupCategoriesStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupCategoriesStep.swift; sourceTree = "<group>"; };
 		D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentBadge.swift; sourceTree = "<group>"; };
 		D6925EBD058F9EFA39FDFB8C /* ChoiceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoiceCard.swift; sourceTree = "<group>"; };
-		D79557DF2B36BA379D0A222B /* SetupProfileStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupProfileStep.swift; sourceTree = "<group>"; };
 		D8D7E92D6ABD885DD23F123D /* Outbox+Cards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+Cards.swift"; sourceTree = "<group>"; };
 		D9C5DE696770F9C03A0C7B11 /* MapCardSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapCardSheet.swift; sourceTree = "<group>"; };
 		DA3361FC13DBC4D8C0BF9A01 /* CategoryIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryIconView.swift; sourceTree = "<group>"; };
@@ -1262,7 +1260,6 @@
 				CB797A0ECBCCE64F53F21F37 /* SetupFlowView.swift */,
 				92F7930A017E5DCAFD9ECBE9 /* SetupNotificationShowcase.swift */,
 				36C0E74B8A5085E376E747EF /* SetupNotificationsSubStep.swift */,
-				D79557DF2B36BA379D0A222B /* SetupProfileStep.swift */,
 				B45B299BA3423C7F04AA8064 /* SetupWalkthroughSubStep.swift */,
 			);
 			path = Setup;
@@ -2033,7 +2030,6 @@
 				BC04CB91D3308912E8C075E7 /* SetupFlowView.swift in Sources */,
 				F9D1A11322F8E77CA141183F /* SetupNotificationShowcase.swift in Sources */,
 				8C60B347A059C20D42210DD8 /* SetupNotificationsSubStep.swift in Sources */,
-				51A74FE55891D73B32D391A2 /* SetupProfileStep.swift in Sources */,
 				98A21BA9452DAB83A6D1AD95 /* SetupWalkthroughSubStep.swift in Sources */,
 				50FD89717A08A3A5CD6C40F3 /* ShareSheet.swift in Sources */,
 				2095867E529AF9871AB428CF /* ShortcutInstallButton.swift in Sources */,

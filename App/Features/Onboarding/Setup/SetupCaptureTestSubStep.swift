@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 4c — the connection test, wearing onboarding's chrome.
+/// Step 3c — the connection test, wearing onboarding's chrome.
 ///
 /// The test itself is `CaptureConnectionTestView`, which carries its own
 /// actions and knows nothing about where it is drawn: Profile → My

@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 6 — which widgets the dashboard opens with, and in what order.
+/// Step 5 — which widgets the dashboard opens with, and in what order.
 ///
 /// **Names, not pictures.** This screen used to render every option as the
 /// real `DashboardWidgetView` against sample data, on the argument that a

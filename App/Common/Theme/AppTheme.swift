@@ -109,6 +109,11 @@ extension AppTheme {
         /// 200 — a drawing that is the whole point of the screen: an empty
         /// state with nothing else competing for the middle of it.
         static let illustrationHero: CGFloat = 200
+        /// 320 — a drawing that *is* the screen's content, with only a
+        /// heading above it and one button below: onboarding's capture
+        /// intro. Still inside the 343pt a 375pt phone leaves between the
+        /// screen margins.
+        static let illustrationFeature: CGFloat = 320
         /// 140 — an avatar that is the subject of the screen rather than a
         /// marker on it: onboarding's profile step, where it and one text
         /// field are the only things present and `illustration` left the

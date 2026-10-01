@@ -7,8 +7,7 @@ import KeepoCore
 /// The draft is what the user said; this is what that means in rows. They
 /// are separated because the translation is where the mistakes live — a
 /// category filed under the wrong kind, a colour that is not in the
-/// palette, a selection order silently sorted, a name that violates the
-/// column's CHECK — and none of those are visible in a screenshot. Pure
+/// palette, a selection order silently sorted — and none of those are visible in a screenshot. Pure
 /// value in, pure value out, so all of it is testable without a network,
 /// a database or a view.
 ///
@@ -18,30 +17,18 @@ import KeepoCore
 struct SetupCommitPlan {
     let userId: UUID
     let baseCurrency: String
-    /// `nil` when the profile step was skipped. Absence, not `""` — see
-    /// `ProfileRepository.completeOnboarding`.
-    let displayName: String?
-    let avatarJPEG: Data?
-    /// `nil` only defensively: the account step is the one step that cannot
-    /// be skipped, so in practice this is always present.
+    /// `nil` when the account step was skipped.
     let account: CreateAccountPayload?
     let categories: [CreateCategoryPayload]
     /// In selection order, deduplicated — the dashboard holds one widget
     /// per kind.
     let widgets: [DashboardWidgetKind]
 
-    /// `profiles_display_name_length` allows 1–60 characters after
-    /// trimming. The field caps typing at 60 already; this is the backstop,
-    /// so a draft restored from an older build can never fail the patch.
-    private static let displayNameLimit = 60
-
     static func make(draft: OnboardingDraft, userId: UUID) -> SetupCommitPlan? {
         guard let baseCurrency = draft.baseCurrency else { return nil }
         return SetupCommitPlan(
             userId: userId,
             baseCurrency: baseCurrency,
-            displayName: name(from: draft.displayName),
-            avatarJPEG: draft.avatarJPEG,
             account: accountPayload(from: draft.account, ownerId: userId),
             categories: CreateCategoryPayload.catalog(draft.selectedCategories, ownerId: userId),
             // **Arranged here, not on the step.** The user chooses a set;
@@ -52,13 +39,6 @@ struct SetupCommitPlan {
             // the finished selection.
             widgets: OnboardingDashboardPlan.arrange(deduplicated(draft.selectedMetrics))
         )
-    }
-
-    private static func name(from raw: String?) -> String? {
-        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-            return nil
-        }
-        return String(trimmed.prefix(displayNameLimit))
     }
 
     /// The id comes from the draft rather than being minted here, which is

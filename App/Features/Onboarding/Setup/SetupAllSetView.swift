@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 8 — the payoff, and the only screen in the flow with nothing to
+/// Step 7 — the payoff, and the only screen in the flow with nothing to
 /// answer.
 ///
 /// **No rating prompt here**, which is the whole of decision §3.10. Apple's
@@ -71,7 +71,7 @@ struct SetupAllSetView: View {
                         .opacity(hasLanded ? 1 : 0)
                         .animation(AppTheme.Motion.standard, value: hasLanded)
 
-                    Text(greeting)
+                    Text("You're all set")
                         .font(AppTheme.Typography.Number.display(
                             AppTheme.Typography.Number.metricCompact, weight: .bold, scale: typeScale
                         ))
@@ -117,17 +117,6 @@ struct SetupAllSetView: View {
             try? await Task.sleep(for: Self.lingerDelay)
             await finish()
         }
-    }
-
-    /// The name is read from the **draft**, not the profile: the profile on
-    /// this device is still the one fetched before setup ran, and the whole
-    /// point of the greeting is that Keepo now knows who they are. A user
-    /// who skipped step 1 gets the unnamed version rather than a blank.
-    private var greeting: String {
-        guard let name = store.draft.displayName?.trimmingCharacters(in: .whitespaces), !name.isEmpty else {
-            return "You're all set"
-        }
-        return "You're all set, \(name)"
     }
 
     /// Clears the draft **before** the refresh, not after: the refresh is

@@ -3,6 +3,11 @@
 > **Status:** proposal, pending Manu's decisions in §3. Nothing here is built.
 > **Scope:** replaces `App/Features/Onboarding/OnboardingView.swift` (267 lines, 5 steps) and reworks `App/Features/Auth/OTPSignInView.swift`; adds a first-time-user-experience layer inside the signed-in app. **Zero migrations** — every screen below is client-only, built on RPCs, payloads and views that already exist.
 > **Read with:** `keepo-brand-identity.md` (§1 colour, §3 Dynamic Type, §4 geometry/motion, §7 haptics), `CLAUDE.md` (Engineering Principles — *reuse before writing*), `version-logs/lessons-learned.md`.
+>
+> **Amendments after delivery — 2026-10-01 (Manu).** The text below describes the original eight-screen design; where it disagrees with this note, this note wins.
+> - **Profile step removed.** Setup is seven screens (currency → account → capture → categories → dashboard → commit → all-set). Name and photo are still editable in My Profile. Gone with it: `SetupProfileStep`, `DisplayNameSuggestion`, `OnboardingDraft.displayName`/`avatarJPEG`, the avatar upload in the commit, the name in the all-set greeting, and `completeOnboarding`'s `displayName` parameter. `SetupStep` raw values are unchanged (`currency` is now the first case, = 1), so a draft saved on the old profile step fails to decode and starts clean. New users have no `display_name` until they set one.
+> - **Account step now has Skip** (reverses §3.6's "`.account` has no Skip"). Skip commits no account; the app's no-accounts empty state leads back to creating one. `.currency` stays the only step without a Skip.
+> - **Capture intro** ("Automatic payment detection"): "Set up later" is gone — the chrome's Skip takes its place; the pitch diagram is replaced by `illustration-auto-payment`; subtitle added; one full-width "Set up now (2 min)" in the scaffold's bottom bar (`primaryFillsWidth`).
 
 ---
 

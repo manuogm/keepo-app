@@ -155,7 +155,7 @@ A **4pt grid** with exactly one half-step. A value not on this scale is a value 
 
 `xxs` (2) survives the grid on purpose: the leading between a row's title and its subtitle is genuinely 2pt work. **`l` (16) is the screen edge** — and also a card's inner inset and the dashboard's own step, so a sheet's edge lines up with a widget's.
 
-Square dimensions (`AppTheme.Size`) run `dot` 8 · `glyph` 24 · `icon` 32 · `touchTarget` 44 · `avatar` 56 · `illustration` 80. `touchTarget` is HIG's minimum, applied as a **hit area** via `hitTarget(_:)` rather than as layout — a 44pt capsule around every widget-header segment would swamp the header.
+Square dimensions (`AppTheme.Size`) run `dot` 8 · `glyph` 24 · `icon` 32 · `touchTarget` 44 · `avatar` 56 · `illustration` 80 · `illustrationHero` 200 · `illustrationFeature` 320. `touchTarget` is HIG's minimum, applied as a **hit area** via `hitTarget(_:)` rather than as layout — a 44pt capsule around every widget-header segment would swamp the header.
 
 ### Corner radii — `AppTheme.Radius`
 

@@ -2,76 +2,6 @@ import Foundation
 import Testing
 @testable import KeepoCore
 
-@Suite("DisplayNameSuggestion")
-struct DisplayNameSuggestionTests {
-    private func fromEmail(_ email: String) -> String? {
-        DisplayNameSuggestion.suggestion(from: nil, email: email)
-    }
-
-    /// The example the original refusal was written about. Splitting a full
-    /// name written as an address gets the person's name wrong, and a wrong
-    /// name is worse than no name.
-    @Test("a full name written as an address suggests nothing")
-    func fullNameAsAddress() {
-        #expect(fromEmail("fam.samper.ona@gmail.com") == nil)
-    }
-
-    @Test("a plain or two-part local part suggests the first piece", arguments: [
-        ("manu@gmail.com", "Manu"),
-        ("manu.ogm@gmail.com", "Manu"),
-        ("manu_ogm@gmail.com", "Manu"),
-        ("manu-ogm@gmail.com", "Manu"),
-        ("MANU@gmail.com", "Manu")
-    ])
-    func suggestsFirstSegment(email: String, expected: String) {
-        #expect(fromEmail(email) == expected)
-    }
-
-    @Test("a local part carrying a digit suggests nothing", arguments: [
-        "manu92@gmail.com", "user123@gmail.com", "1manu@gmail.com"
-    ])
-    func digitsRefused(email: String) {
-        #expect(fromEmail(email) == nil)
-    }
-
-    @Test("too little to be a name suggests nothing", arguments: [
-        "jl@gmail.com", "m@gmail.com", "j.smith@gmail.com"
-    ])
-    func tooShortRefused(email: String) {
-        #expect(fromEmail(email) == nil)
-    }
-
-    /// A mailbox is not a person.
-    @Test("a role address suggests nothing", arguments: [
-        "info@keepo.app", "noreply@keepo.app", "support@keepo.app", "hello@keepo.app"
-    ])
-    func roleAddressRefused(email: String) {
-        #expect(fromEmail(email) == nil)
-    }
-
-    @Test("no email at all suggests nothing")
-    func missingEmail() {
-        #expect(DisplayNameSuggestion.suggestion(from: nil, email: nil) == nil)
-        #expect(fromEmail("") == nil)
-    }
-
-    /// The seam this type exists for: when Sign in with Apple lands, a real
-    /// identity beats any guess and no call site changes.
-    @Test("a real identity wins over the email heuristic")
-    func componentsWin() {
-        var components = PersonNameComponents()
-        components.givenName = "Manu"
-        #expect(DisplayNameSuggestion.suggestion(from: components, email: "fam.samper.ona@gmail.com") == "Manu")
-    }
-
-    @Test("an empty identity falls through to the email")
-    func emptyComponentsFallThrough() {
-        var components = PersonNameComponents()
-        components.givenName = "   "
-        #expect(DisplayNameSuggestion.suggestion(from: components, email: "manu@gmail.com") == "Manu")
-    }
-}
-
 @Suite("DefaultCategoryCatalog")
 struct DefaultCategoryCatalogTests {
     /// `categories_one_default_per_kind` means the backend's seeded "Other"
@@ -124,12 +54,10 @@ struct OnboardingDraftTests {
     func roundTrips() throws {
         var draft = OnboardingDraft()
         draft.step = .capture
-        draft.displayName = "Manu"
         draft.baseCurrency = "EUR"
         draft.account = DraftAccount(name: "Checking", currency: "EUR", openingBalanceE4: 1_250_000)
         draft.selectedMetrics = [.netWorth, .cashflow]
         draft.walkthroughStep = 2
-        draft.avatarJPEG = Data([0xFF, 0xD8, 0xFF])
 
         let decoded = try JSONDecoder().decode(OnboardingDraft.self, from: JSONEncoder().encode(draft))
         #expect(decoded == draft)
@@ -138,36 +66,35 @@ struct OnboardingDraftTests {
     @Test("a fresh draft starts on the first step with the common categories")
     func freshDraftDefaults() {
         let draft = OnboardingDraft()
-        #expect(draft.step == .profile)
+        #expect(draft.step == .currency)
         #expect(draft.selectedCategories == DefaultCategoryCatalog.preselected)
         // Net Worth is always present — a dashboard with nothing on it is
         // the one outcome the Dashboard step must not be able to produce.
         #expect(draft.selectedMetrics == [.netWorth])
     }
 
-    /// Two steps have no Skip and they are the two ends of the same rule:
-    /// `.account` has no honest default to fall back to, and `.currency`
-    /// has nothing but a default — its Skip would have been Next wearing a
-    /// different label.
-    @Test("neither the account nor the currency offers a Skip")
+    /// `.currency` has nothing but a default — its Skip would have been
+    /// Next wearing a different label. `.account` is skippable: Skip there
+    /// means no account yet, and the app's empty state picks it up.
+    @Test("only the currency step offers no Skip")
     func stepsWithoutASkip() {
         for step in SetupStep.allCases {
-            #expect(step.isSkippable == (step != .account && step != .currency))
+            #expect(step.isSkippable == (step != .currency))
         }
     }
 
     @Test("the progress dots count only the steps with something to answer")
     func progressStepsExcludeTheEnding() {
-        #expect(SetupStep.progressSteps.count == 6)
+        #expect(SetupStep.progressSteps.count == 5)
         #expect(!SetupStep.progressSteps.contains(.committing))
         #expect(!SetupStep.progressSteps.contains(.allSet))
     }
 
     @Test("stepping forward and back walks the whole flow")
     func stepNavigation() {
-        #expect(SetupStep.profile.previous == nil)
+        #expect(SetupStep.currency.previous == nil)
         #expect(SetupStep.allSet.next == nil)
-        var step = SetupStep.profile
+        var step = SetupStep.currency
         var visited = [step]
         while let next = step.next {
             step = next
@@ -176,11 +103,23 @@ struct OnboardingDraftTests {
         #expect(visited == SetupStep.allCases)
     }
 
+    /// A draft saved on the removed profile step names step 0, which no case
+    /// has any more — it must fail to decode (the store then starts clean)
+    /// rather than land the user on a different screen.
+    @Test("a draft saved on the removed profile step does not decode")
+    func removedProfileStepDoesNotDecode() throws {
+        let encoded = try JSONEncoder().encode(OnboardingDraft())
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object["step"] = 0
+        let json = try JSONSerialization.data(withJSONObject: object)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(OnboardingDraft.self, from: json) }
+    }
+
     /// The raw values are what a persisted draft names its step by, so a
     /// user mid-flow when the app updates must land on the same screen.
     @Test("step raw values are stable")
     func rawValuesAreStable() {
-        #expect(SetupStep.profile.rawValue == 0)
+        #expect(SetupStep.currency.rawValue == 1)
         #expect(SetupStep.capture.rawValue == 3)
         #expect(SetupStep.allSet.rawValue == 7)
     }

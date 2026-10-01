@@ -68,9 +68,9 @@ struct WalletAutomationGuideView: View {
 
     // MARK: - Nothing set up yet
 
-    /// Onboarding's pitch verbatim — `CapturePitchView` — with one button
-    /// instead of two. "Set up later" is what got them here; offering it
-    /// again on the screen they opened *to* set it up would be a button
+    /// The pitch — `CapturePitchView` — and one button, with no "later":
+    /// skipping onboarding's capture step is what got them here, and offering
+    /// it again on the screen they opened *to* set it up would be a button
     /// whose only function is to undo the tap that opened the screen.
     private var blankState: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {

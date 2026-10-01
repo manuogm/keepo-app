@@ -24,25 +24,11 @@ public enum ProfileRepository {
     /// Sets base_currency and onboarded_at together — the DB's
     /// onboarded_requires_base_currency CHECK constraint means these can
     /// never be split into two calls without a moment of invalid state.
-    ///
-    /// The name rides along in the same patch rather than being written when
-    /// the user typed it, several steps earlier: onboarding can be abandoned
-    /// at any step, and a profile carrying a name but no base currency is a
-    /// half-signed-up user the rest of the app has no shape for.
-    ///
-    /// **`displayName` is optional because skipping the profile step is a
-    /// real answer**, and the column's own CHECK
-    /// (`profiles_display_name_length`) allows null but refuses an empty
-    /// string — so "no name" has to be *absence*, not `""`. `nil` therefore
-    /// omits the key entirely (synthesised `Encodable` uses
-    /// `encodeIfPresent` for optionals), which also means a replayed
-    /// onboarding cannot wipe a name the user already has.
     public static func completeOnboarding(
-        client: SupabaseClient, userId: UUID, baseCurrency: String, displayName: String?
+        client: SupabaseClient, userId: UUID, baseCurrency: String
     ) async throws {
         let patch = ProfileOnboardingPatch(
             baseCurrency: baseCurrency,
-            displayName: displayName,
             onboardedAt: PostgresDate.timestampString(Date())
         )
         try await client.from("profiles").update(patch).eq("id", value: userId).execute()
@@ -130,13 +116,9 @@ public enum ProfileRepository {
 
 private struct ProfileOnboardingPatch: Encodable {
     let baseCurrency: String
-    /// Omitted when nil, deliberately — see `completeOnboarding`. The
-    /// opposite case needed a hand-written encoder (`ProfileOnboardingResetPatch`).
-    let displayName: String?
     let onboardedAt: String
     enum CodingKeys: String, CodingKey {
         case baseCurrency = "base_currency"
-        case displayName = "display_name"
         case onboardedAt = "onboarded_at"
     }
 }

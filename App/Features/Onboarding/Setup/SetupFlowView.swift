@@ -21,8 +21,6 @@ struct SetupFlowView: View {
     var body: some View {
         ZStack {
             switch store.draft.step {
-            case .profile:
-                SetupProfileStep(session: session, store: store)
             case .currency:
                 SetupCurrencyStep(store: store, currencies: currencies)
             case .account:
@@ -43,7 +41,7 @@ struct SetupFlowView: View {
         // Keyed on the refresh token for a reason the old flow discovered
         // the hard way: on a **fresh install** the first sync pull has not
         // landed when this appears, so a one-shot read finds no currencies
-        // and step 2 dead-ends on an empty wheel with a dead Next button,
+        // and step 1 dead-ends on an empty wheel with a dead Next button,
         // recoverable only by relaunching. `syncNow` bumps the token when
         // the pull completes, which re-fires this.
         .task(id: session.refresh.token) {
@@ -65,7 +63,7 @@ struct SetupFlowView: View {
     }
 
     /// Shown once, and only to someone who actually left mid-flow. Without
-    /// it, being dropped onto step 4 of 6 with no explanation reads as the
+    /// it, being dropped onto step 3 of 5 with no explanation reads as the
     /// app having lost the first three.
     private var resumeNote: some View {
         Text("Picking up where you left off")

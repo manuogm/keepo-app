@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 4 — the one that makes Keepo Keepo, and the only step that sends
+/// Step 3 — the one that makes Keepo Keepo, and the only step that sends
 /// the user out of the app.
 ///
 /// Three sub-steps, persisted in `draft.walkthroughStep`, because the
@@ -69,7 +69,7 @@ struct SetupCaptureStep: View {
         store.update { $0.walkthroughStep = next.rawValue }
     }
 
-    /// Leaving step 4 resets the sub-step, so a user who comes *back* to it
+    /// Leaving step 3 resets the sub-step, so a user who comes *back* to it
     /// with the chrome's Back button lands on its first screen rather than
     /// on the notification ask they already answered.
     private func finish() {

@@ -35,10 +35,13 @@ struct OnboardingScaffold<Content: View>: View {
     /// something it genuinely still needs.
     var primaryTitle = "Next"
     var isPrimaryEnabled = true
+    /// Spans the bar instead of hugging its label, for a step whose forward
+    /// button is the one decision on the screen (the capture intro's "Set up
+    /// now") rather than a Next.
+    var primaryFillsWidth = false
     /// Hidden on the steps that own their own forward action: the account
-    /// step's type choice (picking a card *is* the action), the category
-    /// grid (whose Next scrolls with the content), and the capture intro
-    /// (which offers two choices rather than one). A bar holding a
+    /// step's type choice (picking a card *is* the action) and the category
+    /// grid (whose Next scrolls with the content). A bar holding a
     /// permanently disabled button is worse than no bar — it reads as a
     /// control the user has somehow failed to satisfy.
     var isPrimaryVisible = true
@@ -199,7 +202,10 @@ struct OnboardingScaffold<Content: View>: View {
         if isPrimaryVisible {
             HStack {
                 Spacer(minLength: 0)
-                PrimaryActionButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: onPrimary)
+                PrimaryActionButton(
+                    title: primaryTitle, isEnabled: isPrimaryEnabled,
+                    fillsWidth: primaryFillsWidth, action: onPrimary
+                )
             }
             // **`KeepoTabBarMetrics.margin`, on both edges.** The forward
             // button and the tab bar are the same thing in two halves of the

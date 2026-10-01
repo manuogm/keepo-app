@@ -54,8 +54,8 @@ struct AmountField<Header: View>: View {
     /// Off on onboarding's first-account step. The calculator is a
     /// convenience for an amount that needs working out, and an opening
     /// balance is a number the user reads off their bank — a second control
-    /// beside the figure there is one more thing to explain on the one
-    /// screen that cannot be skipped.
+    /// beside the figure there is one more thing to explain on a
+    /// screen that is already asking for a number.
     var showsCalculator = true
     /// Set when the keypad button belongs to a calculator the caller owns —
     /// the transaction card's one calculator for its two figures. `nil`

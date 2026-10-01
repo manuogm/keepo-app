@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 5 — the categories the user will actually file against, chosen
+/// Step 4 — the categories the user will actually file against, chosen
 /// before there is anything to file.
 ///
 /// **Nothing here is `is_default`, and that is a schema constraint rather

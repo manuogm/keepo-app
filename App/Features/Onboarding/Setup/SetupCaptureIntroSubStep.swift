@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 4a — the pitch, and the fork.
+/// Step 3a — the pitch, and the fork.
 ///
 /// **The step used to open with work.** The first thing it did was hand the
 /// user a permission prompt and then send them to Shortcuts, before
@@ -10,13 +10,19 @@ import SwiftUI
 /// it was the one minute asked for with the least context.
 ///
 /// So this screen sells it and then asks. Two answers, both real: **Set up
-/// now** runs the walkthrough and the test; **Set up later** skips straight
-/// past both, and is not a lesser answer — capture lives in Profile → My
+/// now** runs the walkthrough and the test; **Skip** goes straight past
+/// both, and is not a lesser answer — capture lives in Profile → My
 /// Automations unchanged, and everything else in Keepo works without it.
-/// Offering a genuine "later" here is also what lets the two screens behind
+/// Offering a genuine way out here is also what lets the two screens behind
 /// it drop their Skip entirely: a user who starts the setup has already
 /// been given the way out, and one more escape hatch halfway through an
 /// installation is how people end up with a half-built automation.
+///
+/// The answer to "later" is the chrome's Skip, the same control every other
+/// optional step uses, rather than a second button stacked under the
+/// first: one primary action in the scaffold's bottom bar — the same place
+/// every other step's forward button sits — and the escape where the user
+/// already looks for it.
 struct SetupCaptureIntroSubStep: View {
     let onSetUpNow: () -> Void
     let onSetUpLater: () -> Void
@@ -25,37 +31,19 @@ struct SetupCaptureIntroSubStep: View {
     var body: some View {
         OnboardingScaffold(
             title: "Automatic payment detection",
+            subtitle: "Most of your day-to-day spending, registered automatically",
             step: .capture,
             onBack: onBack,
-            isPrimaryVisible: false,
+            onSkip: onSetUpLater,
+            primaryTitle: "Set up now (2 min)",
+            primaryFillsWidth: true,
             onPrimary: onSetUpNow
         ) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
-                CapturePitchView()
-                choices
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    /// Both full width and stacked, rather than a pair in a bottom bar. They
-    /// are two answers to the question the screen just asked, not an action
-    /// and an escape — and a "later" tucked into a corner reads as the
-    /// wrong answer, which would make the minute feel compulsory when it is
-    /// genuinely not.
-    private var choices: some View {
-        VStack(spacing: AppTheme.Spacing.m) {
-            PrimaryActionButton(title: "Set up now", fillsWidth: true, action: onSetUpNow)
-            Button(action: onSetUpLater) {
-                Text("Set up later")
-                    .font(AppTheme.Typography.label)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: AppTheme.Size.touchTarget)
-                    .overlay(Capsule().stroke(AppTheme.Palette.textSecondary, lineWidth: 1))
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
+            // Floats in the space between the heading and the bar — the
+            // scaffold's default — so the drawing is centred in what is
+            // left rather than pinned under the subtitle.
+            KeepoIllustration(name: "illustration-auto-payment", size: AppTheme.Size.illustrationFeature)
+                .frame(maxWidth: .infinity)
         }
     }
 }

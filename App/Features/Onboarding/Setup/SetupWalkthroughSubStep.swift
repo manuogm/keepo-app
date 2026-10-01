@@ -1,7 +1,7 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 4b — get the shortcut, then point a Wallet automation at it, as a
+/// Step 3b — get the shortcut, then point a Wallet automation at it, as a
 /// list of things to do rather than a page to read.
 ///
 /// **This used to be the part where setup went wrong.** The old procedure

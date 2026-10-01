@@ -3,11 +3,9 @@ import SwiftUI
 
 /// What automatic capture is, in one diagram and three lines.
 ///
-/// Shared by onboarding's capture intro and Profile → My Automations,
-/// because they are the same pitch made to the same person at two different
-/// moments — someone deciding whether the minute of setup is worth it. Two
-/// copies of it would drift, and the one in Profile would be the one nobody
-/// noticed had gone stale.
+/// Profile → My Automations' blank state. Onboarding's capture intro used to
+/// share it and now pitches with an illustration instead (see
+/// `SetupCaptureIntroSubStep`).
 ///
 /// **A picture, not paragraphs.** This started as three paragraphs that
 /// were accurate and were not going to be read: it is the fifth screen of a

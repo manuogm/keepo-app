@@ -1,14 +1,14 @@
 import KeepoCore
 import SwiftUI
 
-/// Step 3 — the only step with no honest default, and therefore the only
-/// one with no Skip.
+/// Step 2 — the only step with no honest default, and therefore the only
+/// Skip that means "nothing" rather than "accept the default".
 ///
-/// Keepo without an account is an app that can do nothing at all: there is
-/// nowhere for a balance to be, nowhere for a capture to land, and the
-/// dashboard the user is about to build has nothing to draw. Every other
-/// step has something reasonable behind it; this one does not, which is
-/// what `SetupStep.isSkippable` encodes.
+/// Keepo without an account can do nothing yet: there is nowhere for a
+/// balance to be and nowhere for a capture to land. Skip is still offered,
+/// because the app's "no accounts" empty state leads straight back to
+/// creating one — the user is postponing, not stranded
+/// (`SetupStep.isSkippable`). The commit simply writes no account.
 ///
 /// **Two stages on one step, and the first one is a question.** The kind is
 /// asked on its own, as `AccountKindPicker`'s two cards, and the form does
@@ -56,6 +56,7 @@ struct SetupAccountStep: View {
             title: "Create your first account",
             step: .account,
             onBack: back,
+            onSkip: skip,
             isPrimaryEnabled: isComplete,
             isPrimaryVisible: kind != nil,
             // The cards belong under the question, not floating in the
@@ -222,6 +223,13 @@ struct SetupAccountStep: View {
                 account.openingBalanceE4, minorUnit: selectedCurrencyInfo?.minorUnit ?? 2
             )
         }
+    }
+
+    /// Skip means no account: any draft from an earlier visit is dropped, or
+    /// Skip would quietly commit something the user chose to leave behind.
+    private func skip() {
+        store.update { $0.account = nil }
+        store.advance()
     }
 
     private func next() {

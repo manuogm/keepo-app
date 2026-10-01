@@ -7,13 +7,13 @@ import Observation
 /// back to disk, so there is no "save" step to forget and no in-memory copy
 /// that can drift from what the next launch reads.
 ///
-/// **Persistence here is not a nicety.** Setup step 4 sends the user to the
+/// **Persistence here is not a nicety.** Setup's capture step sends the user to the
 /// Shortcuts app to build an automation, and they are gone for minutes —
 /// long enough that iOS may *terminate* Keepo rather than merely background
 /// it. The flow this replaces held its progress in `@State`, so that
 /// termination silently restarted setup from the beginning.
 ///
-/// The draft holds a name, a photo and an account the user has described —
+/// The draft holds an account the user has described —
 /// **none of which has reached the server**, and all of which is discarded
 /// the moment the commit succeeds. `UserDefaults` is the right home for the
 /// same documented reason the other device-local keys give: it is progress
@@ -43,7 +43,7 @@ final class OnboardingDraftStore {
         // Restoring onto the first step is not a resume — it is a user who
         // opened setup, went no further, and would be told they were
         // somewhere they never left.
-        self.didResume = stored.step != .profile
+        self.didResume = stored.step != .currency
     }
 
     /// The one way the draft changes. A closure rather than a setter per

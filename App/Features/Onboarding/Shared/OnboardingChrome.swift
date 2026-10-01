@@ -14,8 +14,8 @@ struct OnboardingChrome: View {
     /// `nil` on the first step — there is nowhere to go back to, and a
     /// disabled button that never enables is worse than no button.
     var onBack: (() -> Void)?
-    /// `nil` on the account step, which is the one thing Keepo cannot do
-    /// without (see `SetupStep.isSkippable`).
+    /// `nil` on the currency step, where Skip would only repeat Next (see
+    /// `SetupStep.isSkippable`).
     var onSkip: (() -> Void)?
 
     var body: some View {

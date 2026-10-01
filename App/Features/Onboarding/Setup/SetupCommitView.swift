@@ -1,10 +1,9 @@
 import KeepoCore
 import SwiftUI
-import UIKit
 
 /// The one point in setup that writes anything.
 ///
-/// Six screens collect a draft and none of them touch the server. The flow
+/// Every screen collects a draft and none of them touch the server. The flow
 /// this replaces wrote the account and completed onboarding from inside its
 /// fourth step, so abandoning afterwards left an orphan account behind and
 /// Back was only correct by accident. Everything happens here instead,
@@ -24,12 +23,6 @@ struct SetupCommitView: View {
     let session: SessionStore
     let store: OnboardingDraftStore
 
-    /// Its own instance rather than the one `MainTabView` owns, which does
-    /// not exist yet at this point in the flow. Nothing is lost by that:
-    /// the upload writes through to the profile and to the on-disk cache,
-    /// so the store the signed-in app builds a moment later finds the
-    /// picture already there.
-    @State private var avatars = AvatarStore()
     @State private var errorMessage: String?
     /// Worked out once and kept, so **Try Again is the same writes**.
     /// `SetupCommitPlan` mints a fresh id per category, so rebuilding it on
@@ -44,7 +37,7 @@ struct SetupCommitView: View {
             // The same curtain `MappedCardSheet` uses — translucent
             // material over a black at `Opacity.fill`, never a flat scrim.
             // It reads as something laid over the flow rather than as a
-            // ninth screen, which is what this is: the six answers are
+            // extra screen, which is what this is: the answers are
             // still behind it, and if the commit fails the user goes back
             // to them rather than starting again.
             Rectangle()
@@ -138,15 +131,13 @@ struct SetupCommitView: View {
         }
         self.plan = plan
 
-        await uploadAvatar(plan)
-
         // The only hard stop. Everything below it is either local-first or
         // device-local and cannot meaningfully fail; this is the write that
         // makes the user onboarded at all.
         do {
             try await ProfileRepository.completeOnboarding(
                 client: session.client, userId: userId,
-                baseCurrency: plan.baseCurrency, displayName: plan.displayName
+                baseCurrency: plan.baseCurrency
             )
         } catch {
             errorMessage = UserFacingError.describe(error)
@@ -160,24 +151,9 @@ struct SetupCommitView: View {
         // straight into the app — skipping the one screen that tells them
         // the setup they just spent two minutes on actually worked.
         // `SetupAllSetView` does it, on a tap, as the last act of the flow,
-        // with nothing left after it to interrupt. The draft stays for the
-        // same reason: that screen greets them by the name in it, and the
-        // server copy has not been re-read yet.
+        // with nothing left after it to interrupt. The draft stays until
+        // then: the step it holds is what keeps that screen showing.
         store.update { $0.step = .allSet }
-    }
-
-    /// Failure here is swallowed on purpose. A photo that did not upload is
-    /// worth one line in Profile, not a wall between the user and the app
-    /// they just spent two minutes setting up — and the avatar picker on
-    /// that screen is the same control, so the retry already exists.
-    ///
-    /// It runs **before** the profile patch, which is what keeps the
-    /// internal `refreshProfile()` inside `AvatarStore.replace` harmless:
-    /// `onboarded_at` is still null at this point, so that refresh cannot
-    /// flip the phase and pull this screen out from under the commit.
-    private func uploadAvatar(_ plan: SetupCommitPlan) async {
-        guard let data = plan.avatarJPEG, let image = UIImage(data: data) else { return }
-        _ = await avatars.replace(with: image, session: session)
     }
 
     /// Account, then categories, then the dashboard. The first two go
