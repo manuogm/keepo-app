@@ -98,8 +98,22 @@ struct SetupAccountStep: View {
                 .foregroundStyle(AppTheme.Palette.textSecondary)
 
             AccountKindPicker(onSelect: choose(_:))
+
+            Spacer(minLength: AppTheme.Spacing.l)
+
+            // Grows from the bottom of the screen rather than floating under
+            // the cards: the spacer above pushes it down, and the negative
+            // padding cancels the scaffold's own bottom inset so the coins
+            // sit just above the home indicator. Nothing is under it to
+            // collide with — this stage has no forward button.
+            KeepoIllustration(name: "illustration-first-account")
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, -AppTheme.Spacing.xxl)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        // Ahead of the scaffold's trailing spacer, so the slack goes to the
+        // spacer above the drawing and not under it.
+        .layoutPriority(1)
     }
 
     /// Picking a card *is* the forward action, which is why this step has no

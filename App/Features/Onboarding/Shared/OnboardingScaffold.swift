@@ -23,6 +23,11 @@ struct OnboardingScaffold<Content: View>: View {
     /// everything they need to in the title, and an empty subtitle that
     /// still reserves its space is the drift this type prevents.
     var subtitle: String?
+    /// Holds the subtitle to a single line: lifts the prose measure (a line
+    /// that must not wrap cannot also be capped narrower than itself) and
+    /// lets the text shrink a little on a narrow phone rather than wrap or
+    /// truncate. For a subtitle that is one short sentence, not for prose.
+    var subtitleOnOneLine = false
     let step: SetupStep
     var onBack: (() -> Void)?
     var onSkip: (() -> Void)?
@@ -167,9 +172,14 @@ struct OnboardingScaffold<Content: View>: View {
                 Text(subtitle)
                     .font(AppTheme.Typography.body)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .lineLimit(subtitleOnOneLine ? 1 : nil)
+                    .minimumScaleFactor(subtitleOnOneLine ? 0.8 : 1)
                     // The token exists for exactly this: prose stops being
                     // readable past roughly this measure.
-                    .frame(maxWidth: AppTheme.Size.proseWidth, alignment: .leading)
+                    .frame(
+                        maxWidth: subtitleOnOneLine ? .infinity : AppTheme.Size.proseWidth,
+                        alignment: .leading
+                    )
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

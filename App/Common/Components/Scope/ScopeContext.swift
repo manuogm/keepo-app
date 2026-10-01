@@ -58,6 +58,16 @@ final class ScopeContext {
         isLoaded = true
     }
 
+    /// Household scope with no household to show — the case where a screen
+    /// hides its own controls along with its content, since they would only
+    /// filter nothing. Not `emptiness(for:) == .noHousehold`: that answer
+    /// yields to `.noAccounts`, and a missing household is missing either
+    /// way. False until loaded, so a household that simply hasn't been read
+    /// yet doesn't flash as absent for a frame.
+    func isMissingHousehold(in scope: PublicSchema.AccountScope) -> Bool {
+        scope == .household && isLoaded && !hasHousehold
+    }
+
     /// `nil` means "this scope has data — render the screen".
     func emptiness(for scope: PublicSchema.AccountScope) -> ScopeEmptiness? {
         guard isLoaded else { return nil }

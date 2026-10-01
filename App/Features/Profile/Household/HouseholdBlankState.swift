@@ -1,21 +1,29 @@
 import KeepoCore
 import SwiftUI
 
-/// What the Household screen is before there is a household.
+/// What the app shows when there is no household: the drawing, what it is
+/// for, and two doors.
+///
+/// **One view for every place that can be in this state** — the Household
+/// screen and the Home, Accounts, Transactions and Categories screens under
+/// the Household scope. They used to be two different arrangements of the
+/// same fact, and a user who met one first had to relearn the other.
 ///
 /// Two buttons, and the order matters: **Create** leads because it is the
 /// one a user reaching this screen unprompted is doing. Join is what you do
 /// when somebody has already asked you to, and a person in that position is
 /// looking for the word "join" and will find it wherever it is.
 ///
-/// Deliberately not `ScopeEmptyStateView`. That view explains why a *screen*
-/// has gone blank under the current scope and offers one way out; this one is
-/// the front door to a feature and has two. Sharing it would mean bending a
-/// component built around a single action, which is how a shared component
-/// stops being worth sharing.
+/// Deliberately not `ScopeEmptyStateView`'s generic layout. That one explains
+/// why a *screen* has gone blank under the current scope and offers one way
+/// out; this one is the front door to a feature and has two. `ScopeEmptyStateView`
+/// hands the `.noHousehold` case to this view rather than sharing a layout.
 struct HouseholdBlankState: View {
     var onCreate: () -> Void
     var onJoin: () -> Void
+    /// Room under the buttons. The Household screen has the screen edge; the
+    /// main screens have a floating tab bar to stay clear of.
+    var bottomInset = AppTheme.Spacing.xxl
 
     private var tint: Color { PublicSchema.AccountScope.household.tint }
 
@@ -24,17 +32,18 @@ struct HouseholdBlankState: View {
             Spacer()
 
             VStack(spacing: AppTheme.Spacing.m) {
-                KeepoIcon(name: "icon-home", size: AppTheme.Size.icon)
-                    .foregroundStyle(tint)
-                    .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
-                    .background(tint.opacity(AppTheme.Opacity.fill), in: Circle())
+                KeepoIllustration(name: "illustration-no-household")
 
                 Text("No household yet")
                     .font(AppTheme.Typography.sectionTitle)
                     .foregroundStyle(AppTheme.Palette.textPrimary)
-            }
 
-            Spacer()
+                Text("Choose a partner and build a household together to start sharing your finances")
+                    .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             VStack(spacing: AppTheme.Spacing.m) {
                 Button(action: onCreate) {
@@ -62,9 +71,11 @@ struct HouseholdBlankState: View {
                 }
                 .buttonStyle(.pressableCard)
             }
+
+            Spacer()
         }
         .padding(.horizontal, AppTheme.Spacing.xxl)
-        .padding(.bottom, AppTheme.Spacing.xxl)
+        .padding(.bottom, bottomInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

@@ -72,6 +72,18 @@ extension PublicSchema.AccountScope {
         self == .total ? nil : title
     }
 
+    /// The badge's word where the full one does not fit beside the screen
+    /// title — Transactions, whose header also carries export and filter.
+    /// Four letters, no full stop, so it reads as a label and not as a
+    /// word cut short. `nil` for Total, for the same reason as `badgeTitle`.
+    var badgeShortTitle: String? {
+        switch self {
+        case .total: return nil
+        case .me: return "PRIV"
+        case .household: return "HHLD"
+        }
+    }
+
     /// One step darker than `tint`, for a panel that hangs off the banner
     /// and needs to read as a second surface rather than a continuation of
     /// the first — the Transactions filter drawer. Derived rather than
@@ -102,8 +114,8 @@ extension PublicSchema.AccountScope {
 /// Renders a scope's icon whether it's an `Assets.xcassets/Icons` asset
 /// (`icon-…`) or an SF Symbol. Asset icons take `size`; SF Symbols size from
 /// the caller's `.font(…)`, exactly like a bare `Image(systemName:)`. The
-/// blank state needs the fallback — its "no accounts" case is still the
-/// `creditcard` symbol — while the scope badges are all assets now.
+/// FTUX lessons need the fallback; the scope badges and blank states are all
+/// assets now.
 struct ScopeGlyph: View {
     let name: String
     var size: CGFloat = AppTheme.Size.glyphSmall
@@ -120,23 +132,44 @@ struct ScopeGlyph: View {
 // MARK: - Scope badge
 
 /// The "you are not looking at everything" flag beside a screen title.
-/// Never shown for Total — see `badgeTitle`.
+/// Draws nothing for Total — see `badgeTitle`.
+///
+/// **The title beside it is constant, so this is what gives way**: the
+/// full word when it fits, the short one when it does not. The glyph is
+/// never dropped — it is what says *which* scope at a glance — and the
+/// pill is never squeezed or wrapped. `isAbbreviated` skips straight to
+/// the short word, for a header known to be too crowded for the long one.
 struct ScopeBadge: View {
-    let title: String
-    let icon: String
+    let scope: PublicSchema.AccountScope
+    var isAbbreviated = false
 
     var body: some View {
+        if let icon = scope.icon, let full = scope.badgeTitle, let short = scope.badgeShortTitle {
+            ViewThatFits(in: .horizontal) {
+                if !isAbbreviated {
+                    pill(icon: icon, title: full)
+                }
+                pill(icon: icon, title: short)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(scope.title)
+        }
+    }
+
+    private func pill(icon: String, title: String) -> some View {
         HStack(spacing: AppTheme.Spacing.xs) {
             ScopeGlyph(name: icon, size: AppTheme.Size.glyphNano)
                 .font(AppTheme.Typography.nanoEmphasis)
             Text(title.uppercased())
                 .font(AppTheme.Typography.nanoEmphasis)
                 .tracking(0.4)
+                .lineLimit(1)
         }
         .foregroundStyle(AppTheme.Palette.textOnAccent)
         .padding(.horizontal, AppTheme.Spacing.s)
         .padding(.vertical, AppTheme.Spacing.xxs)
         .background(AppTheme.Palette.textOnAccent.opacity(AppTheme.Opacity.fillStrong), in: Capsule())
+        .fixedSize()
     }
 }
 

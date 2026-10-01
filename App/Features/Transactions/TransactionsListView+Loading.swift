@@ -103,11 +103,13 @@ extension TransactionsListView {
         allAccountsBalance = loaded.allAccountsBalance
         availableSources = loaded.availableSources
         // A source that has left the ledger — the last capture deleted, say —
-        // must not go on filtering from a pill that is no longer drawn. Same
-        // guard `loadAuthors` applies to a dissolved household.
+        // must not go on filtering from a pill that is now dimmed and inert.
+        // Down to one source, the filter can only ever match everything, so
+        // it goes too. Same guard `loadAuthors` applies to a dissolved
+        // household.
         if let sources = filter.sources {
             let surviving = sources.intersection(loaded.availableSources)
-            filter.sources = surviving.isEmpty ? nil : surviving
+            filter.sources = surviving.isEmpty || loaded.availableSources.count < 2 ? nil : surviving
         }
         // Day grouping and the category lookup are derived here, once, rather
         // than recomputed inside `body` — see `regroup`'s own comment on why

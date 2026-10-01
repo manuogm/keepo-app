@@ -17,13 +17,34 @@ struct ScopeEmptyStateView: View {
     @Environment(AppNavigation.self) private var navigation: AppNavigation?
     @State private var isAddingAccount = false
 
+    @ViewBuilder
     var body: some View {
+        if case .noHousehold = emptiness {
+            // Not a case of the layout below: this state is the front door to
+            // a feature, with two doors, and it is the same view the
+            // Household screen shows. Both buttons open the setup flow in
+            // place — see `AppNavigation.householdSetupRole`.
+            HouseholdBlankState(
+                onCreate: { navigation?.householdSetupRole = .owner },
+                onJoin: { navigation?.householdSetupRole = .guest },
+                bottomInset: KeepoTabBarMetrics.clearance
+            )
+        } else {
+            explanation
+        }
+    }
+
+    private var explanation: some View {
         VStack(spacing: AppTheme.Spacing.m) {
-            ScopeGlyph(name: icon, size: AppTheme.Size.icon)
-                .font(AppTheme.Typography.screenTitle.weight(.light))
-                .foregroundStyle(tint)
-                .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
-                .background(tint.opacity(AppTheme.Opacity.fill), in: Circle())
+            if let illustration {
+                KeepoIllustration(name: illustration)
+            } else {
+                ScopeGlyph(name: icon, size: AppTheme.Size.icon)
+                    .font(AppTheme.Typography.screenTitle.weight(.light))
+                    .foregroundStyle(tint)
+                    .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
+                    .background(tint.opacity(AppTheme.Opacity.fill), in: Circle())
+            }
 
             VStack(spacing: AppTheme.Spacing.xs) {
                 Text(title)
@@ -67,10 +88,24 @@ struct ScopeEmptyStateView: View {
         let kind: ActionKind
     }
 
+    /// A drawing in place of the glyph, for the states that are a first
+    /// step rather than a filter coming up empty: no accounts at all is the
+    /// whole app waiting to start, the same weight as no household.
+    private var illustration: String? {
+        switch emptiness {
+        case .noAccounts: return "illustration-no-account"
+        case .noHousehold, .noSharedAccounts, .noPrivateAccounts: return nil
+        }
+    }
+
     private var icon: String {
         switch emptiness {
-        case .noAccounts: return "creditcard"
-        case .noHousehold, .noSharedAccounts: return "icon-home"
+        // `.noAccounts` draws `illustration` instead, so its glyph is never
+        // shown; it is grouped so the switch stays exhaustive. `.noHousehold`
+        // is drawn by `HouseholdBlankState` and never reaches the arms below;
+        // it is grouped the same way, without a second copy of that state's
+        // copy.
+        case .noAccounts, .noHousehold, .noSharedAccounts: return "icon-home"
         case .noPrivateAccounts: return "icon-lock"
         }
     }
@@ -89,21 +124,18 @@ struct ScopeEmptyStateView: View {
     private var title: String {
         switch emptiness {
         case .noAccounts: return "No accounts yet"
-        case .noHousehold: return "No household yet"
         case .noPrivateAccounts: return "Nothing private here"
-        case .noSharedAccounts: return "Nothing shared yet"
+        case .noHousehold, .noSharedAccounts: return "Nothing shared yet"
         }
     }
 
     private var message: String {
         switch emptiness {
         case .noAccounts:
-            return "Add your first account and Keepo starts tracking balances, spending and transfers."
-        case .noHousehold:
-            return "Create a household to share accounts with someone and see your money side by side."
+            return "Add your first account and start tracking your money."
         case .noPrivateAccounts:
             return "Every account you have is shared with your household, so there is nothing private to show."
-        case .noSharedAccounts:
+        case .noHousehold, .noSharedAccounts:
             return "Share an account with your household and it shows up here."
         }
     }
@@ -111,8 +143,7 @@ struct ScopeEmptyStateView: View {
     private var action: Action? {
         switch emptiness {
         case .noAccounts: return Action(title: "Add Account", kind: .addAccount)
-        case .noHousehold: return Action(title: "Create Household", kind: .openHousehold)
-        case .noSharedAccounts: return Action(title: "Share Accounts", kind: .openHousehold)
+        case .noHousehold, .noSharedAccounts: return Action(title: "Share Accounts", kind: .openHousehold)
         // Deliberately no button (the user's own call): nothing is broken
         // and nothing needs doing — the answer is "swipe back to Total".
         case .noPrivateAccounts: return nil

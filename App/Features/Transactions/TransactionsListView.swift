@@ -224,6 +224,7 @@ struct TransactionsListView: View {
                     title: "Transactions",
                     session: session,
                     isFiltersExpanded: isFiltersExpanded,
+                    abbreviatesScopeBadge: true,
                     onBack: backToDashboard,
                     onOpenProfile: { navigation?.openProfileRoot() },
                     accessory: { headerActions },
@@ -246,10 +247,13 @@ struct TransactionsListView: View {
                     // two say what the list is, and an explanation that
                     // scrolls off is not one. Below the drawer because they
                     // are the *ledger's* controls — when the inbox takes the
-                    // screen there is no list left for them to filter.
-                    filterBar
-                        .padding(.horizontal, AppTheme.Spacing.l)
-                        .padding(.top, AppTheme.Spacing.s)
+                    // screen there is no list left for them to filter, and
+                    // with no household there is no ledger to filter either.
+                    if scopeContext?.isMissingHousehold(in: session.scope) != true {
+                        filterBar
+                            .padding(.horizontal, AppTheme.Spacing.l)
+                            .padding(.top, AppTheme.Spacing.s)
+                    }
 
                     ledger
                         .padding(.top, AppTheme.Spacing.s)
@@ -270,10 +274,17 @@ struct TransactionsListView: View {
             Spacer()
         } else if transactions.isEmpty {
             Spacer()
-            Text(emptyLedgerMessage)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, AppTheme.Spacing.l)
+            VStack(spacing: AppTheme.Spacing.m) {
+                KeepoIllustration(name: "illustration-no-transactions")
+                Text(emptyLedgerMessage)
+                    .foregroundStyle(AppTheme.Palette.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, AppTheme.Spacing.l)
+            // Centred in what the user can see, not in a region that runs
+            // under the floating tab bar — where the ledger's bottom fade
+            // washes the caption out.
+            .padding(.bottom, KeepoTabBarMetrics.clearance)
             Spacer()
         } else {
             transactionList

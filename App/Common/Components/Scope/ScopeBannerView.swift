@@ -64,6 +64,10 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     /// hiding them is most obviously worth knowing about. Same shape as
     /// `showsPrivacyToggle` above, for the same reason.
     var showsPrivacyLesson = false
+    /// Draws the scope badge as its short word ("HHLD", "PRIV") from the
+    /// start. Transactions opts in: export and filter share its header line
+    /// with the longest title of the four, and the full word does not fit.
+    var abbreviatesScopeBadge = false
     /// The way back to the screen that sent the user here. `nil` — and so
     /// no chevron at all — on a screen that is simply its own tab.
     ///
@@ -157,42 +161,45 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
     }
 
     private func card(_ scope: PublicSchema.AccountScope) -> some View {
-        HStack(spacing: AppTheme.Spacing.m) {
-            backButton
-            Button(action: onOpenProfile) {
-                ProfileAvatarView(
-                    name: session.profile?.displayName, email: session.userEmail,
-                    image: avatars?.image, onColor: true
-                )
-            }
-            .buttonStyle(.pressableCard)
-            .accessibilityLabel("Open profile")
+        // Two clusters with one flexible gap between them, rather than one
+        // row with a `Spacer` in it: a spacer takes the row's spacing on
+        // *both* sides, so the gap could never close below two `m`s and the
+        // badge lost that room to nothing. Transactions — title, badge,
+        // export, filter, eye — needs every point of it on a 6.3" phone.
+        HStack(spacing: 0) {
+            HStack(spacing: AppTheme.Spacing.m) {
+                leadingControl
 
-            HStack(spacing: AppTheme.Spacing.xs) {
-                Text(title)
-                    .font(AppTheme.Typography.headerTitle)
-                    .foregroundStyle(AppTheme.Palette.textOnAccent)
-                if let badge = scope.badgeTitle, let icon = scope.icon {
-                    ScopeBadge(title: badge, icon: icon)
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    // Exactly `headerTitle`, always: never scaled to fit,
+                    // never truncated. The badge beside it is what gives way.
+                    Text(title)
+                        .font(AppTheme.Typography.headerTitle)
+                        .foregroundStyle(AppTheme.Palette.textOnAccent)
+                        .lineLimit(1)
+                        .fixedSize()
+                    ScopeBadge(scope: scope, isAbbreviated: abbreviatesScopeBadge)
                 }
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
 
-            Spacer(minLength: AppTheme.Spacing.xs)
+            Spacer(minLength: AppTheme.Spacing.s)
 
-            accessory
-            if showsPrivacyToggle {
-                PrivacyToggleButton(session: session, tint: .white)
-                    .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
-                    // **Only the card the user is actually looking at.**
-                    // The carousel keeps all three mounted, side by side
-                    // and off-screen, so anchoring every card's eye would
-                    // let a neighbour win the anchor and cut the hole
-                    // somewhere past the edge of the display.
-                    .ftuxAnchor(
-                        showsPrivacyLesson && scope == session.scope ? FTUXLessons.privacy : nil
-                    )
+            // `s`, the same gap the callers' own accessories use between
+            // their buttons, so a row of three icons is evenly spaced.
+            HStack(spacing: AppTheme.Spacing.s) {
+                accessory
+                if showsPrivacyToggle {
+                    PrivacyToggleButton(session: session, tint: .white)
+                        .frame(width: AppTheme.Size.icon, height: AppTheme.Size.icon)
+                        // **Only the card the user is actually looking at.**
+                        // The carousel keeps all three mounted, side by side
+                        // and off-screen, so anchoring every card's eye would
+                        // let a neighbour win the anchor and cut the hole
+                        // somewhere past the edge of the display.
+                        .ftuxAnchor(
+                            showsPrivacyLesson && scope == session.scope ? FTUXLessons.privacy : nil
+                        )
+                }
             }
         }
         .padding(.horizontal, AppTheme.Spacing.l)
@@ -213,24 +220,27 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(title), \(scope.title) scope")
-        // Scoped to the chevron arriving or leaving. Everything else on the
+        // Scoped to the chevron and the avatar trading places. Everything else on the
         // card — tilt, shrink, colour — is driven by the drag and has to
         // stay out of an implicit animation.
         .animation(AppTheme.Motion.standard, value: onBack != nil)
     }
 
-    /// The leading slot, which is where iOS puts back and so where the eye
-    /// looks for it. *Beside* the avatar rather than replacing it: Profile
-    /// is reached from the header on every screen, and one that stopped
-    /// offering it because a filter was applied would be the exception.
+    /// The leading slot: the way back when there is one, the avatar
+    /// otherwise. Back is where iOS puts it and so where the eye looks.
     ///
-    /// At the title's font, not `Size.glyph` like the two controls on the
-    /// other end — a chevron is a stroke, not a filled shape, so in the same
-    /// box as the eye and the funnel it reads as a hairline. Narrow in
-    /// layout but 44pt to the finger, so a glyph this thin doesn't push the
-    /// title a finger's width across.
+    /// **Instead of** the avatar, not beside it (the user's call): a header
+    /// carrying back, avatar, title, scope badge and three buttons does not
+    /// fit on one line, and the title is the one thing on it that may not
+    /// give way. Profile stays one tap away on every other tab, and here
+    /// again the moment the user goes back.
+    ///
+    /// The chevron is at the title's font, not `Size.glyph` like the
+    /// controls on the other end — a chevron is a stroke, not a filled
+    /// shape, so in the same box as the eye and the funnel it reads as a
+    /// hairline. Narrow in layout but 44pt to the finger.
     @ViewBuilder
-    private var backButton: some View {
+    private var leadingControl: some View {
         if let onBack {
             Button(action: onBack) {
                 Image(systemName: "chevron.left")
@@ -243,7 +253,17 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
             // that look like surfaces, and this is a glyph.
             .buttonStyle(.pressableRow)
             .accessibilityLabel("Back")
-            .transition(.opacity.combined(with: .move(edge: .leading)))
+            .transition(.opacity)
+        } else {
+            Button(action: onOpenProfile) {
+                ProfileAvatarView(
+                    name: session.profile?.displayName, email: session.userEmail,
+                    image: avatars?.image, onColor: true
+                )
+            }
+            .buttonStyle(.pressableCard)
+            .accessibilityLabel("Open profile")
+            .transition(.opacity)
         }
     }
 
@@ -367,34 +387,5 @@ struct ScopeBannerView<Accessory: View, Filters: View>: View {
         let next = direction < 0 ? index + 1 : index - 1
         guard scopes.indices.contains(next) else { return nil }
         return scopes[next]
-    }
-}
-
-extension ScopeBannerView where Accessory == EmptyView, Filters == EmptyView {
-    init(
-        title: String, session: SessionStore, showsPrivacyToggle: Bool = true,
-        onOpenProfile: @escaping () -> Void
-    ) {
-        self.init(
-            title: title, session: session, showsPrivacyToggle: showsPrivacyToggle,
-            onOpenProfile: onOpenProfile, accessory: { EmptyView() }, filters: { EmptyView() }
-        )
-    }
-}
-
-extension ScopeBannerView where Filters == EmptyView {
-    init(
-        title: String,
-        session: SessionStore,
-        showsPrivacyToggle: Bool = true,
-        showsPrivacyLesson: Bool = false,
-        onOpenProfile: @escaping () -> Void,
-        @ViewBuilder accessory: () -> Accessory
-    ) {
-        self.init(
-            title: title, session: session, showsPrivacyToggle: showsPrivacyToggle,
-            showsPrivacyLesson: showsPrivacyLesson,
-            onOpenProfile: onOpenProfile, accessory: accessory, filters: { EmptyView() }
-        )
     }
 }

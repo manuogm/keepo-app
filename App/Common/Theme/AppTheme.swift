@@ -106,6 +106,9 @@ extension AppTheme {
         static let avatar: CGFloat = 56
         /// 80 — the mark an empty state is built around.
         static let illustration: CGFloat = 80
+        /// 200 — a drawing that is the whole point of the screen: an empty
+        /// state with nothing else competing for the middle of it.
+        static let illustrationHero: CGFloat = 200
         /// 140 — an avatar that is the subject of the screen rather than a
         /// marker on it: onboarding's profile step, where it and one text
         /// field are the only things present and `illustration` left the

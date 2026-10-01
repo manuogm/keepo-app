@@ -65,6 +65,12 @@ final class AppNavigation {
     /// separate push inside each of the three tabs' own stacks.
     var isProfilePresented = false
 
+    /// The household setup flow, when one of the main screens' blank states
+    /// asked for it. Presented by `MainTabView`, not by the blank state: the
+    /// flow creates the household partway through, and the blank state is
+    /// removed the moment that lands — taking a flow it was presenting with it.
+    var householdSetupRole: HouseholdPairingIdentity.Role?
+
     /// Which screen's Add button was pressed, waiting for that screen to
     /// act on it. Same set-then-clear shape as `transactionsRequest` below:
     /// all three tabs are mounted at once, so the request has to name its

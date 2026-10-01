@@ -24,10 +24,8 @@ struct SetupCurrencyStep: View {
     var body: some View {
         OnboardingScaffold(
             title: "Choose your base currency",
-            // Two lines, deliberately. One sentence with a dash in it read
-            // as a single dense line at the top of a screen whose only job
-            // is one choice; as two it is a fact and a reassurance.
-            subtitle: "Every balance converts to it\nChangeable any time",
+            subtitle: "Every balance converts to it. Change it any time",
+            subtitleOnOneLine: true,
             step: .currency,
             onBack: store.goBack,
             isPrimaryEnabled: !code.isEmpty,
@@ -47,7 +45,10 @@ struct SetupCurrencyStep: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: AppTheme.Size.illustration * 2)
             } else {
-                CurrencyWheel(currencies: currencies, selection: $code, label: "Base currency")
+                VStack(spacing: AppTheme.Spacing.l) {
+                    CurrencyWheel(currencies: currencies, selection: $code, label: "Base currency")
+                    KeepoIllustration(name: "illustration-world-currencies")
+                }
             }
         }
         // Keyed on the list, not run once: the wheel has nothing to sit on

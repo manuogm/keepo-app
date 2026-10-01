@@ -78,11 +78,9 @@ struct CategoriesView: View {
 
     /// Household scope with nobody to share a category with — the same
     /// "nothing behind this scope" state the money screens show, minus the
-    /// account-specific cases that don't mean anything here. Gated on
-    /// `isLoaded` so a household that simply hasn't loaded yet doesn't flash
-    /// as "no household" for a frame.
+    /// account-specific cases that don't mean anything here.
     private var showsHouseholdBlankState: Bool {
-        session.scope == .household && scopeContext?.isLoaded == true && scopeContext?.hasHousehold == false
+        scopeContext?.isMissingHousehold(in: session.scope) == true
     }
 
     /// The catalogue onboarding offered, offered again to someone who

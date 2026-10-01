@@ -69,6 +69,7 @@
 		2E3B3DDB0252C2C09D0842D5 /* CategoryMergeSubject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54321BA404673645FC7ACC9A /* CategoryMergeSubject.swift */; };
 		2EE829D9540BCA03093D5566 /* CategoryIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA3361FC13DBC4D8C0BF9A01 /* CategoryIconView.swift */; };
 		2F0B4AC72E20917F31A0D9F7 /* AccountFormView+Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = E82D12D8E224E6F3833EFD78 /* AccountFormView+Data.swift */; };
+		2F40BD5D0546876F76C3C25E /* ScopeBannerView+Init.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343878A31B96B4455203D620 /* ScopeBannerView+Init.swift */; };
 		2F93B60FFC35E87E8539459C /* CurrencyFlagAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7440D8EAA40F17639CC1041 /* CurrencyFlagAssetTests.swift */; };
 		2FA5C7471F5140A0CC03B744 /* HouseholdKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 429EDEB71C3725F0838B5333 /* HouseholdKit.swift */; };
 		303EFE1709BE276368BD86D3 /* RecurringRuleFormView+Schedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35FCE63463A832562DF9C5DB /* RecurringRuleFormView+Schedule.swift */; };
@@ -264,6 +265,7 @@
 		AD2A7DB89BBDB050452CA807 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE9D5EF2222D3BBB7A7C333C /* Outbox.swift */; };
 		AEDA7863DFF287EA9CB7BE1A /* TransactionsListView+Loading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12323049CBBB834E1978A81E /* TransactionsListView+Loading.swift */; };
 		B00B2A03D82D0237A6D9DB11 /* CategoryTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB1C58405432F114141B208 /* CategoryTile.swift */; };
+		B01DE278E1F200FED51A7A77 /* KeepoIllustration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E561B30DF9AEFF5035FC91C4 /* KeepoIllustration.swift */; };
 		B03FB07E318C04AE8F7EC30D /* LocalTransactionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBF6795112FAE14AF6A9964 /* LocalTransactionRow.swift */; };
 		B062CB0717771AF5D839D4F9 /* FTUXCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35170FD359FD5CC824394DC0 /* FTUXCoordinatorTests.swift */; };
 		B16749167FEEB5FD38909271 /* SoleTransferDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E28C21CD23022194158898 /* SoleTransferDestinationTests.swift */; };
@@ -506,6 +508,7 @@
 		323D6E84BA1E735B53FDE6E7 /* ScopeContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeContext.swift; sourceTree = "<group>"; };
 		330A1DB56C7CE8B1BC25180E /* LocalStoreMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStoreMigrationTests.swift; sourceTree = "<group>"; };
 		341E14CE6FFBD77B40BAD3E6 /* CategoryMergeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryMergeSheet.swift; sourceTree = "<group>"; };
+		343878A31B96B4455203D620 /* ScopeBannerView+Init.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScopeBannerView+Init.swift"; sourceTree = "<group>"; };
 		349CAF3BCEA4D911AA5E107F /* DashboardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardData.swift; sourceTree = "<group>"; };
 		35170FD359FD5CC824394DC0 /* FTUXCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTUXCoordinatorTests.swift; sourceTree = "<group>"; };
 		35FCE63463A832562DF9C5DB /* RecurringRuleFormView+Schedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecurringRuleFormView+Schedule.swift"; sourceTree = "<group>"; };
@@ -752,6 +755,7 @@
 		E3A3543E6EF9E4AA8A2E59C5 /* CaptureIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureIntent.swift; sourceTree = "<group>"; };
 		E3F0AF9AF993A62F84E3B88D /* ConflictReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictReplayTests.swift; sourceTree = "<group>"; };
 		E484AE7752B52893E4087D42 /* ColorHexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHexTests.swift; sourceTree = "<group>"; };
+		E561B30DF9AEFF5035FC91C4 /* KeepoIllustration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoIllustration.swift; sourceTree = "<group>"; };
 		E6A38539331FFF50848026BE /* ProgressDots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressDots.swift; sourceTree = "<group>"; };
 		E6DBDB63AD4D05BD8A1403EA /* DashboardCanvasDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCanvasDrag.swift; sourceTree = "<group>"; };
 		E7D04C4098B946BDD9BEA9AB /* HouseholdData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdData.swift; sourceTree = "<group>"; };
@@ -1006,6 +1010,7 @@
 				59D17800B8CAFD32B42ECB90 /* IconCatalogView.swift */,
 				D63DBFB77A73620BBFC083A5 /* InvestmentBadge.swift */,
 				3BF15D55D3521FD9A1E4BBEC /* KeepoIcon.swift */,
+				E561B30DF9AEFF5035FC91C4 /* KeepoIllustration.swift */,
 				3768CA435AE5F391055BEBA2 /* KindTabBar.swift */,
 				03941D7DA3A9DB1450A09F83 /* OfflineInfoSheet.swift */,
 				D152F0778818C2C0DAF37B15 /* OfflineStatusBar.swift */,
@@ -1182,6 +1187,7 @@
 			children = (
 				756BC1493636418DB21F41D6 /* ProfileAvatarView.swift */,
 				B2268AFD277F8DAB6DE98701 /* ScopeBannerView.swift */,
+				343878A31B96B4455203D620 /* ScopeBannerView+Init.swift */,
 				323D6E84BA1E735B53FDE6E7 /* ScopeContext.swift */,
 				117FFA00703C355E8E5C8639 /* ScopeEmptyStateView.swift */,
 				22D4FBF2E43E2FC47CDE590B /* ScopeStyle.swift */,
@@ -1911,6 +1917,7 @@
 				B9A1A4D4B42ACEA800227B4C /* InvestmentBadge.swift in Sources */,
 				04741E76C3B64E75E8EE741F /* KeepoApp.swift in Sources */,
 				14134599FBFF0BA0BB84AC41 /* KeepoIcon.swift in Sources */,
+				B01DE278E1F200FED51A7A77 /* KeepoIllustration.swift in Sources */,
 				5FC731892AD76F621D409CEB /* KeepoShortcuts.swift in Sources */,
 				60349D9D98A83C5D45F25F98 /* KeepoTabBar.swift in Sources */,
 				609F9032D22FB12CE197C6B7 /* KindTabBar.swift in Sources */,
@@ -2004,6 +2011,7 @@
 				D15A1D633F72688611DDF354 /* ReviewPrompter.swift in Sources */,
 				36FBA0D921B6BC31A1D80771 /* RootStateViews.swift in Sources */,
 				00A8F3AF0335A763CABB29B2 /* RootView.swift in Sources */,
+				2F40BD5D0546876F76C3C25E /* ScopeBannerView+Init.swift in Sources */,
 				30E4BC40C4B7467ABBA50807 /* ScopeBannerView.swift in Sources */,
 				AB95F8EE581EE512211B1275 /* ScopeContext.swift in Sources */,
 				3432151493EA3407DD3DE174 /* ScopeEmptyStateView.swift in Sources */,

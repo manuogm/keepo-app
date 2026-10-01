@@ -74,14 +74,13 @@ extension TransactionsListView {
                     // control you have to scroll to find is not a control.
                     ScrollView(.horizontal) {
                         HStack(spacing: AppTheme.Spacing.s) {
+                            // Every axis, always — dimmed where it cannot
+                            // narrow anything yet, so the panel shows what
+                            // filtering exists rather than only what applies.
                             categoryFilterPill
                             kindFilterPill
-                            if availableSources.count > 1 {
-                                sourceFilterPill
-                            }
-                            if !authors.isEmpty {
-                                authorFilterPill
-                            }
+                            sourceFilterPill
+                            authorFilterPill
                         }
                         // So the last pill can scroll clear of the fade
                         // instead of stopping underneath it.
@@ -151,7 +150,7 @@ extension TransactionsListView {
         }
     }
 
-    /// How the transaction got here. Only drawn when the ledger holds more
+    /// How the transaction got here. Dimmed until the ledger holds more
     /// than one kind of source — an axis with a single option cannot narrow
     /// anything, and a fresh ledger is all `manual`.
     ///
@@ -164,7 +163,9 @@ extension TransactionsListView {
                 axis: "Source", count: filter.sources?.count,
                 single: filter.sources.flatMap { $0.count == 1 ? $0.first.map(Self.sourceTitle) : nil }
             ),
-            isActive: filter.sources != nil
+            isActive: filter.sources != nil,
+            unavailableReason: availableSources.count > 1
+                ? nil : "Available once your transactions come from more than one source"
         ) {
             activeFilterSheet = .sources
         }
@@ -182,12 +183,16 @@ extension TransactionsListView {
     /// Both are adverb-plus-participle, deliberately: two options that answer
     /// the same question should be the same shape, and "Manual input" beside
     /// "Automatically captured" read as a noun answering a verb's question.
+    ///
+    /// "Balance correction", not the enum's own "adjustment": the row is the
+    /// gap Keepo filed when a balance was set by hand (or a transfer leg left
+    /// behind by a household split), and "Adjustment" alone did not say so.
     static func sourceTitle(_ source: PublicSchema.TransactionSource) -> String {
         switch source {
         case .capture: return "Automatically captured"
         case .manual: return "Manually inputted"
         case .recurring: return "Recurring"
-        case .adjustment: return "Adjustment"
+        case .adjustment: return "Balance correction"
         case .csvImport: return "Imported"
         }
     }
@@ -205,7 +210,7 @@ extension TransactionsListView {
         }
     }
 
-    /// Only drawn when a paired household exists — see `TransactionAuthors`,
+    /// Dimmed until a paired household exists — see `TransactionAuthors`,
     /// which returns nothing otherwise. It filters on who **entered** the
     /// transaction, which on a joint account is the distinction a household
     /// actually wants; whose account it is is already the chip above.
@@ -217,7 +222,8 @@ extension TransactionsListView {
                     ids.count == 1 ? authors.first { $0.id == ids.first }?.name : nil
                 }
             ),
-            isActive: filter.createdByIds != nil
+            isActive: filter.createdByIds != nil,
+            unavailableReason: authors.isEmpty ? "Available once you share a household" : nil
         ) {
             activeFilterSheet = .authors
         }
@@ -268,7 +274,13 @@ extension TransactionsListView {
     /// last one being sliced by the scroll edge, and no less clear next to a
     /// chevron. The axis names are **singular** for the same width reason —
     /// a uniform chip has to be as wide as its longest unset label.
-    private func pill(title: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+    ///
+    /// A non-nil `unavailableReason` draws the pill dimmed and inert, and
+    /// is what VoiceOver says about it: the axis is shown so the user knows
+    /// it exists, and told why it does nothing yet.
+    private func pill(
+        title: String, isActive: Bool, unavailableReason: String? = nil, action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: AppTheme.Spacing.xs) {
                 Text(title)
@@ -298,6 +310,9 @@ extension TransactionsListView {
             )
         }
         .buttonStyle(.plain)
+        .disabled(unavailableReason != nil)
+        .opacity(unavailableReason == nil ? 1 : AppTheme.Opacity.muted)
+        .accessibilityHint(unavailableReason ?? "")
     }
 
     // MARK: - Clear

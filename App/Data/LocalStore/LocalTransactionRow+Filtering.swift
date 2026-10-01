@@ -103,7 +103,7 @@ extension LocalTransactionRow {
     /// filter honest in two directions at once. A hardcoded list of the enum's
     /// five cases would offer "Imported" to somebody who never imported a CSV
     /// (the feature is gone; only old rows can still carry the label) and
-    /// "Adjustment" to somebody who has never corrected a balance — options
+    /// "Balance correction" to somebody who has never corrected one — options
     /// that can only ever return nothing. Deriving it also makes the axis
     /// *complete* by construction: every source on screen is on offer, so
     /// ticking them all is the same list as ticking none, and no row can be

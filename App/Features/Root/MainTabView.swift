@@ -117,6 +117,11 @@ struct MainTabView: View {
             // the window, so pinning a concrete scheme here pinned the whole
             // app and broke system-appearance following.
         }
+        .fullScreenCover(item: $navigation.householdSetupRole) { role in
+            HouseholdSetupFlow(session: session, avatars: avatars, role: role) {
+                session.refresh.bump()
+            }
+        }
         // Every coach mark is resolved here, because this is the view that
         // spans the whole screen — the hole has to be cut in the app, not
         // inside the banner or the row that publishes the anchor.
