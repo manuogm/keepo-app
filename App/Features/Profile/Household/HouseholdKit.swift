@@ -197,32 +197,44 @@ struct HouseholdMetric: View {
 /// One row rather than four, because the spec asks for the same thing in four
 /// places and the only difference is what sits at the end: a toggle while you
 /// are choosing, a balance while you are reviewing, a sharing glyph for
-/// somebody else's.
-struct HouseholdAccountRow<Trailing: View>: View {
+/// somebody else's. `detail` sits under the name — the setup picker's
+/// "Share past history" pill — and is empty everywhere else.
+struct HouseholdAccountRow<Detail: View, Trailing: View>: View {
     let name: String
     let icon: String
     let color: Color
     let isInvestment: Bool
+    @ViewBuilder var detail: Detail
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
         HStack(spacing: AppTheme.Spacing.m) {
             CategoryIconView(icon: icon, color: color)
 
-            HStack(spacing: AppTheme.Spacing.xs) {
-                Text(name)
-                    .font(AppTheme.Typography.label)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                    .lineLimit(1)
-                if isInvestment {
-                    InvestmentBadge(compact: true)
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    Text(name)
+                        .font(AppTheme.Typography.label)
+                        .foregroundStyle(AppTheme.Palette.textPrimary)
+                        .lineLimit(1)
+                    if isInvestment {
+                        InvestmentBadge(compact: true)
+                    }
                 }
+                detail
             }
 
             Spacer(minLength: AppTheme.Spacing.s)
             trailing
         }
         .padding(.vertical, AppTheme.Spacing.xs)
+    }
+}
+
+extension HouseholdAccountRow where Detail == EmptyView {
+    init(name: String, icon: String, color: Color, isInvestment: Bool, @ViewBuilder trailing: () -> Trailing) {
+        self.init(name: name, icon: icon, color: color, isInvestment: isInvestment,
+                  detail: { EmptyView() }, trailing: trailing)
     }
 }
 

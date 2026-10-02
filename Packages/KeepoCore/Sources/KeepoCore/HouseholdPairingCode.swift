@@ -112,11 +112,4 @@ public struct HouseholdPairingCode: Hashable, Sendable {
         for index in expected.indices { difference |= expected[index] ^ provided[index] }
         return difference == 0
     }
-
-    /// Grouped for reading aloud — `034 812`. Two groups of three is what
-    /// people can hold in their head for the length of a sentence.
-    public var formatted: String {
-        let middle = digits.index(digits.startIndex, offsetBy: Self.digitCount / 2)
-        return "\(digits[..<middle]) \(digits[middle...])"
-    }
 }

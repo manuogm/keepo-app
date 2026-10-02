@@ -113,10 +113,13 @@ extension AppTheme.Typography {
         /// reliably do. Views that just need a font, rather than a `Text +
         /// Text` concatenation, should use `.numberFont(_:weight:)` below
         /// and never see `scale` at all.
+        ///
+        /// `design: .monospaced` is SF Mono, for a figure that is a string of
+        /// separate digits rather than an amount — the household pairing code.
         static func display(
-            _ size: CGFloat, weight: Font.Weight = .bold, scale: CGFloat = 1
+            _ size: CGFloat, weight: Font.Weight = .bold, design: Font.Design = .default, scale: CGFloat = 1
         ) -> Font {
-            .system(size: size * scale, weight: weight).monospacedDigit()
+            .system(size: size * scale, weight: weight, design: design).monospacedDigit()
         }
     }
 }
@@ -131,21 +134,25 @@ private struct NumberFontModifier: ViewModifier {
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
     private let size: CGFloat
     private let weight: Font.Weight
+    private let design: Font.Design
 
-    init(size: CGFloat, weight: Font.Weight) {
+    init(size: CGFloat, weight: Font.Weight, design: Font.Design) {
         self.size = size
         self.weight = weight
+        self.design = design
     }
 
     func body(content: Content) -> some View {
-        content.font(AppTheme.Typography.Number.display(size, weight: weight, scale: scale))
+        content.font(AppTheme.Typography.Number.display(size, weight: weight, design: design, scale: scale))
     }
 }
 
 extension View {
     /// A figure at one of `AppTheme.Typography.Number`'s display sizes,
     /// scaled by Dynamic Type and drawn with tabular digits.
-    func numberFont(_ size: CGFloat, weight: Font.Weight = .bold) -> some View {
-        modifier(NumberFontModifier(size: size, weight: weight))
+    func numberFont(
+        _ size: CGFloat, weight: Font.Weight = .bold, design: Font.Design = .default
+    ) -> some View {
+        modifier(NumberFontModifier(size: size, weight: weight, design: design))
     }
 }

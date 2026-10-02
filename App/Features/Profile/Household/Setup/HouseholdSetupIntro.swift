@@ -15,6 +15,10 @@ import SwiftUI
 /// question the other five raise ("what have I just signed up to?"), not a
 /// warning to be quarantined in a box.
 ///
+/// No heading or illustration of its own: the sheet's title already says
+/// "New Household", and repeating it underneath only put distance between
+/// that title and the six lines that are the whole point of the page.
+///
 /// The action lives at the end of the scroll, not pinned over it: this page
 /// is something to read to the bottom, and a button floating above unread
 /// text invites skipping the one screen that exists to be understood.
@@ -27,8 +31,7 @@ struct HouseholdSetupIntro<Footer: View>: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
-                header
-                VStack(spacing: AppTheme.Spacing.l) {
+                VStack(spacing: AppTheme.Spacing.xl) {
                     ForEach(points, id: \.title) { point in
                         HouseholdIntroPoint(point: point, tint: tint)
                     }
@@ -41,21 +44,6 @@ struct HouseholdSetupIntro<Footer: View>: View {
         }
         .background(AppTheme.Palette.bgCanvas)
         .scrollBounceBehavior(.basedOnSize)
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.m) {
-            KeepoIcon(name: "icon-home-filled", size: AppTheme.Size.icon)
-                .foregroundStyle(tint)
-                .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
-                .background(tint.opacity(AppTheme.Opacity.fill), in: Circle())
-
-            Text(role == .owner ? "Create a household" : "Join a household")
-                .font(AppTheme.Typography.screenTitle)
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.top, AppTheme.Spacing.m)
     }
 
     /// Points 1 and 2 are the only lines that differ between creating and

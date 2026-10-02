@@ -23,7 +23,6 @@ struct HouseholdAccountPicker<Footer: View>: View {
     var body: some View {
         HouseholdPickerScaffold(
             title: "Shared accounts",
-            subtitle: "Your household sees an account's transactions from today, unless you include its past ones.",
             isLoaded: isLoaded,
             isEmpty: accounts.isEmpty,
             emptyMessage: "You have no accounts to share yet.",
@@ -38,19 +37,18 @@ struct HouseholdAccountPicker<Footer: View>: View {
                             selection: $selection
                         ) {
                             ForEach(rows) { account in
-                                VStack(spacing: 0) {
-                                    HouseholdAccountRow(
-                                        name: account.name,
-                                        icon: account.icon,
-                                        color: Color(hex: account.color),
-                                        isInvestment: account.kind == .investment
-                                    ) {
-                                        HouseholdPickerToggle(isOn: binding(for: account.id))
-                                    }
+                                HouseholdAccountRow(
+                                    name: account.name,
+                                    icon: account.icon,
+                                    color: Color(hex: account.color),
+                                    isInvestment: account.kind == .investment
+                                ) {
                                     if selection.contains(account.id) {
-                                        HouseholdHistoryToggleRow(isOn: historyBinding(for: account.id))
-                                            .transition(.opacity.combined(with: .move(edge: .top)))
+                                        HouseholdHistoryPill(isOn: historyBinding(for: account.id))
+                                            .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .leading)))
                                     }
+                                } trailing: {
+                                    HouseholdPickerToggle(isOn: binding(for: account.id))
                                 }
                                 .animation(AppTheme.Motion.standard, value: selection.contains(account.id))
                             }
@@ -85,21 +83,33 @@ struct HouseholdAccountPicker<Footer: View>: View {
 /// decision, 2026-09-23) — sharing an account's future is the ordinary case,
 /// and handing over its whole past should be a choice someone made.
 ///
-/// Indented to the account's name, so it reads as belonging to the row
-/// above it rather than as one more account.
-struct HouseholdHistoryToggleRow: View {
+/// A pill under the account's name rather than a second switch on a row of
+/// its own: a second row read as one more account, and a second switch made
+/// every shared account look like two decisions of equal weight. Filled in
+/// the household tint when on, so the state reads without a label change.
+struct HouseholdHistoryPill: View {
     @Binding var isOn: Bool
 
+    private var tint: Color { PublicSchema.AccountScope.household.tint }
+
     var body: some View {
-        HStack(spacing: AppTheme.Spacing.m) {
-            Text("Include past transactions")
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-            Spacer(minLength: AppTheme.Spacing.s)
-            HouseholdPickerToggle(isOn: $isOn)
+        Button {
+            withAnimation(AppTheme.Motion.quick) { isOn.toggle() }
+        } label: {
+            HStack(spacing: AppTheme.Spacing.xs) {
+                Image(systemName: isOn ? "checkmark" : "plus")
+                Text("Share past history")
+            }
+            .font(AppTheme.Typography.microEmphasis)
+            .foregroundStyle(isOn ? AppTheme.Palette.textOnAccent : AppTheme.Palette.textSecondary)
+            .padding(.horizontal, AppTheme.Spacing.s)
+            .padding(.vertical, AppTheme.Spacing.xs)
+            .background(isOn ? tint : AppTheme.Palette.fillSubtle, in: Capsule())
+            .contentShape(Capsule())
         }
-        .padding(.leading, AppTheme.Size.dividerInset(icon: AppTheme.Size.icon, leading: 0))
-        .padding(.bottom, AppTheme.Spacing.xs)
+        .buttonStyle(.pressableCard)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .sensoryFeedback(AppTheme.Feedback.toggle, trigger: isOn)
     }
 }
 
@@ -121,7 +131,6 @@ struct HouseholdCategoryPicker<Footer: View>: View {
     var body: some View {
         HouseholdPickerScaffold(
             title: "Shared categories",
-            subtitle: nil,
             isLoaded: isLoaded,
             isEmpty: categories.isEmpty,
             emptyMessage: "You have no categories to share yet.",
@@ -163,14 +172,12 @@ struct HouseholdCategoryPicker<Footer: View>: View {
 
 // MARK: - Shared shell
 
-/// The page both pickers are: a title, an optional sentence explaining the
-/// consequence, and grouped cards of switches. The intro screen carries the
-/// explanation, so the categories picker passes `subtitle: nil`; the accounts
-/// picker keeps one sentence the intro cannot, about how much of each
-/// account's history the household sees.
+/// The page both pickers are: a title and grouped cards of switches. No
+/// explanatory sentence — the intro screen carries the explanation, and the
+/// one thing it cannot say (how much of an account's past is shared) is the
+/// pill on the account itself.
 private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
     let title: String
-    let subtitle: String?
     let isLoaded: Bool
     let isEmpty: Bool
     let emptyMessage: String
@@ -184,18 +191,10 @@ private struct HouseholdPickerScaffold<Content: View, Footer: View>: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-                    Text(title)
-                        .font(AppTheme.Typography.screenTitle)
-                        .foregroundStyle(AppTheme.Palette.textPrimary)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(AppTheme.Typography.body)
-                            .foregroundStyle(AppTheme.Palette.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(title)
+                    .font(AppTheme.Typography.screenTitle)
+                    .foregroundStyle(AppTheme.Palette.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if !isLoaded {
                     ProgressView()

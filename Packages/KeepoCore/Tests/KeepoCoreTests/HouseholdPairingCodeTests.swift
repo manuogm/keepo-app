@@ -107,12 +107,4 @@ struct HouseholdPairingCodeTests {
         #expect(HouseholdPairingCode.maxAttempts <= 10)
         #expect(HouseholdPairingCode.maxAttempts >= 3, "too few tries to survive an honest typo")
     }
-
-    // MARK: - Display
-
-    @Test("the code is grouped in threes for reading aloud")
-    func formatsInTwoGroups() {
-        #expect(HouseholdPairingCode(digits: "034812")?.formatted == "034 812")
-        #expect(HouseholdPairingCode(digits: "000000")?.formatted == "000 000")
-    }
 }

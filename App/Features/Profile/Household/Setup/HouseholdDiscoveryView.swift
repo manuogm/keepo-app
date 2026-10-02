@@ -37,6 +37,11 @@ struct HouseholdDiscoveryView: View {
     @State private var errorMessage: String?
     /// Guest-side only: the digits as typed so far.
     @State var enteredCode = ""
+    /// Guest-side: the owner turned the code away. The wrong digits show in
+    /// red through the shake, then clear for the next code.
+    @State var isCodeRejected = false
+    /// Guest-side: one per refusal — drives the cards' shake and the haptic.
+    @State var codeRejections = 0
     @FocusState var isCodeFieldFocused: Bool
 
     var body: some View {
@@ -96,6 +101,7 @@ struct HouseholdDiscoveryView: View {
         pairing = nil
         coordinator = nil
         enteredCode = ""
+        isCodeRejected = false
         errorMessage = nil
         await start()
     }
@@ -345,18 +351,25 @@ private struct RadarPulse: View {
     var body: some View {
         ZStack {
             ForEach(0..<3, id: \.self) { ring in
+                // Scoped to scale and opacity, never `.animation(_:value:)`.
+                // The value form animates everything that changes in the
+                // same transaction, and `onAppear` fires while the screen is
+                // still settling — the push, the pairing code arriving — so
+                // the ring's *position* was swept into a repeat-forever loop
+                // too, and the rings drifted off-centre from the house.
                 Circle()
                     .strokeBorder(tint.opacity(AppTheme.Opacity.fillStrong), lineWidth: 1.5)
                     .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
-                    .scaleEffect(isAnimating && !isStalled ? 2.4 : 1)
-                    .opacity(isAnimating && !isStalled ? 0 : 1)
                     .animation(
                         isStalled
                             ? .default
                             : .easeOut(duration: 2.4).repeatForever(autoreverses: false)
-                                .delay(Double(ring) * 0.8),
-                        value: isAnimating
-                    )
+                                .delay(Double(ring) * 0.8)
+                    ) { content in
+                        content
+                            .scaleEffect(isAnimating && !isStalled ? 2.4 : 1)
+                            .opacity(isAnimating && !isStalled ? 0 : 1)
+                    }
             }
 
             KeepoIcon(name: "icon-home-filled", size: AppTheme.Size.icon)
