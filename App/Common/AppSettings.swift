@@ -130,6 +130,14 @@ extension AppSettings {
         UserDefaults.standard.object(forKey: AppSettingsKeys.captureSetupCompletedAt) as? Date
     }
 
+    /// Whether the user has been through capture setup on this phone. The
+    /// one question every screen that branches on setup asks — the Profile
+    /// automations screen, and the account form's "add a card", which sends
+    /// the user through setup first: a card mapped by hand on a phone with
+    /// no automation is a card that never captures anything, and it reads
+    /// as Keepo being broken.
+    static var isCaptureSetUp: Bool { captureSetupCompletedAt != nil }
+
     /// Set every time the test passes, not only the first — re-running it
     /// after changing phones or re-importing the shortcut is exactly when
     /// the freshest date is worth having.

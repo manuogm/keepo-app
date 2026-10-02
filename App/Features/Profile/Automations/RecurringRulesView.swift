@@ -44,7 +44,7 @@ struct RecurringRulesView: View {
                 ruleList
             }
         }
-        .navigationTitle("Recurring")
+        .navigationTitle("Recurring Transactions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -122,10 +122,7 @@ struct RecurringRulesView: View {
     /// levels down to reach.
     private var emptyState: some View {
         VStack(spacing: AppTheme.Spacing.m) {
-            KeepoIcon(name: "icon-recurrent", size: AppTheme.Size.icon)
-                .foregroundStyle(AppTheme.Palette.brandPrimary)
-                .frame(width: AppTheme.Size.illustration, height: AppTheme.Size.illustration)
-                .background(AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill), in: Circle())
+            KeepoIllustration(name: "illustration-no-rules")
 
             VStack(spacing: AppTheme.Spacing.xs) {
                 Text("No recurring transactions yet")
@@ -136,7 +133,7 @@ struct RecurringRulesView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button("Add Recurring") { isAddingRule = true }
+            Button("Add Recurring Transaction") { isAddingRule = true }
                 .font(AppTheme.Typography.labelEmphasis)
                 .foregroundStyle(AppTheme.Palette.textOnAccent)
                 .padding(.horizontal, AppTheme.Spacing.l)

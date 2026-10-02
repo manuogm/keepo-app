@@ -63,7 +63,7 @@ extension AccountFormView {
                         }
 
                         Button {
-                            editingCard = MappedCardEditor(accountId: accountId, existing: nil)
+                            addCard(to: accountId)
                         } label: {
                             CreditCardTile.addPlaceholder
                         }
@@ -80,6 +80,29 @@ extension AccountFormView {
             }
             .padding(.vertical, AppTheme.Spacing.s)
         }
+    }
+
+    /// Capture setup comes first. A card linked by hand on a phone with no
+    /// Wallet automation never captures a single purchase, and the user
+    /// reads that as Keepo not working. The reverse order needs no help: with
+    /// capture running, the first tap-payment links its own card.
+    ///
+    /// Only *adding* is gated. Opening a card that is already linked —
+    /// to rename or remove it — has nothing to do with whether capture runs.
+    func addCard(to accountId: UUID) {
+        if AppSettings.isCaptureSetUp {
+            editingCard = MappedCardEditor(accountId: accountId, existing: nil)
+        } else {
+            isSettingUpCapture = true
+        }
+    }
+
+    /// The setup sheet's `onDismiss`: carries on to the card they came here
+    /// to add, but only if setup actually finished — closing it halfway
+    /// leaves them on the form, exactly where they were.
+    func resumeAddingCardAfterSetup() {
+        guard AppSettings.isCaptureSetUp, case .edit(let accountId) = mode else { return }
+        editingCard = MappedCardEditor(accountId: accountId, existing: nil)
     }
 
     func loadCardMappings() async {
@@ -173,33 +196,26 @@ struct LinkedCardsHelpSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
                     Text(
-                        "When you pay with a card, Keepo can file the purchase against this account "
-                            + "for you — no typing."
+                        "After linking a card to an account, Keepo can automatically log every payment you do "
+                            + "using your iPhone"
                     )
                     .font(AppTheme.Typography.body)
 
                     point(
-                        icon: "creditcard.fill",
-                        title: "Link the cards you actually use",
-                        detail: "Add the card name exactly as it appears in Apple Pay. "
-                            + "Every purchase on it lands in this account."
+                        icon: "icon-card",
+                        title: "Manual link",
+                        detail: "Add the card name exactly as it appears in Apple Pay"
                     )
                     point(
-                        icon: "cpu",
-                        title: "Some link themselves",
-                        detail: "A card the capture pipeline recognised while you reviewed a purchase "
-                            + "is marked with a chip icon."
-                    )
-                    point(
-                        icon: "tray.full.fill",
-                        title: "Unrecognised cards wait for you",
-                        detail: "A purchase on a card Keepo does not know yet goes to Needs Review "
-                            + "instead of guessing."
+                        icon: "icon-robot",
+                        title: "Automatically link",
+                        detail: "After a purchase using a new card, choose the account you want to link "
+                            + "and Keepo will do the rest"
                     )
 
                     Text(
-                        "Removing a link never deletes anything you have already recorded — future "
-                            + "purchases on that card just need reviewing again."
+                        "Removing a linked card does not delete any past transaction, but will prevent you from "
+                            + "automatically logging future ones using that card"
                     )
                     .font(AppTheme.Typography.caption)
                     .foregroundStyle(AppTheme.Palette.textSecondary)
@@ -209,8 +225,10 @@ struct LinkedCardsHelpSheet: View {
             .navigationTitle("Linked Cards")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // A glyph, like every other sheet's confirm in the app.
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.fontWeight(.semibold)
+                    Button { dismiss() } label: { Image(systemName: "checkmark") }
+                        .accessibilityLabel("Done")
                 }
             }
         }
@@ -219,10 +237,8 @@ struct LinkedCardsHelpSheet: View {
 
     private func point(icon: String, title: String, detail: String) -> some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.m) {
-            Image(systemName: icon)
-                .font(AppTheme.Typography.body)
+            KeepoIcon(name: icon)
                 .foregroundStyle(AppTheme.Palette.textSecondary)
-                .frame(width: AppTheme.Size.glyph)
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                 Text(title).font(AppTheme.Typography.labelEmphasis)
                 Text(detail).font(AppTheme.Typography.caption).foregroundStyle(AppTheme.Palette.textSecondary)

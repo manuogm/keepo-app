@@ -140,7 +140,7 @@ struct OnboardingScaffold<Content: View>: View {
     @ViewBuilder
     private var layout: some View {
         VStack(alignment: .leading, spacing: 0) {
-            heading
+            ScreenHeading(title: title, subtitle: subtitle, subtitleOnOneLine: subtitleOnOneLine)
             // **A fixed gap, not a flexible one, when pinning.** Two
             // `Spacer`s share whatever slack is going equally, so a
             // `minLength` on the first one sets a floor and then grows past
@@ -153,40 +153,6 @@ struct OnboardingScaffold<Content: View>: View {
             content
             Spacer(minLength: 0)
         }
-    }
-
-    /// **Both lines are `fixedSize` vertically, and that is load-bearing.**
-    /// The content below sits between two flexible spacers, so SwiftUI is
-    /// free to negotiate this block's height — and given the chance it
-    /// compresses the title to a single line and truncates it with an
-    /// ellipsis rather than wrapping. It showed up as "Purchases, without
-    /// o…" on the capture step the moment that step's subtitle got shorter,
-    /// which is the worst shape of layout bug: invisible in code, and
-    /// triggered by editing a different string.
-    private var heading: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            if let title {
-                Text(title)
-                    .font(AppTheme.Typography.screenTitle)
-                    .foregroundStyle(AppTheme.Palette.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let subtitle {
-                Text(subtitle)
-                    .font(AppTheme.Typography.body)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .lineLimit(subtitleOnOneLine ? 1 : nil)
-                    .minimumScaleFactor(subtitleOnOneLine ? 0.8 : 1)
-                    // The token exists for exactly this: prose stops being
-                    // readable past roughly this measure.
-                    .frame(
-                        maxWidth: subtitleOnOneLine ? .infinity : AppTheme.Size.proseWidth,
-                        alignment: .leading
-                    )
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// **Next, and nothing else.** This bar used to carry a second Back

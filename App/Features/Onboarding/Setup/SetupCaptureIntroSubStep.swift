@@ -30,20 +30,19 @@ struct SetupCaptureIntroSubStep: View {
 
     var body: some View {
         OnboardingScaffold(
-            title: "Automatic payment detection",
-            subtitle: "Most of your day-to-day spending, registered automatically",
+            title: CapturePitch.title,
+            subtitle: CapturePitch.subtitle,
             step: .capture,
             onBack: onBack,
             onSkip: onSetUpLater,
-            primaryTitle: "Set up now (2 min)",
+            primaryTitle: CapturePitch.setUpTitle,
             primaryFillsWidth: true,
             onPrimary: onSetUpNow
         ) {
             // Floats in the space between the heading and the bar — the
             // scaffold's default — so the drawing is centred in what is
             // left rather than pinned under the subtitle.
-            KeepoIllustration(name: "illustration-auto-payment", size: AppTheme.Size.illustrationFeature)
-                .frame(maxWidth: .infinity)
+            CapturePitch.illustration
         }
     }
 }

@@ -103,6 +103,7 @@ struct AccountFormView: View {
 
     @State var cardMappings: [PublicSchema.CardMappingsSelect] = []
     @State var editingCard: MappedCardEditor?
+    @State var isSettingUpCapture = false
 
     var isEditing: Bool {
         if case .edit = mode { return true }
@@ -189,6 +190,13 @@ struct AccountFormView: View {
             MappedCardSheet(session: session, editor: editor, accountColor: color) {
                 Task { await loadCardMappings() }
             }
+        }
+        // `onDismiss`, not a callback from inside the flow: the card sheet
+        // can only be presented once this one is fully gone.
+        .sheet(isPresented: $isSettingUpCapture, onDismiss: resumeAddingCardAfterSetup) {
+            CaptureSetupFlowView(
+                session: session, reason: "Your card can only record purchases once this is set up."
+            )
         }
         .deleteAccountDialog(
             accountName: name,

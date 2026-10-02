@@ -32,24 +32,24 @@ struct WalletAutomationGuideView: View {
     /// over a `UserDefaults` static is not something SwiftUI can observe, so
     /// this screen would have kept showing the blank state after the setup
     /// sheet closed — the one moment it is guaranteed to be wrong.
-    @State private var isSetUp = AppSettings.captureSetupCompletedAt != nil
+    @State private var isSetUp = AppSettings.isCaptureSetUp
 
     var body: some View {
         ZStack {
             AppTheme.Palette.bgCanvas.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
-                    if isSetUp {
-                        configured
-                    } else {
-                        blankState
-                    }
+            if isSetUp {
+                ScrollView {
+                    configured.padding(AppTheme.Spacing.l)
                 }
-                .padding(AppTheme.Spacing.l)
+                .scrollBounceBehavior(.basedOnSize)
+            } else {
+                blankState
             }
-            .scrollBounceBehavior(.basedOnSize)
         }
-        .navigationTitle("Automatic Capture")
+        // Empty over the blank state, whose own heading is the title — a
+        // bar title above it would be a second, quieter version of the same
+        // sentence, the reason onboarding's test step has no heading.
+        .navigationTitle(isSetUp ? "Automatic Capture" : "")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $isSettingUp) {
             CaptureSetupFlowView(session: session)
@@ -61,24 +61,22 @@ struct WalletAutomationGuideView: View {
         }
         .onChange(of: isSettingUp) { _, isPresenting in
             guard !isPresenting else { return }
-            isSetUp = AppSettings.captureSetupCompletedAt != nil
+            isSetUp = AppSettings.isCaptureSetUp
         }
         .task(id: session.refresh.token) { await load() }
     }
 
     // MARK: - Nothing set up yet
 
-    /// The pitch — `CapturePitchView` — and one button, with no "later":
-    /// skipping onboarding's capture step is what got them here, and offering
-    /// it again on the screen they opened *to* set it up would be a button
-    /// whose only function is to undo the tap that opened the screen.
+    /// Onboarding's capture intro, so a user who skipped it there meets the
+    /// same screen here, not a second pitch.
+    ///
+    /// One button, with no "later": skipping onboarding's capture step is
+    /// what got them here, and offering it again on the screen they opened
+    /// *to* set it up would be a button whose only function is to undo the
+    /// tap that opened the screen.
     private var blankState: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.xxl) {
-            CapturePitchView()
-            PrimaryActionButton(title: "Set up now", fillsWidth: true) {
-                isSettingUp = true
-            }
-        }
+        CapturePitchScreen { isSettingUp = true }
     }
 
     // MARK: - Set up
@@ -179,7 +177,7 @@ struct WalletAutomationGuideView: View {
     }
 
     private func load() async {
-        isSetUp = AppSettings.captureSetupCompletedAt != nil
+        isSetUp = AppSettings.isCaptureSetUp
         guard let ownerId = session.profile?.id else { return }
         mappedCards = (try? await session.dbQueue.read { database in
             try MappedCardQueries.all(database, ownerId: ownerId.uuidString)
