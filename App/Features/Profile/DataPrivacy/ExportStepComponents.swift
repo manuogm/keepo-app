@@ -3,7 +3,7 @@ import SwiftUI
 
 // The Export screen's building blocks, split out of ExportView+Steps.swift for
 // the project's file-length lint: the period page's quick-pick pill, the last
-// page's recap row, and the carried-filter chip.
+// page's recap row, the carried-filter chip, and the line over the button.
 
 /// A quick pick over the period calendar — "This month", "Last 12 months".
 /// Filled when the calendar's days are exactly that preset's, with the same
@@ -95,5 +95,25 @@ struct ExportFilterChip: View {
         }
         .buttonStyle(.pressableCard)
         .accessibilityLabel("Remove filter \(title)")
+    }
+}
+
+/// The one line over the bar's button — what the period comes to, or that
+/// Face ID will be asked for — with the glyph that says which, when it has one.
+struct ExportBarNote: View {
+    let text: String
+    let icon: String?
+
+    var body: some View {
+        HStack(spacing: AppTheme.Spacing.xs) {
+            if let icon {
+                KeepoIcon(name: icon, size: AppTheme.Size.glyphSmall)
+            }
+            Text(text)
+                .multilineTextAlignment(.center)
+        }
+        .font(AppTheme.Typography.caption)
+        .foregroundStyle(AppTheme.Palette.textSecondary)
+        .frame(maxWidth: .infinity)
     }
 }

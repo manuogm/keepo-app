@@ -219,11 +219,7 @@ struct ExportView: View {
     private var bottomBar: some View {
         VStack(spacing: AppTheme.Spacing.s) {
             if let note = barNote {
-                Text(note)
-                    .font(AppTheme.Typography.caption)
-                    .foregroundStyle(AppTheme.Palette.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
+                ExportBarNote(text: note.text, icon: note.icon)
             }
             PrimaryActionButton(
                 title: step.next == nil ? "Export" : "Continue", isEnabled: isButtonEnabled,
@@ -249,14 +245,14 @@ struct ExportView: View {
         }
     }
 
-    private var barNote: String? {
+    private var barNote: (text: String, icon: String?)? {
         switch step {
         case .accounts: return nil
-        case .period: return periodNote
+        case .period: return periodNote.map { ($0, nil) }
         // Only while it is true: with the Face ID setting off, `stepUp`
         // returns without asking, and the line would be a promise the tap
         // does not keep.
-        case .format: return AppSettings.isFaceIDEnabled ? "Face ID required" : nil
+        case .format: return AppSettings.isFaceIDEnabled ? ("Face ID required", "icon-faceID") : nil
         }
     }
 
