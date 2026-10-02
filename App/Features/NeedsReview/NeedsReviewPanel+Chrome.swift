@@ -31,7 +31,7 @@ extension NeedsReviewPanel {
         .animation(AppTheme.Motion.colorSafe, value: isExpanded)
     }
 
-    /// **Green, not mango.** Everywhere else in this panel the accent means
+    /// **Green, not the accent.** Everywhere else in this panel the accent means
     /// "your attention is wanted"; this is the one moment it is not wanted
     /// any more, and `statusPositive` is the colour the rest of the app
     /// already uses to say money arrived and a thing went right.

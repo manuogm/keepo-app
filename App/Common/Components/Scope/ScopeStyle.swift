@@ -3,23 +3,19 @@ import SwiftUI
 
 /// How a scope looks and reads, in one place — the banner card, the title
 /// badge, the page dots and every blank state all draw from here, so a
-/// scope can never be mango on one screen and teal on the next.
+/// scope can never be teal on one screen and indigo on the next.
 ///
 /// One flat colour each, never a gradient (the user's call — the app stays
 /// minimal). All three are `Assets.xcassets` colour sets carrying four
 /// appearances apiece — light, dark, and both High Contrast variants — so
 /// the banner honours Increase Contrast with no `colorScheme` branch here.
-/// Total is **mango**, the fill side of `BrandPrimary`; the other two are
-/// the cool and green counterparts that keep the three cards
-/// distinguishable at a glance for a colour-vision-deficient user — the
-/// same test `app-architecture.md` §5 applies to the chart palette.
+/// Total is **teal**, the fill side of `BrandPrimary`; Household is indigo
+/// and Private a dark grey, which keeps the three cards distinguishable at
+/// a glance for a colour-vision-deficient user — the same test
+/// `app-architecture.md` §5 applies to the chart palette.
 ///
-/// All three carry `TextOnAccent` (white), and mango does not clear AA
-/// against it: 2.05:1. That is a **deliberate call to judge the mango card
-/// on a real device**, recorded in `keepo-brand-identity.md` §1 and in
-/// `Palette.scopeTotal` — not a value anybody forgot to check. Increase
-/// Contrast is where it is made good: every card deepens until white
-/// clears 4.5:1, Total furthest of the three.
+/// All three carry `TextOnAccent` (white) and clear AA against it in every
+/// appearance — see `Palette.scopeTotal` for the figures.
 extension PublicSchema.AccountScope {
     /// Left to right in the banner's carousel, and the order the page dots
     /// are drawn in. Total leads because it is the default; **Household

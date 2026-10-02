@@ -37,12 +37,16 @@ Every non-semantic colour comes off one zero-chroma ramp:
 
 ### Brand accent — one colour
 
-*   **`BrandPrimary`** (Mango) — `#A05C00` / Dark `#FF9F1C` / HC `#8A5200` / Dark+HC `#FFB347` → `Palette.brandPrimary`
-    *   *Usage:* the Needs Review inbox, the Pending badge, budget and goal benchmarks, the offline bar, the tab bar's unreviewed-count dot. Anything that should catch the eye **without reading as an error** — that is what separates it from `StatusNegative`.
+*   **`BrandPrimary`** (Teal) — `#127268` / Dark `#3CC4B3` / HC `#0E6F66` / Dark+HC `#5ED1C2` → `Palette.brandPrimary`
+    *   *Usage:* the Needs Review inbox, budget and goal benchmarks, the offline bar, the tab bar's unreviewed-count dot, a checked box. Taken from the app icon's family (2026-10-02 redesign; it was mango before).
 
-**There is no `BrandSecondary`.** The Electric Coral `#FF5A5F` that used to be the primary is gone from the app: mango is the whole accent.
+**There is no `BrandSecondary`.** Mango survives only as `StatusPending` (below), for the one job a teal cannot do.
 
-**Why the accent is not one value.** Mango is a light hue. `#FF9F1C` measures **2.05:1 on white** — it fails as text at any size — and **7.37:1 on `#262626`**. Nearly every use of the accent is ink at caption sizes, so the light value has to be a deep amber and the dark value the true mango. That is one accent at the two lightnesses its two grounds require, not two accents. `ScopeTotal` is the same hue on the fill side, where dark ink would sit on it instead.
+**Why the accent is not one value.** Nearly every use of the accent is ink at caption sizes. The teal that reads on the light canvas (`#127268`, 5.3:1 on `#F5F5F5`) measures 2.6:1 on `#262626`, so dark mode lifts it to `#3CC4B3` (7.0:1). That is one accent at the two lightnesses its two grounds require, not two accents. `ScopeTotal` is the same hue on the fill side.
+
+### Launch
+
+*   **`LaunchBackground`** — `#1E5A5D`, one value in every appearance → `Palette.launchBackground`. The app icon's own teal, sampled from it (deeper and bluer than `BrandPrimary`). The launch screen's ground and the splash's; used nowhere else.
 
 ### Surface & Text
 
@@ -70,8 +74,9 @@ Prefer these over `.opacity()` on a neutral: an asset gets a high-contrast varia
 |---|---|---|---|---|
 | `StatusPositive` | `#177A33` | `#4CD97B` | `#116326` | `#7BE8A2` |
 | `StatusNegative` | `#C4271B` | `#FF6B66` | `#A81E15` | `#FF9C99` |
+| `StatusPending` | `#A05C00` | `#FF9F1C` | `#8A5200` | `#FFB347` |
 
-Deliberately **not** the system `.green`/`.red`. Both were deepened when the canvas went neutral: the previous `#1E8E3E` measures 3.86:1 on `#F5F5F5` and failed. Warnings have no token of their own — they use `BrandPrimary`, per the mango rule above.
+Deliberately **not** the system `.green`/`.red`. Both were deepened when the canvas went neutral: the previous `#1E8E3E` measures 3.86:1 on `#F5F5F5` and failed. **`StatusPending` is mango** — the accent before the teal redesign, kept for an automatic capture nobody has reviewed yet (`PendingBadge`, `PendingEdgeStrip`). A teal Pending sits too close to `StatusPositive` and reads as "fine"; a warm one reads as "look at me" without reading as an error. Mango is 2.05:1 on white, so it gets the same two-lightness treatment as the accent: deep amber in light, true mango in dark.
 
 ### Money
 
@@ -89,13 +94,13 @@ Expense is a **deep red**, not the old coral: coral *was* `BrandPrimary`, and re
 
 | Token | Light | Dark | HC Light | HC Dark |
 |---|---|---|---|---|
-| `ScopeTotal` | `#FF9F1C` | `#F0940F` | `#AA6000` | `#A25C00` |
-| `ScopePrivate` | `#5B5BC7` | `#5252BE` | `#4A4AB5` | `#4A4AB5` |
-| `ScopeHousehold` | `#148075` | `#127268` | `#0E6F66` | `#0E6F66` |
+| `ScopeTotal` | `#148075` | `#127268` | `#0E6F66` | `#0E6F66` |
+| `ScopeHousehold` | `#5B5BC7` | `#5252BE` | `#4A4AB5` | `#4A4AB5` |
+| `ScopePrivate` | `#3B3B3B` | `#525252` | `#303030` | `#474747` |
 
-Total is **mango** — `BrandPrimary`'s hue on the fill side — with the cool and green counterparts that keep the three banner cards distinguishable to a colour-vision-deficient user (worst pair ΔE 53 under deuteranopia, against the same floor of 30). **Dark mode deepens every card one step** to cut glare on a `#262626` ground.
+Total is **teal** — `BrandPrimary`'s hue on the fill side — Household indigo and Private a dark grey (2026-10-02 redesign: Total took Household's old teal, Household took Private's old indigo). The grey is achromatic, which keeps the three banner cards distinguishable to a colour-vision-deficient user: under deuteranopia Total–Household is ΔE 54 and Household–Private 61.5; **the closest pair is Total–Private at ΔE 22**, below the floor of 30 the old palette cleared. Accepted, because the badge glyph and word tell those two scopes apart as well. Teal and indigo deepen one step in dark mode to cut glare; **Private lifts instead** (`#525252`), because a grey as dark as the light-mode one sinks into the `#262626` canvas (1.3:1).
 
-All three carry `TextOnAccent` (white), and **Total does not clear AA in its default appearances: white on `#FF9F1C` is 2.05:1.** That is a deliberate call — the mango card is to be judged on a real device before the ink question is reopened — and it is recorded here, in `Palette.scopeTotal` and in `ScopeStyle` so nobody later reads it as an oversight. **High Contrast is where it is made good:** each card deepens until white clears 4.5:1 (Total 4.79, Private 7.15, Household 6.03), Total furthest of the three because it starts furthest away. If the card turns out to read badly on device, the fix is a per-scope foreground (`scope.onTint` returning `#262626` for Total), not a darker mango — a mango dark enough for white text is brown.
+All three carry `TextOnAccent` (white) and **clear AA in every appearance** (light / dark / HC / dark HC): Total 4.8 / 5.8 / 6.0 / 6.0, Household 5.6 / 6.3 / 7.1 / 7.1, Private 11.2 / 7.8 / 13.2 / 9.3. The old mango Total's 2.05:1 exception is gone with it.
 
 ### Elevation tint
 *   **`ShadowTint`** — `#262626` / Dark `#4A4A4A` / HC `#262626` / Dark+HC `#5C5C5C` — the colour every `AppTheme.Elevation` shadow is drawn in
@@ -179,12 +184,13 @@ Three shadows — `resting`, `floating`, `lifted` — applied through `.elevatio
 
 `.snappy` is a spring, springs overshoot, and an overshoot on an *interpolated colour* has nowhere to go — it clamps at the end of the ramp and comes back, which reads as the mark flashing rather than as bounce. That cost two visible defects (the chart highlight flickering, the Cashflow toggle double-blinking) before anyone traced it.
 
-Five tokens:
+Six tokens:
 
 *   **`quick`** `.snappy(0.20)` — a small state flip that moves nothing: a selected segment, a tab, a chip
 *   **`standard`** `.snappy(0.25)` — **the default.** A view arriving, leaving, expanding or collapsing. If you are unsure, it wants this one
 *   **`layout`** `.snappy(0.32)` — the dashboard grid settling into a new arrangement. The slowest thing in the app, on purpose: several tiles move at once and the eye is tracking one of them
 *   **`colorSafe`** `.easeInOut(0.20)` — **anything whose animation is mostly a colour or opacity change.** Not a taste call; see above. The type checker cannot enforce this, so the name has to
+*   **`reveal`** `.easeInOut(0.60)` — the launch splash only: its quote easing in, and the splash giving way to the app. The slowest token, because nothing is being operated while it runs
 *   **`press(isPressed:)`** `.easeOut(0.08)` in / `(0.18)` out — asymmetric on purpose: the press must register on the first frame of the touch, but a snap back on release looks twitchy
 
 Three values stay outside the scale and are documented as exemptions in `AppTheme+Motion.swift`: the scope carousel's two springs (a rejected drag damps harder than a committed one — that pairing *is* the gesture), the edit-mode jiggle's randomised 0.13–0.17 period (no two tiles may stay in sync, so it must not be one number), and `AmountField`'s `.animation(nil,)`, which is suppression rather than motion.
@@ -195,7 +201,11 @@ Three values stay outside the scale and are documented as exemptions in `AppThem
 
 ### App icon: `AppIcon-1024.png`
 
-### Launch Screen: Not yet produced — still an open item.
+### Launch Screen & splash
+
+`UILaunchScreen` (in `App/Info.plist`) is `LaunchBackground` + `LaunchMark`, the icon's white K cut out of `AppIcon-1024.png` and drawn 80pt tall (`AppTheme.Size.illustration`). `RootLoadingView` draws the same two things in the same place, so the handoff from the static launch image is invisible, and adds the only two things a launch screen cannot have: a spinner and a quote (`LaunchQuote`, a new one each launch and never the previous one). The quote is deliberately quiet: subheadline size in curly quotation marks, white, centred in the screen's lower half, no wider than `proseWidth`, with the author a size smaller and in italics. It arrives after a short beat (`RootLoadingView.quoteDelay`, 0.5 s) and eases in over `Motion.reveal`, so the launch reads as mark first, then words.
+
+On a cold launch the splash stays up until the quote has been fully visible for 2.5 s of reading time (`RootLoadingView.minimumDwell` = delay + fade + reading time, 3.6 s in all), then eases into the app over `Motion.reveal` once the app is ready, with no tap. It skips the wait when the launch has somewhere to be (a tapped capture notification or an opened URL). Returning from the background never shows it.
 
 ---
 

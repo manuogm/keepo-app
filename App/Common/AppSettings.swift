@@ -114,6 +114,11 @@ enum AppSettingsKeys {
     /// remembering to add a constant beside it — see
     /// `FTUXCoordinator.seenKey`.
     static let spotlightSeenPrefix = "spotlightSeen."
+    /// The text of the quote the launch splash showed last, so the next
+    /// launch can pick any other one (`LaunchQuote.forThisLaunch`). The text
+    /// rather than an index, because the list is edited by hand and an
+    /// index would point at a different quote after every edit.
+    static let lastLaunchQuote = "lastLaunchQuote"
 }
 
 extension AppSettings {

@@ -108,10 +108,10 @@ struct CurrencyWheel: View {
         )
     }
 
-    /// **Selected is the inverted fill, not the accent.** Mango is the app's
-    /// one accent and it is already carrying the screen behind this — a
-    /// second mango capsule inside a sheet that opened over a mango header
-    /// reads as the header having leaked rather than as a choice. The
+    /// **Selected is the inverted fill, not the accent.** Teal is the app's
+    /// accent and it is already carrying the screen behind this — a second
+    /// teal capsule inside a sheet that opened over a teal header reads as
+    /// the header having leaked rather than as a choice. The
     /// palette names the pair for exactly this case: `textPrimary` as a fill
     /// with the fixed ink its two grounds need, which is what a selected row
     /// in Notification Settings already looks like.

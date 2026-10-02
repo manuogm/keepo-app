@@ -78,6 +78,19 @@ extension AppTheme {
         /// `contentTransition(.numericText())`, and that needs one.
         static let colorSafe = Animation.easeInOut(duration: 0.2)
 
+        /// 0.6, **no bounce** — the launch splash: its quote easing in, and
+        /// the splash itself giving way to the app. Slower than anything
+        /// else here because nothing is being operated: there is no finger
+        /// waiting on it, and a calm entrance is the whole point. Opacity
+        /// only, so eased rather than sprung, for the reason `colorSafe`
+        /// gives.
+        static let reveal = Animation.easeInOut(duration: revealDuration)
+
+        /// The same 0.6, as a number — the splash's minimum dwell is counted
+        /// from it, so the quote gets its full reading time *after* it has
+        /// finished fading in.
+        static let revealDuration: TimeInterval = 0.6
+
         /// 0.4, **linear** — a field shaking its head at an entry it cannot
         /// take (`ShakeEffect`). Linear because the curve is already in the
         /// effect's own sine; a spring on top would smear the three

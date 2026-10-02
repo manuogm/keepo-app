@@ -23,18 +23,30 @@ extension AppTheme {
     /// colour, and this file is the only place it could happen.
     enum Palette {
         // MARK: Brand
-        /// Mango — **the app's only accent**, and the whole of it. There is
-        /// no `brandSecondary`; the coral it used to sit beside is gone.
+        /// Teal — **the app's accent**, from the app icon's family and the
+        /// same hue `scopeTotal` fills with.
         ///
-        /// **It is not one value, and it cannot be.** Mango is a light hue:
-        /// `#FF9F1C` measures 2.05:1 on white, which fails as text at any
-        /// size, and 7.37:1 on `#262626`. So this token is deep amber in
-        /// light mode and true mango in dark — the same accent at the two
-        /// lightnesses its two grounds require. Nearly every use of it is
-        /// *ink* at caption sizes (the Pending badge, the Needs Review
-        /// inbox, the offline bar), which is the side that decides the light
-        /// value. `scopeTotal` is the same hue on the fill side.
+        /// **It is not one value, and it cannot be.** Nearly every use of
+        /// it is *ink* at caption sizes (the Needs Review inbox, the offline
+        /// bar, a checked box), and the teal that reads on a light ground
+        /// (`#127268`, 5.3:1 on the canvas) is 2.6:1 on `#262626`. So dark
+        /// mode lifts it to `#3CC4B3` (7.0:1) — the same accent at the two
+        /// lightnesses its two grounds require. `scopeTotal` is the same
+        /// hue on the fill side.
+        ///
+        /// The one thing it does not mark is *Pending* — see
+        /// `statusPending`.
         static let brandPrimary = Color("BrandPrimary")
+
+        /// The app icon's own teal, one value in every appearance — the
+        /// launch screen's ground (`UILaunchScreen` in `Info.plist`) and
+        /// `RootLoadingView`'s, so the launch reads as the icon opening out
+        /// to fill the screen. Sign-in's header and its Continue button
+        /// carry it too: the first screen a new user sees after the splash. Sampled from the icon rather than borrowed
+        /// from `brandPrimary`, which is a different, lighter teal tuned
+        /// for text: a splash a shade off the icon the user just tapped
+        /// reads as a mismatch. Used only on the splash and sign-in.
+        static let launchBackground = Color("LaunchBackground")
 
         // MARK: Surfaces
         /// The app canvas behind everything. Replaces
@@ -101,6 +113,14 @@ extension AppTheme {
         /// An error, a destructive action, a trend down. Replaces
         /// `Color.red`.
         static let statusNegative = Color("StatusNegative")
+        /// Waiting on the user, not wrong — an automatic capture nobody has
+        /// reviewed yet (`PendingBadge`, `PendingEdgeStrip`). **Mango**, the
+        /// accent before the palette went teal, kept for this one job: a
+        /// teal Pending sits too close to `statusPositive` and reads as
+        /// "fine", where a warm one reads as "look at me". Deep amber in
+        /// light mode, true mango in dark — mango is 2.05:1 on white, so it
+        /// needs the same two-lightness treatment `brandPrimary` gets.
+        static let statusPending = Color("StatusPending")
         /// Something is missing but nothing is wrong — a rate that has not
         /// arrived. The system's own yellow, which already adapts to dark
         /// mode and High Contrast; only ever a wash or a glyph, never text,
@@ -125,19 +145,19 @@ extension AppTheme {
         static let chartNeutral = Color("ChartNeutral")
 
         // MARK: Scope
-        /// The three banner tints. Total is **mango** — the fill side of
-        /// `brandPrimary` — with the cool and green counterparts that keep
-        /// the three cards distinguishable at a glance to a colour-vision-
-        /// deficient user (worst pair ΔE 53 under deuteranopia).
+        /// The three banner tints. Total is **teal** — the fill side of
+        /// `brandPrimary` — Household indigo, Private a dark grey. The grey
+        /// is achromatic, so the three stay distinguishable at a glance to
+        /// a colour-vision-deficient user; the closest pair is Total and
+        /// Private, ΔE 22 under deuteranopia (Total–Household 54), and the
+        /// badge glyph and word tell those two apart as well.
         ///
-        /// All three carry `textOnAccent`, and **Total does not clear AA in
-        /// its default appearances** — white on `#FF9F1C` is 2.05:1. That is
-        /// a deliberate, user-made call to run the mango card on a real
-        /// device and judge it there, not an oversight. The High Contrast
-        /// variants are where it is made good: switch Increase Contrast on
-        /// and Total drops to a deep amber that clears 4.5:1, exactly as
-        /// Private and Household deepen to clear it. Dark mode takes every
-        /// card one step deeper to cut glare.
+        /// All three carry `textOnAccent`, and all three clear AA against
+        /// it in every appearance — light / dark / HC / dark HC: Total
+        /// 4.8 / 5.8 / 6.0 / 6.0, Household 5.6 / 6.3 / 7.1 / 7.1, Private
+        /// 11.2 / 7.8 / 13.2 / 9.3. Private lifts to `#525252` in dark mode
+        /// rather than deepening like the other two: a grey as dark as the
+        /// light one would sink into the `#262626` canvas.
         static let scopeTotal = Color("ScopeTotal")
         static let scopePrivate = Color("ScopePrivate")
         static let scopeHousehold = Color("ScopeHousehold")

@@ -82,7 +82,7 @@ Three more things the form does on the user's behalf, all of them driven by the 
 
 `RootView` is the **only** view in the app allowed to call `.preferredColorScheme`, and it passes the optional `AppearanceMode.colorScheme` — `nil` for `.system`, which is the one value that leaves iOS in charge. `.preferredColorScheme` is a *preference*: it travels **up** to the window, including out of a sheet's content, so a descendant pinning `light`/`dark` pins the whole app. A view that then reads `@Environment(\.colorScheme)` to *decide* that override is reading back its own output, and the app stops following live system flips — that loop was a real bug, fixed by deleting the resolve. Per-screen exceptions that pin deliberately and permanently (`HouseholdCeremonyView`'s `.dark`, `ExportPDFRenderer`'s light values) are fine; deriving a global override from the environment is not.
 
-Touching the Dark Mode toggle pins the choice for good — `.system` is reachable only by never having touched it. Accepted deliberately: a pin is a pin. The launch screen is the one surface the pin cannot reach (`UILaunchScreen` → `BGCanvas` resolves from the system trait collection and Info.plist cannot read `UserDefaults`), so a user pinned against their phone sees one mismatched launch frame.
+Touching the Dark Mode toggle pins the choice for good — `.system` is reachable only by never having touched it. Accepted deliberately: a pin is a pin. The launch screen is the one surface the pin cannot reach (Info.plist cannot read `UserDefaults`). Since the launch ground became the icon's fixed teal (`LaunchBackground`, one value in every appearance), there is nothing left for the pin to mismatch.
 
 ### Shared components (one place each, per CLAUDE.md's Engineering Principles)
 
@@ -412,7 +412,7 @@ Two findings from the retired doc's palette work still hold and are **not being 
 | Income | `#2a78d6` | `#3987e5` |
 
 - **Income is blue, not green.** Coral-vs-green is the canonical red-green colorblind failure (ΔE 7.6); coral-vs-blue clears it (ΔE 19.5).
-- **Mango (`#FF9F1C`) is `BrandPrimary`, the app's only accent, and stays a UI accent** (the Pending badge, the offline bar) — it falls outside the lightness band needed for a data series on a white surface. There is no `BrandSecondary`; see `keepo-brand-identity.md`.
+- **The accent (`BrandPrimary`, teal since the 2026-10-02 redesign) and mango (`StatusPending`) stay UI colours** (the offline bar; the Pending badge) and are never used as a data series. There is no `BrandSecondary`; see `keepo-brand-identity.md`.
 
 Other rules carried forward: one axis, never dual — a second implied scale is a comprehension tax the chart doesn't need to impose. Gaps filled with real zeroes, never omitted, so evenly-spaced bars don't imply evenly-spaced dates. Category bars carry their name and value as text, so an unvalidated user-chosen category color is never the only identity channel. Daily buckets are not offered at all — daily income-vs-expense is dominated by the one day salary lands.
 

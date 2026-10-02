@@ -13,12 +13,15 @@ import UIKit
 /// come back, with nothing before it to have earned that. Nothing here can
 /// fix the round trip — only Sign in with Apple can, and it is the single
 /// highest-value unblock for this flow. What this screen can do is carry
-/// the whole first impression on its own: the mark and tagline say what
+/// the whole first impression on its own: the mark and welcome say what
 /// Keepo is, the waiting state says exactly what is happening, and every
 /// dead end has an escape (resend, open Mail, wrong address).
 ///
-/// The mark is `Typography.Number.hero` — the 48pt size whose own doc
-/// comment calls it "the sign-in screen's mark".
+/// The screen is the splash's teal carried into a header — the app icon's
+/// white K and a rounded welcome, on `launchBackground` — with the form on
+/// the ordinary canvas below, so it still follows dark mode. Sending the
+/// link does not leave the screen: the field and button give way to "Check
+/// your email" in the same place, under the same header.
 struct OTPSignInView: View {
     let session: SessionStore
 
@@ -32,90 +35,169 @@ struct OTPSignInView: View {
     @State private var email = ""
     @State private var step: Step = .email
     @State private var isLoading = false
-    @State private var errorMessage: String?
+    @State private var actionError: ActionError?
     @State private var secondsUntilResend = 0
+    /// The typed address failed `EmailAddress.isPlausible` on Continue. The
+    /// message under the field stays until the user types again; the red
+    /// wash only lasts while the refused text is still in the field, which
+    /// empties itself after the shake.
+    @State private var isEmailRejected = false
+    /// Bumped once per refusal — drives the shake and the haptic, so a
+    /// second refusal of the same text still shakes.
+    @State private var emailRejections = 0
 
-    @ScaledMetric(relativeTo: .largeTitle) private var typeScale: CGFloat = 1
     @FocusState private var isEditingEmail: Bool
 
     private var trimmedEmail: String { email.trimmingCharacters(in: .whitespaces) }
 
+    /// The form sits at the centre of the screen, with the header filling
+    /// everything above it: the header and the space below the form are
+    /// both flexible, so they split what is left equally. That keeps it
+    /// centred in whatever is *visible* — with the keyboard up (it is, from
+    /// the moment the screen appears), the form re-centres above it and the
+    /// header gives up the height.
     var body: some View {
-        ZStack {
-            AppTheme.Palette.bgCanvas.ignoresSafeArea()
+        VStack(spacing: 0) {
+            header
 
-            VStack(spacing: AppTheme.Spacing.xxl) {
-                Spacer(minLength: 0)
-                mark
-
+            Group {
                 switch step {
                 case .email: emailStep
                 case .waiting: waitingStep
                 }
-
-                // A stale or already-used link arrives back here through the
-                // deep link, so this covers both that and a send failure.
-                if let message = session.linkError ?? errorMessage {
-                    Text(message)
-                        .font(AppTheme.Typography.caption)
-                        .foregroundStyle(AppTheme.Palette.statusNegative)
-                        .multilineTextAlignment(.center)
-                }
-
-                Spacer(minLength: 0)
             }
             .padding(.horizontal, AppTheme.Spacing.l)
             .padding(.vertical, AppTheme.Spacing.xxl)
-            .animation(AppTheme.Motion.standard, value: step)
+            // Its full height first, always: the two flexible frames around
+            // it share only what is left. Without this the stack squeezed
+            // the waiting step's message down to a truncated two lines.
+            .fixedSize(horizontal: false, vertical: true)
+            .transition(.opacity)
+
+            // Not a `Spacer`: a stack hands a `Spacer` only what a
+            // `maxHeight: .infinity` sibling leaves, which is nothing — the
+            // header took every point and the form sank to the bottom. Two
+            // frames of the same flexibility split it evenly.
+            Color.clear.frame(maxHeight: .infinity)
+        }
+        .background(AppTheme.Palette.bgCanvas.ignoresSafeArea())
+        .animation(AppTheme.Motion.standard, value: step)
+        // Work that was asked for and did not happen: a send that failed,
+        // or a stale or already-used link arriving back through the deep
+        // link. Validation of the typed address stays inline, under the
+        // field the user is looking at.
+        .errorAlert($actionError)
+        .onChange(of: session.linkError, initial: true) { _, message in
+            guard let message else { return }
+            actionError = ActionError(title: "Couldn't Sign You In", message: message)
         }
     }
 
-    private var mark: some View {
-        VStack(spacing: AppTheme.Spacing.s) {
-            Text("Keepo")
-                .font(AppTheme.Typography.Number.display(
-                    AppTheme.Typography.Number.hero, weight: .bold, scale: typeScale
-                ))
-                .foregroundStyle(AppTheme.Palette.textPrimary)
-            Text("Where all your money is kept under control.")
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .multilineTextAlignment(.center)
+    /// The splash's teal, from the top edge of the screen down to the form.
+    /// Only the *background* ignores the safe area, so the mark is centred
+    /// in the visible part of the header, clear of the Dynamic Island,
+    /// without reading an inset.
+    ///
+    /// The mark gives way first when the header is short — a small phone
+    /// with the keyboard up — so the welcome is never clipped.
+    private var header: some View {
+        ViewThatFits(in: .vertical) {
+            VStack(spacing: AppTheme.Spacing.l) {
+                Image("LaunchMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: AppTheme.Size.illustration)
+                    .accessibilityHidden(true)
+                welcome
+            }
+            welcome
         }
+        .padding(.vertical, AppTheme.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            UnevenRoundedRectangle(
+                bottomLeadingRadius: AppTheme.Radius.surface,
+                bottomTrailingRadius: AppTheme.Radius.surface,
+                style: .continuous
+            )
+            .fill(AppTheme.Palette.launchBackground)
+            .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private var welcome: some View {
+        Text("Welcome to Keepo")
+            .font(AppTheme.Typography.headerTitle)
+            .foregroundStyle(AppTheme.Palette.textOnAccent)
+            .multilineTextAlignment(.center)
     }
 
     // MARK: - Ask
 
     private var emailStep: some View {
         VStack(spacing: AppTheme.Spacing.l) {
-            TextField("Email address", text: $email)
-                .font(AppTheme.Typography.body)
-                .textContentType(.emailAddress)
-                .keyboardType(.emailAddress)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .submitLabel(.go)
-                .focused($isEditingEmail)
-                .onSubmit { Task { await sendLink() } }
-                .padding(AppTheme.Spacing.m)
-                .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.control))
+            VStack(spacing: AppTheme.Spacing.s) {
+                TextField("Email address", text: $email)
+                    .font(AppTheme.Typography.body)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.go)
+                    .focused($isEditingEmail)
+                    .onSubmit { Task { await sendLink() } }
+                    .padding(AppTheme.Spacing.m)
+                    .background {
+                        // The red is a wash over the surface, not a fill of
+                        // its own — the pairing code's cards do the same.
+                        let shape = RoundedRectangle(cornerRadius: AppTheme.Radius.control)
+                        ZStack {
+                            shape.fill(AppTheme.Palette.bgSurface)
+                            shape.fill(AppTheme.Palette.statusNegative.opacity(
+                                isEmailRejected && !email.isEmpty ? AppTheme.Opacity.fill : 0
+                            ))
+                        }
+                    }
+                    .modifier(ShakeEffect(rejections: emailRejections))
+                    // Typing again is what clears the message — not the
+                    // field emptying itself after the shake, which leaves
+                    // the reason on screen for the next attempt.
+                    .onChange(of: email) { _, newValue in
+                        if !newValue.isEmpty { isEmailRejected = false }
+                    }
+
+                if isEmailRejected {
+                    FormErrorText(message: "Invalid input. Enter a valid email address")
+                }
+            }
+            .animation(AppTheme.Motion.colorSafe, value: isEmailRejected)
+            .animation(AppTheme.Motion.colorSafe, value: email.isEmpty)
+            .sensoryFeedback(AppTheme.Feedback.rejection, trigger: emailRejections)
+            // The refused address shakes in red, then empties so the field
+            // is ready for the next one — the pairing code's rhythm. Only if
+            // it is still the refused text: anything typed during the hold
+            // is the user's next attempt, not something to throw away.
+            .task(id: emailRejections) {
+                guard isEmailRejected else { return }
+                let refused = email
+                try? await Task.sleep(for: ShakeEffect.rejectionHold)
+                guard !Task.isCancelled, email == refused else { return }
+                email = ""
+            }
 
             // The same button every setup step uses — this is one step of
             // one flow, and a sign-in button that looked like a different
-            // product's would say so.
+            // product's would say so. Only its fill changes, to the header's.
             PrimaryActionButton(
-                title: "Continue", isEnabled: !trimmedEmail.isEmpty, isLoading: isLoading, fillsWidth: true
+                title: "Continue", isEnabled: !trimmedEmail.isEmpty, isLoading: isLoading, fillsWidth: true,
+                fill: AppTheme.Palette.launchBackground
             ) {
                 Task { await sendLink() }
             }
-
-            // No password to forget, and saying so up front is the reason
-            // the next screen is not a surprise.
-            Text("We'll email you a link to sign in. No password to remember.")
-                .font(AppTheme.Typography.caption)
-                .foregroundStyle(AppTheme.Palette.textSecondary)
-                .multilineTextAlignment(.center)
         }
+        // The field is the screen's whole job, so it owns the keyboard from
+        // the moment the screen appears.
+        .onAppear { isEditingEmail = true }
     }
 
     private var canSend: Bool { !trimmedEmail.isEmpty && !isLoading }
@@ -148,7 +230,6 @@ struct OTPSignInView: View {
                 resendButton
                 Button("Wrong address?") {
                     step = .email
-                    errorMessage = nil
                     secondsUntilResend = 0
                     isEditingEmail = true
                 }
@@ -197,17 +278,22 @@ struct OTPSignInView: View {
 
     private func sendLink() async {
         guard canSend else { return }
+        guard EmailAddress.isPlausible(trimmedEmail) else {
+            isEmailRejected = true
+            withAnimation(AppTheme.Motion.reject) { emailRejections += 1 }
+            return
+        }
         isLoading = true
-        errorMessage = nil
         do {
             try await session.sendOTP(email: trimmedEmail)
             step = .waiting
             isEditingEmail = false
+            isLoading = false
             await startCooldown()
         } catch {
-            errorMessage = UserFacingError.describe(error)
+            actionError = ActionError("Couldn't Send the Link", error)
+            isLoading = false
         }
-        isLoading = false
     }
 
     /// Driven here rather than by a `Timer`, so it cancels with the view and

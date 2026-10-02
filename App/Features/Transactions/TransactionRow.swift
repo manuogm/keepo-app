@@ -210,10 +210,10 @@ struct PendingBadge: View {
     var body: some View {
         Text("Pending")
             .font(AppTheme.Typography.nanoEmphasis)
-            .foregroundStyle(AppTheme.Palette.brandPrimary)
+            .foregroundStyle(AppTheme.Palette.statusPending)
             .padding(.horizontal, AppTheme.Spacing.xs)
             .padding(.vertical, AppTheme.Spacing.xxs)
-            .background(AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill), in: Capsule())
+            .background(AppTheme.Palette.statusPending.opacity(AppTheme.Opacity.fill), in: Capsule())
     }
 }
 
@@ -226,7 +226,7 @@ struct PendingBadge: View {
 /// The band states it once, across the edge, and stands in nothing's way.
 ///
 /// It carries the word as well as the colour for the same reason the badge
-/// did: `brandPrimary` at `Opacity.fill` is a wash, and a wash alone is a
+/// did: `statusPending` at `Opacity.fill` is a wash, and a wash alone is a
 /// status only the people who already know the convention can read.
 ///
 /// Full-bleed by design — it has no corner radius of its own and relies on
@@ -239,9 +239,9 @@ struct PendingEdgeStrip: View {
     var body: some View {
         Text("Pending")
             .font(AppTheme.Typography.nanoEmphasis)
-            .foregroundStyle(AppTheme.Palette.brandPrimary)
+            .foregroundStyle(AppTheme.Palette.statusPending)
             .frame(maxWidth: .infinity)
             .padding(.vertical, AppTheme.Spacing.xs)
-            .background(AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill))
+            .background(AppTheme.Palette.statusPending.opacity(AppTheme.Opacity.fill))
     }
 }

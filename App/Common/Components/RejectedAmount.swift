@@ -35,6 +35,12 @@ struct ShakeEffect: GeometryEffect {
         shakes = 3
     }
 
+    /// How long a refused entry stays on screen before it clears itself:
+    /// the shake (`Motion.reject`, 0.4s) and a beat after it to read the
+    /// red. The lock screen's rhythm — the pairing code and sign-in's email
+    /// field both empty on it.
+    static let rejectionHold: Duration = .milliseconds(800)
+
     init(nudges: Int) {
         animatableData = CGFloat(nudges)
         travel = AppTheme.Spacing.xs

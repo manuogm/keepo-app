@@ -18,18 +18,26 @@
 	     can only carry scalars, and `INFOPLIST_KEY_UILaunchScreen_Generation`
 	     on its own builds an empty dict, i.e. a blank white screen.
 
-	     Same canvas colour and same mark `RootLoadingView` draws, in the
-	     same place, so the handoff from the OS's static image to the first
-	     SwiftUI frame is invisible — the spinner is the only thing that
-	     arrives, because it is the only thing a launch screen cannot have.
+	     Same ground and same mark `RootLoadingView` draws, in the same
+	     place, so the handoff from the OS's static image to the first
+	     SwiftUI frame is invisible — the quote and the spinner are the only
+	     things that arrive, because text and motion are what a launch
+	     screen cannot have. `LaunchBackground` is the app icon's own teal
+	     and `LaunchMark` its white K, so the launch reads as the icon
+	     opening out to fill the screen.
 
 	     `UIImageRespectsSafeAreaInsets` is false deliberately: the mark is
 	     the only thing on the screen, so honouring the insets would push it
 	     off-centre on a device with a home indicator and nowhere else. -->
+	<!-- Read only for the launch screen: past it, SwiftUI's hosting
+	     controller decides. Light because the launch screen is the icon's
+	     teal. -->
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
-		<string>BGCanvas</string>
+		<string>LaunchBackground</string>
 		<key>UIImageName</key>
 		<string>LaunchMark</string>
 		<key>UIImageRespectsSafeAreaInsets</key>

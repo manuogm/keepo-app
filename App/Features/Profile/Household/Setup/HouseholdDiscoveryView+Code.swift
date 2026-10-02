@@ -176,7 +176,7 @@ extension HouseholdDiscoveryView {
         // cancels it instead of writing to a view that has gone.
         .task(id: codeRejections) {
             guard isCodeRejected else { return }
-            try? await Task.sleep(for: Self.rejectedCodeHold)
+            try? await Task.sleep(for: ShakeEffect.rejectionHold)
             guard !Task.isCancelled else { return }
             withAnimation(AppTheme.Motion.colorSafe) {
                 enteredCode = ""
@@ -184,11 +184,6 @@ extension HouseholdDiscoveryView {
             }
         }
     }
-
-    /// How long a refused code stays on screen: the shake
-    /// (`Motion.reject`, 0.4s) and a beat after it to read the red, before
-    /// the cards empty.
-    static var rejectedCodeHold: Duration { .milliseconds(800) }
 
     /// Six digits that are not the code just refused. During the hold the
     /// wrong code is still on screen, and sending it again would spend
@@ -203,7 +198,7 @@ extension HouseholdDiscoveryView {
     /// verdict, left nothing to show a refusal on: the owner's answer
     /// arrives a moment later, and it is the code the user typed that turns
     /// red and shakes. A refused code clears itself after the shake (see
-    /// `rejectedCodeHold`); an accepted one is replaced by the paired card.
+    /// `ShakeEffect.rejectionHold`); an accepted one is replaced by the paired card.
     ///
     /// **Focus is deliberately kept.** Dismissing the keyboard here was the
     /// obvious thing to do — the answer comes from the other phone, so there

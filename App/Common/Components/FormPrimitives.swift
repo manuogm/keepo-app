@@ -146,6 +146,10 @@ struct PrimaryActionButton: View {
     /// Sign-in's button and the transaction form's span their content; a
     /// setup step's hugs its label in the bottom bar.
     var fillsWidth = false
+    /// The enabled fill. The accent everywhere but sign-in, whose button
+    /// takes the header's `launchBackground` so the screen reads as one
+    /// colour. Disabled ignores it — see the type's note.
+    var fill = AppTheme.Palette.brandPrimary
     let action: () -> Void
 
     private var isActive: Bool { isEnabled && !isLoading }
@@ -157,7 +161,7 @@ struct PrimaryActionButton: View {
                 .frame(maxWidth: fillsWidth ? .infinity : nil)
                 .frame(height: AppTheme.Size.touchTarget)
                 .background(
-                    isActive ? AppTheme.Palette.brandPrimary : AppTheme.Palette.fillStrong,
+                    isActive ? fill : AppTheme.Palette.fillStrong,
                     in: Capsule()
                 )
                 .contentShape(Capsule())

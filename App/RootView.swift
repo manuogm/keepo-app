@@ -2,7 +2,8 @@ import KeepoCore
 import SwiftUI
 import UIKit
 
-/// Routes on SessionStore.phase: loading while signing in, the intro and
+/// Routes on SessionStore.phase: the launch splash while signing in (and
+/// for its minimum dwell — see `isSplashHeld`), the intro and
 /// sign-in before there is a session, `SetupFlowView` until a base
 /// currency exists, main TabView after.
 struct RootView: View {
@@ -24,6 +25,22 @@ struct RootView: View {
     /// same instant the OS takes the switcher snapshot) without that quirk.
     @State private var isSceneActive = true
     @State private var captureObserver: DarwinNotificationObserver?
+    /// Keeps the launch splash up past the end of `.loading` until
+    /// `RootLoadingView.minimumDwell` has passed, so its quote can be read.
+    /// `@State` on the root, so it is true exactly once per process: a cold
+    /// launch. Returning from the background never shows the splash.
+    ///
+    /// Released early — no dwell at all — when the launch has somewhere to
+    /// be: a tapped capture notification (`NotificationRouter`) or an
+    /// opened URL (a magic link, a capture-setup callback). Those users are
+    /// mid-task, and a quote standing between them and it is in the way.
+    ///
+    /// While held, the router draws `.loading` and *nothing else* — the
+    /// destination is not mounted underneath. It could not be: a sheet or
+    /// alert the destination presented on appear would land on top of the
+    /// splash.
+    @State private var isSplashHeld = true
+    @State private var router = NotificationRouter.shared
     @Environment(\.scenePhase) private var scenePhase
 
     /// iOS greys every tinted view in a window while a modal is presented
@@ -55,9 +72,10 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            switch session.phase {
+            switch isSplashHeld ? .loading : session.phase {
             case .loading:
                 RootLoadingView()
+                    .transition(.opacity)
             case .needsSignIn:
                 OTPSignInView(session: session)
             case .needsOnboarding:
@@ -71,6 +89,9 @@ struct RootView: View {
                 RootErrorView(message: message)
             }
         }
+        // The splash eases into the app rather than cutting to it, at the
+        // same calm pace its quote arrived at.
+        .animation(AppTheme.Motion.reveal, value: isSplashHeld || session.phase == .loading)
         .appAppearance()
         // A write the server refused outright. The outbox no longer retries
         // one forever (it cannot succeed), so this alert is the only place
@@ -89,7 +110,21 @@ struct RootView: View {
             set: { if $0 == nil { session.outbox.dismissRefusal() } }
         ))
         .task { await session.start() }
+        // Keyed on `isSceneActive` so the dwell is counted while the user
+        // can see it: a quick action wakes this process in the background,
+        // and a splash timed out there would never have been on screen.
+        // A dwell interrupted by the scene resigning simply starts over.
+        .task(id: isSceneActive) {
+            guard isSceneActive, isSplashHeld else { return }
+            try? await Task.sleep(for: RootLoadingView.minimumDwell)
+            guard !Task.isCancelled else { return }
+            isSplashHeld = false
+        }
+        .onChange(of: router.pendingCaptureId, initial: true) { _, id in
+            if id != nil { isSplashHeld = false }
+        }
         .onOpenURL { url in
+            isSplashHeld = false
             // Capture setup's `x-callback-url` answer comes back on the
             // same scheme as the magic link, and `handleMagicLink` would
             // read it as a malformed one and surface a sign-in error over

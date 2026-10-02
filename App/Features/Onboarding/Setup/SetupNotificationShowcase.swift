@@ -231,9 +231,11 @@ private struct NotificationAppIcon: View {
     }
 }
 
-/// A lock screen's worth of colour for the platters to frost: mango into the
-/// private scope's indigo, both brand tokens, so the showcase stays on-palette
-/// while still giving the material something to blur.
+/// A lock screen's worth of colour for the platters to frost: Total's teal
+/// into Household's indigo, both scope tokens, so the showcase stays
+/// on-palette while still giving the material something to blur. Not
+/// Private: it is a dark grey, and a grey wallpaper gives the frost nothing
+/// to show.
 ///
 /// A mesh rather than blurred shapes: it is resolution-independent and takes
 /// its geometry as proportions of whatever size it is given, so there is no
@@ -249,12 +251,12 @@ private struct NotificationWallpaper: View {
             ],
             colors: [
                 AppTheme.Palette.scopeTotal, AppTheme.Palette.scopeTotal, AppTheme.Palette.scopeTotal,
-                AppTheme.Palette.scopeTotal, AppTheme.Palette.scopeTotal, AppTheme.Palette.scopePrivate,
-                AppTheme.Palette.scopePrivate, AppTheme.Palette.scopePrivate, AppTheme.Palette.scopePrivate
+                AppTheme.Palette.scopeTotal, AppTheme.Palette.scopeTotal, AppTheme.Palette.scopeHousehold,
+                AppTheme.Palette.scopeHousehold, AppTheme.Palette.scopeHousehold, AppTheme.Palette.scopeHousehold
             ],
-            // Perceptual, not sRGB: mango and indigo sit across the wheel
-            // from each other, and an sRGB blend between them passes through
-            // a muddy brown the eye reads as a smudge rather than as light.
+            // Perceptual, not sRGB: an sRGB blend between two saturated
+            // hues dips through a duller, darker middle the eye reads as a
+            // smudge rather than as light.
             colorSpace: .perceptual
         )
     }
