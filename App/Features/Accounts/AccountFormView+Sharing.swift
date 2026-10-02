@@ -23,9 +23,10 @@ extension AccountFormView {
                 Toggle("Share with Household", isOn: shareBinding)
                     .tint(AppTheme.Palette.statusPositive)
                     .disabled(!hasHousehold || isSaving)
-                if !hasHousehold {
-                    shareNote("Create a household in Profile first.")
-                }
+                    // The card's own background keeps a disabled switch's
+                    // label at full strength, so dim it by hand.
+                    .opacity(hasHousehold ? 1 : AppTheme.Opacity.muted)
+                createHouseholdLink
                 if let sharedFromLabel {
                     shareNote("Your household sees its transactions from \(sharedFromLabel).")
                     Button("Include Past Transactions") { showIncludePast = true }
@@ -48,6 +49,29 @@ extension AccountFormView {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppTheme.Spacing.l)
         .padding(.vertical, AppTheme.Spacing.m)
+    }
+
+    /// Not a note about the switch but the way out of the state it is stuck
+    /// in, so it is a link, not grey text. The form closes first — Profile is a sheet of its own, and the form is
+    /// a sheet over the screen that would present it.
+    @ViewBuilder
+    var createHouseholdLink: some View {
+        if isOwner, !hasHousehold {
+            Button {
+                dismissSelf()
+                Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    navigation?.openProfile(.household)
+                }
+            } label: {
+                HStack(spacing: AppTheme.Spacing.xxs) {
+                    Text("Create a Household")
+                    Image(systemName: "chevron.right")
+                }
+                .font(AppTheme.Typography.microEmphasis)
+                .foregroundStyle(PublicSchema.AccountScope.household.tint)
+            }
+        }
     }
 
     private func shareNote(_ text: String) -> some View {

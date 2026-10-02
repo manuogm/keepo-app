@@ -113,7 +113,7 @@ struct HouseholdInfoSheet: View {
 
     private var points: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.l) {
-            point("person.2.fill", "A shared account is 100% yours **and** 100% theirs. Never split.")
+            point("icon-shared2", "A shared account is 100% yours **and** 100% theirs. Never split.")
             point("coloncurrencysign.circle.fill", "Figures are in **your** base currency. Theirs may differ.")
             point(
                 "arrow.triangle.2.circlepath",
@@ -130,10 +130,15 @@ struct HouseholdInfoSheet: View {
 
     private func point(_ symbol: String, _ text: String) -> some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.s) {
-            Image(systemName: symbol)
-                .font(AppTheme.Typography.micro)
-                .foregroundStyle(PublicSchema.AccountScope.household.tint)
-                .frame(width: AppTheme.Size.glyphSmall)
+            Group {
+                if symbol.hasPrefix("icon-") {
+                    KeepoIcon(name: symbol, size: AppTheme.Size.glyphSmall)
+                } else {
+                    Image(systemName: symbol).font(AppTheme.Typography.micro)
+                }
+            }
+            .foregroundStyle(PublicSchema.AccountScope.household.tint)
+            .frame(width: AppTheme.Size.glyphSmall)
             Text(.init(text))
                 .font(AppTheme.Typography.label)
                 .foregroundStyle(AppTheme.Palette.textSecondary)

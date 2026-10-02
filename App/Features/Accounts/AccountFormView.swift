@@ -43,6 +43,7 @@ struct AccountFormView: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppNavigation.self) var navigation: AppNavigation?
 
     func dismissSelf() {
         if let onDismissRequested {

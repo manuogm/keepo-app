@@ -52,7 +52,7 @@ struct HouseholdSetupIntro<Footer: View>: View {
     private var points: [HouseholdIntroPoint.Point] {
         [
             .init(
-                icon: "icon-shared",
+                icon: "icon-shared2",
                 title: "Share your finances",
                 detail: role == .owner
                     ? "Invite your partner, roommate or family member"

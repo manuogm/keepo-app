@@ -4,12 +4,11 @@ import SwiftUI
 /// One account in the Accounts list. Split out of `AccountsListView` so that
 /// screen can stay focused on the drag/drop model.
 ///
-/// The `Investment` badge sits beside the name, compacted to "Inv." — this
-/// row is the tightest space it appears in, sharing the line with the name
-/// and racing the balance on the trailing edge. Shared/mapped-card status
-/// moves to its own row underneath instead, appearing only when applicable,
-/// so a plain unshared account with no card contributes no second line at
-/// all.
+/// The household marker and the `Investment` badge follow the name on one
+/// line — the badge compacted to "Inv." because this row is the tightest
+/// space they appear in, racing the balance on the trailing edge. They are
+/// small fixed-size views, so the name is what truncates, never them. Whether
+/// a card is mapped is not shown here; the account form carries it.
 struct AccountRowView: View {
     let row: LocalAccountRow
 
@@ -27,18 +26,14 @@ struct AccountRowView: View {
                             row.archivedAt == nil ? AppTheme.Palette.textPrimary : AppTheme.Palette.textSecondary
                         )
                         .lineLimit(1)
+                    if row.isShared {
+                        // Added to the name's own `xs`, so the marker stands
+                        // apart from the name rather than reading as part of it.
+                        SharedWithHouseholdIcon()
+                            .padding(.leading, AppTheme.Spacing.xs)
+                    }
                     if row.kind == .investment {
                         InvestmentBadge(compact: true)
-                    }
-                }
-                if row.hasMappedCard || row.isShared {
-                    HStack(spacing: AppTheme.Spacing.xs) {
-                        if row.hasMappedCard {
-                            MappedCardIcon()
-                        }
-                        if row.isShared {
-                            SharedWithHouseholdIcon()
-                        }
                     }
                 }
             }

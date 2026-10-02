@@ -78,21 +78,9 @@ struct IconPickerButton: View {
 /// on which glyph means shared.
 struct SharedWithHouseholdIcon: View {
     var body: some View {
-        Image(systemName: "person.2.fill")
-            .font(AppTheme.Typography.micro)
+        KeepoIcon(name: "icon-home", size: AppTheme.Size.glyphSmall)
             .foregroundStyle(AppTheme.Palette.textSecondary)
             .accessibilityLabel("Shared with your household")
-    }
-}
-
-/// The "has a card mapped" marker for the Accounts list — a glance at
-/// whether Apple Pay purchases can auto-capture into this account, without
-/// opening the account form to check.
-struct MappedCardIcon: View {
-    var body: some View {
-        KeepoIcon(name: "icon-mappedcard", size: AppTheme.Size.glyphSmall)
-            .foregroundStyle(AppTheme.Palette.textSecondary)
-            .accessibilityLabel("Has a linked card")
     }
 }
 

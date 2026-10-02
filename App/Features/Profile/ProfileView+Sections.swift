@@ -29,7 +29,7 @@ extension ProfileView {
                     if isSyncingFX {
                         ProgressView().id("fx-sync-spinner")
                     } else {
-                        ProfileRowLabel(icon: "icon-planet", title: "Sync Exchange Rates")
+                        ProfileRowLabel(icon: "icon-FXrates", title: "Sync Exchange Rates")
                     }
                     Spacer()
                     if let lastFXSyncedAt {
@@ -74,14 +74,14 @@ extension ProfileView {
     var helpAndSupport: some View {
         Section {
             ComingSoonRow(icon: "questionmark.circle", title: "FAQ")
-            ComingSoonRow(icon: "envelope", title: "Contact the Keepo Team")
-            ComingSoonRow(icon: "text.bubble", title: "Give Us Feedback")
+            ComingSoonRow(icon: "icon-inbox", title: "Contact the Keepo Team")
+            ComingSoonRow(icon: "icon-like", title: "Give Us Feedback")
             // Available and never mandatory — which is the whole shape of
             // §3.11's answer. The tips fire once each, just-in-time; this is
             // where somebody who dismissed one, or never triggered it, can
             // read all of them.
             NavigationLink(value: AppNavigation.ProfileDestination.showMeAround) {
-                ProfileRowLabel(icon: "sparkles", title: "Show Me Around")
+                ProfileRowLabel(icon: "icon-sign", title: "Show Me Around")
             }
             rateKeepoRow
         } header: {

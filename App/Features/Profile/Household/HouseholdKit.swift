@@ -268,7 +268,7 @@ struct HouseholdCategoryRow<Trailing: View>: View {
 /// says whose it is.
 struct SharedByThemIcon: View {
     var body: some View {
-        KeepoIcon(name: "icon-shared", size: AppTheme.Size.glyphSmall)
+        KeepoIcon(name: "icon-shared2", size: AppTheme.Size.glyphSmall)
             .foregroundStyle(AppTheme.Palette.textSecondary)
             .accessibilityLabel("Shared with you")
     }

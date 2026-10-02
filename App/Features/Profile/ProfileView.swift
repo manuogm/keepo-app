@@ -71,7 +71,7 @@ struct ProfileView: View {
                         // level to label automatic capture specifically, and
                         // the same glyph on the row that contains it said the
                         // parent and the child were the same thing.
-                        ProfileRowLabel(icon: "bolt", title: "My Automations")
+                        ProfileRowLabel(icon: "icon-flash", title: "My Automations")
                     }
                 }
                 general
@@ -374,7 +374,7 @@ struct ProfileView: View {
             // the toggle reflects whichever way that resolved — so its first
             // position is never a surprise. Touching it pins the choice.
             Toggle(isOn: isDarkMode) {
-                ProfileRowLabel(icon: "moon", title: "Dark Mode")
+                ProfileRowLabel(icon: "icon-moon", title: "Dark Mode")
             }
             .tint(AppTheme.Palette.statusPositive)
         } header: {
