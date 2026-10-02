@@ -344,6 +344,7 @@
 		DEF43BE5B0DCBA4720D12EF2 /* TransactionFormView+Categories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2530398B305DA990A40ED538 /* TransactionFormView+Categories.swift */; };
 		DF2251AD169556468232895D /* NeedsReviewPanel+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51126A63F6BCA2B3BB3778E /* NeedsReviewPanel+Actions.swift */; };
 		E035D81A41952DFA11DEBB47 /* FormPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF251868300EF158A6F57D1 /* FormPrimitives.swift */; };
+		E048A30831ED77FF4D38DA8D /* AccountDeletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44FE6EBDD414EFED65A4E1A7 /* AccountDeletionView.swift */; };
 		E0DAD97BB21630538872749D /* AppAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DDBCD555F41DA76C2F36B0 /* AppAppearance.swift */; };
 		E207C8EB0EE6AD263601F72A /* DashboardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5D7423604124262739036E /* DashboardStore.swift */; };
 		E28D269E5ACBCDE0B135659B /* TransactionFormView+Date.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674719F7E885BAA299442408 /* TransactionFormView+Date.swift */; };
@@ -535,6 +536,7 @@
 		42EFC2392496054638F1B9CF /* WalkthroughClipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkthroughClipView.swift; sourceTree = "<group>"; };
 		4483B90ADDC12EA6923C282A /* SimulateCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulateCaptureView.swift; sourceTree = "<group>"; };
 		44DEBA10D23CE56C2C8D9F1E /* NeedsReviewPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsReviewPanel.swift; sourceTree = "<group>"; };
+		44FE6EBDD414EFED65A4E1A7 /* AccountDeletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionView.swift; sourceTree = "<group>"; };
 		45DD737B9CA83E61775B1FA8 /* HouseholdAutoMerge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdAutoMerge.swift; sourceTree = "<group>"; };
 		46B51809A9E015EC3C4BA079 /* DashboardCanvasCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCanvasCatalog.swift; sourceTree = "<group>"; };
 		46D0D6AA2508CE2682EE3445 /* SeriesWidgetChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesWidgetChrome.swift; sourceTree = "<group>"; };
@@ -1101,6 +1103,7 @@
 		74BC9B5B820623D331253951 /* Profile */ = {
 			isa = PBXGroup;
 			children = (
+				44FE6EBDD414EFED65A4E1A7 /* AccountDeletionView.swift */,
 				2B81EA0691D95EE39E4461BC /* AvatarPicker.swift */,
 				9E22F93DB44C5DFEC4CF6725 /* ProfileMetricCard.swift */,
 				50EF6E55983303FD58CA0B30 /* ProfileRowLabel.swift */,
@@ -1779,6 +1782,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E048A30831ED77FF4D38DA8D /* AccountDeletionView.swift in Sources */,
 				8AA1FF962A3D43F4042148F0 /* AccountFilterSheet.swift in Sources */,
 				DB9AE2A3AFF6265C834A63E4 /* AccountFormView+Cards.swift in Sources */,
 				2F0B4AC72E20917F31A0D9F7 /* AccountFormView+Data.swift in Sources */,

@@ -52,10 +52,12 @@ struct OTPSignInView: View {
 
     /// The form sits at the centre of the screen, with the header filling
     /// everything above it: the header and the space below the form are
-    /// both flexible, so they split what is left equally. That keeps it
-    /// centred in whatever is *visible* — with the keyboard up (it is, from
-    /// the moment the screen appears), the form re-centres above it and the
-    /// header gives up the height.
+    /// both flexible, so they split what is left equally.
+    ///
+    /// The keyboard is ignored: it rises over the empty lower half and
+    /// nothing moves. Respecting it re-centred the form in what was left
+    /// above the keyboard, which squeezed the header until the mark no
+    /// longer fitted and `header` dropped it, leaving the welcome alone.
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -80,6 +82,7 @@ struct OTPSignInView: View {
             // frames of the same flexibility split it evenly.
             Color.clear.frame(maxHeight: .infinity)
         }
+        .ignoresSafeArea(.keyboard)
         .background(AppTheme.Palette.bgCanvas.ignoresSafeArea())
         .animation(AppTheme.Motion.standard, value: step)
         // Work that was asked for and did not happen: a send that failed,
@@ -98,8 +101,9 @@ struct OTPSignInView: View {
     /// in the visible part of the header, clear of the Dynamic Island,
     /// without reading an inset.
     ///
-    /// The mark gives way first when the header is short — a small phone
-    /// with the keyboard up — so the welcome is never clipped.
+    /// The mark gives way first if the header is ever too short for it —
+    /// a large Dynamic Type size on a small phone — so the welcome is never
+    /// clipped.
     private var header: some View {
         ViewThatFits(in: .vertical) {
             VStack(spacing: AppTheme.Spacing.l) {

@@ -48,6 +48,12 @@ struct ProfileView: View {
     @State var isSigningOut = false
     @State var isShowingDeleteConfirmation = false
     @State var isDeletingAccount = false
+    /// The teal "Deleting all your data" cover — up from the moment the
+    /// step-up passes until the deletion fails (success never lowers it).
+    @State var isShowingDeletionProgress = false
+    /// A deletion failure waits here until the cover is gone: an alert
+    /// presented while it is still dismissing would never appear.
+    @State var deletionError: ActionError?
     @AppStorage(AppSettingsKeys.isFaceIDEnabled) var isFaceIDEnabled = true
     @AppStorage(AppSettingsKeys.isHideBalanceEnabled) var isHideBalanceEnabled = true
 

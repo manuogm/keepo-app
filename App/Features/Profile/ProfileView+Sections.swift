@@ -171,6 +171,12 @@ extension ProfileView {
                     + "You will be signed out immediately. This cannot be undone."
             )
         }
+        .fullScreenCover(isPresented: $isShowingDeletionProgress) {
+            actionError = deletionError
+            deletionError = nil
+        } content: {
+            AccountDeletionView()
+        }
     }
 
     func signOut() async {
@@ -189,14 +195,26 @@ extension ProfileView {
     /// equally invisible from the outside, and this is the one button in the
     /// app where "nothing appeared to happen" is indistinguishable from
     /// "your account is gone".
+    ///
+    /// The deletion cover goes up only once Face ID has passed: under the
+    /// prompt it would announce a deletion that has not been confirmed, and
+    /// a cancelled prompt would flash it.
     func deleteAccount() async {
         isDeletingAccount = true
         actionError = nil
         do {
             try await session.stepUp(reason: "Confirm account deletion")
-            try await session.deleteAccount()
         } catch {
             actionError = ActionError("Couldn't Delete Your Account", error)
+            isDeletingAccount = false
+            return
+        }
+        isShowingDeletionProgress = true
+        do {
+            try await session.deleteAccount()
+        } catch {
+            deletionError = ActionError("Couldn't Delete Your Account", error)
+            isShowingDeletionProgress = false
             isDeletingAccount = false
         }
     }
