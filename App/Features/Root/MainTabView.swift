@@ -112,10 +112,9 @@ struct MainTabView: View {
                         profileDestination(destination)
                     }
             }
-            // No `.preferredColorScheme` here, or anywhere but `RootView` —
-            // see its `appearanceMode`. A sheet's preference travels up to
-            // the window, so pinning a concrete scheme here pinned the whole
-            // app and broke system-appearance following.
+            // The same stored setting the root applies, not a resolved
+            // scheme — see `AppAppearance` for why the sheet needs its own.
+            .appAppearance()
         }
         .fullScreenCover(item: $navigation.householdSetupRole) { role in
             HouseholdSetupFlow(session: session, avatars: avatars, role: role) {

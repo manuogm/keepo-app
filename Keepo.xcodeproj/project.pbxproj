@@ -343,6 +343,7 @@
 		DEF43BE5B0DCBA4720D12EF2 /* TransactionFormView+Categories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2530398B305DA990A40ED538 /* TransactionFormView+Categories.swift */; };
 		DF2251AD169556468232895D /* NeedsReviewPanel+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51126A63F6BCA2B3BB3778E /* NeedsReviewPanel+Actions.swift */; };
 		E035D81A41952DFA11DEBB47 /* FormPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF251868300EF158A6F57D1 /* FormPrimitives.swift */; };
+		E0DAD97BB21630538872749D /* AppAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DDBCD555F41DA76C2F36B0 /* AppAppearance.swift */; };
 		E207C8EB0EE6AD263601F72A /* DashboardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5D7423604124262739036E /* DashboardStore.swift */; };
 		E28D269E5ACBCDE0B135659B /* TransactionFormView+Date.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674719F7E885BAA299442408 /* TransactionFormView+Date.swift */; };
 		E43BEBD85BAD11CDD781A200 /* CategoryLocalWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */; };
@@ -420,6 +421,7 @@
 		0385315DE0205887262ED048 /* SessionStore+TimeZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionStore+TimeZone.swift"; sourceTree = "<group>"; };
 		03941D7DA3A9DB1450A09F83 /* OfflineInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineInfoSheet.swift; sourceTree = "<group>"; };
 		03C66FB827DFBD10EF7AEC18 /* CurrencyExposureWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyExposureWidget.swift; sourceTree = "<group>"; };
+		03DDBCD555F41DA76C2F36B0 /* AppAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAppearance.swift; sourceTree = "<group>"; };
 		03E47695783E639B37462948 /* AccountLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLocalWrite.swift; sourceTree = "<group>"; };
 		0409EB6DE009773078275B19 /* LocalRecurringRuleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalRecurringRuleRow.swift; sourceTree = "<group>"; };
 		04390E921137B01C4EBB45D2 /* CategoryLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryLocalWrite.swift; sourceTree = "<group>"; };
@@ -1199,6 +1201,7 @@
 		978A560D3AAE06360198F16B /* Modifiers */ = {
 			isa = PBXGroup;
 			children = (
+				03DDBCD555F41DA76C2F36B0 /* AppAppearance.swift */,
 				EC9E5777197B29849763DF87 /* DismissesKeyboardOnTap.swift */,
 				A2EFE59B1202392CFCB41D33 /* DropsBottomSafeArea.swift */,
 				1690836BEC31AA131CD45E46 /* FadingEdges.swift */,
@@ -1786,6 +1789,7 @@
 				B286284590780CBB794D4894 /* AddAccountFlowView.swift in Sources */,
 				F9C0B3CFA6553A04391C6E26 /* AmountField+Controls.swift in Sources */,
 				FCB0E6FB98D7B8C682A287D6 /* AmountField.swift in Sources */,
+				E0DAD97BB21630538872749D /* AppAppearance.swift in Sources */,
 				D1A22957D9168F2FB74BBEA7 /* AppDelegate.swift in Sources */,
 				5AC76702BFC9E686203A47A6 /* AppNavigation.swift in Sources */,
 				0187390179020E4EFD45AE22 /* AppSettings.swift in Sources */,

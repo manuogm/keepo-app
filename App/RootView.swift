@@ -25,17 +25,6 @@ struct RootView: View {
     @State private var isSceneActive = true
     @State private var captureObserver: DarwinNotificationObserver?
     @Environment(\.scenePhase) private var scenePhase
-    /// The app's **only** writer of `.preferredColorScheme`, and deliberately
-    /// optional: `.system` resolves to `nil`, which is the one value that
-    /// leaves iOS in charge. Nothing below this line may resolve it to a
-    /// concrete scheme, because `.preferredColorScheme` is a *preference* —
-    /// it travels up to the window, including out of a sheet's content — so
-    /// a descendant that pins `light`/`dark` also pins the window, and any
-    /// view reading `@Environment(\.colorScheme)` to *decide* the override
-    /// is then reading back its own output. That loop is what stopped the
-    /// app following a live system flip: the resolve could never see a value
-    /// it had not itself just written.
-    @AppStorage(AppSettingsKeys.appearanceMode) private var appearanceMode = AppearanceMode.system
 
     /// iOS greys every tinted view in a window while a modal is presented
     /// (`tintAdjustmentMode` flips to `.dimmed`) and is supposed to undo it
@@ -82,7 +71,7 @@ struct RootView: View {
                 RootErrorView(message: message)
             }
         }
-        .preferredColorScheme(appearanceMode.colorScheme)
+        .appAppearance()
         // A write the server refused outright. The outbox no longer retries
         // one forever (it cannot succeed), so this alert is the only place
         // the user learns their change did not stick — and that what they
