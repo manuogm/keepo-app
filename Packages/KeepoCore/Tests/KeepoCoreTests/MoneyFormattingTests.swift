@@ -236,3 +236,47 @@ struct MoneyShortFormTests {
         #expect(MoneyFormatter.isShort(9_999_950, minorUnit: 2))
     }
 }
+
+@Suite("MoneyFormatter currency symbol")
+struct MoneySymbolTests {
+    let usd = CurrencyInfo(code: "USD", minorUnit: 2)
+    let aud = CurrencyInfo(code: "AUD", minorUnit: 2)
+
+    @Test("the US dollar is a bare $ in every locale", arguments: ["en_GB", "es_ES", "es_MX", "en_AU", "fr_FR"])
+    func usdIsBareDollar(localeId: String) {
+        let locale = Locale(identifier: localeId)
+        #expect(MoneyFormatter.symbol(for: usd, locale: locale) == "$")
+        for figure in [
+            MoneyFormatter.format(123_450_000, currency: usd, locale: locale, exact: true),
+            MoneyFormatter.format(568_465_000, currency: usd, locale: locale),
+            MoneyFormatter.compact(8_423_700, currency: usd, locale: locale)
+        ] {
+            #expect(figure.contains("$"))
+            #expect(!figure.contains("US"))
+        }
+    }
+
+    @Test("other dollars keep their full symbol, even at home")
+    func otherDollarsKeepFullSymbol() {
+        #expect(MoneyFormatter.symbol(for: aud, locale: Locale(identifier: "en_US")) == "A$")
+        #expect(MoneyFormatter.symbol(for: aud, locale: Locale(identifier: "en_AU")) == "A$")
+        #expect(MoneyFormatter.format(568_465_000, currency: aud, locale: Locale(identifier: "en_AU")) == "A$56.8K")
+    }
+
+    @Test("short and exact place the symbol the same way")
+    func shortFollowsTheLocalePattern() {
+        let spain = Locale(identifier: "es_ES")
+        #expect(MoneyFormatter.format(12_345_000, currency: usd, locale: spain, exact: true) == "1234,50\u{00A0}$")
+        #expect(MoneyFormatter.format(-568_465_000, currency: usd, locale: spain) == "-56,8\u{00A0}mil\u{00A0}$")
+        #expect(MoneyFormatter.format(-568_465_000, currency: usd, locale: Locale(identifier: "en_GB")) == "-$56.8k")
+    }
+
+    @Test("exact split keeps the cents of a big figure")
+    func exactSplit() {
+        let split = MoneyFormatter.formatSplit(
+            568_465_000, currency: usd, locale: Locale(identifier: "en_US"), exact: true
+        )
+        #expect(split.whole == "$56,846")
+        #expect(split.fraction == ".50")
+    }
+}

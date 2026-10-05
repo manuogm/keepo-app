@@ -84,16 +84,18 @@ public enum MoneyFormatter {
     /// smaller styling. `fraction` includes the separator itself (e.g.
     /// ".56") and is empty for a zero-decimal currency, a missing value, or
     /// a short figure — "$56.8K" has no cents to set apart, and splitting
-    /// it would draw ".8K" small.
+    /// it would draw ".8K" small. `exact` is `format`'s, for an expanded
+    /// widget's headline when the full figure fits.
     public static func formatSplit(
         _ amountE4: Int64?,
         currency: CurrencyInfo,
         locale: Locale = .current,
-        signStyle: MoneySignStyle = .standard
+        signStyle: MoneySignStyle = .standard,
+        exact: Bool = false
     ) -> (whole: String, fraction: String) {
         guard let amountE4 else { return ("—", "") }
-        let full = format(amountE4, currency: currency, locale: locale, signStyle: signStyle)
-        if isShort(amountE4, minorUnit: currency.minorUnit) { return (full, "") }
+        let full = format(amountE4, currency: currency, locale: locale, signStyle: signStyle, exact: exact)
+        if !exact && isShort(amountE4, minorUnit: currency.minorUnit) { return (full, "") }
         let separator = currencyFormatter(currency: currency, locale: locale).decimalSeparator
         return split(full, separator: separator, minorUnit: currency.minorUnit)
     }
@@ -126,11 +128,11 @@ public enum MoneyFormatter {
         signStyle: MoneySignStyle = .standard
     ) -> String {
         guard let amountE4 else { return "—" }
-        let value = Decimal(drawnAmount(amountE4, signStyle: signStyle)) / Decimal(10_000)
+        let value = displayValue(drawnAmount(amountE4, signStyle: signStyle), minorUnit: 0)
         let rendered = isShort(value)
             ? short(value, currency: currency, locale: locale)
-            : value.formatted(Decimal.FormatStyle.Currency(code: currency.code, locale: locale)
-                .precision(.fractionLength(0)).rounded(rule: .toNearestOrAwayFromZero))
+            : FormatterCache.currency(code: currency.code, minorUnit: 0, locale: locale)
+                .string(from: value as NSDecimalNumber) ?? "—"
         return prefix(for: amountE4, signStyle: signStyle) + rendered
     }
 
@@ -138,8 +140,12 @@ public enum MoneyFormatter {
     /// `AmountField`, which draws both itself ahead of the number, exactly
     /// as it does for the full figure.
     public static func compactFigure(_ amountE4: Int64, locale: Locale = .current) -> String {
-        let value = Decimal(amountE4.magnitude) / Decimal(10_000)
-        return value.formatted(
+        compactNumber(Decimal(amountE4.magnitude) / Decimal(10_000), locale: locale)
+    }
+
+    /// "56.8K" for any magnitude — the figure half of every short form.
+    private static func compactNumber(_ magnitude: Decimal, locale: Locale) -> String {
+        magnitude.formatted(
             .number.notation(.compactName).precision(.fractionLength(0 ... 1))
                 .rounded(rule: .toNearestOrAwayFromZero).locale(locale)
         )
@@ -156,18 +162,48 @@ public enum MoneyFormatter {
         abs(value) >= shortThreshold
     }
 
-    /// ICU places the suffix, so a locale that trails its symbol still reads
-    /// correctly ("1,2 Mio. €") — appending a `K` to a formatted string
-    /// would not. Rounded to nearest, so 999,960 reads "$1M", not "$1000K".
+    /// The short figure poured into the currency's own pattern: the locale's
+    /// rendering of one unit ("$1.00", "1,00 $") with its "1.00" swapped for
+    /// "56.8K". ICU still places the suffix ("1,2 Mio. €") — appending a `K`
+    /// to a formatted string would not — and rounds to nearest, so 999,960
+    /// reads "$1M", not "$1000K".
+    ///
+    /// Not ICU's own compact *currency* style: that style takes no symbol
+    /// override, so it went on writing "US$56.8K" beside an exact "$56.80" —
+    /// one figure, two symbols, decided by size alone. The pattern comes from
+    /// the same cached formatter as every exact figure, so the two can no
+    /// longer disagree about the symbol (`displaySymbol`) or its spacing.
     private static func short(_ value: Decimal, currency: CurrencyInfo, locale: Locale) -> String {
-        value.formatted(
-            Decimal.FormatStyle.Currency(code: currency.code, locale: locale)
-                .notation(.compactName).precision(.fractionLength(0 ... 1))
-                .rounded(rule: .toNearestOrAwayFromZero)
-        )
+        let formatter = currencyFormatter(currency: currency, locale: locale)
+        let unit: Decimal = value < 0 ? -1 : 1
+        guard let pattern = formatter.string(from: unit as NSDecimalNumber),
+              let one = FormatterCache.editable(minorUnit: currency.minorUnit, locale: locale)
+                .string(from: 1 as NSDecimalNumber),
+              let range = pattern.range(of: one)
+        else { return formatter.string(from: value as NSDecimalNumber) ?? "—" }
+        return pattern.replacingCharacters(in: range, with: compactNumber(abs(value), locale: locale))
     }
 
-    /// The locale's symbol for this currency ("$", "€", "¥") — used by the
+    /// The symbol Keepo writes for a currency, given the one ICU would.
+    ///
+    /// **"$" is the US dollar's, and only the US dollar's.** ICU writes USD as
+    /// "US$" ("$US", "USD") in every locale outside the US — correct for a
+    /// reader who might mean their own dollar, but every other dollar already
+    /// carries its full symbol ("A$", "CA$"), so the prefix only clutters the
+    /// one currency it is meant to clarify. The reverse holds too: a locale's
+    /// own dollar, which ICU writes bare ("$" for AUD in Australia), takes its
+    /// full symbol, so a bare "$" never means two currencies on one screen.
+    static func displaySymbol(code: String, icuSymbol: String?) -> String? {
+        if code == "USD" { return "$" }
+        guard icuSymbol == "$" else { return icuSymbol }
+        let international = NumberFormatter()
+        international.locale = Locale(identifier: "en_US")
+        international.numberStyle = .currency
+        international.currencyCode = code
+        return international.currencySymbol
+    }
+
+    /// The symbol for this currency ("$", "€", "¥", "A$") — used by the
     /// amount fields that draw the symbol themselves instead of letting the
     /// formatter place it. Falls back to the code, which is never wrong,
     /// only less compact.

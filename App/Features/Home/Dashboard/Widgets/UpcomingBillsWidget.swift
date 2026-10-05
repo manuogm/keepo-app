@@ -115,10 +115,20 @@ struct UpcomingBillsWidget: View {
 
     private func expanded(_ metrics: UpcomingTransactionsMetrics) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
-            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
-                MetricHeadline(value: .money(metrics.totalE4, currency), size: WidgetStyle.metricExpanded)
-                Spacer(minLength: AppTheme.Spacing.xs)
-                counts(metrics)
+            // The counts are what step aside when the full figure is
+            // revealed — see `FittingFigure`.
+            FittingFigure { fit in
+                HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
+                    MetricHeadline(
+                        value: .money(metrics.totalE4, currency), size: WidgetStyle.metricExpanded,
+                        exact: fit.showsExact
+                    )
+                    FigureFitToggle(fit: fit)
+                    Spacer(minLength: AppTheme.Spacing.xs)
+                    if !fit.clearsLine {
+                        counts(metrics)
+                    }
+                }
             }
             carousel(metrics, isInteractive: true)
             dayList(metrics)

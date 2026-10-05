@@ -129,6 +129,9 @@ struct CategoryFormView: View {
                         .padding(.bottom, AppTheme.Spacing.m)
                     }
                 }
+                // Stays at the sheet's bottom while typing — same fix, same
+                // reason as `AccountFormView`'s.
+                .ignoresSafeArea(.keyboard, edges: .bottom)
             }
             .navigationTitle(isEditing ? "Edit Category" : "New Category")
             .navigationBarTitleDisplayMode(.inline)

@@ -142,39 +142,29 @@ struct SetupAccountStep: View {
                 isPickingIcon = true
             }
 
-            VStack(spacing: 0) {
-                HStack(spacing: AppTheme.Spacing.s) {
-                    TextField("Account name", text: $name)
-                        .font(AppTheme.Typography.body)
-                        .foregroundStyle(AppTheme.Palette.textPrimary)
-                        .textInputAutocapitalization(.words)
-                    // The same marker this account will carry on every
-                    // screen it ever appears on, shown at the moment the
-                    // user names it rather than as a surprise afterwards.
-                    if kind == .investment {
-                        InvestmentBadge()
-                    }
-                }
-                .padding(.horizontal, AppTheme.Spacing.m)
-                .frame(minHeight: AppTheme.Size.touchTarget)
-
-                Divider()
-                    .padding(.leading, AppTheme.Spacing.m)
-
-                // `onPickCurrency` replaces the sentence that used to sit
-                // under this figure explaining that the account could be in
-                // another currency. The capability was worth keeping and
-                // the paragraph was not: the code chip beside the number is
-                // the same offer in the place the answer belongs.
-                AmountField(
-                    text: $balanceText,
-                    currency: selectedCurrencyInfo,
-                    onPickCurrency: currencies.isEmpty ? nil : { isPickingCurrency = true },
-                    showsCalculator: false,
-                    size: AppTheme.Typography.Number.balance
-                )
-                .padding(AppTheme.Spacing.m)
+            // The name is the figure's header, exactly as on the account
+            // form: a balance too long for its line sends the currency pill
+            // up beside the name, and the Investment badge — the same marker
+            // this account will carry on every screen, shown at the moment
+            // the user names it — steps left for it, shortening to "Inv."
+            // if the name would otherwise be cut (`AccountNameRow`).
+            //
+            // `onPickCurrency` replaces the sentence that used to sit under
+            // this figure explaining that the account could be in another
+            // currency. The capability was worth keeping and the paragraph
+            // was not: the code chip beside the number is the same offer in
+            // the place the answer belongs.
+            AmountField(
+                text: $balanceText,
+                currency: selectedCurrencyInfo,
+                onPickCurrency: currencies.isEmpty ? nil : { isPickingCurrency = true },
+                showsCalculator: false,
+                size: AppTheme.Typography.Number.balance,
+                headerSpacing: AppTheme.Spacing.m
+            ) {
+                AccountNameRow(name: $name, isInvestment: kind == .investment, isShared: false)
             }
+            .padding(AppTheme.Spacing.m)
             .background(AppTheme.Palette.bgSurface, in: RoundedRectangle(cornerRadius: AppTheme.Radius.card))
         }
         .frame(maxWidth: .infinity)

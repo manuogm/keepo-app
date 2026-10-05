@@ -19,6 +19,10 @@ struct BalanceHeaderView: View {
     /// information; a figure whose direction its own label already states —
     /// Upcoming Bills' "due" — passes `.ledger` and drops the minus.
     var signStyle: MoneySignStyle = .standard
+    /// The full figure, cents and all, instead of the short form from a
+    /// thousand up — an expanded widget's headline when it fits
+    /// (`FittingFigure`).
+    var exact = false
 
     @Environment(\.isPrivacyMode) private var isPrivacyMode
     /// **The whole app's money figures scale from here.** Every balance,
@@ -52,7 +56,7 @@ struct BalanceHeaderView: View {
     /// a detail rather than competing with it.
     private var styledAmount: Text {
         guard let currency else { return Text("—").font(font(size)) }
-        let split = MoneyFormatter.formatSplit(amount, currency: currency, signStyle: signStyle)
+        let split = MoneyFormatter.formatSplit(amount, currency: currency, signStyle: signStyle, exact: exact)
         return Text(split.whole).font(font(size))
             + Text(split.fraction).font(font(size * 0.55))
     }

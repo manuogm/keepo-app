@@ -181,7 +181,7 @@ struct CashflowWidget: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             MetricHeadlineBlock(
                 value: .money(series.highlightedPoint?.amountE4, currency), size: WidgetStyle.metricExpanded,
-                percentChange: series.percentChange, caption: badgeCaption
+                fitsExact: true, percentChange: series.percentChange, caption: badgeCaption
             )
             SeriesChartOrMessage(series: series, color: WidgetPalette.neutral, charted: chartSeries)
                 .frame(minHeight: 128)
@@ -203,16 +203,33 @@ struct CashflowWidget: View {
     /// the tile's midline whatever the two labels happen to measure; and
     /// unlike an overlay it is still laid out, so an unusually long figure
     /// pushes the buttons apart rather than drawing over them.
+    ///
+    /// The total is exact when the line has room for it and short with a
+    /// chevron when not; revealed, In and Out step aside for it until it is
+    /// shortened again (`FittingFigure`).
     private var directionNav: some View {
-        HStack(spacing: AppTheme.Spacing.s) {
-            segment(.moneyIn)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            PrivateText(directionTotalLabel, spoken: amountLabel(highlightedDirectionE4, exact: true))
-                .font(AppTheme.Typography.labelEmphasis)
-                .foregroundStyle(direction.color)
-                .lineLimit(1)
-            segment(.moneyOut)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+        FittingFigure { fit in
+            HStack(spacing: AppTheme.Spacing.s) {
+                if !fit.clearsLine {
+                    segment(.moneyIn)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    PrivateText(
+                        amountLabel(highlightedDirectionE4, exact: fit.showsExact),
+                        spoken: amountLabel(highlightedDirectionE4, exact: true)
+                    )
+                    .font(AppTheme.Typography.labelEmphasis)
+                    .foregroundStyle(direction.color)
+                    .lineLimit(1)
+                    FigureFitToggle(fit: fit)
+                }
+                .frame(maxWidth: fit.clearsLine ? .infinity : nil)
+                if !fit.clearsLine {
+                    segment(.moneyOut)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
         }
         .sensoryFeedback(AppTheme.Feedback.selection, trigger: direction)
     }
@@ -265,10 +282,6 @@ struct CashflowWidget: View {
 
     private var highlightedDirectionE4: Int64? {
         series.series(direction.metric).first { $0.bucket == series.highlighted }?.amountE4
-    }
-
-    private var directionTotalLabel: String {
-        amountLabel(highlightedDirectionE4)
     }
 
     private var badgeCaption: String {

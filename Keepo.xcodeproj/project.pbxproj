@@ -180,6 +180,7 @@
 		7027DFCC65547FCC92C2644F /* ProfileMetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E22F93DB44C5DFEC4CF6725 /* ProfileMetricCard.swift */; };
 		71D5F5ADD5B5A545BF2A344A /* RejectedAmount.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED949BB88265A5D7BAFC77E7 /* RejectedAmount.swift */; };
 		720897F8D137E6761E836C80 /* AvatarStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC04F25F3E87CBB7240E1BC6 /* AvatarStore.swift */; };
+		728AD0177C9EBE3677B48EDA /* AccountNameRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BB92E1FDA60A984EF87AA4 /* AccountNameRow.swift */; };
 		740E6573623946DF9C219E5F /* CaptureQuickActionRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D622D3BC234133CBEBEA83 /* CaptureQuickActionRegistry.swift */; };
 		740F18DE2C4B1A6D52882358 /* NotificationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5597232F1DF84A5AC9F1058F /* NotificationRouter.swift */; };
 		7423565633D4F1D0A1288CDF /* SetupAllSetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C538B0CF7A52543253F959F /* SetupAllSetView.swift */; };
@@ -304,6 +305,7 @@
 		C83D5628BC4774EBD0CC495E /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B8E976E97E2B97A613D5C1 /* QRScannerView.swift */; };
 		C942E94D282D0F15C4C02322 /* PrivateText.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE76797B503A0D4F8F1EDF56 /* PrivateText.swift */; };
 		C974C2896B1F2F0C46514C41 /* CaptureQuickActionPickTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF03E0B592A4996FA4CACAF /* CaptureQuickActionPickTests.swift */; };
+		C9DE4B3FE1F7E005FA0809DD /* FittingFigure.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67C246C9D101E56B82B81957 /* FittingFigure.swift */; };
 		CA7EE6547F31A801FD9BD8B3 /* UncheckedSendable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B22BD4DEC754DAEC181A07 /* UncheckedSendable.swift */; };
 		CA90E71209B3E46F64C6F22A /* OfflineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C826F8EB1CECA41DDF5D02A /* OfflineStore.swift */; };
 		CB5A3E7838E7FF8BE0DCC658 /* LiquidGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F5CF9CDA73EB350C94ED75 /* LiquidGlass.swift */; };
@@ -530,6 +532,7 @@
 		3DD854E6F3280A8D82CB3225 /* TransactionFilterSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFilterSheets.swift; sourceTree = "<group>"; };
 		3F8FFECC5948E8F48BA0801E /* FXRateSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXRateSync.swift; sourceTree = "<group>"; };
 		3FB16A0FBB8E0356AFBB7D47 /* WalletAutomationGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAutomationGuideView.swift; sourceTree = "<group>"; };
+		40BB92E1FDA60A984EF87AA4 /* AccountNameRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountNameRow.swift; sourceTree = "<group>"; };
 		4201A86EDD51E43F6AF56621 /* TransactionFormView+Recurring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionFormView+Recurring.swift"; sourceTree = "<group>"; };
 		429EDEB71C3725F0838B5333 /* HouseholdKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdKit.swift; sourceTree = "<group>"; };
 		42DD908C92224E7C61E6275F /* SetupCaptureTestSubStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupCaptureTestSubStep.swift; sourceTree = "<group>"; };
@@ -604,6 +607,7 @@
 		672ABF9C6E754098C7465188 /* WidgetFillBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetFillBar.swift; sourceTree = "<group>"; };
 		674719F7E885BAA299442408 /* TransactionFormView+Date.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionFormView+Date.swift"; sourceTree = "<group>"; };
 		6777B149C1267AD0636DC635 /* HouseholdDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdDiscoveryView.swift; sourceTree = "<group>"; };
+		67C246C9D101E56B82B81957 /* FittingFigure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FittingFigure.swift; sourceTree = "<group>"; };
 		67F70AFEF9431B8FA8A98F6E /* UUID+Identifiable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UUID+Identifiable.swift"; sourceTree = "<group>"; };
 		6882A009B70A74B987B3AD38 /* OutboxSending.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxSending.swift; sourceTree = "<group>"; };
 		68FD22A4D8E74530E6ECFCEA /* TransactionFormView+Delete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransactionFormView+Delete.swift"; sourceTree = "<group>"; };
@@ -994,6 +998,7 @@
 		571ED3242B2BDBCAF2C24571 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				40BB92E1FDA60A984EF87AA4 /* AccountNameRow.swift */,
 				2ADACFF6B4E83FE909AC4361 /* AmountField.swift */,
 				70C638743AD9E6B08F627872 /* AmountField+Controls.swift */,
 				4C7034897D9B030CE34263BF /* AvatarButton.swift */,
@@ -1283,6 +1288,7 @@
 				18D7EDAF6788363C5C9CB5C9 /* ChartAxisLabels.swift */,
 				AB3B46B7F5593307A881BC90 /* CurrencyBadge.swift */,
 				651B6E75A1EEE0DE610ECB03 /* DaySplitRing.swift */,
+				67C246C9D101E56B82B81957 /* FittingFigure.swift */,
 				ECC746EFCAC75E605AF30BCD /* HighlightableChart.swift */,
 				5E2B99129C4E07F0E402F157 /* HighlightableChart+Axis.swift */,
 				F149A624F5F2249B3FA98BA9 /* MetricHeadline.swift */,
@@ -1790,6 +1796,7 @@
 				AB930943ED526213A67DAB14 /* AccountFormView+Sharing.swift in Sources */,
 				FB2AC3D154B13437974DAC63 /* AccountFormView.swift in Sources */,
 				1FDF557AFBD5BA0222622C8F /* AccountLocalWrite.swift in Sources */,
+				728AD0177C9EBE3677B48EDA /* AccountNameRow.swift in Sources */,
 				896E6BDFFC95D090F2B825A6 /* AccountRowView.swift in Sources */,
 				EADC88BE53BA8201A5A0D55D /* AccountsListView+Reorder.swift in Sources */,
 				A0A3C7CA5A7F03F096D79844 /* AccountsListView.swift in Sources */,
@@ -1890,6 +1897,7 @@
 				CF7632BB3A1B0551894DCCB0 /* FTUXLessonDetail.swift in Sources */,
 				1D704BAE22582F48C476BEBC /* FXRateSync.swift in Sources */,
 				124124D5FCC9AB799601F076 /* FadingEdges.swift in Sources */,
+				C9DE4B3FE1F7E005FA0809DD /* FittingFigure.swift in Sources */,
 				E035D81A41952DFA11DEBB47 /* FormPrimitives.swift in Sources */,
 				29A9DAF6B04FAC0AE4F55FE5 /* FxRateWidget.swift in Sources */,
 				46AB8B8FB9F85DA2E5188014 /* HighlightableChart+Axis.swift in Sources */,

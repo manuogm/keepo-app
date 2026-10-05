@@ -29,6 +29,9 @@ struct MetricHeadline: View {
     let value: MetricValue
     var size: CGFloat = WidgetStyle.metric
     var signStyle: MoneySignStyle = .standard
+    /// Money only: the full figure rather than the short form. Set by a
+    /// `FigureFit`, never decided here — see `FittingFigure`.
+    var exact = false
 
     var body: some View {
         content
@@ -43,7 +46,9 @@ struct MetricHeadline: View {
         case .money(let amountE4, let currency):
             // Delegated rather than reimplemented: this is where the
             // big-whole/small-fraction weighting and privacy mode live.
-            BalanceHeaderView(amount: amountE4, currency: currency, size: size, signStyle: signStyle)
+            BalanceHeaderView(
+                amount: amountE4, currency: currency, size: size, signStyle: signStyle, exact: exact
+            )
         case .percent(let ratio):
             text(ratio.map { $0.formatted(.percent.precision(.fractionLength(0))) })
         case .rate(let rate, let digits):
@@ -78,10 +83,15 @@ struct MetricHeadline: View {
 /// percentage it belonged to and read as part of the card's chrome. It still
 /// cannot push the badge anywhere: the badge is on the next row of the
 /// `VStack`, not in this `HStack`.
+///
+/// `fitsExact` is for an expanded widget: a money figure is shown in full
+/// when its line has the room, short with a chevron when not
+/// (`FittingFigure`). Collapsed tiles leave it off and stay short.
 struct MetricHeadlineBlock<Adjacent: View>: View {
     let value: MetricValue
     var size: CGFloat = WidgetStyle.metric
     var signStyle: MoneySignStyle = .standard
+    var fitsExact = false
     var percentChange: Double?
     var unit: String = "%"
     var caption: String?
@@ -89,12 +99,25 @@ struct MetricHeadlineBlock<Adjacent: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
-                MetricHeadline(value: value, size: size, signStyle: signStyle)
-                adjacent()
-                Spacer(minLength: 0)
+            if fitsExact, case .money = value {
+                FittingFigure { fit in headlineRow(fit) }
+            } else {
+                headlineRow(nil)
             }
             WidgetTrendBadge(percentChange: percentChange, unit: unit, caption: caption)
+        }
+    }
+
+    private func headlineRow(_ fit: FigureFit?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.s) {
+            MetricHeadline(value: value, size: size, signStyle: signStyle, exact: fit?.showsExact ?? false)
+            if let fit {
+                FigureFitToggle(fit: fit)
+            }
+            if fit?.clearsLine != true {
+                adjacent()
+            }
+            Spacer(minLength: 0)
         }
     }
 }
@@ -104,12 +127,13 @@ extension MetricHeadlineBlock where Adjacent == EmptyView {
         value: MetricValue,
         size: CGFloat = WidgetStyle.metric,
         signStyle: MoneySignStyle = .standard,
+        fitsExact: Bool = false,
         percentChange: Double?,
         unit: String = "%",
         caption: String? = nil
     ) {
         self.init(
-            value: value, size: size, signStyle: signStyle,
+            value: value, size: size, signStyle: signStyle, fitsExact: fitsExact,
             percentChange: percentChange, unit: unit, caption: caption
         ) { EmptyView() }
     }

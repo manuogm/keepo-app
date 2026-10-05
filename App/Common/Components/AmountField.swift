@@ -269,6 +269,10 @@ struct AmountField<Header: View>: View {
                 Text(symbol)
                     .font(figureFont(size * figureScale))
                     .foregroundStyle(text.isEmpty ? AppTheme.Palette.fillStrong : AppTheme.Palette.textPrimary)
+                    // "$" is part of the figure, so a tap on it focuses the
+                    // field — the shape spans the gap to the digits too.
+                    .contentShape(Rectangle().inset(by: -AppTheme.Spacing.xs))
+                    .onTapGesture { if isEnabled { isFocused = true } }
             }
 
             ZStack(alignment: .leading) {

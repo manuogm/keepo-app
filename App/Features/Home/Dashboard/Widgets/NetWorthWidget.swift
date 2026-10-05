@@ -88,7 +88,7 @@ struct NetWorthWidget: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.s) {
             MetricHeadlineBlock(
                 value: .money(series.highlightedPoint?.amountE4, currency), size: WidgetStyle.metricExpanded,
-                percentChange: series.percentChange, caption: badgeCaption
+                fitsExact: true, percentChange: series.percentChange, caption: badgeCaption
             )
             SeriesChartOrMessage(series: series, color: trendColor)
         }

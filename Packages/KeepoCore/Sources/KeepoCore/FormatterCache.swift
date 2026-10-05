@@ -52,6 +52,7 @@ enum FormatterCache {
         formatter(.currency, code: code, minorUnit: minorUnit, locale: locale) { formatter in
             formatter.numberStyle = .currency
             formatter.currencyCode = code
+            formatter.currencySymbol = MoneyFormatter.displaySymbol(code: code, icuSymbol: formatter.currencySymbol)
             formatter.minimumFractionDigits = minorUnit
             formatter.maximumFractionDigits = minorUnit
         }
