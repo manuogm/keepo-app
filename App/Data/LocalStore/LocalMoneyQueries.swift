@@ -164,24 +164,36 @@ enum LocalMoneyQueries {
     private static func needsReviewSyncConflicts(
         _ database: Database, ownerId: String
     ) throws -> [NeedsReviewLocalRow] {
+        // The subject mirrors the server's `sync_conflict_subject`: a
+        // transaction's title, else its merchant, else its category, else
+        // "Transfer"; an account's name.
         try Row.fetchAll(
             database,
             sql: """
-            SELECT id, table_name, row_id, client_version, server_version, created_at
-            FROM sync_conflicts WHERE resolved_at IS NULL AND deleted_at IS NULL AND owner_id = ?
+            SELECT sc.id, sc.table_name, sc.row_id, sc.created_at,
+                   CASE sc.table_name
+                     WHEN 'accounts' THEN a.name
+                     WHEN 'transactions' THEN COALESCE(
+                       t.title, t.merchant_raw, c.name,
+                       CASE WHEN t.transfer_group_id IS NOT NULL THEN 'Transfer' END)
+                   END AS subject
+            FROM sync_conflicts sc
+            LEFT JOIN accounts a ON sc.table_name = 'accounts' AND a.id = sc.row_id
+            LEFT JOIN transactions t ON sc.table_name = 'transactions' AND t.id = sc.row_id
+            LEFT JOIN categories c ON c.id = t.category_id
+            WHERE sc.resolved_at IS NULL AND sc.deleted_at IS NULL AND sc.owner_id = ?
             """,
             arguments: [ownerId]
         ).map { row in
             let tableName: String = row["table_name"]
             let rowId: String = row["row_id"]
-            let clientVersion: Int = row["client_version"]
-            let serverVersion: Int = row["server_version"]
+            let subject: String? = row["subject"]
             return NeedsReviewLocalRow(
                 kind: "sync_conflict", itemId: row["id"],
                 accountId: tableName == "accounts" ? rowId : nil,
                 occurredAt: row["created_at"],
-                title: "Sync conflict — \(tableName)",
-                subtitle: "your version \(clientVersion) vs. the saved version \(serverVersion)",
+                title: "Sync Conflict",
+                subtitle: (subject.map { "\($0) · " } ?? "") + "Choose which version to keep",
                 amountE4: nil, currency: nil
             )
         }

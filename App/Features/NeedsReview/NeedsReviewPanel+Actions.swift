@@ -38,7 +38,7 @@ extension NeedsReviewPanel {
         // both dropped on the way. A custom asset would carry the weight;
         // it is not worth an asset.
         case "sync_conflict":
-            return RowAction(title: "Resolve", symbol: "checkmark", kind: .resolveConflict)
+            return RowAction(title: "Keep Saved", symbol: "checkmark", kind: .resolveConflict)
         case "pending_capture":
             return isReadyToConfirm(entry)
                 ? RowAction(title: "Confirm", symbol: "checkmark", kind: .confirmCapture) : nil
@@ -236,7 +236,7 @@ extension NeedsReviewPanel {
             }
             removeLocally(id)
         } catch {
-            actionError = ActionError("Couldn't Resolve This Conflict", error)
+            actionError = ActionError("Couldn't Keep the Saved Version", error)
         }
     }
 

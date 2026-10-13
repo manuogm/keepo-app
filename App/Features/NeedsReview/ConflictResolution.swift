@@ -18,6 +18,8 @@ struct SyncConflictDetail {
     /// RPC does since migration 20261008100000. `nil` for account conflicts
     /// and for anything recorded before then.
     let attemptedWrite: AttemptedTransactionWrite?
+    /// The same, for an account — kept since migration 20261018100000.
+    let attemptedAccountWrite: AttemptedAccountWrite?
 }
 
 /// A rejected transaction write, exactly as the RPC received it, so "Keep
@@ -158,10 +160,13 @@ enum ConflictLocalQueries {
             arguments: [id]
         ) else { return nil }
         guard let idString: String = row["id"], let uuid = UUID(uuidString: idString) else { return nil }
+        let tableName: String = row["table_name"]
+        let attempted: String? = row["attempted_payload"]
         return SyncConflictDetail(
-            id: uuid, tableName: row["table_name"], rowId: row["row_id"],
+            id: uuid, tableName: tableName, rowId: row["row_id"],
             clientVersion: row["client_version"], serverVersion: row["server_version"],
-            attemptedWrite: AttemptedTransactionWrite.decode(row["attempted_payload"])
+            attemptedWrite: tableName == "transactions" ? AttemptedTransactionWrite.decode(attempted) : nil,
+            attemptedAccountWrite: tableName == "accounts" ? AttemptedAccountWrite.decode(attempted) : nil
         )
     }
 

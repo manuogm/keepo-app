@@ -73,6 +73,17 @@ extension AppTheme {
     }
 }
 
+// MARK: - Stroke
+
+extension AppTheme {
+    /// Line widths for an outline drawn around a surface.
+    enum Stroke {
+        /// 2 — a card marked out from its neighbours as the one that is
+        /// authoritative: the saved version on the Sync Conflict sheet.
+        static let emphasis: CGFloat = 2
+    }
+}
+
 // MARK: - Size
 
 extension AppTheme {

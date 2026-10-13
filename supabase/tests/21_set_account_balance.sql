@@ -8,6 +8,9 @@
 -- Collapsed by 20260902100000_unify_account_kinds.sql to a single path —
 -- every account kind now files an adjustment transaction, never a
 -- balance_snapshots row (that table and the old valuation branch are gone).
+-- 20261018100000 stopped a balance save from touching the account row, so
+-- it no longer bumps the account's version: every balance call below is made
+-- against version 1 until section 8 renames the account.
 -- Fixture A = 11111111-...
 
 \ir _helpers.psql
@@ -48,9 +51,9 @@ select is(
   'the ledger account''s computed balance matches the entered value'
 );
 
--- 4. Lowering the balance creates a negative (expense) adjustment. That
--- first edit bumped the checking account to version 2.
-select set_account_balance('a0000000-0000-0000-0000-000000000021', 1000000, 2);
+-- 4. Lowering the balance creates a negative (expense) adjustment. The
+-- account is still at version 1: filing an adjustment does not change it.
+select set_account_balance('a0000000-0000-0000-0000-000000000021', 1000000, 1);
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000021', current_date)),
   1000000::bigint,
@@ -59,9 +62,9 @@ select is(
 
 -- 5. Setting the balance to its current value is a no-op — no zero-amount
 -- transaction (the DB's own amount_not_zero CHECK would reject one anyway),
--- and no version bump either. Now at version 3.
+-- and no version bump either.
 select is(
-  (select transaction_id from set_account_balance('a0000000-0000-0000-0000-000000000021', 1000000, 3)),
+  (select transaction_id from set_account_balance('a0000000-0000-0000-0000-000000000021', 1000000, 1)),
   null::uuid,
   'setting a ledger balance to its current value creates no transaction'
 );
@@ -90,7 +93,7 @@ select is(
 
 -- 7. A second same-day edit on the investment account also just files
 -- another adjustment transaction, version-checked like any other write.
-select set_account_balance('a0000000-0000-0000-0000-000000000022', 13000000, 2);
+select set_account_balance('a0000000-0000-0000-0000-000000000022', 13000000, 1);
 
 select is(
   (select account_balance_on('a0000000-0000-0000-0000-000000000022', current_date)),
@@ -101,11 +104,12 @@ select is(
 -- 8. Idempotency: replaying the same client-supplied id twice does not
 -- double the effect (queued-write-replayed-twice safety, same pattern as
 -- create_transfer's idempotent leg ids) — and critically, the SECOND call
--- still succeeds even though it passes the same p_expected_version=3 that
--- the first call already advanced past (checking is now at version 4),
--- because the idempotency check runs before the version check.
-select set_account_balance('a0000000-0000-0000-0000-000000000021', 2500000, 3, 'b0000000-0000-0000-0000-000000000001');
-select set_account_balance('a0000000-0000-0000-0000-000000000021', 2500000, 3, 'b0000000-0000-0000-0000-000000000001');
+-- still succeeds even though the account has moved past the version it
+-- carries (a rename in between takes it to version 2), because the
+-- idempotency check runs before the version check.
+select set_account_balance('a0000000-0000-0000-0000-000000000021', 2500000, 1, 'b0000000-0000-0000-0000-000000000001');
+select update_account('a0000000-0000-0000-0000-000000000021', 1, 'Main Checking', 0, true, 'banknote', '#22AA88');
+select set_account_balance('a0000000-0000-0000-0000-000000000021', 2500000, 1, 'b0000000-0000-0000-0000-000000000001');
 select is(
   (select count(*) from transactions where id = 'b0000000-0000-0000-0000-000000000001'),
   1::bigint,
@@ -139,7 +143,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 
 select throws_like(
-  $$ select set_account_balance('a0000000-0000-0000-0000-000000000021', 9990000, 4) $$,
+  $$ select set_account_balance('a0000000-0000-0000-0000-000000000021', 9990000, 2) $$,
   '%not found or not accessible%',
   'a different owner cannot set another user''s account balance'
 );

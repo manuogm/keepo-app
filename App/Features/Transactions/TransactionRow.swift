@@ -30,6 +30,29 @@ struct TransactionRow: View {
     /// whether a capture is real — the merchant is. So the inbox, and only
     /// the inbox, puts it ahead of the account on the second line.
     var merchant: String?
+    /// Requested changes to draw over this row, set only by the Sync Conflict
+    /// sheet's "Your change" card: each part keeps its saved value, struck
+    /// through in red, followed by the value the change asked for. A `nil`
+    /// value means the change removes it — the part is struck and nothing
+    /// follows.
+    var edits: [Part: String?] = [:]
+    /// The amount in full rather than its short form — see
+    /// `AccountRowView.showsExactBalance`.
+    var showsExactAmount = false
+
+    /// What `edits` can change.
+    enum Part: Hashable {
+        /// The title, or the category when the row has none.
+        case headline
+        case category
+        case merchant
+        case account
+        /// A transfer's sending and receiving accounts.
+        case fromAccount, toAccount
+        case amount
+        /// Review status: a pending row's badge.
+        case status
+    }
 
     @Environment(\.isPrivacyMode) private var isPrivacyMode
 
@@ -78,11 +101,15 @@ struct TransactionRow: View {
 
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
                 HStack(spacing: AppTheme.Spacing.xs) {
-                    Text(headline)
-                        .foregroundStyle(AppTheme.Palette.textPrimary)
+                    edited(headlinePart, headline, AppTheme.Palette.textPrimary)
                         .lineLimit(1)
                     if isPendingReview {
-                        PendingBadge()
+                        if let status = edits[.status] {
+                            PendingBadge().strikethrough(color: AppTheme.Palette.statusNegative)
+                            if let status { StatusBadge(title: status, color: AppTheme.Palette.brandPrimary) }
+                        } else {
+                            PendingBadge()
+                        }
                     }
                     if isPendingUpdate {
                         Image(systemName: "icloud.slash")
@@ -92,9 +119,8 @@ struct TransactionRow: View {
                 }
 
                 HStack(spacing: AppTheme.Spacing.xs) {
-                    Text(detailLine)
+                    detailLine
                         .font(AppTheme.Typography.micro)
-                        .foregroundStyle(AppTheme.Palette.textSecondary)
                         .lineLimit(1)
                     // How this row came to exist, when it wasn't the user
                     // typing it. Glyph-only and grey: it is provenance, and
@@ -116,10 +142,14 @@ struct TransactionRow: View {
             Spacer(minLength: AppTheme.Spacing.s)
 
             VStack(alignment: .trailing, spacing: AppTheme.Spacing.xxs) {
-                PrivateText(formattedAmount(), spoken: formattedAmount(exact: true))
-                    .font(AppTheme.Typography.bodyEmphasis)
-                    .monospacedDigit()
-                    .foregroundStyle(amountColor)
+                if let edit = edits[.amount] {
+                    amountEdit(edit)
+                } else {
+                    PrivateText(formattedAmount(exact: showsExactAmount), spoken: formattedAmount(exact: true))
+                        .font(AppTheme.Typography.bodyEmphasis)
+                        .monospacedDigit()
+                        .foregroundStyle(amountColor)
+                }
                 if let arriving = arrivingAmount() {
                     PrivateText("→ " + arriving, spoken: arrivingAmount(exact: true).map { "→ " + $0 })
                         .font(AppTheme.Typography.micro)
@@ -143,9 +173,48 @@ struct TransactionRow: View {
     /// Both accounts when the row is a whole transfer, one when it is a leg
     /// or an ordinary transaction. The arrow is the row's statement of
     /// direction, which is why the amount beside it needs no sign.
-    private var accountLine: String {
-        guard let legs else { return transaction.accountName ?? "—" }
-        return "\(legs.from.accountName ?? "—") → \(legs.to.accountName ?? "—")"
+    private var accountLine: Text {
+        let secondary = AppTheme.Palette.textSecondary
+        guard let legs else { return edited(.account, transaction.accountName ?? "—", secondary) }
+        return edited(.fromAccount, legs.from.accountName ?? "—", secondary)
+            + Text(" → ").foregroundStyle(secondary)
+            + edited(.toAccount, legs.to.accountName ?? "—", secondary)
+    }
+
+    /// The category is the headline unless a title has pushed it down to the
+    /// second line, so a changed category is drawn wherever it is.
+    private var headlinePart: Part {
+        edits[.headline] == nil && transaction.title == nil && !isTransfer ? .category : .headline
+    }
+
+    /// One piece of the row's text: as saved, or — when `edits` changes it —
+    /// the saved value struck through in red, then the requested one.
+    private func edited(_ part: Part, _ saved: String, _ base: Color) -> Text {
+        guard let edit = edits[part] else { return Text(saved).foregroundStyle(base) }
+        let negative = AppTheme.Palette.statusNegative
+        let struck = Text(saved).strikethrough(color: negative).foregroundStyle(negative)
+        guard let requested = edit, !requested.isEmpty else { return struck }
+        let replacement = Text(requested).foregroundStyle(AppTheme.Palette.brandPrimary).fontWeight(.semibold)
+        return saved.isEmpty ? replacement : struck + Text(" ") + replacement
+    }
+
+    /// The trailing figure under an edit: the requested amount, with the saved
+    /// one struck under it — both exact, since a short form could hide the change.
+    private func amountEdit(_ requested: String?) -> some View {
+        // Stacked rather than side by side: two exact figures in a row take
+        // the width the name and account need.
+        VStack(alignment: .trailing, spacing: AppTheme.Spacing.xxs) {
+            if let requested {
+                PrivateText(requested)
+                    .font(AppTheme.Typography.bodyEmphasis)
+                    .foregroundStyle(AppTheme.Palette.brandPrimary)
+            }
+            PrivateText(formattedAmount(exact: true))
+                .font(requested == nil ? AppTheme.Typography.bodyEmphasis : AppTheme.Typography.micro)
+                .strikethrough(color: AppTheme.Palette.statusNegative)
+                .foregroundStyle(AppTheme.Palette.statusNegative)
+        }
+        .monospacedDigit()
     }
 
     /// What the row is called: the user's own title when they gave it one,
@@ -164,14 +233,17 @@ struct TransactionRow: View {
     /// category did I file this under" is a question the ledger has always
     /// answered in words. A transfer has none to move — its arrow is already
     /// in the account line.
-    private var detailLine: String {
-        var parts: [String] = []
-        if let merchant, !merchant.isEmpty { parts.append(merchant) }
+    private var detailLine: Text {
+        let secondary = AppTheme.Palette.textSecondary
+        var parts: [Text] = []
+        if (merchant?.isEmpty == false) || edits[.merchant] != nil {
+            parts.append(edited(.merchant, merchant ?? "", secondary))
+        }
         if transaction.title != nil, !isTransfer, let category = transaction.categoryName {
-            parts.append(category)
+            parts.append(edited(.category, category, secondary))
         }
         parts.append(accountLine)
-        return parts.joined(separator: " · ")
+        return parts.dropFirst().reduce(parts[0]) { $0 + Text(" · ").foregroundStyle(secondary) + $1 }
     }
 
     /// `exact` is the VoiceOver reading.
@@ -208,12 +280,24 @@ struct TransactionRow: View {
 /// one. `PendingEdgeStrip` is the same fact on the form, where it isn't.
 struct PendingBadge: View {
     var body: some View {
-        Text("Pending")
+        StatusBadge(title: "Pending", color: AppTheme.Palette.statusPending)
+    }
+}
+
+/// A word in a tinted capsule, beside a row's title — `PendingBadge`'s shape,
+/// for any colour. The Sync Conflict sheet uses it for the "Confirmed" a
+/// capture's confirm asks for.
+struct StatusBadge: View {
+    let title: String
+    let color: Color
+
+    var body: some View {
+        Text(title)
             .font(AppTheme.Typography.nanoEmphasis)
-            .foregroundStyle(AppTheme.Palette.statusPending)
+            .foregroundStyle(color)
             .padding(.horizontal, AppTheme.Spacing.xs)
             .padding(.vertical, AppTheme.Spacing.xxs)
-            .background(AppTheme.Palette.statusPending.opacity(AppTheme.Opacity.fill), in: Capsule())
+            .background(color.opacity(AppTheme.Opacity.fill), in: Capsule())
     }
 }
 

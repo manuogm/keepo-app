@@ -74,6 +74,7 @@
 		2F40BD5D0546876F76C3C25E /* ScopeBannerView+Init.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343878A31B96B4455203D620 /* ScopeBannerView+Init.swift */; };
 		2F93B60FFC35E87E8539459C /* CurrencyFlagAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7440D8EAA40F17639CC1041 /* CurrencyFlagAssetTests.swift */; };
 		2FA5C7471F5140A0CC03B744 /* HouseholdKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 429EDEB71C3725F0838B5333 /* HouseholdKit.swift */; };
+		2FDDC3DE038D8F44E178E9A4 /* ConflictComparison.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF685929EFD708940521BC8E /* ConflictComparison.swift */; };
 		303EFE1709BE276368BD86D3 /* RecurringRuleFormView+Schedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35FCE63463A832562DF9C5DB /* RecurringRuleFormView+Schedule.swift */; };
 		3050B5B40C0C7419FDE71B98 /* DashboardDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D355FA2D4C581552DA98EC05 /* DashboardDataTests.swift */; };
 		3081F610263348FB89AFB5FE /* NetWorthWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907CF10603055CC52ED389C /* NetWorthWidget.swift */; };
@@ -135,6 +136,7 @@
 		50FE45A6E2499611801E6C79 /* UpcomingBillsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F1A025C92FE107062438BE2 /* UpcomingBillsWidget.swift */; };
 		50FEDE6442856BA78C4547ED /* TransactionFormView+Transfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C2F3F64823347A025EBB9D /* TransactionFormView+Transfer.swift */; };
 		51BA6A30B9400096154FA704 /* TagsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0722C7D32EF6A7D41AC4C27 /* TagsListView.swift */; };
+		52F40BB1FE75F4F6DA72DA0D /* LocalAccountRow+Preview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C907E52B76989E9865AA3D70 /* LocalAccountRow+Preview.swift */; };
 		53B6766AF8B573E922F1A2E8 /* LocalTitleMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E275E268E79E191D77B111 /* LocalTitleMemory.swift */; };
 		53DDDCB9693C26D604738006 /* HouseholdCeremonyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3A3B1E628DB2EC5C721FAA /* HouseholdCeremonyView.swift */; };
 		54680D9D88EE02E2A6AB43CB /* RecurringRuleFormView+Title.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0469EE03F76A32E90642FD4B /* RecurringRuleFormView+Title.swift */; };
@@ -261,6 +263,7 @@
 		A6E02A53EABAE8F0D8A74907 /* TransactionsRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FC1BC7AE3C35B901FDBC490 /* TransactionsRequestTests.swift */; };
 		A793C8226CBFA214995B54F6 /* OnboardingChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFBE5C8738FD3E2CC3D5E90A /* OnboardingChrome.swift */; };
 		A7E7A7AA57AE3AA8A98E0B85 /* DropsBottomSafeArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2EFE59B1202392CFCB41D33 /* DropsBottomSafeArea.swift */; };
+		A825B93DF8493ACCD757D6B6 /* ConflictComparisonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFEBE73D571208BCEEE915C7 /* ConflictComparisonTests.swift */; };
 		A855C12BDD746FBBC8DC4175 /* AppTheme+Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EAD50C8C4F508D8508ADA8D /* AppTheme+Motion.swift */; };
 		A8C3B22C1F1507158B971007 /* MappedCardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6E6B97FB91FA6725C935483 /* MappedCardSheet.swift */; };
 		A91D573436DB3670A85B7632 /* CategoryMergeTiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB53E034FD3042637C97381 /* CategoryMergeTiles.swift */; };
@@ -330,6 +333,7 @@
 		D4AA2BDD4ED0AE7893ED8527 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1506F139C92C88A14BDEE6BE /* MainTabView.swift */; };
 		D530555F72E1DD35B8DDD5CF /* CurrencyBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3B46B7F5593307A881BC90 /* CurrencyBadge.swift */; };
 		D594095F14809F42BA45A1BE /* ConflictReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F0AF9AF993A62F84E3B88D /* ConflictReplayTests.swift */; };
+		D5BB5FD37F2405A19B85DF78 /* ConflictResolution+Accounts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85619AF358C096D7791F8F55 /* ConflictResolution+Accounts.swift */; };
 		D5BC2258891043F649F34EF9 /* ExportPDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BF6E57F10CB1047F58BF73A /* ExportPDFRenderer.swift */; };
 		D64124F33CB34BB851120789 /* ProfileRowLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF6E55983303FD58CA0B30 /* ProfileRowLabel.swift */; };
 		D65A1019026AF89426A721E3 /* TransactionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59AA89C7BCC52496BCAC8B27 /* TransactionsListView.swift */; };
@@ -646,6 +650,7 @@
 		8242FCE5C65D5AC6A220824F /* TestCaptureQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestCaptureQueries.swift; sourceTree = "<group>"; };
 		82CCCE4FCBDBDE32D9845EC2 /* TransactionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionRow.swift; sourceTree = "<group>"; };
 		836C3B105BFF7FDA7D03535F /* KeepoTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoTabBar.swift; sourceTree = "<group>"; };
+		85619AF358C096D7791F8F55 /* ConflictResolution+Accounts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConflictResolution+Accounts.swift"; sourceTree = "<group>"; };
 		8751F9843E7767C3D18397CB /* ConflictDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictDetailSheet.swift; sourceTree = "<group>"; };
 		8831E6C06D79D35874F2D11D /* AccountFilterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountFilterSheet.swift; sourceTree = "<group>"; };
 		884043304F66BADDBBBE1E13 /* KeepoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepoApp.swift; sourceTree = "<group>"; };
@@ -717,6 +722,7 @@
 		BDA7D8129135E6F7A3654E79 /* OnboardingDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingDraftStore.swift; sourceTree = "<group>"; };
 		BE1C0F6BEC1D5D9D5B966833 /* RecurringRuleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringRuleRow.swift; sourceTree = "<group>"; };
 		BFC2601A5B057E9F8CD882E7 /* ConflictDetailSheet+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConflictDetailSheet+Loading.swift"; sourceTree = "<group>"; };
+		BFEBE73D571208BCEEE915C7 /* ConflictComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictComparisonTests.swift; sourceTree = "<group>"; };
 		C02190F3A60526A587EFCA91 /* CaptureQuickActionSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureQuickActionSuggestions.swift; sourceTree = "<group>"; };
 		C0E9E6F95279957552B50094 /* BalanceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceHeaderView.swift; sourceTree = "<group>"; };
 		C0F66735C03B655438EA8251 /* Keepo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Keepo.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -731,6 +737,7 @@
 		C6D6ADF3730A34B1AC06B97E /* TransactionTitleLocalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionTitleLocalTests.swift; sourceTree = "<group>"; };
 		C80AB872EF3B66A5C757E62D /* DashboardGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardGeometryTests.swift; sourceTree = "<group>"; };
 		C898961FFBC213487D1CDC41 /* HouseholdSummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdSummaryCard.swift; sourceTree = "<group>"; };
+		C907E52B76989E9865AA3D70 /* LocalAccountRow+Preview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalAccountRow+Preview.swift"; sourceTree = "<group>"; };
 		C91440E871E1BD48AB796B63 /* Keepo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Keepo.entitlements; sourceTree = "<group>"; };
 		C9E58B1BE46FA6D65AC6C6F5 /* OutboxCaptureRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxCaptureRecoveryTests.swift; sourceTree = "<group>"; };
 		C9FD45D022E157FC1FCC85EA /* PartnerWritesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartnerWritesTests.swift; sourceTree = "<group>"; };
@@ -814,6 +821,7 @@
 		FB9C1A1428E63DBE126B9974 /* OutboxLocalWrite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxLocalWrite.swift; sourceTree = "<group>"; };
 		FD124F353024A73375A9AF82 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		FDF208FED76F3DA6AA345059 /* Outbox+Retry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Outbox+Retry.swift"; sourceTree = "<group>"; };
+		FF685929EFD708940521BC8E /* ConflictComparison.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictComparison.swift; sourceTree = "<group>"; };
 		FFBE5C8738FD3E2CC3D5E90A /* OnboardingChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingChrome.swift; sourceTree = "<group>"; };
 		FFD73BEBFB264E503231B4D5 /* CaptureSetupChecklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSetupChecklist.swift; sourceTree = "<group>"; };
 		FFF89385A8B184D9222CDA06 /* CreditCardFace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditCardFace.swift; sourceTree = "<group>"; };
@@ -1058,6 +1066,7 @@
 				C02190F3A60526A587EFCA91 /* CaptureQuickActionSuggestions.swift */,
 				04390E921137B01C4EBB45D2 /* CategoryLocalWrite.swift */,
 				A23166A8674504049A46489F /* LocalAccountRow.swift */,
+				C907E52B76989E9865AA3D70 /* LocalAccountRow+Preview.swift */,
 				204DD14B86C4E79F663C9568 /* LocalCategoryRanking.swift */,
 				A3AF792C04D22B7EF9030339 /* LocalDashboardQueries.swift */,
 				A0CACCDB94B18F3F770A4D1A /* LocalDashboardQueries+Cashflow.swift */,
@@ -1085,9 +1094,11 @@
 		6196E0530F686B918EDF6FC7 /* NeedsReview */ = {
 			isa = PBXGroup;
 			children = (
+				FF685929EFD708940521BC8E /* ConflictComparison.swift */,
 				8751F9843E7767C3D18397CB /* ConflictDetailSheet.swift */,
 				BFC2601A5B057E9F8CD882E7 /* ConflictDetailSheet+Loading.swift */,
 				B81CEAFFB8092FE202B4DB40 /* ConflictResolution.swift */,
+				85619AF358C096D7791F8F55 /* ConflictResolution+Accounts.swift */,
 				44DEBA10D23CE56C2C8D9F1E /* NeedsReviewPanel.swift */,
 				B51126A63F6BCA2B3BB3778E /* NeedsReviewPanel+Actions.swift */,
 				DCFE635AA4C784F92926E54B /* NeedsReviewPanel+Chrome.swift */,
@@ -1413,6 +1424,7 @@
 				36CB714B7454C4FB8AEB03C4 /* CategoryLocalWriteTests.swift */,
 				E484AE7752B52893E4087D42 /* ColorHexTests.swift */,
 				7844A2E9B211843BAC817322 /* ConfirmCaptureLocalWriteTests.swift */,
+				BFEBE73D571208BCEEE915C7 /* ConflictComparisonTests.swift */,
 				E3F0AF9AF993A62F84E3B88D /* ConflictReplayTests.swift */,
 				A7440D8EAA40F17639CC1041 /* CurrencyFlagAssetTests.swift */,
 				B94FB4E11E9E2B108F27D397 /* DashboardCashflowScopeTests.swift */,
@@ -1731,6 +1743,7 @@
 				E43BEBD85BAD11CDD781A200 /* CategoryLocalWriteTests.swift in Sources */,
 				1DE12C979AD8910AE84A27EB /* ColorHexTests.swift in Sources */,
 				1979678A5304703AB79F5093 /* ConfirmCaptureLocalWriteTests.swift in Sources */,
+				A825B93DF8493ACCD757D6B6 /* ConflictComparisonTests.swift in Sources */,
 				D594095F14809F42BA45A1BE /* ConflictReplayTests.swift in Sources */,
 				2F93B60FFC35E87E8539459C /* CurrencyFlagAssetTests.swift in Sources */,
 				F3517F805696EDDDC151A5E3 /* DashboardCashflowScopeTests.swift in Sources */,
@@ -1858,8 +1871,10 @@
 				220FB3E6F39AFE20C9F4EA8D /* ChoiceCard.swift in Sources */,
 				0CFAB8B74442EB878B25B5D6 /* ColorHex.swift in Sources */,
 				9E048910960D5BEBA16D34D5 /* ConfettiBurst.swift in Sources */,
+				2FDDC3DE038D8F44E178E9A4 /* ConflictComparison.swift in Sources */,
 				DA3DD0A6F03B63D0B703EB28 /* ConflictDetailSheet+Loading.swift in Sources */,
 				56E944F8732512BA5C7CD0DE /* ConflictDetailSheet.swift in Sources */,
+				D5BB5FD37F2405A19B85DF78 /* ConflictResolution+Accounts.swift in Sources */,
 				0EC6927922D113746FDC1FD4 /* ConflictResolution.swift in Sources */,
 				D9C088A9DC38B417115479EC /* CreateCategoryPayload+Catalog.swift in Sources */,
 				9F206B449D6124FFBFD56069 /* CreditCardFace.swift in Sources */,
@@ -1947,6 +1962,7 @@
 				268DC9861969DD817B2A212C /* LaunchQuote.swift in Sources */,
 				CB5A3E7838E7FF8BE0DCC658 /* LiquidGlass.swift in Sources */,
 				581E09E6D236BB73E9A99B64 /* LiveOutboxSender.swift in Sources */,
+				52F40BB1FE75F4F6DA72DA0D /* LocalAccountRow+Preview.swift in Sources */,
 				48B57064BBC55CA213316957 /* LocalAccountRow.swift in Sources */,
 				D7672F2C62C1AF581DC40ABE /* LocalCategoryRanking.swift in Sources */,
 				7B1AB6DED6B05998A338F540 /* LocalDashboardQueries+Cashflow.swift in Sources */,

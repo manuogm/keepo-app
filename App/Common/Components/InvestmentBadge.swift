@@ -17,14 +17,21 @@ import SwiftUI
 /// always uses.
 struct InvestmentBadge: View {
     var compact: Bool = false
+    /// Drawn in the brand colour when it is the thing that differs — the
+    /// Sync Conflict sheet's way of pointing at a changed account type.
+    var isHighlighted = false
 
     var body: some View {
         Text(compact ? "Inv." : "Investment")
-            .font(AppTheme.Typography.nano)
-            .foregroundStyle(AppTheme.Palette.textSecondary)
+            .font(isHighlighted ? AppTheme.Typography.nanoEmphasis : AppTheme.Typography.nano)
+            .foregroundStyle(isHighlighted ? AppTheme.Palette.brandPrimary : AppTheme.Palette.textSecondary)
             .padding(.horizontal, AppTheme.Spacing.xs)
             .padding(.vertical, AppTheme.Spacing.xxs)
-            .background(AppTheme.Palette.fillSubtle, in: Capsule())
+            .background(
+                isHighlighted ? AppTheme.Palette.brandPrimary.opacity(AppTheme.Opacity.fill)
+                    : AppTheme.Palette.fillSubtle,
+                in: Capsule()
+            )
             .accessibilityLabel("Investment account")
     }
 }

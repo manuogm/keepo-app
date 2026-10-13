@@ -213,8 +213,51 @@ enum LocalTransactionRow {
         _ database: Database, ids: [String], baseCurrency: String, ownerId: String
     ) throws -> [PublicSchema.TransactionsWithDetailsSelect] {
         guard !ids.isEmpty else { return [] }
+        let rows = try fetchRows(database, ids: ids, ownerId: ownerId)
+        let base = try BaseCurrency(database, code: baseCurrency)
+        return try rows.map { try build($0, database: database, base: base) }
+    }
+
+    /// The row as it would read with `changes` written over it — the Sync
+    /// Conflict sheet's "your change" tile, drawn from a write the server
+    /// refused. Keyed by column name, a `nil` value clearing that column.
+    ///
+    /// The names and the conversion are not the caller's to supply: a new
+    /// `account_id` brings that account's name, currency and minor unit, a new
+    /// `category_id` its category's name, and the converted amount comes out
+    /// of `build` exactly as it does for every saved row.
+    static func preview(
+        _ database: Database, id: String, changing changes: [String: (any DatabaseValueConvertible)?],
+        baseCurrency: String, ownerId: String
+    ) throws -> PublicSchema.TransactionsWithDetailsSelect? {
+        guard let saved = try fetchRows(database, ids: [id], ownerId: ownerId).first else { return nil }
+        var columns: [String: (any DatabaseValueConvertible)?] = [:]
+        for (column, value) in saved { columns[column] = value }
+        for (column, value) in changes { columns[column] = value }
+        if let accountId = changes["account_id"] ?? nil, let account = try Row.fetchOne(
+            database,
+            sql: """
+            SELECT a.name, a.currency, cur.minor_unit FROM accounts a
+            LEFT JOIN currencies cur ON cur.code = a.currency WHERE a.id = ?
+            """,
+            arguments: [accountId]
+        ) {
+            columns["account_name"] = account["name"] as String?
+            columns["currency"] = account["currency"] as String?
+            columns["minor_unit"] = account["minor_unit"] as Int64?
+        }
+        if let categoryId = changes["category_id"] ?? nil {
+            columns["category_name"] = try String.fetchOne(
+                database, sql: "SELECT name FROM categories WHERE id = ?", arguments: [categoryId]
+            )
+        }
+        return try build(Row(columns), database: database, base: BaseCurrency(database, code: baseCurrency))
+    }
+
+    /// The columns `fetch` and `preview` both decode from.
+    private static func fetchRows(_ database: Database, ids: [String], ownerId: String) throws -> [Row] {
         let arguments: [any DatabaseValueConvertible] = [ownerId, ownerId] + ids + [ownerId]
-        let rows = try Row.fetchAll(
+        return try Row.fetchAll(
             database,
             sql: """
             SELECT t.id AS transaction_id, t.account_id, a.name AS account_name, t.category_id, c.name AS category_name,
@@ -233,8 +276,6 @@ enum LocalTransactionRow {
             """,
             arguments: StatementArguments(arguments)
         )
-        let base = try BaseCurrency(database, code: baseCurrency)
-        return try rows.map { try build($0, database: database, base: base) }
     }
 
     /// The base currency and its minor unit — looked up **once per fetch**,
