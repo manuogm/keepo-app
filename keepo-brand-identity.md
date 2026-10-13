@@ -37,12 +37,12 @@ Every non-semantic colour comes off one zero-chroma ramp:
 
 ### Brand accent — one colour
 
-*   **`BrandPrimary`** (Teal) — `#127268` / Dark `#3CC4B3` / HC `#0E6F66` / Dark+HC `#5ED1C2` → `Palette.brandPrimary`
+*   **`BrandPrimary`** (Teal) — `#127268` / Dark `#279A8D` / HC `#0E6F66` / Dark+HC `#359A8E` → `Palette.brandPrimary`
     *   *Usage:* the Needs Review inbox, budget and goal benchmarks, the offline bar, the tab bar's unreviewed-count dot, a checked box. Taken from the app icon's family (2026-10-02 redesign; it was mango before).
 
 **There is no `BrandSecondary`.** Mango survives only as `StatusPending` (below), for the one job a teal cannot do.
 
-**Why the accent is not one value.** Nearly every use of the accent is ink at caption sizes. The teal that reads on the light canvas (`#127268`, 5.3:1 on `#F5F5F5`) measures 2.6:1 on `#262626`, so dark mode lifts it to `#3CC4B3` (7.0:1). That is one accent at the two lightnesses its two grounds require, not two accents. `ScopeTotal` is the same hue on the fill side.
+**Dark mode is one teal doing two jobs, and no teal can pass AA at both** (2026-10-13; it was a lifted `#3CC4B3` / `#5ED1C2` before). The accent is a fill under white text (Capsule buttons, the walkthrough badge) *and* ink on the dark canvas. Those pull in opposite directions: the best any single colour reaches against white and `#262626` at once is ~3.9:1. `#279A8D` sits between the old lifted teal and the light value in OKLab, same hue, leaning toward ink because most uses are ink: 4.4:1 on the canvas, 3.8:1 on `BGSurface`, 3.5:1 under white — all above the 3:1 large-text / UI floor, below 4.5:1 for body text. The lifted `#3CC4B3` was 7.0:1 as ink but 2.2:1 under white. **Dark+HC (`#359A8E`) cannot be higher contrast than Dark** — the same ceiling applies — so it is the same blend from the HC endpoints (`#0E6F66` ↔ `#5ED1C2`): 4.4:1 on the canvas, 3.7:1 on the HC surface, 3.4:1 under white.
 
 ### Launch
 
@@ -94,13 +94,13 @@ Expense is a **deep red**, not the old coral: coral *was* `BrandPrimary`, and re
 
 | Token | Light | Dark | HC Light | HC Dark |
 |---|---|---|---|---|
-| `ScopeTotal` | `#148075` | `#127268` | `#0E6F66` | `#0E6F66` |
-| `ScopeHousehold` | `#5B5BC7` | `#5252BE` | `#4A4AB5` | `#4A4AB5` |
+| `ScopeTotal` | `#148075` | `#279A8D` | `#0E6F66` | `#359A8E` |
+| `ScopeHousehold` | `#5B5BC7` | `#7074E3` | `#4A4AB5` | `#6E74E4` |
 | `ScopePrivate` | `#3B3B3B` | `#525252` | `#303030` | `#474747` |
 
-Total is **teal** — `BrandPrimary`'s hue on the fill side — Household indigo and Private a dark grey (2026-10-02 redesign: Total took Household's old teal, Household took Private's old indigo). The grey is achromatic, which keeps the three banner cards distinguishable to a colour-vision-deficient user: under deuteranopia Total–Household is ΔE 54 and Household–Private 61.5; **the closest pair is Total–Private at ΔE 22**, below the floor of 30 the old palette cleared. Accepted, because the badge glyph and word tell those two scopes apart as well. Teal and indigo deepen one step in dark mode to cut glare; **Private lifts instead** (`#525252`), because a grey as dark as the light-mode one sinks into the `#262626` canvas (1.3:1).
+Total is **teal** — `BrandPrimary`'s hue on the fill side — Household indigo and Private a dark grey (2026-10-02 redesign: Total took Household's old teal, Household took Private's old indigo). The grey is achromatic, which keeps the three banner cards distinguishable to a colour-vision-deficient user: under deuteranopia Total–Household is ΔE 54 and Household–Private 61.5; **the closest pair is Total–Private at ΔE 22**, below the floor of 30 the old palette cleared. Accepted, because the badge glyph and word tell those two scopes apart as well. **In dark mode all three lift rather than deepen** (2026-10-13). Total takes `BrandPrimary`'s dark values, so the scope and the accent are one teal in dark mode too. Household lifts to the indigo that balances white text against ink on `#262626` (~3.9:1 each): it is ink as often as fill ("Added by …", the household screens), and the old `#5252BE` / `#4A4AB5` were 2.4 / 2.1:1 as ink. Private lifts (`#525252`), because a grey as dark as the light-mode one sinks into the `#262626` canvas (1.3:1).
 
-All three carry `TextOnAccent` (white) and **clear AA in every appearance** (light / dark / HC / dark HC): Total 4.8 / 5.8 / 6.0 / 6.0, Household 5.6 / 6.3 / 7.1 / 7.1, Private 11.2 / 7.8 / 13.2 / 9.3. The old mango Total's 2.05:1 exception is gone with it.
+All three carry `TextOnAccent` (white). Against it (light / dark / HC / dark HC): Total 4.8 / 3.5 / 6.0 / 3.4, Household 5.6 / 4.0 / 7.1 / 4.0, Private 11.2 / 7.8 / 13.2 / 9.3. **Total and Household in dark mode are below AA for body text** — one colour cannot pass under white and on `#262626` at once (see Brand accent); both clear the 3:1 large-text floor the balance figure needs. As ink on `#262626` / `BGSurface`: Total 4.4 / 3.8, Household 3.8 / 3.3 (dark HC on `#333333`: Total 3.7, Household 3.2). Under deuteranopia in dark mode, Total–Private rises from ΔE 8 to 21.5 (HC 11 → 26.5); Total–Household 54, Household–Private 62.
 
 ### Elevation tint
 *   **`ShadowTint`** — `#262626` / Dark `#4A4A4A` / HC `#262626` / Dark+HC `#5C5C5C` — the colour every `AppTheme.Elevation` shadow is drawn in

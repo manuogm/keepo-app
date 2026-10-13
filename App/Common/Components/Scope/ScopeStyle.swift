@@ -14,8 +14,8 @@ import SwiftUI
 /// a glance for a colour-vision-deficient user — the same test
 /// `app-architecture.md` §5 applies to the chart palette.
 ///
-/// All three carry `TextOnAccent` (white) and clear AA against it in every
-/// appearance — see `Palette.scopeTotal` for the figures.
+/// All three carry `TextOnAccent` (white) — see `Palette.scopeTotal` for
+/// the contrast figures, including Total's dark-mode compromise.
 extension PublicSchema.AccountScope {
     /// Left to right in the banner's carousel, and the order the page dots
     /// are drawn in. Total leads because it is the default; **Household

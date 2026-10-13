@@ -26,13 +26,12 @@ extension AppTheme {
         /// Teal — **the app's accent**, from the app icon's family and the
         /// same hue `scopeTotal` fills with.
         ///
-        /// **It is not one value, and it cannot be.** Nearly every use of
-        /// it is *ink* at caption sizes (the Needs Review inbox, the offline
-        /// bar, a checked box), and the teal that reads on a light ground
-        /// (`#127268`, 5.3:1 on the canvas) is 2.6:1 on `#262626`. So dark
-        /// mode lifts it to `#3CC4B3` (7.0:1) — the same accent at the two
-        /// lightnesses its two grounds require. `scopeTotal` is the same
-        /// hue on the fill side.
+        /// **Dark mode is a compromise, and has to be.** It is both a fill
+        /// under white text and ink on `#262626`, and no single colour
+        /// passes AA at both (~3.9:1 is the ceiling). `#279A8D` leans to
+        /// ink: 4.4:1 on the canvas, 3.8:1 on `bgSurface`, 3.5:1 under
+        /// white — above the 3:1 large-text / UI floor, below 4.5:1. Dark
+        /// HC (`#359A8E`) hits the same ceiling, so it is no higher.
         ///
         /// The one thing it does not mark is *Pending* — see
         /// `statusPending`.
@@ -152,12 +151,15 @@ extension AppTheme {
         /// Private, ΔE 22 under deuteranopia (Total–Household 54), and the
         /// badge glyph and word tell those two apart as well.
         ///
-        /// All three carry `textOnAccent`, and all three clear AA against
-        /// it in every appearance — light / dark / HC / dark HC: Total
-        /// 4.8 / 5.8 / 6.0 / 6.0, Household 5.6 / 6.3 / 7.1 / 7.1, Private
-        /// 11.2 / 7.8 / 13.2 / 9.3. Private lifts to `#525252` in dark mode
-        /// rather than deepening like the other two: a grey as dark as the
-        /// light one would sink into the `#262626` canvas.
+        /// All three carry `textOnAccent` — light / dark / HC / dark HC:
+        /// Total 4.8 / 3.5 / 6.0 / 3.4, Household 5.6 / 4.0 / 7.1 / 4.0,
+        /// Private 11.2 / 7.8 / 13.2 / 9.3. All three lift in dark mode.
+        /// Total and Household are ink as well as fill, and no single colour
+        /// passes AA both under white and on `#262626`, so their dark values
+        /// are compromises above the 3:1 large-text floor: Total takes
+        /// `brandPrimary`'s, Household balances the two (~3.9:1 each).
+        /// Private lifts to `#525252` because a grey as dark as the light
+        /// one would sink into the `#262626` canvas.
         static let scopeTotal = Color("ScopeTotal")
         static let scopePrivate = Color("ScopePrivate")
         static let scopeHousehold = Color("ScopeHousehold")
