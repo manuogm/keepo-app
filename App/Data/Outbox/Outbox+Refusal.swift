@@ -17,7 +17,8 @@ extension Outbox {
     /// silently absent on the server, with a pending-sync banner as the only
     /// clue.
     func recordRefusal(_ error: Error) {
-        refusal = OutboxRefusal(message: UserFacingError.describe(error))
+        let reason = UserFacingError.describe(error)
+        refusal = OutboxRefusal(reason: reason == UserFacingError.genericMessage ? nil : reason)
         needsFullResync = true
         onRefusal?()
     }

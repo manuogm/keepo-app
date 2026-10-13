@@ -138,8 +138,17 @@ struct UserFacingErrorFinalRefusalTests {
     @Test("A sentence the database raised on purpose is final")
     func raisedSentenceIsFinal() {
         #expect(UserFacingError.isFinalRefusal(
-            PostgrestError(code: "P0001", message: "transaction 1 is a transfer leg — use delete_transfer")
+            PostgrestError(code: "P0001", message: "this category cannot be deleted")
         ))
+    }
+
+    /// "Use update_transaction" is written for whoever called the wrong RPC,
+    /// not for the person holding the phone.
+    @Test("A guard written for a developer is final, and never shown")
+    func developerGuardIsFinalAndHidden() {
+        let error = PostgrestError(code: "22023", message: "transaction 1 is not a capture — use update_transaction")
+        #expect(UserFacingError.isFinalRefusal(error))
+        #expect(UserFacingError.describe(error) == UserFacingError.genericMessage)
     }
 
     @Test("A rate limit is raised as a sentence too, and is not final")

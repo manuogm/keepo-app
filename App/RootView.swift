@@ -99,13 +99,7 @@ struct RootView: View {
         // see now is what the server has.
         .errorAlert(Binding(
             get: {
-                session.outbox.refusal.map {
-                    ActionError(
-                        title: "Couldn't Save a Change",
-                        message: $0.message + "\n\nThe change wasn't saved, and Keepo is showing what the "
-                            + "server has instead."
-                    )
-                }
+                session.outbox.refusal.map { ActionError(title: "Couldn't Save a Change", message: $0.message) }
             },
             set: { if $0 == nil { session.outbox.dismissRefusal() } }
         ))

@@ -303,13 +303,15 @@ select is(
   'a later capture from the same merchant resolves to the re-taught category, not the original one'
 );
 
-select throws_like(
-  $$ select review_capture_transaction(
-    'd2000000-0000-0000-0000-000000000003', 2, 'a2000000-0000-0000-0000-000000000001',
-    'c2000000-0000-0000-0000-000000000002', -52500, 'EUR', now()
-  ) $$,
-  '%not a pending capture%',
-  'review_capture_transaction refuses a row that is already confirmed'
+-- A resend of the review above, exactly as the outbox would make it.
+-- Migration 20261017100000: this used to raise "not a pending capture".
+select is(
+  (select conflict from review_capture_transaction(
+    'd2000000-0000-0000-0000-000000000003', 1, 'a2000000-0000-0000-0000-000000000001',
+    'c2000000-0000-0000-0000-000000000002', -52500, 'EUR', now(), 'Blue Bottle Coffee', 'Reviewed'
+  )),
+  false,
+  'review_capture_transaction answers a resend of a review that already landed with success'
 );
 
 -- Captured here (before section 9/10's capture_transaction cutoff, per the
@@ -415,10 +417,12 @@ select is(
 );
 
 -- 12. A stale expected_version logs a sync_conflicts row instead of confirming.
-select confirm_capture_transaction('d2000000-0000-0000-0000-000000000003', 999);
+-- On a capture still pending (d...07): an already-confirmed one is the
+-- confirm's success, not a conflict (migration 20261017100000).
+select confirm_capture_transaction('d2000000-0000-0000-0000-000000000007', 999);
 
 select is(
-  (select count(*) from sync_conflicts where row_id = 'd2000000-0000-0000-0000-000000000003' and resolved_at is null),
+  (select count(*) from sync_conflicts where row_id = 'd2000000-0000-0000-0000-000000000007' and resolved_at is null),
   1::bigint,
   'confirming with a stale version logs a sync_conflicts row instead of applying'
 );

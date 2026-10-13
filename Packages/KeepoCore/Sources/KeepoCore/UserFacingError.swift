@@ -43,8 +43,13 @@ public enum UserFacingError {
             return edgeFunctionMessage
         }
         logger.error("Suppressed from UI, showing a generic message instead: \(String(describing: error))")
-        return "Something went wrong. Please try again."
+        return genericMessage
     }
+
+    /// What `describe` says when the error carries nothing a person could
+    /// act on. Public so a caller that has better words of its own for that
+    /// case (the outbox's refusal alert) can recognise it.
+    public static let genericMessage = "Something went wrong. Please try again."
 
     /// Whether the work was cancelled rather than failed — a `.task(id:)`
     /// whose id changed while a load was in flight, which SwiftUI cancels by
@@ -169,7 +174,9 @@ extension UserFacingError {
     /// Final: a sentence the database raised on purpose (`P0001`), an
     /// integrity or data error (classes `23` and `22` — a duplicate key on a
     /// *create* never gets here, the senders already treat that as "already
-    /// applied"), and an RLS or grant refusal (`42501`). Everything else is
+    /// applied"; `22023` is also what a guard written for a developer raises,
+    /// "use update_transfer", so it is final without being shown), and an RLS
+    /// or grant refusal (`42501`). Everything else is
     /// assumed transient, including every PostgREST-level `PGRST…` code —
     /// "function not found" is what an app ahead of an un-pushed migration
     /// sees, and that one does fix itself once the migration lands. So does a

@@ -30,6 +30,12 @@ enum CaptureQuickActionHandler {
     /// above `review`/`confirm`/`delete` are reachable from tests — the real
     /// entry point can't be, since `CaptureEnvironment` needs a Supabase
     /// config and a Keychain session.
+    ///
+    /// Every write below waits for its delivery attempt, not just the local
+    /// write. `AppDelegate` calls the notification's completion handler when
+    /// this returns, and iOS may suspend the process right then: a request
+    /// still in flight can land on the server and lose its answer, so the
+    /// outbox queues it and sends it a second time on the next launch.
     static func handle(_ request: Request, outbox: Outbox, dbQueue: DatabaseQueue) async {
         switch request.actionIdentifier {
         case CaptureQuickActions.confirmActionId:
@@ -62,14 +68,16 @@ enum CaptureQuickActionHandler {
 
     private static func confirm(transactionId: UUID, outbox: Outbox, dbQueue: DatabaseQueue) async {
         guard let version = try? await currentVersion(transactionId, dbQueue) else { return }
-        await outbox.submitConfirmCaptureTransaction(
+        _ = await outbox.submitConfirmCaptureTransaction(
             ConfirmCaptureTransactionPayload(id: transactionId, expectedVersion: version)
-        )
+        ).value
     }
 
     private static func delete(transactionId: UUID, outbox: Outbox, dbQueue: DatabaseQueue) async {
         guard let version = try? await currentVersion(transactionId, dbQueue) else { return }
-        await outbox.submitDeleteTransaction(DeleteTransactionPayload(id: transactionId, expectedVersion: version))
+        _ = await outbox.submitDeleteTransaction(
+            DeleteTransactionPayload(id: transactionId, expectedVersion: version)
+        ).value
     }
 
     /// `reviewCaptureTransaction` takes the whole row, not a per-field
@@ -117,7 +125,7 @@ enum CaptureQuickActionHandler {
             // row, and nil would clear a title the user had already typed.
             title: row["title"] as String?
         )
-        await outbox.submitReviewCaptureTransaction(payload)
+        _ = await outbox.submitReviewCaptureTransaction(payload).value
     }
 
     private static func currentVersion(_ transactionId: UUID, _ dbQueue: DatabaseQueue) async throws -> Int? {

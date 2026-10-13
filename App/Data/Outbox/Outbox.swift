@@ -17,7 +17,19 @@ public enum OutboxSubmitResult: Equatable, Sendable {
 
 /// A write the server refused outright — what the app-wide alert says.
 public struct OutboxRefusal: Equatable, Sendable {
-    public let message: String
+    /// The database's own sentence, when it raised one meant for a person
+    /// ("That date is before this account was shared with you…"). `nil` when
+    /// all `UserFacingError` could offer is its generic fallback — which says
+    /// "try again" without saying what, and the user never saw this write fail.
+    public let reason: String?
+
+    public var message: String {
+        guard let reason else {
+            return "One of your recent changes couldn't be saved, so Keepo has put back the last saved version. "
+                + "If you still need it, please make the change again."
+        }
+        return reason + "\n\nYour change wasn't saved, and Keepo has put back the last saved version."
+    }
 }
 
 public enum OutboxCaptureResult: Equatable, Sendable {

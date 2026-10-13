@@ -265,7 +265,7 @@ struct OutboxTests {
     func refusedWriteIsFinal() async throws {
         let sender = StubTransactionSender()
         sender.deleteTransactionResult = .failure(
-            PostgrestError(code: "P0001", message: "transaction 1 is a transfer leg — use delete_transfer")
+            PostgrestError(code: "22023", message: "transaction 1 is a transfer leg — use delete_transfer")
         )
         let outbox = try makeOutbox(sender: sender)
 
